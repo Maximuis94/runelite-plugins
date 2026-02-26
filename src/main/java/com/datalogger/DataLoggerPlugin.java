@@ -31,13 +31,9 @@ import java.awt.image.BufferedImage;
 import javax.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
-import net.runelite.api.GameState;
-import net.runelite.api.Player;
-import net.runelite.api.events.GameStateChanged;
-import net.runelite.api.events.GrandExchangeOfferChanged;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
-import net.runelite.client.eventbus.Subscribe;
+import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.ClientToolbar;
@@ -52,20 +48,16 @@ import net.runelite.client.util.ImageUtil;
 )
 public class DataLoggerPlugin extends Plugin
 {
-	@Inject
-	private ClientThread clientThread;
+	@Inject private ClientThread clientThread;
 
-	@Inject
-	private Client client;
+	@Inject private Client client;
 
-	@Inject
-	private ClientToolbar clientToolbar;
+	@Inject private ClientToolbar clientToolbar;
 
-	@Inject
-	private GrandExchangeLogger geLogger;
+	@Inject private EventBus eventBus;
+	@Inject private GrandExchangeLogger geLogger;
 
-	@Inject
-	private DataLoggerPanel panel;
+	@Inject private DataLoggerPanel panel;
 
 	private NavigationButton navButton;
 
@@ -78,10 +70,9 @@ public class DataLoggerPlugin extends Plugin
 	@Override
 	protected void startUp() throws Exception
 	{
-		// 1. Load your sidebar icon (ensure icon.png is in src/main/resources/com/datalogger/)
-		final BufferedImage icon = ImageUtil.loadImageResource(getClass(), "icon.png");
+		eventBus.register(geLogger);
 
-		// 2. Build the navigation button
+		final BufferedImage icon = ImageUtil.loadImageResource(getClass(), "icon.png");
 		navButton = NavigationButton.builder()
 			.tooltip("Data Logger Viewer")
 			.icon(icon)
@@ -96,34 +87,7 @@ public class DataLoggerPlugin extends Plugin
 	@Override
 	protected void shutDown()
 	{
+		eventBus.unregister(geLogger);
 		clientToolbar.removeNavigation(navButton);
-	}
-
-	@Subscribe
-	public void onGameStateChanged(GameStateChanged gameStateChanged)
-	{
-		GameState state = gameStateChanged.getGameState();
-
-		if (state == GameState.LOGGED_IN)
-		{
-			clientThread.invokeLater(() -> {
-				Player local = client.getLocalPlayer();
-				if (local != null && local.getName() != null)
-				{
-					geLogger.setAccountName(local.getName());
-					geLogger.initialScan();
-				}
-			});
-		}
-		else if (state == GameState.LOGIN_SCREEN || state == GameState.HOPPING)
-		{
-			geLogger.setAccountName("unknown");
-		}
-	}
-
-	@Subscribe
-	public void onGrandExchangeOfferChanged(GrandExchangeOfferChanged event)
-	{
-		geLogger.handleOffer(event.getSlot(), event.getOffer());
 	}
 }

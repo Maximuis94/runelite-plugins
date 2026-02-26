@@ -32,12 +32,17 @@ import javax.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.Player;
+import net.runelite.api.GameState;
+import net.runelite.api.events.GameStateChanged;
+import net.runelite.client.callback.ClientThread;
+import net.runelite.client.eventbus.Subscribe;
 
 @Slf4j
 public abstract class AbstractLogger implements Loggable {
 	@Inject protected Client client;
 	@Inject protected FileIOService utils;
 	@Inject protected DataLoggerConfig config;
+	@Inject protected ClientThread clientThread;
 
 	private String accountNameCache;
 
@@ -63,8 +68,11 @@ public abstract class AbstractLogger implements Loggable {
 	 * It automatically resolves the target file based on the logger type.
 	 */
 	protected void logRow(String csvRow) {
+		if (!isEnabled()) {
+			return;
+		}
+
 		String currentAccount = getAccountName();
-		// Uses the utility to determine the file path: root/type/account/date.csv
 		File logFile = utils.getTargetFile(getLogType(), currentAccount);
 
 		try {
@@ -82,6 +90,25 @@ public abstract class AbstractLogger implements Loggable {
 			return String.valueOf(client.getClass().getMethod("getAccountHash").invoke(client));
 		} catch (Exception e) {
 			return getAccountName().toLowerCase().replace(" ", "_");
+		}
+	}
+
+	@Subscribe
+	public void onGameStateChanged(GameStateChanged gameStateChanged) {
+		GameState state = gameStateChanged.getGameState();
+		if (state == GameState.LOGGED_IN) {
+			clientThread.invokeLater(() -> {
+				Player local = client.getLocalPlayer();
+				if (local != null && local.getName() != null) {
+					setAccountName(local.getName());
+
+					if (isEnabled()) {
+						setup();
+					}
+				}
+			});
+		} else if (state == GameState.LOGIN_SCREEN || state == GameState.HOPPING) {
+			setAccountName("unknown");
 		}
 	}
 }

@@ -26,24 +26,26 @@ package com.datalogger.ui;
 
 import com.datalogger.framework.LogType;
 import com.datalogger.services.FileIOService;
+import com.google.inject.Injector;
 import java.awt.BorderLayout;
-import java.awt.Color;
 import java.awt.GridLayout;
 import javax.inject.Inject;
 import javax.swing.JComboBox;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
-import javax.swing.border.EmptyBorder;
 import javax.swing.border.CompoundBorder;
+import javax.swing.border.EmptyBorder;
 import javax.swing.border.MatteBorder;
+import net.runelite.api.Client;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.PluginPanel;
-import net.runelite.client.ui.components.PluginErrorPanel;
 
 public class DataLoggerPanel extends PluginPanel {
 	private final FileIOService fileService;
 	private final JComboBox<LogType> logTypeSelector = new JComboBox<>(LogType.values());
 	private final JPanel logContentDisplay = new JPanel();
+	@Inject private Injector injector; // Needed to spawn sub-panels
+	@Inject private Client client;
 
 	@Inject
 	public DataLoggerPanel(FileIOService fileService) {
@@ -97,15 +99,18 @@ public class DataLoggerPanel extends PluginPanel {
 		logContentDisplay.removeAll();
 
 		LogType selected = (LogType) logTypeSelector.getSelectedItem();
-		if (selected == null) return;
+		// Skip if nothing is selected or if the panel class is null (like if it's unfinished)
+		if (selected == null || selected.getPanelClass() == null) return;
 
-		// The ErrorPanel is a standard way to show placeholders in RuneLite
-		PluginErrorPanel errorPanel = new PluginErrorPanel();
-		errorPanel.setBorder(new EmptyBorder(50, 20, 20, 20));
-		errorPanel.setContent("Viewing " + selected.getDirectoryName(),
-			"Data for this category will appear here.");
+		// 1. Dynamically create the specific panel for this LogType
+		LogTypePanel specificPanel = injector.getInstance(selected.getPanelClass());
 
-		logContentDisplay.add(errorPanel, BorderLayout.NORTH);
+		// 2. Refresh it with data
+		String account = client.getLocalPlayer() != null ? client.getLocalPlayer().getName() : "unknown";
+		specificPanel.refresh(account);
+
+		// 3. Add it to the display
+		logContentDisplay.add(specificPanel, BorderLayout.CENTER);
 
 		logContentDisplay.revalidate();
 		logContentDisplay.repaint();

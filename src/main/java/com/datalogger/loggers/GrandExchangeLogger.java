@@ -39,6 +39,8 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.GrandExchangeOffer;
 import net.runelite.api.GrandExchangeOfferState;
+import net.runelite.api.events.GrandExchangeOfferChanged;
+import net.runelite.client.eventbus.Subscribe;
 
 @Slf4j
 @Singleton
@@ -60,7 +62,15 @@ public class GrandExchangeLogger extends AbstractLogger
 	public boolean isEnabled() { return config.logGrandExchange(); }
 
 	@Override
-	public void setup() {super.setup();}
+	public void setup()
+	{
+		initialScan();
+	}
+
+	@Subscribe
+	public void onGrandExchangeOfferChanged(GrandExchangeOfferChanged event) {
+		handleOffer(event.getSlot(), event.getOffer());
+	}
 
 	private GrandExchangeOfferData assembleData(int slot, GrandExchangeOffer offer, String createdTs) {
 		int quantity = offer.getQuantitySold();
@@ -87,7 +97,7 @@ public class GrandExchangeLogger extends AbstractLogger
 	 * @param offer The offer that is to be processed
 	 */
 	public void handleOffer(int slot, GrandExchangeOffer offer) {
-		if (!config.logGrandExchange()) {
+		if (!isEnabled()) {
 			return;
 		}
 
