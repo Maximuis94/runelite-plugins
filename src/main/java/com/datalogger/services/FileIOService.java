@@ -22,13 +22,19 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package com.datalogger;
+package com.datalogger.services;
 
+import com.datalogger.DataLoggerConfig;
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.FileReader;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Properties;
+import java.util.function.Function;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import lombok.extern.slf4j.Slf4j;
@@ -36,16 +42,45 @@ import net.runelite.client.RuneLite;
 
 @Slf4j
 @Singleton
-public class DataLoggerUtils {
+public class FileIOService
+{
 	private final DataLoggerConfig config;
 
 	@Inject
-	private DataLoggerUtils(DataLoggerConfig config) {
+	private FileIOService(DataLoggerConfig config) {
 		this.config = config;
 	}
 
 	public final File PLUGIN_ROOT = new File(RuneLite.RUNELITE_DIR, "data-logger");
 	private final File STATE_DIR = new File(PLUGIN_ROOT, "state");
+
+	/**
+	 * Parse registered logs of the file and return them
+	 * @param file The log file
+	 * @param parser The parser method used to parse the CSV rows
+	 * @return A List of DataRow instances
+	 * @param <T> DataRow class that represents one logged row
+	 */
+	public <T> List<T> loadLogs(File file, Function<String, T> parser) {
+		List<T> data = new ArrayList<>();
+		if (!file.exists()) return data;
+
+		try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
+			String line;
+			boolean isHeader = true;
+			while ((line = reader.readLine()) != null) {
+				if (isHeader) { // Skip the CSV_HEADER
+					isHeader = false;
+					continue;
+				}
+				T obj = parser.apply(line);
+				if (obj != null) data.add(obj);
+			}
+		} catch (IOException e) {
+			log.error("Failed to read log file: {}", file.getName(), e);
+		}
+		return data;
+	}
 
 	/**
 	 * Performs an atomic append to a file.
