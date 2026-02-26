@@ -24,19 +24,21 @@
  */
 package com.datalogger;
 
+import com.datalogger.loggers.GrandExchangeLogger;
+import com.datalogger.ui.DataLoggerPanel;
 import com.google.inject.Provides;
+import java.awt.image.BufferedImage;
 import javax.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
-import net.runelite.api.GameState;
-import net.runelite.api.Player;
-import net.runelite.api.events.GameStateChanged;
-import net.runelite.api.events.GrandExchangeOfferChanged;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
-import net.runelite.client.eventbus.Subscribe;
+import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
+import net.runelite.client.ui.ClientToolbar;
+import net.runelite.client.ui.NavigationButton;
+import net.runelite.client.util.ImageUtil;
 
 @Slf4j
 @PluginDescriptor(
@@ -46,14 +48,18 @@ import net.runelite.client.plugins.PluginDescriptor;
 )
 public class DataLoggerPlugin extends Plugin
 {
-	@Inject
-	private ClientThread clientThread;
+	@Inject private ClientThread clientThread;
 
-	@Inject
-	private Client client;
+	@Inject private Client client;
 
-	@Inject
-	private GrandExchangeLogger geLogger;
+	@Inject private ClientToolbar clientToolbar;
+
+	@Inject private EventBus eventBus;
+	@Inject private GrandExchangeLogger geLogger;
+
+	@Inject private DataLoggerPanel panel;
+
+	private NavigationButton navButton;
 
 	@Provides
 	DataLoggerConfig provideConfig(ConfigManager configManager)
@@ -62,42 +68,26 @@ public class DataLoggerPlugin extends Plugin
 	}
 
 	@Override
-	protected void startUp()
+	protected void startUp() throws Exception
 	{
-		log.info("Data Logger started!");
+		eventBus.register(geLogger);
+
+		final BufferedImage icon = ImageUtil.loadImageResource(getClass(), "icon.png");
+		navButton = NavigationButton.builder()
+			.tooltip("Data Logger Viewer")
+			.icon(icon)
+			.priority(5) // Adjust priority to move it up or down in the sidebar
+			.panel(panel)
+			.build();
+
+		// 3. Add it to the sidebar
+		clientToolbar.addNavigation(navButton);
 	}
 
 	@Override
 	protected void shutDown()
 	{
-		log.info("Data Logger stopped!");
-	}
-
-	@Subscribe
-	public void onGameStateChanged(GameStateChanged gameStateChanged)
-	{
-		GameState state = gameStateChanged.getGameState();
-
-		if (state == GameState.LOGGED_IN)
-		{
-			clientThread.invokeLater(() -> {
-				Player local = client.getLocalPlayer();
-				if (local != null && local.getName() != null)
-				{
-					geLogger.setAccountName(local.getName());
-					geLogger.initialScan();
-				}
-			});
-		}
-		else if (state == GameState.LOGIN_SCREEN || state == GameState.HOPPING)
-		{
-			geLogger.setAccountName("unknown");
-		}
-	}
-
-	@Subscribe
-	public void onGrandExchangeOfferChanged(GrandExchangeOfferChanged event)
-	{
-		geLogger.handleOffer(event.getSlot(), event.getOffer());
+		eventBus.unregister(geLogger);
+		clientToolbar.removeNavigation(navButton);
 	}
 }

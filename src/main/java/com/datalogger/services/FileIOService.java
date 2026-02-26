@@ -22,13 +22,21 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package com.datalogger;
+package com.datalogger.services;
 
+import com.datalogger.DataLoggerConfig;
+import com.datalogger.framework.DataRow;
+import com.datalogger.framework.LogType;
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.FileReader;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Properties;
+import java.util.function.Function;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import lombok.extern.slf4j.Slf4j;
@@ -36,16 +44,46 @@ import net.runelite.client.RuneLite;
 
 @Slf4j
 @Singleton
-public class DataLoggerUtils {
+public class FileIOService
+{
 	private final DataLoggerConfig config;
 
 	@Inject
-	private DataLoggerUtils(DataLoggerConfig config) {
+	private FileIOService(DataLoggerConfig config) {
 		this.config = config;
 	}
 
 	public final File PLUGIN_ROOT = new File(RuneLite.RUNELITE_DIR, "data-logger");
 	private final File STATE_DIR = new File(PLUGIN_ROOT, "state");
+
+	/**
+	 * Parse the rows associated with the given LogType and account
+	 * @param type The log that is to be parsed
+	 * @param account The account of which the entries are to be parsed
+	 * @return A List of DataRow instances parsed from the associated log file
+	 * @param <T> The DataRow class associated with LogType
+	 */
+	public <T extends DataRow> List<T> loadLogs(LogType type, String account) {
+		File file = getTargetFile(type, account);
+		List<T> data = new ArrayList<>();
+
+		if (!file.exists()) return data;
+
+		// The enum now provides the parser!
+		Function<String, T> parser = (Function<String, T>) type.getParser();
+
+		try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
+			reader.readLine(); // Skip header
+			String line;
+			while ((line = reader.readLine()) != null) {
+				T obj = parser.apply(line);
+				if (obj != null) data.add(obj);
+			}
+		} catch (IOException e) {
+			log.error("Failed to read logs for {}", type, e);
+		}
+		return data;
+	}
 
 	/**
 	 * Performs an atomic append to a file.
@@ -78,21 +116,18 @@ public class DataLoggerUtils {
 
 	/**
 	 * Returns a File reference based on the input provided and the plugin configurations
-	 * @param dataType The data that is to be logged
+	 * @param type The data that is to be logged
 	 * @param account The account that the data relates to
 	 * @return File reference based on inputs provided and strategy selected
 	 */
-	public File getTargetFile(String dataType, String account) {
-		if (config == null) {
-			log.error("Config is NULL in DataLoggerUtils!");
-			return PLUGIN_ROOT;
-		}
-		String safeAccount = account.toLowerCase();
+	public File getTargetFile(LogType type, String account) {
 		String date = java.time.LocalDate.now().toString();
+		File accountDir = new File(type.getLogDirectory(), account.toLowerCase());
 
-		File path = new File(new File(PLUGIN_ROOT, dataType), safeAccount);
-		String fileName = String.format("%s_%s_%s.csv", dataType, safeAccount, date);
-		return new File(path, fileName);
+		// Ensure the directory exists
+		if (!accountDir.exists()) accountDir.mkdirs();
+
+		return new File(accountDir, type.getDirectoryName() + "_" + date + ".csv");
 	}
 
 	/**

@@ -22,8 +22,13 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package com.datalogger;
+package com.datalogger.loggers;
 
+import com.datalogger.DataLoggerConfig;
+import com.datalogger.framework.LogType;
+import com.datalogger.services.FileIOService;
+import com.datalogger.framework.AbstractLogger;
+import com.datalogger.models.GrandExchangeOfferData;
 import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
@@ -34,42 +39,56 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.GrandExchangeOffer;
 import net.runelite.api.GrandExchangeOfferState;
-import net.runelite.api.Player;
+import net.runelite.api.events.GrandExchangeOfferChanged;
+import net.runelite.client.eventbus.Subscribe;
 
 @Slf4j
 @Singleton
-public class GrandExchangeLogger {
+public class GrandExchangeLogger extends AbstractLogger
+{
 	@Inject private DataLoggerConfig config;
 	@Inject private Client client;
-	@Inject private DataLoggerUtils utils;
+	@Inject private FileIOService utils;
 
 	private static final String CSV_HEADER = "item_id,timestamp,timestamp_created,is_buy,quantity,offer_quantity,price,offer_price,value,account,ge_slot";
-	private static final String LOG_TYPE = "grand-exchange";
 
-	private String accountNameCache;
+	@Override
+	public LogType getLogType() { return LogType.GRAND_EXCHANGE; }
 
-	private String getAccountName() {
-		if (accountNameCache != null && !accountNameCache.equals("unknown")) {
-			return accountNameCache;
-		}
-		Player player = client.getLocalPlayer();
-		accountNameCache = (player != null && player.getName() != null) ? player.getName() : "unknown";
-		return accountNameCache;
+	@Override
+	public String getCsvHeader() {return "item_id,timestamp,timestamp_created,is_buy,quantity,offer_quantity,price,offer_price,value,account,ge_slot";}
+
+	@Override
+	public boolean isEnabled() { return config.logGrandExchange(); }
+
+	@Override
+	public void setup()
+	{
+		initialScan();
 	}
 
-	public void setAccountName(String name) {
-		this.accountNameCache = name;
+	@Subscribe
+	public void onGrandExchangeOfferChanged(GrandExchangeOfferChanged event) {
+		handleOffer(event.getSlot(), event.getOffer());
 	}
 
-	/**
-	 * A numerical hash string associated with the OSRS account. Uses account name as fallback.
-	 */
-	private String getAccountHashString() {
-		try {
-			return String.valueOf(client.getClass().getMethod("getAccountHash").invoke(client));
-		} catch (Exception e) {
-			return getAccountName().toLowerCase().replace(" ", "_");
-		}
+	private GrandExchangeOfferData assembleData(int slot, GrandExchangeOffer offer, String createdTs) {
+		int quantity = offer.getQuantitySold();
+		long averagePrice = (quantity > 0) ? (offer.getSpent() / quantity) : offer.getPrice();
+
+		return new GrandExchangeOfferData(
+			offer.getItemId(),
+			Instant.now().toString(),
+			createdTs,
+			isBuy(offer.getState()),
+			quantity,
+			offer.getTotalQuantity(),
+			averagePrice,
+			offer.getPrice(),
+			offer.getSpent(),
+			getAccountName(),
+			slot
+		);
 	}
 
 	/**
@@ -78,7 +97,7 @@ public class GrandExchangeLogger {
 	 * @param offer The offer that is to be processed
 	 */
 	public void handleOffer(int slot, GrandExchangeOffer offer) {
-		if (!config.logGrandExchange()) {
+		if (!isEnabled()) {
 			return;
 		}
 
@@ -172,7 +191,7 @@ public class GrandExchangeLogger {
 	 */
 	private void logFinalTrade(int slot, GrandExchangeOffer offer, String createdTs) {
 		String currentAccount = getAccountName();
-		File logFile = utils.getTargetFile(LOG_TYPE, currentAccount);
+		File logFile = utils.getTargetFile(getLogType(), currentAccount);
 		String row = formatCsvRow(slot, offer, createdTs, currentAccount);
 
 		try {
