@@ -25,7 +25,9 @@
 package com.datalogger;
 
 import com.datalogger.loggers.GrandExchangeLogger;
+import com.datalogger.ui.DataLoggerPanel;
 import com.google.inject.Provides;
+import java.awt.image.BufferedImage;
 import javax.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
@@ -38,6 +40,9 @@ import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
+import net.runelite.client.ui.ClientToolbar;
+import net.runelite.client.ui.NavigationButton;
+import net.runelite.client.util.ImageUtil;
 
 @Slf4j
 @PluginDescriptor(
@@ -54,7 +59,15 @@ public class DataLoggerPlugin extends Plugin
 	private Client client;
 
 	@Inject
+	private ClientToolbar clientToolbar;
+
+	@Inject
 	private GrandExchangeLogger geLogger;
+
+	@Inject
+	private DataLoggerPanel panel;
+
+	private NavigationButton navButton;
 
 	@Provides
 	DataLoggerConfig provideConfig(ConfigManager configManager)
@@ -63,15 +76,27 @@ public class DataLoggerPlugin extends Plugin
 	}
 
 	@Override
-	protected void startUp()
+	protected void startUp() throws Exception
 	{
-		log.info("Data Logger started!");
+		// 1. Load your sidebar icon (ensure icon.png is in src/main/resources/com/datalogger/)
+		final BufferedImage icon = ImageUtil.loadImageResource(getClass(), "icon.png");
+
+		// 2. Build the navigation button
+		navButton = NavigationButton.builder()
+			.tooltip("Data Logger Viewer")
+			.icon(icon)
+			.priority(5) // Adjust priority to move it up or down in the sidebar
+			.panel(panel)
+			.build();
+
+		// 3. Add it to the sidebar
+		clientToolbar.addNavigation(navButton);
 	}
 
 	@Override
 	protected void shutDown()
 	{
-		log.info("Data Logger stopped!");
+		clientToolbar.removeNavigation(navButton);
 	}
 
 	@Subscribe

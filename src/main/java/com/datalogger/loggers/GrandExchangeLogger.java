@@ -25,6 +25,7 @@
 package com.datalogger.loggers;
 
 import com.datalogger.DataLoggerConfig;
+import com.datalogger.framework.LogType;
 import com.datalogger.services.FileIOService;
 import com.datalogger.framework.AbstractLogger;
 import com.datalogger.models.GrandExchangeOfferData;
@@ -48,25 +49,18 @@ public class GrandExchangeLogger extends AbstractLogger
 	@Inject private FileIOService utils;
 
 	private static final String CSV_HEADER = "item_id,timestamp,timestamp_created,is_buy,quantity,offer_quantity,price,offer_price,value,account,ge_slot";
-	private static final String LOG_TYPE = "grand-exchange";
-
-	private String accountNameCache;
-	@Override
-	public String getLogType() { return "grand-exchange"; }
 
 	@Override
-	public String getCsvHeader() {
-		return "item_id,timestamp,timestamp_created,is_buy,quantity,offer_quantity,price,offer_price,value,account,ge_slot";
-	}
+	public LogType getLogType() { return LogType.GRAND_EXCHANGE; }
+
+	@Override
+	public String getCsvHeader() {return "item_id,timestamp,timestamp_created,is_buy,quantity,offer_quantity,price,offer_price,value,account,ge_slot";}
 
 	@Override
 	public boolean isEnabled() { return config.logGrandExchange(); }
 
 	@Override
-	public void setup()
-	{
-		super.setup();
-	}
+	public void setup() {super.setup();}
 
 	private GrandExchangeOfferData assembleData(int slot, GrandExchangeOffer offer, String createdTs) {
 		int quantity = offer.getQuantitySold();
@@ -187,7 +181,7 @@ public class GrandExchangeLogger extends AbstractLogger
 	 */
 	private void logFinalTrade(int slot, GrandExchangeOffer offer, String createdTs) {
 		String currentAccount = getAccountName();
-		File logFile = utils.getTargetFile(LOG_TYPE, currentAccount);
+		File logFile = utils.getTargetFile(getLogType(), currentAccount);
 		String row = formatCsvRow(slot, offer, createdTs, currentAccount);
 
 		try {
