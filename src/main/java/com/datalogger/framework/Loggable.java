@@ -47,7 +47,6 @@ public interface Loggable {
 
 	/**
 	 * Optional: Initialization logic run when the player logs in or the plugin starts.
-	 * Useful for scanners like initialScan() in your GE logger.
 	 */
 	default void setup() {}
 }

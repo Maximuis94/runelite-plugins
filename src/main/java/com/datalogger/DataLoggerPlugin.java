@@ -44,7 +44,7 @@ import net.runelite.client.util.ImageUtil;
 @PluginDescriptor(
 	name = "Data Logger",
 	description = "Logs various types of game data",
-	tags = {"ge", "grand exchange", "logger", "data", "colosseum"}
+	tags = {"ge", "grand exchange", "logger", "data"}
 )
 public class DataLoggerPlugin extends Plugin
 {
@@ -56,9 +56,7 @@ public class DataLoggerPlugin extends Plugin
 
 	@Inject private EventBus eventBus;
 
-	// Inject your separate logger classes
 	@Inject private GrandExchangeLogger geLogger;
-//	@Inject private ColosseumAttemptLogger colosseumLogger;
 
 	@Inject private DataLoggerPanel panel;
 
@@ -73,11 +71,8 @@ public class DataLoggerPlugin extends Plugin
 	@Override
 	protected void startUp() throws Exception
 	{
-		// Register your separate classes to the EventBus so their @Subscribe methods fire
 		eventBus.register(geLogger);
-//		eventBus.register(colosseumLogger);
 
-		// Note: Make sure "icon.png" actually exists in your resources folder!
 		final BufferedImage icon = ImageUtil.loadImageResource(getClass(), "icon.png");
 		navButton = NavigationButton.builder()
 			.tooltip("Data Logger Viewer")
@@ -85,17 +80,13 @@ public class DataLoggerPlugin extends Plugin
 			.priority(5)
 			.panel(panel)
 			.build();
-
-		// Add it to the sidebar
 		clientToolbar.addNavigation(navButton);
 	}
 
 	@Override
 	protected void shutDown()
 	{
-		// Always unregister your external classes to prevent memory leaks!
 		eventBus.unregister(geLogger);
-//		eventBus.unregister(colosseumLogger);
 
 		clientToolbar.removeNavigation(navButton);
 	}

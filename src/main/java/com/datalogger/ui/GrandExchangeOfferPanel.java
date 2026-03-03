@@ -51,11 +51,9 @@ public class GrandExchangeOfferPanel extends LogTypePanel {
 		setLayout(new BorderLayout());
 		setBackground(ColorScheme.DARK_GRAY_COLOR);
 
-		// List container setup
 		listContainer.setLayout(new BoxLayout(listContainer, BoxLayout.Y_AXIS));
 		listContainer.setBackground(ColorScheme.DARK_GRAY_COLOR);
 
-		// ScrollPane with the "Flat" look you requested
 		scrollPane = new JScrollPane(listContainer);
 		scrollPane.setBackground(ColorScheme.DARK_GRAY_COLOR);
 		scrollPane.setBorder(null);
@@ -68,9 +66,7 @@ public class GrandExchangeOfferPanel extends LogTypePanel {
 	public void refresh(String accountName) {
 		listContainer.removeAll();
 
-		// Use the generic loadLogs from our service
 		List<GrandExchangeOfferData> logs = fileService.loadLogs(type, accountName);
-
 		if (logs.isEmpty()) {
 			renderEmptyState();
 		} else {
@@ -95,13 +91,11 @@ public class GrandExchangeOfferPanel extends LogTypePanel {
 		entry.setBorder(new EmptyBorder(5, 5, 5, 5));
 		entry.setPreferredSize(new java.awt.Dimension(0, 40));
 
-		// Placeholder for a more complex row (Item ID + Quantity)
 		JLabel text = new JLabel(String.format("Item %d x %d", data.getItemId(), data.getQuantity()));
 		text.setForeground(data.getQuantity() > 0 ? ColorScheme.PROGRESS_COMPLETE_COLOR : ColorScheme.PROGRESS_ERROR_COLOR);
 
 		entry.add(text, BorderLayout.CENTER);
 
-		// Add a small spacer between rows
 		JPanel marginWrapper = new JPanel(new BorderLayout());
 		marginWrapper.setBackground(ColorScheme.DARK_GRAY_COLOR);
 		marginWrapper.setBorder(new EmptyBorder(2, 0, 2, 0));
