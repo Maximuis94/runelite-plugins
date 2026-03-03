@@ -44,14 +44,14 @@ public class DataLoggerPanel extends PluginPanel {
 	private final FileIOService fileService;
 	private final JComboBox<LogType> logTypeSelector = new JComboBox<>(LogType.values());
 	private final JPanel logContentDisplay = new JPanel();
-	@Inject private Injector injector; // Needed to spawn sub-panels
+
+	@Inject private Injector injector;
 	@Inject private Client client;
 
 	@Inject
 	public DataLoggerPanel(FileIOService fileService) {
 		this.fileService = fileService;
 
-		// Matches the standard RuneLite sidebar padding
 		this.setBorder(new EmptyBorder(0, 0, 10, 0));
 		this.setBackground(ColorScheme.DARKER_GRAY_COLOR);
 		this.getScrollPane().setBorder(new EmptyBorder(10, 10, 10, 10));
@@ -60,17 +60,14 @@ public class DataLoggerPanel extends PluginPanel {
 		// --- TOP NAVIGATION SECTION ---
 		JPanel navContainer = new JPanel();
 		navContainer.setLayout(new GridLayout(2, 1, 2, 7));
-		// Subtle bottom border to separate the selector from content
 		navContainer.setBorder(new CompoundBorder(
 			new MatteBorder(0, 0, 1, 0, ColorScheme.DARKER_GRAY_COLOR),
 			new EmptyBorder(0, 4, 1, 4)
 		));
 		navContainer.setBackground(ColorScheme.DARK_GRAY_COLOR);
 
-
-
 		JLabel label = new JLabel("Select Log Type");
-		label.setForeground(ColorScheme.BRAND_ORANGE); // Branding orange from your image
+		label.setForeground(ColorScheme.BRAND_ORANGE);
 		label.setFont(net.runelite.client.ui.FontManager.getRunescapeBoldFont());
 		navContainer.add(label, BorderLayout.WEST);
 
@@ -95,23 +92,43 @@ public class DataLoggerPanel extends PluginPanel {
 		updateView();
 	}
 
+	/**
+	 * Safely and explicitly routes the selected LogType to its corresponding Panel class
+	 * without relying on dynamic class loading or reflection.
+	 */
+	private LogTypePanel getPanelForType(LogType type) {
+		if (type == null) return null;
+
+		switch (type) {
+			case GRAND_EXCHANGE:
+				return injector.getInstance(GrandExchangeOfferPanel.class);
+
+//			case COLOSSEUM:
+//				return injector.getInstance(ColosseumPanel.class);
+
+
+			default:
+				return null;
+		}
+	}
+
 	private void updateView() {
 		logContentDisplay.removeAll();
 
 		LogType selected = (LogType) logTypeSelector.getSelectedItem();
-		// Skip if nothing is selected or if the panel class is null (like if it's unfinished)
-		if (selected == null || selected.getPanelClass() == null) return;
 
-		// 1. Dynamically create the specific panel for this LogType
-		LogTypePanel specificPanel = injector.getInstance(selected.getPanelClass());
+		LogTypePanel specificPanel = getPanelForType(selected);
 
-		// 2. Refresh it with data
+		if (specificPanel == null) {
+			logContentDisplay.revalidate();
+			logContentDisplay.repaint();
+			return;
+		}
+
 		String account = client.getLocalPlayer() != null ? client.getLocalPlayer().getName() : "unknown";
 		specificPanel.refresh(account);
 
-		// 3. Add it to the display
 		logContentDisplay.add(specificPanel, BorderLayout.CENTER);
-
 		logContentDisplay.revalidate();
 		logContentDisplay.repaint();
 	}
