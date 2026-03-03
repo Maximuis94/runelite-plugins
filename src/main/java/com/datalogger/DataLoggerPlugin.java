@@ -25,9 +25,7 @@
 package com.datalogger;
 
 import com.datalogger.loggers.GrandExchangeLogger;
-import com.datalogger.ui.DataLoggerPanel;
 import com.google.inject.Provides;
-import java.awt.image.BufferedImage;
 import javax.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
@@ -36,9 +34,7 @@ import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
-import net.runelite.client.ui.ClientToolbar;
 import net.runelite.client.ui.NavigationButton;
-import net.runelite.client.util.ImageUtil;
 
 @Slf4j
 @PluginDescriptor(
@@ -52,13 +48,9 @@ public class DataLoggerPlugin extends Plugin
 
 	@Inject private Client client;
 
-	@Inject private ClientToolbar clientToolbar;
-
 	@Inject private EventBus eventBus;
 
 	@Inject private GrandExchangeLogger geLogger;
-
-	@Inject private DataLoggerPanel panel;
 
 	private NavigationButton navButton;
 
@@ -72,22 +64,11 @@ public class DataLoggerPlugin extends Plugin
 	protected void startUp() throws Exception
 	{
 		eventBus.register(geLogger);
-
-		final BufferedImage icon = ImageUtil.loadImageResource(getClass(), "icon.png");
-		navButton = NavigationButton.builder()
-			.tooltip("Data Logger Viewer")
-			.icon(icon)
-			.priority(5)
-			.panel(panel)
-			.build();
-		clientToolbar.addNavigation(navButton);
 	}
 
 	@Override
 	protected void shutDown()
 	{
 		eventBus.unregister(geLogger);
-
-		clientToolbar.removeNavigation(navButton);
 	}
 }
