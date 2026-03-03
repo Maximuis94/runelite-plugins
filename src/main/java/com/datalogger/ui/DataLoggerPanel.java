@@ -36,12 +36,13 @@ import javax.swing.JPanel;
 import javax.swing.border.CompoundBorder;
 import javax.swing.border.EmptyBorder;
 import javax.swing.border.MatteBorder;
+import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.PluginPanel;
 
+@Slf4j
 public class DataLoggerPanel extends PluginPanel {
-	private final FileIOService fileService;
 	private final JComboBox<LogType> logTypeSelector = new JComboBox<>(LogType.values());
 	private final JPanel logContentDisplay = new JPanel();
 	@Inject private Injector injector; // Needed to spawn sub-panels
@@ -49,7 +50,6 @@ public class DataLoggerPanel extends PluginPanel {
 
 	@Inject
 	public DataLoggerPanel(FileIOService fileService) {
-		this.fileService = fileService;
 
 		// Matches the standard RuneLite sidebar padding
 		this.setBorder(new EmptyBorder(0, 0, 10, 0));

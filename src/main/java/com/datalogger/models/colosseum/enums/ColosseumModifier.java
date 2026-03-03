@@ -22,52 +22,55 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package com.datalogger.framework;
 
-import com.datalogger.models.GrandExchangeOfferData;
-import com.datalogger.models.colosseum.ColosseumWave;
-import com.datalogger.ui.LogTypePanel;
-import java.io.File;
-import java.util.function.Function;
-import lombok.Getter;
-import lombok.RequiredArgsConstructor;
-import net.runelite.client.RuneLite;
+package com.datalogger.models.colosseum.enums;
 
-@Getter
-@RequiredArgsConstructor
-public enum LogType
-{
-	GRAND_EXCHANGE(
-		"Grand Exchange",
-		GrandExchangeOfferData.class,
-		GrandExchangeOfferData::fromCsv,
-		null),
-	COLOSSEUM(
-		"Colosseum",
-		ColosseumWave.class,
-		ColosseumWave::fromCsv,
-		null);
+public enum ColosseumModifier {
+	BEES_I,
+	BEES_II,
+	BEES_III,
 
-	private final String name;
-	private final String directoryName;
-	private final Class<? extends DataRow> dataClass;
-	private final Class<? extends LogTypePanel> panelClass;
-	private final Function<String, ? extends DataRow> parser;
-	private final File logDirectory;
+	BLASPHEMY_I,
+	BLASPHEMY_II,
+	BLASPHEMY_III,
 
-	LogType(String logTypeName, Class<? extends DataRow> dataClass, Function<String, ? extends DataRow> parser, Class<? extends LogTypePanel> panelClass) {
-		this.name = logTypeName;
-		this.dataClass = dataClass;
-		this.panelClass = panelClass;
-		this.parser = parser;
+	DOOM_I,
+	DOOM_II,
+	DOOM_III,
 
-		this.directoryName = logTypeName.toLowerCase().replace(" ", "-");
+	DYNAMIC_DUO,
 
-		File baseDir = new File(RuneLite.RUNELITE_DIR, "data-logger");
-		this.logDirectory = new File(baseDir, directoryName);
-	}
+	FRAILTY_I,
+	FRAILTY_II,
+	FRAILTY_III,
 
-	@Override
-	public String toString() { return name; }
+	MANTIMAYHEM_I,
+	MANTIMAYHEM_II,
+	MANTIMAYHEM_III,
 
+	MYOPIA_I,
+	MYOPIA_II,
+	MYOPIA_III,
+
+	QUARTET,
+
+	RED_FLAG,
+
+	REENTRY_I,
+	REENTRY_II,
+	REENTRY_III,
+
+	RELENTLESS_I,
+	RELENTLESS_II,
+	RELENTLESS_III,
+
+	SOLARFLARE_I,
+	SOLARFLARE_II,
+	SOLARFLARE_III,
+
+	TOTEMIC,
+
+	VOLATILITY_I,
+	VOLATILITY_II,
+	VOLATILITY_III
 }

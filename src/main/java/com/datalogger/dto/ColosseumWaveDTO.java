@@ -22,52 +22,36 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package com.datalogger.framework;
 
-import com.datalogger.models.GrandExchangeOfferData;
-import com.datalogger.models.colosseum.ColosseumWave;
-import com.datalogger.ui.LogTypePanel;
-import java.io.File;
-import java.util.function.Function;
-import lombok.Getter;
-import lombok.RequiredArgsConstructor;
-import net.runelite.client.RuneLite;
+package com.datalogger.dto;
 
-@Getter
-@RequiredArgsConstructor
-public enum LogType
-{
-	GRAND_EXCHANGE(
-		"Grand Exchange",
-		GrandExchangeOfferData.class,
-		GrandExchangeOfferData::fromCsv,
-		null),
-	COLOSSEUM(
-		"Colosseum",
-		ColosseumWave.class,
-		ColosseumWave::fromCsv,
-		null);
+import com.datalogger.models.common.ItemBundle;
+import lombok.Builder;
+import lombok.Data;
+import java.util.List;
 
-	private final String name;
-	private final String directoryName;
-	private final Class<? extends DataRow> dataClass;
-	private final Class<? extends LogTypePanel> panelClass;
-	private final Function<String, ? extends DataRow> parser;
-	private final File logDirectory;
+@Data
+@Builder
+public class ColosseumWaveDTO {
+	private int wave;
+	private String status; // WaveStatus.name()
 
-	LogType(String logTypeName, Class<? extends DataRow> dataClass, Function<String, ? extends DataRow> parser, Class<? extends LogTypePanel> panelClass) {
-		this.name = logTypeName;
-		this.dataClass = dataClass;
-		this.panelClass = panelClass;
-		this.parser = parser;
+	// Flattened ItemStack
+	private List<ItemBundle> earnedLoot;
 
-		this.directoryName = logTypeName.toLowerCase().replace(" ", "-");
+	// Indices for the Timeline JSON
+	private int startIdx;
+	private int endIdx;
 
-		File baseDir = new File(RuneLite.RUNELITE_DIR, "data-logger");
-		this.logDirectory = new File(baseDir, directoryName);
-	}
+	private List<String> modifierChoices; // Three modifiers the user has to choose from
+	private String chosenModifier;
 
-	@Override
-	public String toString() { return name; }
-
+	// Performance Metrics
+	private int timeTaken;
+	private int speedBonus;
+	private int damageTaken;
+	private int damageBonus;
+	private int modifierGlory;
+	private int completionBonus;
+	private int totalGlory;
 }

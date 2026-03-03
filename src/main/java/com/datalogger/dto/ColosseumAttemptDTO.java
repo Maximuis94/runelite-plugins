@@ -22,52 +22,19 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package com.datalogger.framework;
 
-import com.datalogger.models.GrandExchangeOfferData;
-import com.datalogger.models.colosseum.ColosseumWave;
-import com.datalogger.ui.LogTypePanel;
-import java.io.File;
-import java.util.function.Function;
-import lombok.Getter;
-import lombok.RequiredArgsConstructor;
-import net.runelite.client.RuneLite;
+package com.datalogger.dto;
 
-@Getter
-@RequiredArgsConstructor
-public enum LogType
-{
-	GRAND_EXCHANGE(
-		"Grand Exchange",
-		GrandExchangeOfferData.class,
-		GrandExchangeOfferData::fromCsv,
-		null),
-	COLOSSEUM(
-		"Colosseum",
-		ColosseumWave.class,
-		ColosseumWave::fromCsv,
-		null);
+import java.util.List;
+import lombok.Builder;
+import lombok.Data;
 
-	private final String name;
-	private final String directoryName;
-	private final Class<? extends DataRow> dataClass;
-	private final Class<? extends LogTypePanel> panelClass;
-	private final Function<String, ? extends DataRow> parser;
-	private final File logDirectory;
-
-	LogType(String logTypeName, Class<? extends DataRow> dataClass, Function<String, ? extends DataRow> parser, Class<? extends LogTypePanel> panelClass) {
-		this.name = logTypeName;
-		this.dataClass = dataClass;
-		this.panelClass = panelClass;
-		this.parser = parser;
-
-		this.directoryName = logTypeName.toLowerCase().replace(" ", "-");
-
-		File baseDir = new File(RuneLite.RUNELITE_DIR, "data-logger");
-		this.logDirectory = new File(baseDir, directoryName);
-	}
-
-	@Override
-	public String toString() { return name; }
-
+@Data
+@Builder
+public class ColosseumAttemptDTO {
+	private long attemptId;
+	private long timestamp;
+	private String result;
+	private int totalGlory;
+	private List<ColosseumWaveDTO> waves;
 }

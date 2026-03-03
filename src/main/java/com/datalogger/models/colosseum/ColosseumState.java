@@ -22,52 +22,47 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package com.datalogger.framework;
 
-import com.datalogger.models.GrandExchangeOfferData;
-import com.datalogger.models.colosseum.ColosseumWave;
-import com.datalogger.ui.LogTypePanel;
-import java.io.File;
-import java.util.function.Function;
-import lombok.Getter;
-import lombok.RequiredArgsConstructor;
-import net.runelite.client.RuneLite;
+package com.datalogger.models.colosseum;
 
-@Getter
-@RequiredArgsConstructor
-public enum LogType
+import com.datalogger.dto.ColosseumStateDTO;
+import java.util.ArrayList;
+import java.util.stream.Collectors;
+import lombok.Builder;
+import lombok.Data;
+import net.runelite.api.NPC;
+import net.runelite.api.coords.WorldPoint;
+
+/**
+ * The state of the Colosseum at a particular tick during a particular wave. It encodes the coordinates of the player
+ * and the NPCs, as well as the wave id and tick number
+ */
+@Data
+@Builder
+public class ColosseumState
 {
-	GRAND_EXCHANGE(
-		"Grand Exchange",
-		GrandExchangeOfferData.class,
-		GrandExchangeOfferData::fromCsv,
-		null),
-	COLOSSEUM(
-		"Colosseum",
-		ColosseumWave.class,
-		ColosseumWave::fromCsv,
-		null);
+	private int wave;
+	private int tick;
+	private WorldPoint playerLocation;
+	private ArrayList<NPC> npcs;
 
-	private final String name;
-	private final String directoryName;
-	private final Class<? extends DataRow> dataClass;
-	private final Class<? extends LogTypePanel> panelClass;
-	private final Function<String, ? extends DataRow> parser;
-	private final File logDirectory;
-
-	LogType(String logTypeName, Class<? extends DataRow> dataClass, Function<String, ? extends DataRow> parser, Class<? extends LogTypePanel> panelClass) {
-		this.name = logTypeName;
-		this.dataClass = dataClass;
-		this.panelClass = panelClass;
-		this.parser = parser;
-
-		this.directoryName = logTypeName.toLowerCase().replace(" ", "-");
-
-		File baseDir = new File(RuneLite.RUNELITE_DIR, "data-logger");
-		this.logDirectory = new File(baseDir, directoryName);
+	/**
+	 * Converts this live engine state into a static DTO for saving.
+	 */
+	public ColosseumStateDTO toDTO() {
+		return ColosseumStateDTO.builder()
+			.wave(this.wave)
+			.tick(this.tick)
+			.playerX(this.playerLocation.getX())
+			.playerY(this.playerLocation.getY())
+			.npcs(this.npcs.stream()
+				.map(npc -> ColosseumStateDTO.NPCDataDTO.builder()
+					.id(npc.getId())
+					.name(npc.getName())
+					.x(npc.getWorldLocation().getX())
+					.y(npc.getWorldLocation().getY())
+					.build())
+				.collect(Collectors.toList()))
+			.build();
 	}
-
-	@Override
-	public String toString() { return name; }
-
 }

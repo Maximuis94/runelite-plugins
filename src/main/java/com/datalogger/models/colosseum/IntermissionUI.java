@@ -22,52 +22,31 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package com.datalogger.framework;
 
-import com.datalogger.models.GrandExchangeOfferData;
-import com.datalogger.models.colosseum.ColosseumWave;
-import com.datalogger.ui.LogTypePanel;
-import java.io.File;
-import java.util.function.Function;
-import lombok.Getter;
-import lombok.RequiredArgsConstructor;
-import net.runelite.client.RuneLite;
+package com.datalogger.models.colosseum;
 
-@Getter
-@RequiredArgsConstructor
-public enum LogType
+import com.datalogger.models.colosseum.enums.ColosseumModifier;
+import com.datalogger.models.common.ItemBundle;
+import java.util.List;
+import lombok.Builder;
+import lombok.Data;
+
+@Data
+@Builder
+public class IntermissionUI
 {
-	GRAND_EXCHANGE(
-		"Grand Exchange",
-		GrandExchangeOfferData.class,
-		GrandExchangeOfferData::fromCsv,
-		null),
-	COLOSSEUM(
-		"Colosseum",
-		ColosseumWave.class,
-		ColosseumWave::fromCsv,
-		null);
+	private final List<ItemBundle> potentialLoot;
+	private final List<ColosseumModifier> modifierChoices;
 
-	private final String name;
-	private final String directoryName;
-	private final Class<? extends DataRow> dataClass;
-	private final Class<? extends LogTypePanel> panelClass;
-	private final Function<String, ? extends DataRow> parser;
-	private final File logDirectory;
+	private final int waveBonusGlory;
+	private final int speedBonusGlory;
+	private final int speedBonusTimeSeconds;
+	private final int modChoiceGlory;
+	private final int damageTakenGlory;
+	private final int damageTakenAmount;
+	private final int totalGlory;
+	private final int totalTimeSeconds;
 
-	LogType(String logTypeName, Class<? extends DataRow> dataClass, Function<String, ? extends DataRow> parser, Class<? extends LogTypePanel> panelClass) {
-		this.name = logTypeName;
-		this.dataClass = dataClass;
-		this.panelClass = panelClass;
-		this.parser = parser;
-
-		this.directoryName = logTypeName.toLowerCase().replace(" ", "-");
-
-		File baseDir = new File(RuneLite.RUNELITE_DIR, "data-logger");
-		this.logDirectory = new File(baseDir, directoryName);
-	}
-
-	@Override
-	public String toString() { return name; }
-
+	private ColosseumModifier selectedModifier;
+	private final List<ColosseumModifier> activeModifiers;
 }
