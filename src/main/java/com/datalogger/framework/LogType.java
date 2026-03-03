@@ -25,34 +25,28 @@
 package com.datalogger.framework;
 
 import com.datalogger.models.GrandExchangeOfferData;
-import com.datalogger.ui.LogTypePanel;
 import java.io.File;
 import java.util.function.Function;
 import lombok.Getter;
-import lombok.RequiredArgsConstructor;
 import net.runelite.client.RuneLite;
 
 @Getter
-@RequiredArgsConstructor
 public enum LogType
 {
 	GRAND_EXCHANGE(
 		"Grand Exchange",
-		GrandExchangeOfferData.class,
-		GrandExchangeOfferData::fromCsv,
-		null);
+		GrandExchangeOfferData::fromCsv
+	);
 
 	private final String name;
 	private final String directoryName;
-	private final Class<? extends DataRow> dataClass;
-	private final Class<? extends LogTypePanel> panelClass;
 	private final Function<String, ? extends DataRow> parser;
+
+
 	private final File logDirectory;
 
-	LogType(String logTypeName, Class<? extends DataRow> dataClass, Function<String, ? extends DataRow> parser, Class<? extends LogTypePanel> panelClass) {
+	LogType(String logTypeName, Function<String, ? extends DataRow> parser) {
 		this.name = logTypeName;
-		this.dataClass = dataClass;
-		this.panelClass = panelClass;
 		this.parser = parser;
 
 		this.directoryName = logTypeName.toLowerCase().replace(" ", "-");
@@ -63,5 +57,4 @@ public enum LogType
 
 	@Override
 	public String toString() { return name; }
-
 }
