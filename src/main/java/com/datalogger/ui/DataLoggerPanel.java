@@ -45,12 +45,15 @@ public class DataLoggerPanel extends PluginPanel {
 	private final JComboBox<LogType> logTypeSelector = new JComboBox<>(LogType.values());
 	private final JPanel logContentDisplay = new JPanel();
 
-	@Inject private Injector injector;
-	@Inject private Client client;
+	private final Injector injector;
+	private final Client client;
 
 	@Inject
-	public DataLoggerPanel(FileIOService fileService) {
+	public DataLoggerPanel(FileIOService fileService, Injector injector, Client client)
+	{
 		this.fileService = fileService;
+		this.injector = injector;
+		this.client = client;
 
 		this.setBorder(new EmptyBorder(0, 0, 10, 0));
 		this.setBackground(ColorScheme.DARKER_GRAY_COLOR);
