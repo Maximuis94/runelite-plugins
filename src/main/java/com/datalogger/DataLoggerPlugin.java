@@ -56,6 +56,7 @@ public class DataLoggerPlugin extends Plugin
 	@Inject private ClientToolbar clientToolbar;
 
 	@Inject private EventBus eventBus;
+
 	@Inject private GrandExchangeLogger geLogger;
 	@Inject private ColosseumAttemptLogger coloLogger;
 
