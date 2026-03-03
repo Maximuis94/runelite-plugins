@@ -40,6 +40,8 @@ import net.runelite.api.Client;
 import net.runelite.api.GrandExchangeOffer;
 import net.runelite.api.GrandExchangeOfferState;
 import net.runelite.api.events.GrandExchangeOfferChanged;
+import net.runelite.api.gameval.InterfaceID;
+import net.runelite.api.events.WidgetLoaded;
 import net.runelite.client.eventbus.Subscribe;
 
 @Slf4j
@@ -181,6 +183,24 @@ public class GrandExchangeLogger extends AbstractLogger
 			account,
 			slot
 		);
+	}
+
+	@Subscribe
+	public void onWidgetLoaded(WidgetLoaded event) {
+		// Using the modern InterfaceID check
+		if (event.getGroupId() == InterfaceID.GE_HISTORY) {
+
+			// Give the client thread a tick to populate the text fields
+			clientThread.invokeLater(this::processGEHistory);
+		}
+	}
+
+	/**
+	 * Iterate over GE history entries and attempt to match them to previously logged transactions.
+	 */
+	private void processGEHistory()
+	{
+
 	}
 
 	/**
