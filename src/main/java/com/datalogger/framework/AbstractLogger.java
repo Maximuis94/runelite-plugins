@@ -86,11 +86,11 @@ public abstract class AbstractLogger implements Loggable {
 	 * A numerical hash string associated with the OSRS account. Uses account name as fallback.
 	 */
 	protected String getAccountHashString() {
-		try {
-			return String.valueOf(client.getClass().getMethod("getAccountHash").invoke(client));
-		} catch (Exception e) {
+		long accountHash = client.getAccountHash();
+		if (accountHash != -1L)
+			return String.valueOf(accountHash);
+		else
 			return getAccountName().toLowerCase().replace(" ", "_");
-		}
 	}
 
 	@Subscribe

@@ -6,10 +6,10 @@
  * modification, are permitted provided that the following conditions are met:
  *
  * 1. Redistributions of source code must retain the above copyright notice, this
- * list of conditions and the following disclaimer.
+ *    list of conditions and the following disclaimer.
  * 2. Redistributions in binary form must reproduce the above copyright notice,
- * this list of conditions and the following disclaimer in the documentation
- * and/or other materials provided with the distribution.
+ *    this list of conditions and the following disclaimer in the documentation
+ *    and/or other materials provided with the distribution.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
@@ -22,31 +22,55 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package com.datalogger.framework;
 
-/**
- * Defines the contract for all data logging modules within the plugin.
- */
-public interface Loggable {
-	/**
-	 * The unique identifier for this logger (e.g., "grand-exchange").
-	 * Used for directory naming and configuration checks.
-	 */
-	LogType getLogType();
+package com.datalogger.models.colosseum.enums;
 
-	/**
-	 * The CSV header string that defines the columns for this logger's data.
-	 * This is written to the file if it's newly created.
-	 */
-	String getCsvHeader();
+public enum ColosseumModifier {
+	BEES_I,
+	BEES_II,
+	BEES_III,
 
-	/**
-	 * Logic to determine if this specific logger is enabled based on user config.
-	 */
-	boolean isEnabled();
+	BLASPHEMY_I,
+	BLASPHEMY_II,
+	BLASPHEMY_III,
 
-	/**
-	 * Optional: Initialization logic run when the player logs in or the plugin starts.
-	 */
-	default void setup() {}
+	DOOM_I,
+	DOOM_II,
+	DOOM_III,
+
+	DYNAMIC_DUO,
+
+	FRAILTY_I,
+	FRAILTY_II,
+	FRAILTY_III,
+
+	MANTIMAYHEM_I,
+	MANTIMAYHEM_II,
+	MANTIMAYHEM_III,
+
+	MYOPIA_I,
+	MYOPIA_II,
+	MYOPIA_III,
+
+	QUARTET,
+
+	RED_FLAG,
+
+	REENTRY_I,
+	REENTRY_II,
+	REENTRY_III,
+
+	RELENTLESS_I,
+	RELENTLESS_II,
+	RELENTLESS_III,
+
+	SOLARFLARE_I,
+	SOLARFLARE_II,
+	SOLARFLARE_III,
+
+	TOTEMIC,
+
+	VOLATILITY_I,
+	VOLATILITY_II,
+	VOLATILITY_III
 }

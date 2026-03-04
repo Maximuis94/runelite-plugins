@@ -36,12 +36,13 @@ import javax.swing.JPanel;
 import javax.swing.border.CompoundBorder;
 import javax.swing.border.EmptyBorder;
 import javax.swing.border.MatteBorder;
+import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.PluginPanel;
 
+@Slf4j
 public class DataLoggerPanel extends PluginPanel {
-	private final FileIOService fileService;
 	private final JComboBox<LogType> logTypeSelector = new JComboBox<>(LogType.values());
 	private final JPanel logContentDisplay = new JPanel();
 	@Inject private Injector injector; // Needed to spawn sub-panels
@@ -49,7 +50,6 @@ public class DataLoggerPanel extends PluginPanel {
 
 	@Inject
 	public DataLoggerPanel(FileIOService fileService) {
-		this.fileService = fileService;
 
 		// Matches the standard RuneLite sidebar padding
 		this.setBorder(new EmptyBorder(0, 0, 10, 0));
@@ -96,23 +96,6 @@ public class DataLoggerPanel extends PluginPanel {
 	}
 
 	private void updateView() {
-		logContentDisplay.removeAll();
 
-		LogType selected = (LogType) logTypeSelector.getSelectedItem();
-		// Skip if nothing is selected or if the panel class is null (like if it's unfinished)
-		if (selected == null || selected.getPanelClass() == null) return;
-
-		// 1. Dynamically create the specific panel for this LogType
-		LogTypePanel specificPanel = injector.getInstance(selected.getPanelClass());
-
-		// 2. Refresh it with data
-		String account = client.getLocalPlayer() != null ? client.getLocalPlayer().getName() : "unknown";
-		specificPanel.refresh(account);
-
-		// 3. Add it to the display
-		logContentDisplay.add(specificPanel, BorderLayout.CENTER);
-
-		logContentDisplay.revalidate();
-		logContentDisplay.repaint();
 	}
 }

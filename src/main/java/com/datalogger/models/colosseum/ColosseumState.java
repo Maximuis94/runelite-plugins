@@ -22,43 +22,41 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package com.datalogger.framework;
 
-import com.datalogger.models.GrandExchangeOfferData;
-import com.datalogger.models.colosseum.ColosseumWave;
-import java.io.File;
-import java.util.function.Function;
-import lombok.Getter;
-import lombok.RequiredArgsConstructor;
-import net.runelite.client.RuneLite;
+package com.datalogger.models.colosseum;
 
-@Getter
-@RequiredArgsConstructor
-public enum LogType
+import com.datalogger.dto.ColosseumStateDTO;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
+import lombok.Builder;
+import lombok.Data;
+import net.runelite.api.NPC;
+import net.runelite.api.coords.WorldPoint;
+
+/**
+ * The state of the Colosseum at a particular tick during a particular wave. It encodes the coordinates of the player
+ * and the NPCs, as well as the wave id and tick number
+ */
+@Data
+@Builder
+public class ColosseumState
 {
-	GRAND_EXCHANGE(
-		"Grand Exchange",
-		GrandExchangeOfferData::fromCsv),
-	COLOSSEUM(
-		"Colosseum",
-		ColosseumWave::fromCsv);
+	private int wave;
+	private int tick;
+	private WorldPoint playerLocation;
+	private List<ColosseumNPC> npcs; // Changed to List for better API practice
 
-	private final String name;
-	private final String directoryName;
-	private final Function<String, ? extends DataRow> parser;
-
-	private final File logDirectory;
-
-	LogType(String logTypeName, Function<String, ? extends DataRow> parser) {
-		this.name = logTypeName;
-		this.parser = parser;
-
-		this.directoryName = logTypeName.toLowerCase().replace(" ", "-");
-
-		File baseDir = new File(RuneLite.RUNELITE_DIR, "data-logger");
-		this.logDirectory = new File(baseDir, directoryName);
+	/**
+	 * Converts this live engine state into a static DTO for saving.
+	 */
+	public ColosseumStateDTO toDTO() {
+		return ColosseumStateDTO.builder()
+			.wave(this.wave)
+			.tick(this.tick)
+			.playerX(this.playerLocation != null ? this.playerLocation.getX() : 0)
+			.playerY(this.playerLocation != null ? this.playerLocation.getY() : 0)
+			.npcs(this.npcs)
+			.build();
 	}
-
-	@Override
-	public String toString() { return name; }
 }

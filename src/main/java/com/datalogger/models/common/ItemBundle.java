@@ -6,10 +6,10 @@
  * modification, are permitted provided that the following conditions are met:
  *
  * 1. Redistributions of source code must retain the above copyright notice, this
- * list of conditions and the following disclaimer.
+ *    list of conditions and the following disclaimer.
  * 2. Redistributions in binary form must reproduce the above copyright notice,
- * this list of conditions and the following disclaimer in the documentation
- * and/or other materials provided with the distribution.
+ *    this list of conditions and the following disclaimer in the documentation
+ *    and/or other materials provided with the distribution.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
@@ -22,31 +22,36 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package com.datalogger.framework;
+
+package com.datalogger.models.common;
+
+import lombok.Value;
+import net.runelite.api.ItemComposition;
 
 /**
- * Defines the contract for all data logging modules within the plugin.
+ * Represents a quantity of a specific item
  */
-public interface Loggable {
-	/**
-	 * The unique identifier for this logger (e.g., "grand-exchange").
-	 * Used for directory naming and configuration checks.
-	 */
-	LogType getLogType();
+@Value
+public class ItemBundle
+{
+	int itemId;
+	String itemName;
+	int quantity;
+
+	public ItemBundle(int itemId, String itemName, int quantity) {
+		this.itemId = itemId;
+		this.itemName = itemName;
+		this.quantity = quantity;
+	}
 
 	/**
-	 * The CSV header string that defines the columns for this logger's data.
-	 * This is written to the file if it's newly created.
+	 * Constructs a new ItemBundle using the game's item composition blueprint.
+	 *
+	 * @param itemComp The ItemComposition fetched from the ItemManager.
+	 * @param quantity The amount of this item.
 	 */
-	String getCsvHeader();
-
-	/**
-	 * Logic to determine if this specific logger is enabled based on user config.
-	 */
-	boolean isEnabled();
-
-	/**
-	 * Optional: Initialization logic run when the player logs in or the plugin starts.
-	 */
-	default void setup() {}
+	public static ItemBundle fromComp(ItemComposition itemComp, int quantity)
+	{
+		return new ItemBundle(itemComp.getId(), itemComp.getName(), quantity);
+	}
 }

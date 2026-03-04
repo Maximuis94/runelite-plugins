@@ -23,23 +23,32 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.datalogger.ui;
+package com.datalogger.dto;
 
-import com.datalogger.framework.LogType;
-import javax.swing.JPanel;
-import net.runelite.client.ui.ColorScheme;
+import com.datalogger.models.common.ItemBundle;
+import lombok.Builder;
+import lombok.Data;
+import java.util.List;
 
-public abstract class LogTypePanel extends JPanel {
-	protected final LogType type;
+@Data
+@Builder
+public class ColosseumWaveDTO {
+	private int wave;
+	private String status; // WaveStatus.name()
 
-	public LogTypePanel(LogType type) {
-		this.type = type;
-		setBackground(ColorScheme.DARK_GRAY_COLOR);
-	}
+	private List<ItemBundle> earnedLoot;
 
-	/**
-	 * Called by the main panel to tell this sub-panel to fetch
-	 * fresh data from the FileIOService.
-	 */
-	public abstract void refresh(String accountName);
+	private List<String> modifierChoices;
+	private String chosenModifier;
+
+	private double timeTaken;
+	private int speedBonus;
+	private int speedBonusTime;
+	private int damageTaken;
+	private int damageBonus;
+	private int modifierGlory;
+	private int completionBonus;
+	private int waveGlory;
+	private int totalGlory;
+	private int totalTime;
 }
