@@ -26,7 +26,6 @@ package com.datalogger.framework;
 
 import com.datalogger.models.GrandExchangeOfferData;
 import com.datalogger.models.colosseum.ColosseumWave;
-import com.datalogger.ui.LogTypePanel;
 import java.io.File;
 import java.util.function.Function;
 import lombok.Getter;
@@ -47,7 +46,6 @@ public enum LogType
 	private final String name;
 	private final String directoryName;
 	private final Function<String, ? extends DataRow> parser;
-
 
 	private final File logDirectory;
 

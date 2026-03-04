@@ -41,6 +41,8 @@ public class ColosseumAttempt
 {
 	private final long id;
 
+	private int startTick;
+
 	private final String startTime;
 
 	@Setter
@@ -49,9 +51,10 @@ public class ColosseumAttempt
 	private final List<ColosseumWave> waves;
 
 
-	public ColosseumAttempt()
+	public ColosseumAttempt(int startTick)
 	{
 		id = System.currentTimeMillis();
+		this.startTick = startTick;
 		startTime = Instant.ofEpochMilli(id)
 			.atZone(ZoneId.systemDefault())
 			.format(DateTimeFormatter.ofPattern("yyMMdd_HHmmss"));

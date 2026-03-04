@@ -25,6 +25,7 @@
 
 package com.datalogger.dto;
 
+import com.datalogger.models.colosseum.ColosseumNPC;
 import java.util.List;
 import lombok.Builder;
 import lombok.Data;
@@ -39,14 +40,14 @@ public class ColosseumStateDTO {
 	private int tick;
 	private int playerX;
 	private int playerY;
-	private List<NPCDataDTO> npcs;
+	private List<ColosseumNPC> npcs;
 
-	@Data
-	@Builder
-	public static class NPCDataDTO {
-		private int id;
-		private String name;
-		private int x;
-		private int y;
-	}
+//	@Data
+//	@Builder
+//	public static class NPCDataDTO {
+//		private int id;
+//		private String name;
+//		private int x;
+//		private int y;
+//	}
 }

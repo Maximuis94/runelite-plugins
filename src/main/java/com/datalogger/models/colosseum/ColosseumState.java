@@ -27,6 +27,7 @@ package com.datalogger.models.colosseum;
 
 import com.datalogger.dto.ColosseumStateDTO;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.stream.Collectors;
 import lombok.Builder;
 import lombok.Data;
@@ -44,7 +45,7 @@ public class ColosseumState
 	private int wave;
 	private int tick;
 	private WorldPoint playerLocation;
-	private ArrayList<NPC> npcs;
+	private List<ColosseumNPC> npcs; // Changed to List for better API practice
 
 	/**
 	 * Converts this live engine state into a static DTO for saving.
@@ -53,16 +54,9 @@ public class ColosseumState
 		return ColosseumStateDTO.builder()
 			.wave(this.wave)
 			.tick(this.tick)
-			.playerX(this.playerLocation.getX())
-			.playerY(this.playerLocation.getY())
-			.npcs(this.npcs.stream()
-				.map(npc -> ColosseumStateDTO.NPCDataDTO.builder()
-					.id(npc.getId())
-					.name(npc.getName())
-					.x(npc.getWorldLocation().getX())
-					.y(npc.getWorldLocation().getY())
-					.build())
-				.collect(Collectors.toList()))
+			.playerX(this.playerLocation != null ? this.playerLocation.getX() : 0)
+			.playerY(this.playerLocation != null ? this.playerLocation.getY() : 0)
+			.npcs(this.npcs)
 			.build();
 	}
 }

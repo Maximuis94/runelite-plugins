@@ -26,6 +26,7 @@ package com.datalogger;
 
 import com.datalogger.loggers.ColosseumAttemptLogger;
 import com.datalogger.loggers.GrandExchangeLogger;
+import com.datalogger.services.ColosseumScanner;
 import com.datalogger.ui.DataLoggerPanel;
 import com.google.inject.Provides;
 import java.awt.image.BufferedImage;
@@ -59,6 +60,7 @@ public class DataLoggerPlugin extends Plugin
 
 	@Inject private GrandExchangeLogger geLogger;
 	@Inject private ColosseumAttemptLogger coloLogger;
+	@Inject private ColosseumScanner coloScanner;
 
 	@Inject private DataLoggerPanel panel;
 
@@ -75,6 +77,8 @@ public class DataLoggerPlugin extends Plugin
 	{
 		eventBus.register(geLogger);
 		eventBus.register(coloLogger);
+		eventBus.register(coloScanner);
+		coloScanner.updateConfigFlags(true);
 
 		final BufferedImage icon = ImageUtil.loadImageResource(getClass(), "icon.png");
 		navButton = NavigationButton.builder()
@@ -93,6 +97,7 @@ public class DataLoggerPlugin extends Plugin
 	{
 		eventBus.unregister(geLogger);
 		eventBus.unregister(coloLogger);
+		eventBus.unregister(coloScanner);
 		clientToolbar.removeNavigation(navButton);
 	}
 }

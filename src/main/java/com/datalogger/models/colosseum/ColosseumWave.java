@@ -48,15 +48,15 @@ public class ColosseumWave implements DataRow
 	private WaveStatus status;
 	private List<ItemBundle> earnedLoot;
 
-	private int startIdx;
-	private int endIdx;
-
 	@Singular
 	private List<ColosseumModifier> modifierChoices;
 
 	private ColosseumModifier chosenModifier;
 
-	private int timeTaken;
+	private int startTick;
+	private int endTick;
+
+	private double timeTaken;
 	private int speedBonus;
 
 	private int damageTaken;
@@ -65,6 +65,7 @@ public class ColosseumWave implements DataRow
 	private int modifierGlory;
 
 	private int completionBonus;
+	private int waveGlory;
 	private int totalGlory;
 
 	public ColosseumWaveDTO toDTO() {
@@ -74,8 +75,6 @@ public class ColosseumWave implements DataRow
 
 			.earnedLoot(this.earnedLoot != null ? this.earnedLoot : new java.util.ArrayList<>())
 
-			.startIdx(this.startIdx)
-			.endIdx(this.endIdx)
 			.modifierChoices(this.modifierChoices != null ? this.modifierChoices.stream()
 				.map(ColosseumModifier::name)
 				.collect(Collectors.toList()) : new java.util.ArrayList<>())
@@ -87,6 +86,7 @@ public class ColosseumWave implements DataRow
 			.modifierGlory(this.modifierGlory)
 			.completionBonus(this.completionBonus)
 			.totalGlory(this.totalGlory)
+			.waveGlory(this.waveGlory)
 			.build();
 	}
 
@@ -102,7 +102,7 @@ public class ColosseumWave implements DataRow
 	}
 
 	public static String csvHeader() {
-		return "wave,status,itemIds,itemNames,quantities,startIdx,endIdx,modifierChoice_I,modifierChoice_II,modifierChoice_III,chosenModifier,timeTaken,speedBonus,damageTaken,damageBonus,modifierGlory,completionBonus,totalGlory";
+		return "wave,status,itemIds,itemNames,quantities,modifierChoice_I,modifierChoice_II,modifierChoice_III,chosenModifier,timeTaken,damageTaken,speedBonus,damageBonus,modifierGlory,completionBonus,waveGlory,totalGlory";
 	}
 
 	public String toCsvRow() {
@@ -129,18 +129,17 @@ public class ColosseumWave implements DataRow
 			itemIds,
 			itemNames,
 			quantities,
-			String.valueOf(startIdx),
-			String.valueOf(endIdx),
 			mod1,
 			mod2,
 			mod3,
 			chosenMod,
-			String.valueOf(timeTaken),
-			String.valueOf(speedBonus),
+			String.format("%.1f", timeTaken),
 			String.valueOf(damageTaken),
+			String.valueOf(speedBonus),
 			String.valueOf(damageBonus),
 			String.valueOf(modifierGlory),
 			String.valueOf(completionBonus),
+			String.valueOf(waveGlory),
 			String.valueOf(totalGlory)
 		);
 	}
@@ -154,8 +153,8 @@ public class ColosseumWave implements DataRow
 		// The -1 ensures trailing empty columns aren't discarded.
 		String[] parts = csv.split(",(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)", -1);
 
-		if (parts.length < 18) {
-			throw new IllegalArgumentException("Invalid CSV row, expected 18 columns but got " + parts.length);
+		if (parts.length < 16) {
+			throw new IllegalArgumentException("Invalid CSV row, expected 16 columns but got " + parts.length);
 		}
 
 		int wave = Integer.parseInt(parts[0]);
@@ -180,7 +179,6 @@ public class ColosseumWave implements DataRow
 		}
 
 		// 2. Extract Integers
-		int startIdx = Integer.parseInt(parts[5]);
 		int endIdx = Integer.parseInt(parts[6]);
 
 		// 3. Rebuild Modifier Choices
@@ -196,11 +194,9 @@ public class ColosseumWave implements DataRow
 			.wave(wave)
 			.status(status)
 			.earnedLoot(loot) // Uses the list directly
-			.startIdx(startIdx)
-			.endIdx(endIdx)
+			.timeTaken(endIdx*0.6)
 			.modifierChoices(choices) // Passes the rebuilt list
 			.chosenModifier(chosen)
-			.timeTaken(Integer.parseInt(parts[11]))
 			.speedBonus(Integer.parseInt(parts[12]))
 			.damageTaken(Integer.parseInt(parts[13]))
 			.damageBonus(Integer.parseInt(parts[14]))

@@ -31,7 +31,6 @@ import com.datalogger.framework.LogType;
 import com.datalogger.models.colosseum.ColosseumAttempt;
 import com.datalogger.models.colosseum.ColosseumState;
 import com.datalogger.models.colosseum.ColosseumWave;
-import com.datalogger.models.grandexchange.GrandExchangeHistoryEntry;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import java.awt.image.BufferedImage;
@@ -196,51 +195,6 @@ public class FileIOService
 		} catch (IOException e) {
 			log.error("Could not save state to {}", file.getName(), e);
 		}
-	}
-
-	// Assuming you already have your base directory defined somewhere
-	private final File geLogFile = new File("path/to/runelite/logs", "ge_history.csv");
-
-	/**
-	 * Reads the bottom N lines of the GE history CSV and parses them into objects.
-	 */
-	public List<GrandExchangeHistoryEntry> readRecentGeLogs(int limit) {
-		List<GrandExchangeHistoryEntry> recentLogs = new ArrayList<>();
-
-		if (!geLogFile.exists()) {
-			return recentLogs;
-		}
-
-		Deque<String> lastNLines = new ArrayDeque<>(limit);
-
-		try (BufferedReader reader = new BufferedReader(new FileReader(geLogFile))) {
-			String line;
-			boolean isHeader = true;
-
-			while ((line = reader.readLine()) != null) {
-				if (isHeader) {
-					isHeader = false;
-					continue;
-				}
-
-				if (lastNLines.size() == limit) {
-					lastNLines.removeFirst();
-				}
-				lastNLines.addLast(line);
-			}
-
-			for (String savedLine : lastNLines) {
-				GrandExchangeHistoryEntry entry = GrandExchangeHistoryEntry.fromCsvRow(savedLine);
-				if (entry != null) {
-					recentLogs.add(entry);
-				}
-			}
-
-		} catch (IOException e) {
-			log.error("Failed to read recent GE logs for reconciliation", e);
-		}
-
-		return recentLogs;
 	}
 
 	/**

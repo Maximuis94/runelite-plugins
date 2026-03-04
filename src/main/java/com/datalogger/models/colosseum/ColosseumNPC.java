@@ -23,32 +23,27 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.datalogger.dto;
+package com.datalogger.models.colosseum;
 
-import com.datalogger.models.common.ItemBundle;
 import lombok.Builder;
-import lombok.Data;
-import java.util.List;
+import lombok.Value;
 
-@Data
+@Value
 @Builder
-public class ColosseumWaveDTO {
-	private int wave;
-	private String status; // WaveStatus.name()
+public class ColosseumNPC {
+	int npcId;
+	String name;
+	int x;
+	int y;
+	int hp;
+	int maxHp;
 
-	private List<ItemBundle> earnedLoot;
-
-	private List<String> modifierChoices;
-	private String chosenModifier;
-
-	private double timeTaken;
-	private int speedBonus;
-	private int speedBonusTime;
-	private int damageTaken;
-	private int damageBonus;
-	private int modifierGlory;
-	private int completionBonus;
-	private int waveGlory;
-	private int totalGlory;
-	private int totalTime;
+	/**
+	 * Converts this snapshot into a CSV-friendly string.
+	 * Format: npcId|name|x|y|hp
+	 */
+	public String toLogString() {
+		return String.format("%d|%s|%d|%d|%d",
+			npcId, name, x, y, hp);
+	}
 }

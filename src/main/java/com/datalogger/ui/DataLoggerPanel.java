@@ -96,23 +96,6 @@ public class DataLoggerPanel extends PluginPanel {
 	}
 
 	private void updateView() {
-		logContentDisplay.removeAll();
 
-		LogType selected = (LogType) logTypeSelector.getSelectedItem();
-		// Skip if nothing is selected or if the panel class is null (like if it's unfinished)
-		if (selected == null || selected.getPanelClass() == null) return;
-
-		// 1. Dynamically create the specific panel for this LogType
-		LogTypePanel specificPanel = injector.getInstance(selected.getPanelClass());
-
-		// 2. Refresh it with data
-		String account = client.getLocalPlayer() != null ? client.getLocalPlayer().getName() : "unknown";
-		specificPanel.refresh(account);
-
-		// 3. Add it to the display
-		logContentDisplay.add(specificPanel, BorderLayout.CENTER);
-
-		logContentDisplay.revalidate();
-		logContentDisplay.repaint();
 	}
 }

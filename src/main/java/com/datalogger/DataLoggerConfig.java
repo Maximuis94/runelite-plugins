@@ -49,6 +49,13 @@ public interface DataLoggerConfig extends Config {
 	)
 	String colosseumSection = "colosseum";
 
+	@ConfigSection(
+		name = "Colosseum NPCs",
+		description = "Toggle logging for specific optional NPCs during trials",
+		position = 2
+	)
+	String colosseumNpcSection = "colosseumNpc";
+
 	// --- Grand Exchange Items ---
 
 	@ConfigItem(
@@ -72,13 +79,22 @@ public interface DataLoggerConfig extends Config {
 	default boolean logColosseum() { return true; }
 
 	@ConfigItem(
-		keyName = "logColosseum",
+		keyName = "logColosseumCSV", // Fixed duplicate keyName from "logColosseum"
 		name = "Log Colosseum Trials (CSV)",
 		description = "If enabled, Fortis Colosseum waves are also logged in a CSV file.",
 		position = 1,
 		section = colosseumSection
 	)
 	default boolean logColosseumCSV() { return true; }
+
+	@ConfigItem(
+		keyName = "logWaveTimeline", // Fixed duplicate keyName from "logColosseum"
+		name = "Track player and NPC locations every tick during waves.",
+		description = "If enabled, a state composed of player- and relevant NPC-locations is generated every game tick and added to a timeline.",
+		position = 1,
+		section = colosseumSection
+	)
+	default boolean logWaveTimeline() { return true; }
 
 	@ConfigItem(
 		keyName = "screenshotBetweenWaves",
@@ -97,4 +113,51 @@ public interface DataLoggerConfig extends Config {
 		section = colosseumSection
 	)
 	default boolean logQuiverAsSplinters() { return true; }
+
+	// --- Colosseum NPC Optional Items ---
+
+	@ConfigItem(
+		keyName = "logFremenniks",
+		name = "Log Fremenniks",
+		description = "Include Fremennik warband NPC locations in timeline data",
+		position = 0,
+		section = colosseumNpcSection
+	)
+	default boolean logFremenniks() { return false; }
+
+	@ConfigItem(
+		keyName = "logSolarFlare",
+		name = "Log Solar Flares",
+		description = "Include Solar flare locations in timeline data",
+		position = 1,
+		section = colosseumNpcSection
+	)
+	default boolean logSolarFlare() { return false; }
+
+	@ConfigItem(
+		keyName = "logHealingTotem",
+		name = "Log Healing Totems",
+		description = "Include Healing totem locations in timeline data",
+		position = 3,
+		section = colosseumNpcSection
+	)
+	default boolean logHealingTotem() { return false; }
+
+	@ConfigItem(
+		keyName = "logBeeSwarm",
+		name = "Log Bee Swarms",
+		description = "Include Bee Swarm locations in timeline data",
+		position = 2,
+		section = colosseumNpcSection
+	)
+	default boolean logBeeSwarm() { return false; }
+
+	@ConfigItem(
+		keyName = "logBeamCrystal",
+		name = "Log Beam Crystals",
+		description = "Include Beam Crystal locations in timeline data",
+		position = 4,
+		section = colosseumNpcSection
+	)
+	default boolean logBeamCrystal() { return false; }
 }

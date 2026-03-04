@@ -44,9 +44,11 @@ public class IntermissionUI
 	private final int modChoiceGlory;
 	private final int damageTakenGlory;
 	private final int damageTakenAmount;
-	private final int totalGlory;
+	private final int waveGlory;
 	private final int totalTimeSeconds;
+	private final int totalGlory;
 
 	private ColosseumModifier selectedModifier;
 	private final List<ColosseumModifier> activeModifiers;
+
 }

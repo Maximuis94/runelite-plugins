@@ -33,34 +33,41 @@ import static com.datalogger.constants.Colosseum.Intermission.INTERMISSION_NEXT_
 import static com.datalogger.constants.Colosseum.Intermission.INTERMISSION_RESULT_CONTAINER;
 import static com.datalogger.constants.Colosseum.Item.DIZANAS_QUIVER_UNCHARGED_ID;
 import static com.datalogger.constants.Colosseum.Item.SUNFIRE_SPLINTERS_ID;
-import static com.datalogger.constants.Colosseum.NPC.BEE_SWARM_NPC_ID;
-import static com.datalogger.constants.Colosseum.NPC.BOSS_WAVE_BEAM_CRYSTAL;
-import static com.datalogger.constants.Colosseum.NPC.FREMENNIK_MAGE_NPC_ID;
-import static com.datalogger.constants.Colosseum.NPC.FREMENNIK_MELEE_NPC_ID;
-import static com.datalogger.constants.Colosseum.NPC.FREMENNIK_RANGED_NPC_ID;
-import static com.datalogger.constants.Colosseum.NPC.HEALING_TOTEM_NPC_ID;
-import static com.datalogger.constants.Colosseum.NPC.MINIMUS_NPC_ID;
-import static com.datalogger.constants.Colosseum.NPC.SITTING_SOL_HEREDIT_NPC_ID;
-import static com.datalogger.constants.Colosseum.NPC.SOLAR_FLARE_NPC_ID;
+import static com.datalogger.constants.Colosseum.NPC.*;
 import static com.datalogger.constants.Colosseum.RewardsChest.REWARDS_CHEST_GROUP_ID;
 import static com.datalogger.constants.Colosseum.RewardsChest.REWARDS_CHEST_MODIFIER_LIST_CONTAINER_ID;
 import static com.datalogger.constants.Colosseum.RewardsChest.REWARDS_CHEST_REWARDS_TAB_CHILD_ID;
 import static com.datalogger.constants.Colosseum.RewardsChest.REWARDS_CHEST_SUMMARY_TAB_CHILD_ID;
+import com.datalogger.models.colosseum.ColosseumNPC;
 import com.datalogger.models.colosseum.ColosseumState;
 import com.datalogger.models.colosseum.IntermissionUI;
+import com.datalogger.models.colosseum.SummaryUI;
 import com.datalogger.models.colosseum.enums.ColosseumModifier;
 import com.datalogger.models.common.ItemBundle;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.BooleanSupplier;
 import java.util.function.Function;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.NPC;
+import net.runelite.api.NPCComposition;
 import net.runelite.api.Player;
 import net.runelite.api.coords.WorldPoint;
 import net.runelite.api.widgets.Widget;
+import net.runelite.client.eventbus.Subscribe;
+import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.util.Text;
 
@@ -68,16 +75,49 @@ import net.runelite.client.util.Text;
 @Singleton
 public class ColosseumScanner {
 
-	@Inject
-	private Client client;
+	private final Client client;
 
-	@Inject
-	private ItemManager itemManager;
+	private final ItemManager itemManager;
 
-	@Inject
-	private DataLoggerConfig config;
+	private final DataLoggerConfig config;
 
+	private boolean enabledSwapQuiverLoot;
+
+	// Wave 12 reward instead of Dizana's quiver, if the option is active
 	private final ItemBundle swappedDizanasQuiver = new ItemBundle(SUNFIRE_SPLINTERS_ID, "Sunfire splinters", 4000);
+
+	private final Set<Integer> CORE_COLOSSEUM_MOBS = ImmutableSet.of(
+		JAVELIN_COLOSSUS_NPC_ID,
+		MANTICORE_NPC_ID,
+		SHOCKWAVE_COLOSSUS_NPC_ID,
+		SOL_HEREDIT_NPC_ID,
+		JAGUAR_WARRIOR_NPC_ID,
+		SERPENT_SHAMAN_NPC_ID,
+		MINOTAUR_NPC_ID,
+		MINOTAUR_RED_FLAG_NPC_ID
+	);
+
+	private Map<BooleanSupplier, Collection<Integer>> OPTIONAL_NPC_SUPPLIERS;
+
+	private final Set<Integer> trackedNpcIds = new HashSet<>();
+
+	@Inject
+	public ColosseumScanner(DataLoggerConfig config, Client client, ItemManager itemManager)
+	{
+		this.config = config;
+		this.client = client;
+		this.itemManager = itemManager;
+		OPTIONAL_NPC_SUPPLIERS = new HashMap<>();
+	}
+
+	@Subscribe
+	public void onConfigChanged(ConfigChanged event) {
+		if (!event.getGroup().equals(DataLoggerConfig.CONFIG_GROUP)) {
+			return;
+		}
+
+		updateConfigFlags(false);
+	}
 
 	/**
 	 * Match a ColosseumModifier instance to the given String and return it
@@ -143,10 +183,9 @@ public class ColosseumScanner {
 	}
 
 	/**
-	 * Extract all values from the wave intermission UI.
+	 * Extract relevant data from the UI that appears in-between waves.
 	 */
 	private IntermissionUI scanIntermissionUI() {
-
 		log.debug("Scanning intermission UI");
 		int speedBonusTimeSeconds = -1;
 		int damageTakenAmount = -1;
@@ -191,6 +230,7 @@ public class ColosseumScanner {
 			damageTakenAmount = parseNum.apply(dmgText.substring(dmgText.indexOf("(") + 1, dmgText.indexOf(")")));
 		}
 
+		int waveGlory = waveBonusGlory+modChoiceGlory+damageTakenGlory+speedBonusGlory;
 		int totalGlory = parseNum.apply(clean.apply(10));
 		int totalTimeSeconds = parseTime.apply(clean.apply(11));
 
@@ -218,14 +258,15 @@ public class ColosseumScanner {
 			.modChoiceGlory(modChoiceGlory)
 			.damageTakenGlory(damageTakenGlory)
 			.damageTakenAmount(damageTakenAmount)
-			.totalGlory(totalGlory)
+			.waveGlory(waveGlory)
 			.totalTimeSeconds(totalTimeSeconds)
 			.activeModifiers(activeModifiers)
+			.totalGlory(totalGlory)
 			.build();
 	}
 
 	/**
-	 * Extract values from the rewards chest UI and return them
+	 * Extract relevant data from the rewards chest UI and return them
 	 */
 	private IntermissionUI scanRewardsChestUI() {
 		log.debug("Scanning rewards chest UI");
@@ -249,41 +290,7 @@ public class ColosseumScanner {
 			log.error("Failed to scan nextLoot");
 
 		Widget stats = client.getWidget(REWARDS_CHEST_GROUP_ID, REWARDS_CHEST_SUMMARY_TAB_CHILD_ID);
-		if (stats == null) {return null;}
-		Function<Integer, String> clean = (id) -> {
-			Widget w = stats.getChild(id);
-			return w != null ? Text.removeTags(w.getText()) : "";
-		};
-
-		Function<String, Integer> parseNum = (s) -> {
-			String val = s.replaceAll("[^0-9-]", "");
-			return val.isEmpty() ? 0 : Integer.parseInt(val);
-		};
-
-		Function<String, Integer> parseTime = (s) -> {
-			if (!s.contains(":")) return 0;
-			String[] parts = s.split(":");
-			return (Integer.parseInt(parts[0].trim()) * 60) + Integer.parseInt(parts[1].trim());
-		};
-
-		int waveBonusGlory = parseNum.apply(clean.apply(1));
-
-		String speedText = clean.apply(3);
-		int speedBonusGlory = parseNum.apply(speedText.split("\\(")[0]);
-		if (speedText.contains("(")) {
-			speedBonusTimeSeconds = parseTime.apply(speedText.substring(speedText.indexOf("(") + 1, speedText.indexOf(")")));
-		}
-
-		int modChoiceGlory = parseNum.apply(clean.apply(5));
-
-		String dmgText = clean.apply(7);
-		int damageTakenGlory = parseNum.apply(dmgText.split("\\(")[0]);
-		if (dmgText.contains("(")) {
-			damageTakenAmount = parseNum.apply(dmgText.substring(dmgText.indexOf("(") + 1, dmgText.indexOf(")")));
-		}
-
-		int totalGlory = parseNum.apply(clean.apply(10));
-		int totalTimeSeconds = parseTime.apply(clean.apply(11));
+		SummaryUI ui = parseSummaryUI(stats);
 
 		Widget modContainer = client.getWidget(REWARDS_CHEST_GROUP_ID, REWARDS_CHEST_MODIFIER_LIST_CONTAINER_ID);
 		List<ColosseumModifier> activeModifiers = parseActiveModifiers(modContainer);
@@ -291,54 +298,156 @@ public class ColosseumScanner {
 		return IntermissionUI.builder()
 			.activeModifiers(activeModifiers)
 			.potentialLoot(allLoot)
-			.damageTakenGlory(damageTakenGlory)
-			.speedBonusGlory(speedBonusGlory)
+			.damageTakenGlory(ui == null ? 0 : ui.getDamageTakenGlory())
+			.speedBonusGlory(ui == null ? 0 : ui.getSpeedBonusGlory())
 			.speedBonusTimeSeconds(speedBonusTimeSeconds)
 			.damageTakenAmount(damageTakenAmount)
-			.waveBonusGlory(waveBonusGlory)
-			.totalGlory(totalGlory)
-			.totalTimeSeconds(totalTimeSeconds)
-			.modChoiceGlory(modChoiceGlory)
+			.waveBonusGlory(ui == null ? 0 : ui.getWaveBonusGlory())
+			.waveGlory(ui == null ? 0 : ui.getWaveGlory())
+			.totalGlory(ui == null ? 0 : ui.getTotalGlory())
+			.totalTimeSeconds(ui == null ? 0 : ui.getTotalTimeSeconds())
+			.modChoiceGlory(ui == null ? 0 : ui.getModChoiceGlory())
 			.build();
 	}
 
 	/**
-	 * Scans the immediate environment to capture the current Colosseum state. Executed every game tick during a wave.
+	 * Generate an NPC that can be inserted into the timeline from the given data.
+	 * @param npc NPC instance of the NPC
+	 * @param npcComposition NPCComposition instance of the NPC
+	 * @return Subset of NPC data that can be added to the NPC list of the scanned state
+	 */
+	private ColosseumNPC generateNpc(NPC npc, NPCComposition npcComposition)
+	{
+		int id = (npcComposition != null) ? npcComposition.getId() : npc.getId();
+
+		String name = "Unknown";
+		if (npcComposition != null) {
+			name = npcComposition.getName();
+		} else if (npc.getName() != null) {
+			name = npc.getName();
+		}
+
+		int[] stats = npcComposition == null ? new int[0] : npcComposition.getStats();
+		int ratio = npc.getHealthRatio();
+		int scale = npc.getHealthScale();
+		int maxHp = npcComposition == null ? -1 : stats[3];
+
+		int currentHp = maxHp;
+		if (maxHp != -1 && ratio >= 0 && scale > 0) {
+			currentHp = (int) Math.ceil((double) ratio * maxHp / scale);
+		}
+
+		WorldPoint location = npc.getWorldLocation();
+		npc.getHealthScale();
+		return ColosseumNPC.builder()
+			.npcId(id)
+			.name(Text.removeTags(name))
+			.x(location.getX())
+			.y(location.getY())
+			.hp(currentHp)
+			.maxHp(maxHp)
+			.build();
+	}
+
+	/**
+	 * Scan the State on a particular tick and return it. The contents of the resulting State is dictated by
+	 * user-defined configurations
 	 */
 	public ColosseumState scanCurrentState(int currentWave, int waveStart) {
 		Player player = client.getLocalPlayer();
 		WorldPoint playerLocation = (player != null) ? player.getWorldLocation() : null;
 
-		ArrayList<NPC> detectedNpcs = new ArrayList<>();
+		ArrayList<ColosseumNPC> detectedNpcs = new ArrayList<>();
 
 		for (NPC npc : client.getTopLevelWorldView().npcs()) {
 			if (npc == null || npc.isDead()) {
 				continue;
 			}
+//			log.info("[ColosseumState.scanCurrentState()] Saw NPC: {} ID: {}", npc.getName(), npc.getId());
 
-			if (isColosseumEnemy(npc)) {
-				detectedNpcs.add(npc);
+			NPCComposition composition = npc.getComposition();
+			int npcId = npc.getId();
+			String npcName = npc.getName();
+			if (composition != null)
+			{
+				npcId = composition.getId();
+			}
+
+			if (trackedNpcIds.contains(npcId)) {
+				ColosseumNPC colosseumNpc = generateNpc(npc, composition);
+				detectedNpcs.add(colosseumNpc);
 			}
 		}
 
 		return ColosseumState.builder()
 			.wave(currentWave)
-			.tick(client.getTickCount()-waveStart)
+			.tick(client.getTickCount() - waveStart)
 			.playerLocation(playerLocation)
 			.npcs(detectedNpcs)
 			.build();
 	}
 
 	/**
-	 * Helper to filter out pets, thralls, or irrelevant NPCs.
+	 * Parse the wave results UI described by stats and return the interpreted values
 	 */
-	private boolean isColosseumEnemy(NPC npc) {
-		if (npc == null) {return false;}
+	private SummaryUI parseSummaryUI(Widget stats)
+	{
+		if (stats == null) return null;
 
-		int id = npc.getId();
-		return id != -1 && id != SOLAR_FLARE_NPC_ID && id != SITTING_SOL_HEREDIT_NPC_ID && id != MINIMUS_NPC_ID && id != FREMENNIK_MAGE_NPC_ID && id != FREMENNIK_MELEE_NPC_ID && id != FREMENNIK_RANGED_NPC_ID && id != BOSS_WAVE_BEAM_CRYSTAL && id != BEE_SWARM_NPC_ID && id != HEALING_TOTEM_NPC_ID;
+		int waveBonusGlory = parseNum(clean(stats, 1));
+
+		String speedText = clean(stats, 3);
+		int speedBonusGlory = parseNum(speedText.split("\\(")[0]);
+		int speedBonusTimeSeconds = 0;
+		if (speedText.contains("(")) {
+			speedBonusTimeSeconds = parseTime(speedText.substring(speedText.indexOf("(") + 1, speedText.indexOf(")")));
+		}
+
+		int modChoiceGlory = parseNum(clean(stats, 5));
+
+		String dmgText = clean(stats, 7);
+		int damageTakenGlory = parseNum(dmgText.split("\\(")[0]);
+		int damageTakenAmount = 0;
+		if (dmgText.contains("(")) {
+			damageTakenAmount = parseNum(dmgText.substring(dmgText.indexOf("(") + 1, dmgText.indexOf(")")));
+		}
+
+		int totalGlory = parseNum(clean(stats, 10));
+		int totalTime = parseTime(clean(stats, 11));
+
+
+		return SummaryUI.builder()
+			.waveBonusGlory(waveBonusGlory)
+			.speedBonusGlory(speedBonusGlory)
+			.speedBonusTimeSeconds(speedBonusTimeSeconds)
+			.modChoiceGlory(modChoiceGlory)
+			.damageTakenGlory(damageTakenGlory)
+			.damageTakenAmount(damageTakenAmount)
+			.waveGlory(waveBonusGlory + modChoiceGlory + damageTakenGlory + speedBonusGlory)
+			.totalGlory(totalGlory)
+			.totalTimeSeconds(totalTime)
+			.build();
 	}
 
+	private String clean(Widget parent, int childId) {
+		Widget w = parent.getChild(childId);
+		return (w != null) ? Text.removeTags(w.getText()) : "";
+	}
+
+	private static int parseNum(String s) {
+		String val = s.replaceAll("[^0-9-]", "");
+		return val.isEmpty() ? 0 : Integer.parseInt(val);
+	}
+
+	private static int parseTime(String s) {
+		if (!s.contains(":")) return 0;
+		String[] parts = s.split(":");
+		return (Integer.parseInt(parts[0].trim()) * 60) + Integer.parseInt(parts[1].trim());
+	}
+
+	/**
+	 * Iterate over lootContainer elements, attempt to extract a quantity of items from each element and return the extracted data as a List.
+	 */
 	private List<ItemBundle> parseNextLoot(Widget lootContainer)
 	{
 		List<ItemBundle> nextLoot = new ArrayList<>();
@@ -348,7 +457,7 @@ public class ColosseumScanner {
 				int quantity = child.getItemQuantity();
 				ItemBundle nextItem = ItemBundle.fromComp(itemManager.getItemComposition(id), quantity);
 
-				if (config.logQuiverAsSplinters() && nextItem.getItemId() == DIZANAS_QUIVER_UNCHARGED_ID)
+				if (enabledSwapQuiverLoot && nextItem.getItemId() == DIZANAS_QUIVER_UNCHARGED_ID)
 					nextLoot.add(swappedDizanasQuiver);
 				else
 					nextLoot.add(nextItem);
@@ -357,6 +466,9 @@ public class ColosseumScanner {
 		return nextLoot;
 	}
 
+	/**
+	 * Extract and return the active modifiers listed in the given modifierContainer
+	 */
 	private List<ColosseumModifier> parseActiveModifiers(Widget modifierContainer)
 	{
 		List<ColosseumModifier> parsedModifiers = new ArrayList<>();
@@ -370,5 +482,37 @@ public class ColosseumScanner {
 			}
 		}
 		return parsedModifiers;
+	}
+
+	/**
+	 * Update flags that are derived from (combinations of) configurations.
+	 */
+	public void updateConfigFlags(boolean startUp)
+	{
+		enabledSwapQuiverLoot = config.logQuiverAsSplinters();
+
+		if (startUp) {
+			OPTIONAL_NPC_SUPPLIERS = ImmutableMap.<BooleanSupplier, Collection<Integer>>builder()
+				.put(config::logBeeSwarm, Collections.singletonList(BEE_SWARM_NPC_ID))
+				.put(config::logSolarFlare, Collections.singletonList(SOLAR_FLARE_NPC_ID))
+				.put(config::logHealingTotem, Collections.singletonList(HEALING_TOTEM_NPC_ID))
+				.put(config::logBeamCrystal, Collections.singletonList(BOSS_WAVE_BEAM_CRYSTAL))
+				.put(config::logFremenniks, Arrays.asList(
+					FREMENNIK_MAGE_NPC_ID,
+					FREMENNIK_MELEE_NPC_ID,
+					FREMENNIK_RANGED_NPC_ID
+				))
+				.build();
+		}
+		trackedNpcIds.clear();
+		trackedNpcIds.addAll(CORE_COLOSSEUM_MOBS);
+
+		for (Map.Entry<BooleanSupplier, Collection<Integer>> entry : OPTIONAL_NPC_SUPPLIERS.entrySet())
+		{
+			if (entry.getKey().getAsBoolean())
+			{
+				trackedNpcIds.addAll(entry.getValue());
+			}
+		}
 	}
 }
