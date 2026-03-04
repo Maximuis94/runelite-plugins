@@ -43,10 +43,8 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.Reader;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Deque;
 import java.util.List;
 import java.util.Properties;
 import java.util.function.Function;
@@ -77,8 +75,9 @@ public class FileIOService
 	private final File COLOSSEUM_TIMELINE_DIR = new File(COLOSSEUM_ROOT_DIR, "timeline");
 	private final File COLOSSEUM_LOG_DIR = new File(COLOSSEUM_ROOT_DIR, "log");
 	private final File COLOSSEUM_CSV_DIR = new File(COLOSSEUM_ROOT_DIR, "csv");
-	private final File COLOSSEUM_SCREENSHOT_DIR = new File(COLOSSEUM_ROOT_DIR, "screenshot");
 	private final File COLOSSEUM_TEMP_DIR = new File(COLOSSEUM_ROOT_DIR, "temp");
+	private final File SCREENSHOT_DIR = new File(PLUGIN_ROOT, "screenshot");
+	private final File COLOSSEUM_SCREENSHOT_DIR = new File(COLOSSEUM_ROOT_DIR, "screenshot");
 
 	/**
 	 * Parse the rows associated with the given LogType and account
@@ -374,6 +373,33 @@ public class FileIOService
 			log.error("Failed to save Colosseum screenshot", e);
 		}
 
+	}
+
+	/**
+	 * Saves a screenshot to a specified sub-directory with a specific file name.
+	 * * @param screenshot   The image to save
+	 * @param subDirectory The path relative to the root screenshots folder (e.g., "colosseum/231012_143000")
+	 * @param fileName     The name of the file without the extension (e.g., "wave-01")
+	 */
+	public void saveScreenshot(BufferedImage screenshot, String subDirectory, String fileName) {
+		try {
+			File dir = new File(SCREENSHOT_DIR, subDirectory);
+			if (!dir.exists()) {
+				if (dir.mkdirs()) {
+					log.debug("Created screenshot directory: {}", dir.getAbsolutePath());
+				} else {
+					log.error("Failed to create screenshot directory: {}", dir.getAbsolutePath());
+					return;
+				}
+			}
+
+			File file = new File(dir, fileName + ".png");
+			ImageIO.write(screenshot, "png", file);
+
+			log.info("Saved screenshot to {}", file.getAbsolutePath());
+		} catch (IOException e) {
+			log.error("Failed to save screenshot", e);
+		}
 	}
 
 	public void writeColosseumCSVLog(String account, String attemptId, String rows) {

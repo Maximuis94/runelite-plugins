@@ -24,12 +24,10 @@ import com.datalogger.models.common.ItemBundle;
 import com.datalogger.services.ColosseumScanner;
 import com.datalogger.services.FileIOService;
 import com.google.common.primitives.Ints;
-import java.awt.image.BufferedImage;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ScheduledExecutorService;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import lombok.extern.slf4j.Slf4j;
@@ -46,7 +44,6 @@ import net.runelite.api.widgets.Widget;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
-import net.runelite.client.ui.DrawManager;
 import net.runelite.client.util.Text;
 import org.apache.commons.lang3.NotImplementedException;
 
@@ -74,8 +71,6 @@ public class ColosseumAttemptLogger extends AbstractLogger
 	private int waveStartTick;
 	private int waveEndTick;
 
-	private boolean screenshotUI;
-
 	private final List<ColosseumState> states = new ArrayList<>();
 	private ColosseumAttempt currentAttempt;
 	private WaveStatus finalStatus;
@@ -85,21 +80,16 @@ public class ColosseumAttemptLogger extends AbstractLogger
 	private final FileIOService fileIOService;
 	private final DataLoggerConfig config;
 	private final ConfigManager configManager;
-	private final DrawManager drawManager;
-	private final ScheduledExecutorService executor;
 
 	private boolean waitingForIntermission;
 	private boolean widgetIsOpen;
-	private boolean fullSkip;
 
 	@Inject
-	public ColosseumAttemptLogger(ColosseumScanner scanner, Client client, FileIOService fileIOService, DataLoggerConfig config, DrawManager drawManager, ScheduledExecutorService executor, ConfigManager configManager) {
+	public ColosseumAttemptLogger(ColosseumScanner scanner, Client client, FileIOService fileIOService, DataLoggerConfig config, ConfigManager configManager) {
 		this.scanner = scanner;
 		this.client = client;
 		this.fileIOService = fileIOService;
 		this.config = config;
-		this.drawManager = drawManager;
-		this.executor = executor;
 		this.configManager = configManager;
 
 		updateConfigFlags();
@@ -111,7 +101,6 @@ public class ColosseumAttemptLogger extends AbstractLogger
 	 */
 	private void updateConfigFlags()
 	{
-		fullSkip = !config.screenshotBetweenWaves() && !config.logColosseum();
 		enabledLogging = config.logColosseum();
 		enabledCsvLogging = enabledLogging && config.logColosseumCSV();
 		enabledTimelineLogging = enabledLogging && config.logWaveTimeline();
@@ -224,10 +213,9 @@ public class ColosseumAttemptLogger extends AbstractLogger
 
 	@Subscribe
 	public void onWidgetLoaded(WidgetLoaded event) {
-		if (fullSkip || !inColosseum) return;
+		if (!inColosseum) return;
 
 		if (isColosseumUI(event)) {
-			takeColosseumScreenshot();
 			widgetIsOpen = true;
 		}
 	}
@@ -267,7 +255,6 @@ public class ColosseumAttemptLogger extends AbstractLogger
 	private void startAttempt() {
 		attemptStartTick = client.getTickCount();
 		currentWave = 1;
-		screenshotUI = true;
 		activeWave = false;
 		currentAttempt = new ColosseumAttempt(attemptStartTick);
 		finalStatus = null;
@@ -356,7 +343,6 @@ public class ColosseumAttemptLogger extends AbstractLogger
 		if (activeWave) return;
 
 		waveStartTick = client.getTickCount();
-		screenshotUI = true;
 
 		activeWave = true;
 		log.debug("Starting Wave {}", currentWave);
@@ -387,21 +373,6 @@ public class ColosseumAttemptLogger extends AbstractLogger
 			log.warn("Wave {} ended. Captured {}/{} ticks (missed {} ticks)", currentWave, ticksCaptured, nTicks, nMissed);
 		}
 
-	}
-
-	/**
-	 * Take a screenshot if the appropriate conditions are met
-	 */
-	private void takeColosseumScreenshot() {
-		if (!config.screenshotBetweenWaves()) return;
-		if (!screenshotUI) return;
-
-		drawManager.requestNextFrameListener(image -> {
-			executor.submit(() -> {
-				fileIOService.logColosseumScreenshot((BufferedImage) image, currentAttempt.getStartTime(), currentWave);
-			});
-		});
-		screenshotUI = false;
 	}
 
 	/**

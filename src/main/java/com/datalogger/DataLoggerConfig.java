@@ -56,6 +56,13 @@ public interface DataLoggerConfig extends Config {
 	)
 	String colosseumNpcSection = "colosseumNpc";
 
+	@ConfigSection(
+		name = "Screenshots",
+		description = "Settings for automatic screenshot capturing",
+		position = 3
+	)
+	String screenshotSection = "screenshot";
+
 	// --- Grand Exchange Items ---
 
 	@ConfigItem(
@@ -79,7 +86,7 @@ public interface DataLoggerConfig extends Config {
 	default boolean logColosseum() { return true; }
 
 	@ConfigItem(
-		keyName = "logColosseumCSV", // Fixed duplicate keyName from "logColosseum"
+		keyName = "logColosseumCSV",
 		name = "Log Colosseum Trials (CSV)",
 		description = "If enabled, Fortis Colosseum waves are also logged in a CSV file.",
 		position = 1,
@@ -88,22 +95,13 @@ public interface DataLoggerConfig extends Config {
 	default boolean logColosseumCSV() { return true; }
 
 	@ConfigItem(
-		keyName = "logWaveTimeline", // Fixed duplicate keyName from "logColosseum"
+		keyName = "logWaveTimeline",
 		name = "Track player and NPC locations every tick during waves.",
 		description = "If enabled, a state composed of player- and relevant NPC-locations is generated every game tick and added to a timeline.",
-		position = 1,
-		section = colosseumSection
-	)
-	default boolean logWaveTimeline() { return true; }
-
-	@ConfigItem(
-		keyName = "screenshotBetweenWaves",
-		name = "Screenshot Between Waves",
-		description = "Automatically take a screenshot between waves when the UI/chest is opened",
 		position = 2,
 		section = colosseumSection
 	)
-	default boolean screenshotBetweenWaves() { return false; }
+	default boolean logWaveTimeline() { return true; }
 
 	@ConfigItem(
 		keyName = "logQuiverAsSplinters",
@@ -138,7 +136,7 @@ public interface DataLoggerConfig extends Config {
 		keyName = "logHealingTotem",
 		name = "Log Healing Totems",
 		description = "Include Healing totem locations in timeline data",
-		position = 3,
+		position = 2,
 		section = colosseumNpcSection
 	)
 	default boolean logHealingTotem() { return false; }
@@ -147,7 +145,7 @@ public interface DataLoggerConfig extends Config {
 		keyName = "logBeeSwarm",
 		name = "Log Bee Swarms",
 		description = "Include Bee Swarm locations in timeline data",
-		position = 2,
+		position = 3,
 		section = colosseumNpcSection
 	)
 	default boolean logBeeSwarm() { return false; }
@@ -160,4 +158,15 @@ public interface DataLoggerConfig extends Config {
 		section = colosseumNpcSection
 	)
 	default boolean logBeamCrystal() { return false; }
+
+	// --- Screenshot Items ---
+
+	@ConfigItem(
+		keyName = "screenshotBetweenWaves",
+		name = "Colosseum Wave Completion",
+		description = "Automatically take a screenshot after completing a wave when the intermission/rewards chest UI is visible",
+		position = 0,
+		section = screenshotSection
+	)
+	default boolean screenshotBetweenWaves() { return false; }
 }

@@ -26,6 +26,7 @@ package com.datalogger;
 
 import com.datalogger.loggers.ColosseumAttemptLogger;
 import com.datalogger.loggers.GrandExchangeLogger;
+import com.datalogger.loggers.ScreenshotLogger;
 import com.datalogger.services.ColosseumScanner;
 import com.datalogger.ui.DataLoggerPanel;
 import com.google.inject.Provides;
@@ -61,6 +62,7 @@ public class DataLoggerPlugin extends Plugin
 	@Inject private GrandExchangeLogger geLogger;
 	@Inject private ColosseumAttemptLogger coloLogger;
 	@Inject private ColosseumScanner coloScanner;
+	@Inject private ScreenshotLogger screenshotLogger;
 
 	@Inject private DataLoggerPanel panel;
 
@@ -78,17 +80,17 @@ public class DataLoggerPlugin extends Plugin
 		eventBus.register(geLogger);
 		eventBus.register(coloLogger);
 		eventBus.register(coloScanner);
+		eventBus.register(screenshotLogger);
 		coloScanner.updateConfigFlags(true);
 
 		final BufferedImage icon = ImageUtil.loadImageResource(getClass(), "icon.png");
 		navButton = NavigationButton.builder()
 			.tooltip("Data Logger Viewer")
 			.icon(icon)
-			.priority(5) // Adjust priority to move it up or down in the sidebar
+			.priority(5)
 			.panel(panel)
 			.build();
 
-		// 3. Add it to the sidebar
 		clientToolbar.addNavigation(navButton);
 	}
 
@@ -98,6 +100,7 @@ public class DataLoggerPlugin extends Plugin
 		eventBus.unregister(geLogger);
 		eventBus.unregister(coloLogger);
 		eventBus.unregister(coloScanner);
+		eventBus.unregister(screenshotLogger);
 		clientToolbar.removeNavigation(navButton);
 	}
 }
