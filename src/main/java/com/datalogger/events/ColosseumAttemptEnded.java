@@ -22,43 +22,10 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package com.datalogger.events;
+import lombok.Value;
 
-package com.datalogger.models.colosseum;
-
-import com.datalogger.dto.ColosseumStateDTO;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.stream.Collectors;
-import lombok.Builder;
-import lombok.Data;
-import net.runelite.api.NPC;
-import net.runelite.api.coords.WorldPoint;
-
-/**
- * The state of the Colosseum at a particular tick during a particular wave. It encodes the coordinates of the player
- * and the NPCs, as well as the wave id and tick number
- */
-@Data
-@Builder
-public class ColosseumState
-{
-	private int wave;
-	private int tick;
-	private int playerHp;
-	private int playerPrayer;
-	private WorldPoint playerLocation;
-	private List<ColosseumNPC> npcs; // Changed to List for better API practice
-
-	/**
-	 * Converts this live engine state into a static DTO for saving.
-	 */
-	public ColosseumStateDTO toDTO() {
-		return ColosseumStateDTO.builder()
-			.wave(this.wave)
-			.tick(this.tick)
-			.playerX(this.playerLocation != null ? this.playerLocation.getX() : 0)
-			.playerY(this.playerLocation != null ? this.playerLocation.getY() : 0)
-			.npcs(this.npcs)
-			.build();
-	}
+@Value
+public class ColosseumAttemptEnded {
+	String attemptId;
 }

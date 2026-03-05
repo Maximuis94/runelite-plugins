@@ -1,6 +1,7 @@
 package com.datalogger.loggers;
 
 import com.datalogger.DataLoggerConfig;
+import com.datalogger.constants.Colosseum;
 import static com.datalogger.constants.Colosseum.Intermission.INTERMISSION_GROUP_ID;
 import static com.datalogger.constants.Colosseum.Intermission.INTERMISSION_RESULT_CONTAINER;
 import static com.datalogger.constants.Colosseum.Message.BOSS_WAVE_START_PREFIX;
@@ -8,14 +9,23 @@ import static com.datalogger.constants.Colosseum.Message.DEATH_MESSAGE;
 import static com.datalogger.constants.Colosseum.Message.END_ATTEMPT_MESSAGE;
 import static com.datalogger.constants.Colosseum.Message.START_ATTEMPT_MESSAGE;
 import static com.datalogger.constants.Colosseum.Message.WAVE_START_PREFIX;
+import static com.datalogger.constants.Colosseum.NPC.JAGUAR_WARRIOR_NPC_ID;
+import static com.datalogger.constants.Colosseum.NPC.JAVELIN_COLOSSUS_NPC_ID;
+import static com.datalogger.constants.Colosseum.NPC.MANTICORE_NPC_ID;
+import static com.datalogger.constants.Colosseum.NPC.MINOTAUR_NPC_ID;
+import static com.datalogger.constants.Colosseum.NPC.MINOTAUR_RED_FLAG_NPC_ID;
+import static com.datalogger.constants.Colosseum.NPC.SERPENT_SHAMAN_NPC_ID;
+import static com.datalogger.constants.Colosseum.NPC.SHOCKWAVE_COLOSSUS_NPC_ID;
 import static com.datalogger.constants.Colosseum.Region.COLOSSEUM_REGION_ID;
 import static com.datalogger.constants.Colosseum.RewardsChest.REWARDS_CHEST_GROUP_ID;
 import static com.datalogger.constants.Colosseum.RewardsChest.REWARDS_CHEST_REWARDS_TAB_CHILD_ID;
 import static com.datalogger.constants.Colosseum.Varbit.COLOSSEUM_SELECTED_MODIFIER_VARBIT;
+import com.datalogger.events.ColosseumAttemptEnded;
+import com.datalogger.events.ColosseumWaveEnded;
+import com.datalogger.events.ColosseumWaveStarted;
 import com.datalogger.framework.AbstractLogger;
 import com.datalogger.framework.LogType;
 import com.datalogger.models.colosseum.ColosseumAttempt;
-import com.datalogger.models.colosseum.ColosseumState;
 import com.datalogger.models.colosseum.ColosseumWave;
 import com.datalogger.models.colosseum.IntermissionUI;
 import com.datalogger.models.colosseum.enums.ColosseumModifier;
@@ -27,21 +37,30 @@ import com.google.common.primitives.Ints;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import lombok.extern.slf4j.Slf4j;
+import net.runelite.api.ActorSpotAnim;
 import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
+import net.runelite.api.IndexedObjectSet;
+import net.runelite.api.NPC;
 import net.runelite.api.WorldView;
+import net.runelite.api.coords.WorldPoint;
 import net.runelite.api.events.ChatMessage;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
+import net.runelite.api.events.GraphicChanged;
+import net.runelite.api.events.NpcSpawned;
 import net.runelite.api.events.VarbitChanged;
 import net.runelite.api.events.WidgetLoaded;
 import net.runelite.api.widgets.Widget;
 import net.runelite.client.config.ConfigManager;
+import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.util.Text;
@@ -53,25 +72,25 @@ public class ColosseumAttemptLogger extends AbstractLogger
 {
 	private IntermissionUI parsedTransitionUI;
 
+	private String entryTag;
+	private String entryAccount;
+
 	private boolean activeTrial;
 	private boolean activeWave;
 	private boolean inColosseum;
 
 	private boolean enabledLogging;
 	private boolean enabledCsvLogging;
-	private boolean enabledTimelineLogging;
 
 	private int currentWave;
 	private int selectedModifierIdx;
 	private ColosseumModifier selectedModifier;
-	private int lastWaveTickCount;
 
 	private int attemptStartTick;
 	private int attemptEndTick;
 	private int waveStartTick;
 	private int waveEndTick;
 
-	private final List<ColosseumState> states = new ArrayList<>();
 	private ColosseumAttempt currentAttempt;
 	private WaveStatus finalStatus;
 
@@ -80,30 +99,43 @@ public class ColosseumAttemptLogger extends AbstractLogger
 	private final FileIOService fileIOService;
 	private final DataLoggerConfig config;
 	private final ConfigManager configManager;
+	private final EventBus eventBus;
 
 	private boolean waitingForIntermission;
 	private boolean widgetIsOpen;
 
+	private WorldPoint serpentShamanSpawn;
+	private WorldPoint javelinColossusSpawnA;
+	private WorldPoint javelinColossusSpawnB;
+	private WorldPoint manticoreSpawnA;
+	private WorldPoint manticoreSpawnB;
+	private WorldPoint shockwaveColossusSpawnA;
+	private WorldPoint shockwaveColossusSpawnB;
+
+	private WorldPoint jaguarWarriorReinforcementsSpawn;
+	private WorldPoint serpentShamanReinforcementsSpawn;
+	private WorldPoint minotaurReinforcementsSpawn;
+
 	@Inject
-	public ColosseumAttemptLogger(ColosseumScanner scanner, Client client, FileIOService fileIOService, DataLoggerConfig config, ConfigManager configManager) {
+	public ColosseumAttemptLogger(ColosseumScanner scanner, Client client, FileIOService fileIOService, DataLoggerConfig config, ConfigManager configManager, EventBus eventBus) {
 		this.scanner = scanner;
 		this.client = client;
 		this.fileIOService = fileIOService;
 		this.config = config;
 		this.configManager = configManager;
+		this.eventBus = eventBus;
 
 		updateConfigFlags();
 		startAttempt();
 	}
 
 	/**
-	 * Update booleans derived from (combinations of) plugin configurations
+	 * Parse relevant plugin configurations
 	 */
 	private void updateConfigFlags()
 	{
 		enabledLogging = config.logColosseum();
 		enabledCsvLogging = enabledLogging && config.logColosseumCSV();
-		enabledTimelineLogging = enabledLogging && config.logWaveTimeline();
 	}
 
 	@Subscribe
@@ -125,6 +157,8 @@ public class ColosseumAttemptLogger extends AbstractLogger
 	@Subscribe
 	public void onChatMessage(ChatMessage event)
 	{
+		IndexedObjectSet<? extends NPC> npcs = client.getTopLevelWorldView().npcs();
+		NPC npc = npcs.byIndex(0);
 		if (!enabledLogging || !inColosseum) return;
 
 		if (event.getType() != ChatMessageType.NPC_SAY && event.getType() != ChatMessageType.GAMEMESSAGE  && event.getType() != ChatMessageType.CONSOLE)
@@ -166,8 +200,8 @@ public class ColosseumAttemptLogger extends AbstractLogger
 		{
 			waveEndTick = client.getTickCount();
 			waitingForIntermission = true;
-			if (enabledTimelineLogging)
-				endWave();
+
+			endWave();
 			return;
 		}
 
@@ -191,9 +225,24 @@ public class ColosseumAttemptLogger extends AbstractLogger
 		}
 	}
 
+	private void parseNpcAnimations(NPC npc)
+	{
+		if (npc.getId() != MANTICORE_NPC_ID || scanner.scannedManticoreSequences(currentWave)) return;
+		scanner.parseManticoreAttackSequence(npc);
+	}
+
 	@Subscribe
 	public void onGameTick(GameTick event) {
 		if (!enabledLogging || !inColosseum) return;
+
+		if (!scanner.scannedManticoreSequences(currentWave))
+		{
+			for (NPC npc : client.getTopLevelWorldView().npcs())
+			{
+				if (npc != null)
+					scanner.parseManticoreAttackSequence(npc);
+			}
+		}
 
 		if (widgetIsOpen)
 		{
@@ -202,12 +251,6 @@ public class ColosseumAttemptLogger extends AbstractLogger
 				widgetIsOpen = false;
 				parseUI();
 			}
-		}
-
-		if (enabledTimelineLogging && activeWave)
-		{
-			ColosseumState state = scanner.scanCurrentState(currentWave, waveStartTick);
-			states.add(state);
 		}
 	}
 
@@ -219,6 +262,60 @@ public class ColosseumAttemptLogger extends AbstractLogger
 			widgetIsOpen = true;
 		}
 	}
+
+	@Subscribe
+	public void onNpcSpawned(NpcSpawned event) {
+		if (!activeWave || !inColosseum) return;
+
+		NPC npc = event.getNpc();
+		int id = npc.getId();
+		WorldPoint loc = npc.getWorldLocation();
+
+		int relativeTick = client.getTickCount() - waveStartTick;
+
+		if (relativeTick > 30) {
+			switch (id) {
+				case JAGUAR_WARRIOR_NPC_ID:
+					jaguarWarriorReinforcementsSpawn = loc;
+					break;
+				case MINOTAUR_RED_FLAG_NPC_ID:
+				case MINOTAUR_NPC_ID:
+					minotaurReinforcementsSpawn = loc;
+					break;
+				case SERPENT_SHAMAN_NPC_ID:
+					serpentShamanReinforcementsSpawn = loc;
+					break;
+			}
+		}
+		else {
+			switch (id) {
+				case SERPENT_SHAMAN_NPC_ID:
+					serpentShamanSpawn = loc;
+					break;
+				case JAVELIN_COLOSSUS_NPC_ID:
+					if (javelinColossusSpawnA == null) javelinColossusSpawnA = loc;
+					else javelinColossusSpawnB = loc;
+					break;
+				case MANTICORE_NPC_ID:
+					if (manticoreSpawnA == null)
+					{
+						manticoreSpawnA = loc;
+						scanner.setManticoreIndexA(npc.getIndex());
+					}
+					else
+					{
+						manticoreSpawnB = loc;
+						scanner.setManticoreIndexA(npc.getIndex());
+					}
+					break;
+				case SHOCKWAVE_COLOSSUS_NPC_ID:
+					if (shockwaveColossusSpawnA == null) shockwaveColossusSpawnA = loc;
+					else shockwaveColossusSpawnB = loc;
+					break;
+			}
+		}
+	}
+
 
 	@Subscribe
 	public void onGameStateChanged(GameStateChanged event) {
@@ -262,6 +359,18 @@ public class ColosseumAttemptLogger extends AbstractLogger
 		waitingForIntermission = true;
 		parsedTransitionUI = null;
 
+		try
+		{
+			entryTag = config.colosseumTag();
+			entryAccount = getAccountName();
+		}
+		catch (NullPointerException e)
+		{
+			entryTag = "";
+			entryAccount = "";
+		}
+
+
 		log.info("Starting a new Colosseum attempt.");
 	}
 
@@ -271,12 +380,12 @@ public class ColosseumAttemptLogger extends AbstractLogger
 	 */
 	private void endAttempt()
 	{
+		eventBus.post(new ColosseumAttemptEnded(currentAttempt.getStartTime()));
 		currentAttempt.setFinalStatus(finalStatus);
-		fileIOService.mergeTimelineFiles(currentAttempt.getStartTime());
 		fileIOService.logColosseumAttempt(currentAttempt);
 
 		if (enabledCsvLogging)
-			fileIOService.writeColosseumCSVLog(getAccountName(), currentAttempt.getStartTime(), writeCsvLog());
+			fileIOService.writeColosseumCSVLog(entryAccount, currentAttempt.getStartTime(), writeCsvLog());
 		currentAttempt = null;
 	}
 
@@ -317,6 +426,8 @@ public class ColosseumAttemptLogger extends AbstractLogger
 		ColosseumWave failedWave = ColosseumWave.builder()
 			.wave(currentWave)
 			.status(WaveStatus.FAILED)
+			.accountName(entryAccount)
+			.tag(entryTag)
 			.earnedLoot(loot)
 			.modifierChoices(parsedTransitionUI != null ? parsedTransitionUI.getModifierChoices() : new ArrayList<>())
 			.chosenModifier(selectedModifier)
@@ -330,12 +441,26 @@ public class ColosseumAttemptLogger extends AbstractLogger
 			.completionBonus(0)
 			.waveGlory(0)
 			.totalGlory(parsedTransitionUI != null ? parsedTransitionUI.getTotalGlory() : 0)
+			.serpentShamanSpawn(serpentShamanSpawn)
+			.javelinColossusSpawnA(javelinColossusSpawnA)
+			.javelinColossusSpawnB(javelinColossusSpawnB)
+			.manticoreSpawnA(manticoreSpawnA)
+			.manticoreSequenceA(scanner.getManticoreSequenceA())
+			.manticoreSpawnB(manticoreSpawnB)
+			.manticoreSequenceB(scanner.getManticoreSequenceB())
+			.shockwaveColossusSpawnA(shockwaveColossusSpawnA)
+			.shockwaveColossusSpawnB(shockwaveColossusSpawnB)
+			.jaguarWarriorReinforcementsSpawn(jaguarWarriorReinforcementsSpawn)
+			.serpentShamanReinforcementsSpawn(serpentShamanReinforcementsSpawn)
+			.minotaurReinforcementsSpawn(minotaurReinforcementsSpawn)
 			.build();
 
 		log.debug("Failed Colosseum attempt during wave {}", currentWave);
 		log.debug(failedWave.toString());
 
+
 		currentAttempt.submitWave(failedWave);
+
 		endAttempt();
 	}
 
@@ -343,36 +468,34 @@ public class ColosseumAttemptLogger extends AbstractLogger
 		if (activeWave) return;
 
 		waveStartTick = client.getTickCount();
-
+		eventBus.post(new ColosseumWaveStarted(currentAttempt.getStartTime(), currentWave, waveStartTick));
 		activeWave = true;
+		scanner.resetManticoreSequences();
+
+		serpentShamanSpawn = null;
+		javelinColossusSpawnA = null;
+		javelinColossusSpawnB = null;
+		manticoreSpawnA = null;
+		manticoreSpawnB = null;
+		shockwaveColossusSpawnA = null;
+		shockwaveColossusSpawnB = null;
+
+		jaguarWarriorReinforcementsSpawn = null;
+		serpentShamanReinforcementsSpawn = null;
+		minotaurReinforcementsSpawn = null;
+		
 		log.debug("Starting Wave {}", currentWave);
+		
+		
 	}
 
 	/**
-	 * End the wave by submitting the registered WaveState instances to a temporary file.
+	 * Ends the wave; flag is updated and a log message is produced.
 	 */
 	public void endWave() {
 		activeWave = false;
-
-		List<ColosseumState> snapshot = new ArrayList<>(this.states);
-		int ticksCaptured = snapshot.size();
-
-		if (ticksCaptured == 0) return;
-
-		fileIOService.saveWaveStates(currentAttempt.getStartTime(), currentWave, snapshot);
-
-		this.lastWaveTickCount = ticksCaptured;
-		int nTicks = waveEndTick - waveStartTick;
-		states.clear();
-
-		if (nTicks == ticksCaptured)
-			log.debug("Wave {} ended. Captured {}/{} ticks. Waiting for UI...", currentWave, ticksCaptured, nTicks);
-		else
-		{
-			int nMissed = nTicks - ticksCaptured;
-			log.warn("Wave {} ended. Captured {}/{} ticks (missed {} ticks)", currentWave, ticksCaptured, nTicks, nMissed);
-		}
-
+		eventBus.post(new ColosseumWaveEnded(currentAttempt.getStartTime(), currentWave));
+		log.debug("Wave {} ended", currentWave);
 	}
 
 	/**
@@ -425,6 +548,8 @@ public class ColosseumAttemptLogger extends AbstractLogger
 		return ColosseumWave.builder()
 			.wave(currentWave)
 			.status(WaveStatus.COMPLETED)
+			.accountName(entryAccount)
+			.tag(entryTag)
 			.earnedLoot(loot)
 			.modifierChoices(parsedTransitionUI.getModifierChoices())
 			.chosenModifier(parsedTransitionUI.getSelectedModifier())
@@ -438,35 +563,25 @@ public class ColosseumAttemptLogger extends AbstractLogger
 			.completionBonus(curUI.getWaveBonusGlory())
 			.waveGlory(curUI.getWaveGlory())
 			.totalGlory(curUI.getTotalGlory())
+			.serpentShamanSpawn(serpentShamanSpawn)
+			.javelinColossusSpawnA(javelinColossusSpawnA)
+			.javelinColossusSpawnB(javelinColossusSpawnB)
+			.manticoreSpawnA(manticoreSpawnA)
+			.manticoreSequenceA(scanner.getManticoreSequenceA())
+			.manticoreSpawnB(manticoreSpawnB)
+			.manticoreSequenceB(scanner.getManticoreSequenceB())
+			.shockwaveColossusSpawnA(shockwaveColossusSpawnA)
+			.shockwaveColossusSpawnB(shockwaveColossusSpawnB)
+			.jaguarWarriorReinforcementsSpawn(jaguarWarriorReinforcementsSpawn)
+			.serpentShamanReinforcementsSpawn(serpentShamanReinforcementsSpawn)
+			.minotaurReinforcementsSpawn(minotaurReinforcementsSpawn)
+
 			.build();
 	}
 
-	private ColosseumWave generateFailedWave()
-	{
-		List<ItemBundle> loot = parsedTransitionUI != null && parsedTransitionUI.getPotentialLoot() != null
-			? parsedTransitionUI.getPotentialLoot()
-			: new ArrayList<>();
-
-		double timeTaken = getWaveTimeTaken();
-		return ColosseumWave.builder()
-			.wave(currentWave)
-			.status(WaveStatus.FAILED)
-			.earnedLoot(loot)
-			.modifierChoices(parsedTransitionUI != null ? parsedTransitionUI.getModifierChoices() : new ArrayList<>())
-			.chosenModifier(parsedTransitionUI != null ? parsedTransitionUI.getSelectedModifier() : null)
-			.startTick(waveStartTick)
-			.endTick(waveEndTick)
-			.timeTaken(timeTaken)
-			.damageTaken(0)
-			.speedBonus(0)
-			.damageBonus(0)
-			.modifierGlory(0)
-			.completionBonus(0)
-			.waveGlory(0)
-			.totalGlory(parsedTransitionUI != null ? parsedTransitionUI.getWaveGlory() : 0)
-			.build();
-	}
-
+	/**
+	 * Generate a cancelled wave and return it. Occurs after parsing the rewards chest UI before wave 12.
+	 */
 	private ColosseumWave generateCancelledWave(IntermissionUI curUI)
 	{
 		List<ItemBundle> loot = parsedTransitionUI != null && parsedTransitionUI.getPotentialLoot() != null
@@ -476,6 +591,8 @@ public class ColosseumAttemptLogger extends AbstractLogger
 		return ColosseumWave.builder()
 			.wave(currentWave+1)
 			.status(WaveStatus.CANCELLED)
+			.accountName(entryAccount)
+			.tag(entryTag)
 			.earnedLoot(loot)
 			.modifierChoices(parsedTransitionUI != null ? parsedTransitionUI.getModifierChoices() : new ArrayList<>())
 			.chosenModifier(null)
@@ -488,6 +605,18 @@ public class ColosseumAttemptLogger extends AbstractLogger
 			.modifierGlory(0)
 			.completionBonus(0)
 			.totalGlory(curUI.getWaveGlory())
+			.serpentShamanSpawn(null)
+			.javelinColossusSpawnA(null)
+			.javelinColossusSpawnB(null)
+			.manticoreSpawnA(null)
+			.manticoreSequenceA(null)
+			.manticoreSpawnB(null)
+			.manticoreSequenceB(null)
+			.shockwaveColossusSpawnA(null)
+			.shockwaveColossusSpawnB(null)
+			.jaguarWarriorReinforcementsSpawn(null)
+			.serpentShamanReinforcementsSpawn(null)
+			.minotaurReinforcementsSpawn(null)
 			.build();
 	}
 

@@ -22,43 +22,66 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
 package com.datalogger.models.colosseum;
 
-import com.datalogger.dto.ColosseumStateDTO;
+import static com.datalogger.constants.Colosseum.ManticoreAttack.MAGIC_ORB_ID;
+import static com.datalogger.constants.Colosseum.ManticoreAttack.MELEE_ORB_ID;
+import static com.datalogger.constants.Colosseum.ManticoreAttack.NO_ORB_ID;
+import static com.datalogger.constants.Colosseum.ManticoreAttack.RANGED_ORB_ID;
+import lombok.Getter;
+import net.runelite.api.ActorSpotAnim;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
-import lombok.Builder;
-import lombok.Data;
-import net.runelite.api.NPC;
-import net.runelite.api.coords.WorldPoint;
 
-/**
- * The state of the Colosseum at a particular tick during a particular wave. It encodes the coordinates of the player
- * and the NPCs, as well as the wave id and tick number
- */
-@Data
-@Builder
-public class ColosseumState
-{
-	private int wave;
-	private int tick;
-	private int playerHp;
-	private int playerPrayer;
-	private WorldPoint playerLocation;
-	private List<ColosseumNPC> npcs; // Changed to List for better API practice
+@Getter
+public class ManticoreAttackSequence {
+
+	@Getter
+	public enum ManticoreOrb {
+		MAGIC(MAGIC_ORB_ID),
+		RANGE(RANGED_ORB_ID),
+		MELEE(MELEE_ORB_ID),
+		UNKNOWN(NO_ORB_ID);
+
+		private final int id;
+
+		ManticoreOrb(int id) {
+			this.id = id;
+		}
+
+		public static ManticoreOrb fromId(int id) {
+			for (ManticoreOrb orb : values()) {
+				if (orb.getId() == id) return orb;
+			}
+			return UNKNOWN;
+		}
+	}
+
+	private final List<ManticoreOrb> orbs;
 
 	/**
-	 * Converts this live engine state into a static DTO for saving.
+	 * The constructor takes the raw SpotAnims from the engine,
+	 * sorts them by height, and safely maps them to our Enums!
 	 */
-	public ColosseumStateDTO toDTO() {
-		return ColosseumStateDTO.builder()
-			.wave(this.wave)
-			.tick(this.tick)
-			.playerX(this.playerLocation != null ? this.playerLocation.getX() : 0)
-			.playerY(this.playerLocation != null ? this.playerLocation.getY() : 0)
-			.npcs(this.npcs)
-			.build();
+	public ManticoreAttackSequence(List<ActorSpotAnim> rawSpotAnims) {
+		this.orbs = new ArrayList<>();
+
+		// Sort by height ascending (Bottom to Top)
+		rawSpotAnims.sort(Comparator.comparingInt(ActorSpotAnim::getHeight));
+
+		for (ActorSpotAnim anim : rawSpotAnims) {
+			this.orbs.add(ManticoreOrb.fromId(anim.getId()));
+		}
+	}
+
+	/**
+	 * Convert animation IDs to readable Strings, e.g. MAGIC-RANGE-MELEE
+	 */
+	public String toCsvFormat() {
+		return orbs.stream()
+			.map(Enum::name)
+			.collect(Collectors.joining("-"));
 	}
 }

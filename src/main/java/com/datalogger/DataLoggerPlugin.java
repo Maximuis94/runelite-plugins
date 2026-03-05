@@ -25,6 +25,7 @@
 package com.datalogger;
 
 import com.datalogger.loggers.ColosseumAttemptLogger;
+import com.datalogger.loggers.ColosseumTimelineLogger;
 import com.datalogger.loggers.GrandExchangeLogger;
 import com.datalogger.loggers.ScreenshotLogger;
 import com.datalogger.services.ColosseumScanner;
@@ -46,8 +47,14 @@ import net.runelite.client.util.ImageUtil;
 @Slf4j
 @PluginDescriptor(
 	name = "Data Logger",
-	description = "Logs various types of game data",
-	tags = {"ge", "grand exchange", "logger", "data"}
+	description = "Logs game data for various activities, like Fortis Colosseum results or the Grand Exchange",
+	tags = {
+		"logger", "data", "history", "screenshot", "tracker", "csv", "json",
+
+		"ge", "grand exchange",
+
+		"fortis", "colosseum"
+	}
 )
 public class DataLoggerPlugin extends Plugin
 {
@@ -63,6 +70,7 @@ public class DataLoggerPlugin extends Plugin
 	@Inject private ColosseumAttemptLogger coloLogger;
 	@Inject private ColosseumScanner coloScanner;
 	@Inject private ScreenshotLogger screenshotLogger;
+	@Inject private ColosseumTimelineLogger timelineLogger;
 
 	@Inject private DataLoggerPanel panel;
 
@@ -81,6 +89,7 @@ public class DataLoggerPlugin extends Plugin
 		eventBus.register(coloLogger);
 		eventBus.register(coloScanner);
 		eventBus.register(screenshotLogger);
+		eventBus.register(timelineLogger);
 		coloScanner.updateConfigFlags(true);
 
 		final BufferedImage icon = ImageUtil.loadImageResource(getClass(), "icon.png");
@@ -101,6 +110,7 @@ public class DataLoggerPlugin extends Plugin
 		eventBus.unregister(coloLogger);
 		eventBus.unregister(coloScanner);
 		eventBus.unregister(screenshotLogger);
+		eventBus.unregister(timelineLogger);
 		clientToolbar.removeNavigation(navButton);
 	}
 }

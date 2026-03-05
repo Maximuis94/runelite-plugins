@@ -33,6 +33,9 @@ import static com.datalogger.constants.Colosseum.Intermission.INTERMISSION_NEXT_
 import static com.datalogger.constants.Colosseum.Intermission.INTERMISSION_RESULT_CONTAINER;
 import static com.datalogger.constants.Colosseum.Item.DIZANAS_QUIVER_UNCHARGED_ID;
 import static com.datalogger.constants.Colosseum.Item.SUNFIRE_SPLINTERS_ID;
+import static com.datalogger.constants.Colosseum.ManticoreAttack.MAGIC_ORB_ID;
+import static com.datalogger.constants.Colosseum.ManticoreAttack.MELEE_ORB_ID;
+import static com.datalogger.constants.Colosseum.ManticoreAttack.RANGED_ORB_ID;
 import static com.datalogger.constants.Colosseum.NPC.*;
 import static com.datalogger.constants.Colosseum.RewardsChest.REWARDS_CHEST_GROUP_ID;
 import static com.datalogger.constants.Colosseum.RewardsChest.REWARDS_CHEST_MODIFIER_LIST_CONTAINER_ID;
@@ -41,6 +44,7 @@ import static com.datalogger.constants.Colosseum.RewardsChest.REWARDS_CHEST_SUMM
 import com.datalogger.models.colosseum.ColosseumNPC;
 import com.datalogger.models.colosseum.ColosseumState;
 import com.datalogger.models.colosseum.IntermissionUI;
+import com.datalogger.models.colosseum.ManticoreAttackSequence;
 import com.datalogger.models.colosseum.SummaryUI;
 import com.datalogger.models.colosseum.enums.ColosseumModifier;
 import com.datalogger.models.common.ItemBundle;
@@ -50,6 +54,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -60,10 +65,13 @@ import java.util.function.Function;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import lombok.extern.slf4j.Slf4j;
+import net.runelite.api.ActorSpotAnim;
 import net.runelite.api.Client;
+import net.runelite.api.IterableHashTable;
 import net.runelite.api.NPC;
 import net.runelite.api.NPCComposition;
 import net.runelite.api.Player;
+import net.runelite.api.Skill;
 import net.runelite.api.coords.WorldPoint;
 import net.runelite.api.widgets.Widget;
 import net.runelite.client.eventbus.Subscribe;
@@ -73,7 +81,8 @@ import net.runelite.client.util.Text;
 
 @Slf4j
 @Singleton
-public class ColosseumScanner {
+public class ColosseumScanner
+{
 
 	private final Client client;
 
@@ -83,8 +92,33 @@ public class ColosseumScanner {
 
 	private boolean enabledSwapQuiverLoot;
 
+	private boolean scannedManticores;
+	private Integer manticoreIndexA = null;
+	private Integer manticoreIndexB = null;
+	private final Map<Integer, ManticoreAttackSequence> manticoreSequences = new HashMap<>();
+
+	public void setManticoreIndexA(int index) {
+		manticoreIndexA = index;
+	}
+
+	public ManticoreAttackSequence getManticoreSequenceA()
+	{
+		return manticoreIndexA != null ? manticoreSequences.get(manticoreIndexA) : null;
+	}
+
+	public void setManticoreIndexB(int index) {
+		manticoreIndexB = index;
+	}
+
+	public ManticoreAttackSequence getManticoreSequenceB()
+	{
+		return manticoreIndexB != null ? manticoreSequences.get(manticoreIndexB) : null;
+	}
+
+	private final Map<Integer, List<Integer>> manticoreAttackSequences = new HashMap<>();
+
 	// Wave 12 reward instead of Dizana's quiver, if the option is active
-	private final ItemBundle swappedDizanasQuiver = new ItemBundle(SUNFIRE_SPLINTERS_ID, "Sunfire splinters", 4000);
+	private final ItemBundle SWAPPED_DIZANAS_QUIVER = new ItemBundle(SUNFIRE_SPLINTERS_ID, "Sunfire splinters", 4000);
 
 	private final Set<Integer> CORE_COLOSSEUM_MOBS = ImmutableSet.of(
 		JAVELIN_COLOSSUS_NPC_ID,
@@ -111,8 +145,10 @@ public class ColosseumScanner {
 	}
 
 	@Subscribe
-	public void onConfigChanged(ConfigChanged event) {
-		if (!event.getGroup().equals(DataLoggerConfig.CONFIG_GROUP)) {
+	public void onConfigChanged(ConfigChanged event)
+	{
+		if (!event.getGroup().equals(DataLoggerConfig.CONFIG_GROUP))
+		{
 			return;
 		}
 
@@ -120,54 +156,146 @@ public class ColosseumScanner {
 	}
 
 	/**
+	 * Return true if all Manticores have an identified orb sequence, false if not. Cache result until end of wave.
+	 */
+	public boolean scannedManticoreSequences(int currentWave)
+	{
+		if (scannedManticores) {
+			return true;
+		}
+
+		if (currentWave < 4) {
+			scannedManticores = true;
+		}
+		else if (currentWave <= 8) {
+			scannedManticores = getManticoreSequenceA() != null;
+		}
+		else if (currentWave <= 11) {
+			scannedManticores = getManticoreSequenceA() != null && getManticoreSequenceB() != null;
+		}
+		return scannedManticores;
+	}
+
+	/**
+	 * Identify the orb order of npc, provided it is a Manticore, it is not already logged and it has three orbs
+	 */
+	public void parseManticoreAttackSequence(NPC npc) {
+		if (manticoreSequences.containsKey(npc.getIndex()) || npc.getSpotAnims() == null) {
+			return;
+		}
+
+		List<ActorSpotAnim> activeOrbs = new ArrayList<>();
+		for (ActorSpotAnim anim : npc.getSpotAnims()) {
+			int id = anim.getId();
+			if (id == MAGIC_ORB_ID ||
+				id == RANGED_ORB_ID ||
+				id == MELEE_ORB_ID) {
+				activeOrbs.add(anim);
+			}
+		}
+
+		if (activeOrbs.size() == 3) {
+			ManticoreAttackSequence sequence = new ManticoreAttackSequence(activeOrbs);
+			manticoreSequences.put(npc.getIndex(), sequence);
+		}
+	}
+
+	/**
+	 * Clears existing identified Manticore attack sequences and indices.
+	 */
+	public void resetManticoreSequences()
+	{
+		manticoreAttackSequences.clear();
+		manticoreIndexA = null;
+		manticoreIndexB = null;
+		scannedManticores = false;
+	}
+
+	/**
 	 * Match a ColosseumModifier instance to the given String and return it
 	 */
-	private ColosseumModifier matchModifier(String text) {
-		switch (text) {
-			case "Bees!": return ColosseumModifier.BEES_I;
-			case "Bees! (II)": return ColosseumModifier.BEES_II;
-			case "Bees! (III)": return ColosseumModifier.BEES_III;
+	private ColosseumModifier matchModifier(String text)
+	{
+		switch (text)
+		{
+			case "Bees!":
+				return ColosseumModifier.BEES_I;
+			case "Bees! (II)":
+				return ColosseumModifier.BEES_II;
+			case "Bees! (III)":
+				return ColosseumModifier.BEES_III;
 
-			case "Blasphemy": return ColosseumModifier.BLASPHEMY_I;
-			case "Blasphemy (II)": return ColosseumModifier.BLASPHEMY_II;
-			case "Blasphemy (III)": return ColosseumModifier.BLASPHEMY_III;
+			case "Blasphemy":
+				return ColosseumModifier.BLASPHEMY_I;
+			case "Blasphemy (II)":
+				return ColosseumModifier.BLASPHEMY_II;
+			case "Blasphemy (III)":
+				return ColosseumModifier.BLASPHEMY_III;
 
-			case "Doom": return ColosseumModifier.DOOM_I;
-			case "Doom (II)": return ColosseumModifier.DOOM_II;
-			case "Doom (III)": return ColosseumModifier.DOOM_III;
+			case "Doom":
+				return ColosseumModifier.DOOM_I;
+			case "Doom (II)":
+				return ColosseumModifier.DOOM_II;
+			case "Doom (III)":
+				return ColosseumModifier.DOOM_III;
 
-			case "Frailty": return ColosseumModifier.FRAILTY_I;
-			case "Frailty (II)": return ColosseumModifier.FRAILTY_II;
-			case "Frailty (III)": return ColosseumModifier.FRAILTY_III;
+			case "Frailty":
+				return ColosseumModifier.FRAILTY_I;
+			case "Frailty (II)":
+				return ColosseumModifier.FRAILTY_II;
+			case "Frailty (III)":
+				return ColosseumModifier.FRAILTY_III;
 
-			case "Mantimayhem": return ColosseumModifier.MANTIMAYHEM_I;
-			case "Mantimayhem (II)": return ColosseumModifier.MANTIMAYHEM_II;
-			case "Mantimayhem (III)": return ColosseumModifier.MANTIMAYHEM_III;
+			case "Mantimayhem":
+				return ColosseumModifier.MANTIMAYHEM_I;
+			case "Mantimayhem (II)":
+				return ColosseumModifier.MANTIMAYHEM_II;
+			case "Mantimayhem (III)":
+				return ColosseumModifier.MANTIMAYHEM_III;
 
-			case "Myopia": return ColosseumModifier.MYOPIA_I;
-			case "Myopia (II)": return ColosseumModifier.MYOPIA_II;
-			case "Myopia (III)": return ColosseumModifier.MYOPIA_III;
+			case "Myopia":
+				return ColosseumModifier.MYOPIA_I;
+			case "Myopia (II)":
+				return ColosseumModifier.MYOPIA_II;
+			case "Myopia (III)":
+				return ColosseumModifier.MYOPIA_III;
 
-			case "Reentry": return ColosseumModifier.REENTRY_I;
-			case "Reentry (II)": return ColosseumModifier.REENTRY_II;
-			case "Reentry (III)": return ColosseumModifier.REENTRY_III;
+			case "Reentry":
+				return ColosseumModifier.REENTRY_I;
+			case "Reentry (II)":
+				return ColosseumModifier.REENTRY_II;
+			case "Reentry (III)":
+				return ColosseumModifier.REENTRY_III;
 
-			case "Relentless": return ColosseumModifier.RELENTLESS_I;
-			case "Relentless (II)": return ColosseumModifier.RELENTLESS_II;
-			case "Relentless (III)": return ColosseumModifier.RELENTLESS_III;
+			case "Relentless":
+				return ColosseumModifier.RELENTLESS_I;
+			case "Relentless (II)":
+				return ColosseumModifier.RELENTLESS_II;
+			case "Relentless (III)":
+				return ColosseumModifier.RELENTLESS_III;
 
-			case "Solarflare": return ColosseumModifier.SOLARFLARE_I;
-			case "Solarflare (II)": return ColosseumModifier.SOLARFLARE_II;
-			case "Solarflare (III)": return ColosseumModifier.SOLARFLARE_III;
+			case "Solarflare":
+				return ColosseumModifier.SOLARFLARE_I;
+			case "Solarflare (II)":
+				return ColosseumModifier.SOLARFLARE_II;
+			case "Solarflare (III)":
+				return ColosseumModifier.SOLARFLARE_III;
 
-			case "Volatility": return ColosseumModifier.VOLATILITY_I;
-			case "Volatility (II)": return ColosseumModifier.VOLATILITY_II;
-			case "Volatility (III)": return ColosseumModifier.VOLATILITY_III;
+			case "Volatility":
+				return ColosseumModifier.VOLATILITY_I;
+			case "Volatility (II)":
+				return ColosseumModifier.VOLATILITY_II;
+			case "Volatility (III)":
+				return ColosseumModifier.VOLATILITY_III;
 
-			case "Dynamic Duo": return ColosseumModifier.DYNAMIC_DUO;
-			case "Quartet": return ColosseumModifier.QUARTET;
-			case "Red Flag": return ColosseumModifier.RED_FLAG;
-			case "Totemic": return ColosseumModifier.TOTEMIC;
+			case "Dynamic Duo":
+				return ColosseumModifier.DYNAMIC_DUO;
+			case "Quartet":
+				return ColosseumModifier.QUARTET;
+			case "Red Flag":
+				return ColosseumModifier.RED_FLAG;
+			case "Totemic":
+				return ColosseumModifier.TOTEMIC;
 
 			default:
 				throw new UnsupportedOperationException("Unknown modifier: " + text);
@@ -185,7 +313,8 @@ public class ColosseumScanner {
 	/**
 	 * Extract relevant data from the UI that appears in-between waves.
 	 */
-	private IntermissionUI scanIntermissionUI() {
+	private IntermissionUI scanIntermissionUI()
+	{
 		log.debug("Scanning intermission UI");
 		int speedBonusTimeSeconds = -1;
 		int damageTakenAmount = -1;
@@ -197,7 +326,10 @@ public class ColosseumScanner {
 		List<ItemBundle> nextLoot = parseNextLoot(lootContainer);
 
 		Widget stats = client.getWidget(INTERMISSION_GROUP_ID, INTERMISSION_RESULT_CONTAINER);
-		if (stats == null) {return null;}
+		if (stats == null)
+		{
+			return null;
+		}
 		Function<Integer, String> clean = (id) -> {
 			Widget w = stats.getChild(id);
 			return w != null ? Text.removeTags(w.getText()) : "";
@@ -218,7 +350,8 @@ public class ColosseumScanner {
 
 		String speedText = clean.apply(3);
 		int speedBonusGlory = parseNum.apply(speedText.split("\\(")[0]);
-		if (speedText.contains("(")) {
+		if (speedText.contains("("))
+		{
 			speedBonusTimeSeconds = parseTime.apply(speedText.substring(speedText.indexOf("(") + 1, speedText.indexOf(")")));
 		}
 
@@ -226,21 +359,25 @@ public class ColosseumScanner {
 
 		String dmgText = clean.apply(7);
 		int damageTakenGlory = parseNum.apply(dmgText.split("\\(")[0]);
-		if (dmgText.contains("(")) {
+		if (dmgText.contains("("))
+		{
 			damageTakenAmount = parseNum.apply(dmgText.substring(dmgText.indexOf("(") + 1, dmgText.indexOf(")")));
 		}
 
-		int waveGlory = waveBonusGlory+modChoiceGlory+damageTakenGlory+speedBonusGlory;
+		int waveGlory = waveBonusGlory + modChoiceGlory + damageTakenGlory + speedBonusGlory;
 		int totalGlory = parseNum.apply(clean.apply(10));
 		int totalTimeSeconds = parseTime.apply(clean.apply(11));
 
 		List<ColosseumModifier> modifierChoices = new ArrayList<>();
-		for (int childId : INTERMISSION_MODIFIER_CHOICES) {
+		for (int childId : INTERMISSION_MODIFIER_CHOICES)
+		{
 			Widget container = client.getWidget(INTERMISSION_GROUP_ID, childId);
-			if (container != null) {
+			if (container != null)
+			{
 				String rawText = Text.removeTags(container.getName());
 				ColosseumModifier mod = matchModifier(rawText);
-				if (mod != null) {
+				if (mod != null)
+				{
 					modifierChoices.add(mod);
 					log.debug("Parsed Modifier choice: {}", rawText);
 				}
@@ -268,7 +405,8 @@ public class ColosseumScanner {
 	/**
 	 * Extract relevant data from the rewards chest UI and return them
 	 */
-	private IntermissionUI scanRewardsChestUI() {
+	private IntermissionUI scanRewardsChestUI()
+	{
 		log.debug("Scanning rewards chest UI");
 
 		int speedBonusTimeSeconds = -1;
@@ -300,8 +438,8 @@ public class ColosseumScanner {
 			.potentialLoot(allLoot)
 			.damageTakenGlory(ui == null ? 0 : ui.getDamageTakenGlory())
 			.speedBonusGlory(ui == null ? 0 : ui.getSpeedBonusGlory())
-			.speedBonusTimeSeconds(speedBonusTimeSeconds)
-			.damageTakenAmount(damageTakenAmount)
+			.speedBonusTimeSeconds(ui == null ? -1 : ui.getSpeedBonusTimeSeconds())
+			.damageTakenAmount(ui == null ? -1 : ui.getDamageTakenAmount())
 			.waveBonusGlory(ui == null ? 0 : ui.getWaveBonusGlory())
 			.waveGlory(ui == null ? 0 : ui.getWaveGlory())
 			.totalGlory(ui == null ? 0 : ui.getTotalGlory())
@@ -312,7 +450,8 @@ public class ColosseumScanner {
 
 	/**
 	 * Generate an NPC that can be inserted into the timeline from the given data.
-	 * @param npc NPC instance of the NPC
+	 *
+	 * @param npc            NPC instance of the NPC
 	 * @param npcComposition NPCComposition instance of the NPC
 	 * @return Subset of NPC data that can be added to the NPC list of the scanned state
 	 */
@@ -321,11 +460,17 @@ public class ColosseumScanner {
 		int id = (npcComposition != null) ? npcComposition.getId() : npc.getId();
 
 		String name = "Unknown";
-		if (npcComposition != null) {
+
+		// These names are undefined as the NPC entities cannot be targeted
+		if (id == BOSS_WAVE_BEAM_CRYSTAL)
+			name = BOSS_WAVE_BEAM_CRYSTAL_NPC_NAME;
+		else if (id == SOLAR_FLARE_NPC_ID)
+			name = SOLARFLARE_NPC_NAME;
+
+		else if (npcComposition != null)
 			name = npcComposition.getName();
-		} else if (npc.getName() != null) {
+		else if (npc.getName() != null)
 			name = npc.getName();
-		}
 
 		int[] stats = npcComposition == null ? new int[0] : npcComposition.getStats();
 		int ratio = npc.getHealthRatio();
@@ -333,7 +478,8 @@ public class ColosseumScanner {
 		int maxHp = npcComposition == null ? -1 : stats[3];
 
 		int currentHp = maxHp;
-		if (maxHp != -1 && ratio >= 0 && scale > 0) {
+		if (maxHp != -1 && ratio >= 0 && scale > 0)
+		{
 			currentHp = (int) Math.ceil((double) ratio * maxHp / scale);
 		}
 
@@ -353,17 +499,19 @@ public class ColosseumScanner {
 	 * Scan the State on a particular tick and return it. The contents of the resulting State is dictated by
 	 * user-defined configurations
 	 */
-	public ColosseumState scanCurrentState(int currentWave, int waveStart) {
+	public ColosseumState scanCurrentState(int currentWave, int waveStart)
+	{
 		Player player = client.getLocalPlayer();
 		WorldPoint playerLocation = (player != null) ? player.getWorldLocation() : null;
 
 		ArrayList<ColosseumNPC> detectedNpcs = new ArrayList<>();
 
-		for (NPC npc : client.getTopLevelWorldView().npcs()) {
-			if (npc == null || npc.isDead()) {
+		for (NPC npc : client.getTopLevelWorldView().npcs())
+		{
+			if (npc == null || npc.isDead())
+			{
 				continue;
 			}
-//			log.info("[ColosseumState.scanCurrentState()] Saw NPC: {} ID: {}", npc.getName(), npc.getId());
 
 			NPCComposition composition = npc.getComposition();
 			int npcId = npc.getId();
@@ -373,15 +521,20 @@ public class ColosseumScanner {
 				npcId = composition.getId();
 			}
 
-			if (trackedNpcIds.contains(npcId)) {
+			if (trackedNpcIds.contains(npcId))
+			{
 				ColosseumNPC colosseumNpc = generateNpc(npc, composition);
 				detectedNpcs.add(colosseumNpc);
 			}
 		}
+		int playerHp = client.getBoostedSkillLevel(Skill.HITPOINTS);
+		int playerPrayer = client.getBoostedSkillLevel(Skill.PRAYER);
 
 		return ColosseumState.builder()
 			.wave(currentWave)
 			.tick(client.getTickCount() - waveStart)
+			.playerHp(playerHp)
+			.playerPrayer(playerPrayer)
 			.playerLocation(playerLocation)
 			.npcs(detectedNpcs)
 			.build();
@@ -399,7 +552,8 @@ public class ColosseumScanner {
 		String speedText = clean(stats, 3);
 		int speedBonusGlory = parseNum(speedText.split("\\(")[0]);
 		int speedBonusTimeSeconds = 0;
-		if (speedText.contains("(")) {
+		if (speedText.contains("("))
+		{
 			speedBonusTimeSeconds = parseTime(speedText.substring(speedText.indexOf("(") + 1, speedText.indexOf(")")));
 		}
 
@@ -408,7 +562,8 @@ public class ColosseumScanner {
 		String dmgText = clean(stats, 7);
 		int damageTakenGlory = parseNum(dmgText.split("\\(")[0]);
 		int damageTakenAmount = 0;
-		if (dmgText.contains("(")) {
+		if (dmgText.contains("("))
+		{
 			damageTakenAmount = parseNum(dmgText.substring(dmgText.indexOf("(") + 1, dmgText.indexOf(")")));
 		}
 
@@ -429,17 +584,20 @@ public class ColosseumScanner {
 			.build();
 	}
 
-	private String clean(Widget parent, int childId) {
+	private String clean(Widget parent, int childId)
+	{
 		Widget w = parent.getChild(childId);
 		return (w != null) ? Text.removeTags(w.getText()) : "";
 	}
 
-	private static int parseNum(String s) {
+	private static int parseNum(String s)
+	{
 		String val = s.replaceAll("[^0-9-]", "");
 		return val.isEmpty() ? 0 : Integer.parseInt(val);
 	}
 
-	private static int parseTime(String s) {
+	private static int parseTime(String s)
+	{
 		if (!s.contains(":")) return 0;
 		String[] parts = s.split(":");
 		return (Integer.parseInt(parts[0].trim()) * 60) + Integer.parseInt(parts[1].trim());
@@ -451,14 +609,16 @@ public class ColosseumScanner {
 	private List<ItemBundle> parseNextLoot(Widget lootContainer)
 	{
 		List<ItemBundle> nextLoot = new ArrayList<>();
-		if (lootContainer != null && lootContainer.getChild(0) != null) {
-			for (Widget child : lootContainer.getDynamicChildren()) {
+		if (lootContainer != null && lootContainer.getChild(0) != null)
+		{
+			for (Widget child : lootContainer.getDynamicChildren())
+			{
 				int id = child.getItemId();
 				int quantity = child.getItemQuantity();
 				ItemBundle nextItem = ItemBundle.fromComp(itemManager.getItemComposition(id), quantity);
 
 				if (enabledSwapQuiverLoot && nextItem.getItemId() == DIZANAS_QUIVER_UNCHARGED_ID)
-					nextLoot.add(swappedDizanasQuiver);
+					nextLoot.add(SWAPPED_DIZANAS_QUIVER);
 				else
 					nextLoot.add(nextItem);
 			}
@@ -472,10 +632,13 @@ public class ColosseumScanner {
 	private List<ColosseumModifier> parseActiveModifiers(Widget modifierContainer)
 	{
 		List<ColosseumModifier> parsedModifiers = new ArrayList<>();
-		if (modifierContainer != null && modifierContainer.getDynamicChildren() != null) {
-			for (Widget child : modifierContainer.getDynamicChildren()) {
+		if (modifierContainer != null && modifierContainer.getDynamicChildren() != null)
+		{
+			for (Widget child : modifierContainer.getDynamicChildren())
+			{
 				String txt = Text.removeTags(child.getText()).trim();
-				if (!txt.isEmpty() && !txt.equals("You have no modifiers yet.")) {
+				if (!txt.isEmpty() && !txt.equals("You have no modifiers yet."))
+				{
 					ColosseumModifier mod = matchModifier(txt);
 					if (mod != null) parsedModifiers.add(mod);
 				}
@@ -491,7 +654,8 @@ public class ColosseumScanner {
 	{
 		enabledSwapQuiverLoot = config.logQuiverAsSplinters();
 
-		if (startUp) {
+		if (startUp)
+		{
 			OPTIONAL_NPC_SUPPLIERS = ImmutableMap.<BooleanSupplier, Collection<Integer>>builder()
 				.put(config::logBeeSwarm, Collections.singletonList(BEE_SWARM_NPC_ID))
 				.put(config::logSolarFlare, Collections.singletonList(SOLAR_FLARE_NPC_ID))

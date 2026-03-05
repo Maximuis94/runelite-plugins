@@ -75,9 +75,21 @@ public final class Colosseum
 		public static final int SOL_HEREDIT_NPC_ID = 12821;
 		public static final int BEE_SWARM_NPC_ID = 12823;
 		public static final int BOSS_WAVE_BEAM_CRYSTAL = 12824;
+		public static final String BOSS_WAVE_BEAM_CRYSTAL_NPC_NAME = "Beam crystal";
 		public static final int HEALING_TOTEM_NPC_ID = 12825;
 		public static final int SOLAR_FLARE_NPC_ID = 12826;
+		public static final String SOLARFLARE_NPC_NAME = "Solarflare";
 		public static final int SITTING_SOL_HEREDIT_NPC_ID = 12827;
+
+	}
+
+	public static class ManticoreAttack
+	{
+		public static final int NO_ORB_ID = -1;
+		public static final int MAGIC_ORB_ID = 2681;
+		public static final int RANGED_ORB_ID = 2683;
+		public static final int MELEE_ORB_ID = 2685;
+
 	}
 
 	/**

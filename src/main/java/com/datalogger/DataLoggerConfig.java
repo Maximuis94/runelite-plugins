@@ -50,11 +50,11 @@ public interface DataLoggerConfig extends Config {
 	String colosseumSection = "colosseum";
 
 	@ConfigSection(
-		name = "Colosseum NPCs",
-		description = "Toggle logging for specific optional NPCs during trials",
+		name = "Colosseum timeline logger",
+		description = "Toggle to track player and NPC data during Colosseum waves",
 		position = 2
 	)
-	String colosseumNpcSection = "colosseumNpc";
+	String colosseumTimelineSection = "colosseumTimeline";
 
 	@ConfigSection(
 		name = "Screenshots",
@@ -95,67 +95,76 @@ public interface DataLoggerConfig extends Config {
 	default boolean logColosseumCSV() { return true; }
 
 	@ConfigItem(
-		keyName = "logWaveTimeline",
-		name = "Track player and NPC locations every tick during waves.",
-		description = "If enabled, a state composed of player- and relevant NPC-locations is generated every game tick and added to a timeline.",
-		position = 2,
-		section = colosseumSection
-	)
-	default boolean logWaveTimeline() { return true; }
-
-	@ConfigItem(
 		keyName = "logQuiverAsSplinters",
 		name = "Log Dizana's quiver (uncharged) Sunfire splinters",
 		description = "If enabled, the Dizana's quiver (uncharged) reward is logged as 4,000 Sunfire splinters instead.",
-		position = 3,
+		position = 2,
 		section = colosseumSection
 	)
 	default boolean logQuiverAsSplinters() { return true; }
 
+	@ConfigItem(
+		keyName = "colosseumTag",
+		name = "Tag",
+		description = "A custom tag that will be assigned to logged entries",
+		position = 3,
+		section = colosseumSection
+	)
+	default String colosseumTag() { return ""; }
+
 	// --- Colosseum NPC Optional Items ---
 
 	@ConfigItem(
-		keyName = "logFremenniks",
-		name = "Log Fremenniks",
-		description = "Include Fremennik warband NPC locations in timeline data",
+		keyName = "logWaveTimeline",
+		name = "Log Colosseum wave timeline",
+		description = "If enabled, player- and NPC- data is logged every game tick during waves and added to a timeline.",
 		position = 0,
-		section = colosseumNpcSection
+		section = colosseumTimelineSection
+	)
+	default boolean logWaveTimeline() { return true; }
+
+	@ConfigItem(
+		keyName = "logFremenniks",
+		name = "Track Fremenniks",
+		description = "Include Fremennik warband NPC data in the timeline",
+		position = 1,
+		section = colosseumTimelineSection
 	)
 	default boolean logFremenniks() { return false; }
 
 	@ConfigItem(
 		keyName = "logSolarFlare",
-		name = "Log Solar Flares",
-		description = "Include Solar flare locations in timeline data",
-		position = 1,
-		section = colosseumNpcSection
+		name = "Track Solar Flares",
+		description = "Include Solarflare locations in timeline data",
+		position = 2,
+		section = colosseumTimelineSection
 	)
 	default boolean logSolarFlare() { return false; }
 
 	@ConfigItem(
 		keyName = "logHealingTotem",
-		name = "Log Healing Totems",
+		name = "Track Healing Totems",
 		description = "Include Healing totem locations in timeline data",
-		position = 2,
-		section = colosseumNpcSection
+		position = 3,
+		section = colosseumTimelineSection
 	)
 	default boolean logHealingTotem() { return false; }
 
 	@ConfigItem(
 		keyName = "logBeeSwarm",
-		name = "Log Bee Swarms",
+		name = "Track Bee Swarms",
 		description = "Include Bee Swarm locations in timeline data",
-		position = 3,
-		section = colosseumNpcSection
+		position = 4,
+		section = colosseumTimelineSection
 	)
 	default boolean logBeeSwarm() { return false; }
 
 	@ConfigItem(
 		keyName = "logBeamCrystal",
-		name = "Log Beam Crystals",
-		description = "Include Beam Crystal locations in timeline data",
-		position = 4,
-		section = colosseumNpcSection
+		name = "Track Beam Crystals",
+		description = "Include Beam Crystal locations during wave 12 in timeline data",
+		position = 5,
+		section = colosseumTimelineSection
 	)
 	default boolean logBeamCrystal() { return false; }
 
