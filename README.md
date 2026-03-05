@@ -19,8 +19,9 @@ Logger that keeps track of Colosseum data per wave. If enabled, the following da
 - Total glory: Total glory earned so far
 - Mob spawn locations: X and Y coordinates for each mob, except for Sol and Fremenniks
 - Manticore sequence: Orb sequences of manticores encountered during the wave (bottom-top)
+
 The data described above is always generated as JSON file, but can also be generated as CSV file.
-Logs are stored in the csv and log folder in ${user.home}/.runelite/data-logger/colosseum
+Logs are stored in the csv and log folder in .runelite/data-logger/colosseum
 
 ![img.png](images/example-colosseum-log-entry-csv.png)
 _Example CSV row of the Colosseum wave logger, note that it does not show the entire row_
@@ -36,15 +37,16 @@ A state is composed of the following values;
   - Name
   - X and Y coordinate
   - HP and Max HP
-Fremenniks, Solarflares, Healing totems, Bee Swarms and Beam crystals are optional and can be disabled via configurations.
-Timelines are stored in ${user.home}/.runelite/data-logger/colosseum/timeline
+
+    Fremenniks, Solarflares, Healing totems, Bee Swarms and Beam crystals are optional and can be disabled via configurations.
+Timelines are stored in .runelite/data-logger/colosseum/timeline
 
 ![img.png](images/example-colosseum-timeline-state.png)
 
 _Example of state data at a particular tick during a particular wave_
 
 ### Wave completion screenshots
-If enabled, a screenshot is created and stored in ${user.home}/.runelite/data-logger/screenshot/colosseum when the 
+If enabled, a screenshot is created and stored in .runelite/data-logger/screenshot/colosseum when the 
 interface between waves or the rewards chest interface pops up.
 For each attempt, a new directory is created and all screenshots taken during that attempt are stored in that directory.
 ![img_1.png](images/example-wave-completion-screenshot.png)

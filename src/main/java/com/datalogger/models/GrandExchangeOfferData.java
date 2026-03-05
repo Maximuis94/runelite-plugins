@@ -41,27 +41,6 @@ public class GrandExchangeOfferData implements DataRow {
 	String account;
 	int slot;
 
-	public static GrandExchangeOfferData fromCsv(String csvLine) {
-		try {
-			String[] parts = csvLine.split(",");
-			return new GrandExchangeOfferData(
-				Integer.parseInt(parts[0]), // itemId
-				parts[1],                   // timestamp
-				parts[2],                   // timestampCreated
-				Boolean.parseBoolean(parts[3]), // isBuy
-				Integer.parseInt(parts[4]), // quantity
-				Integer.parseInt(parts[5]), // totalQuantity
-				Long.parseLong(parts[6]),    // price
-				Long.parseLong(parts[7]),    // offerPrice
-				Long.parseLong(parts[8]),    // value
-				parts[9],                   // account
-				Integer.parseInt(parts[10]) // slot
-			);
-		} catch (Exception e) {
-			return null;
-		}
-	}
-
 	@Override
 	public String toCsvRow() {
 		return String.format("%d,%s,%s,%b,%d,%d,%d,%d,%d,%s,%d",

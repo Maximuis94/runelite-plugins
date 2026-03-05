@@ -24,10 +24,7 @@
  */
 package com.datalogger.framework;
 
-import com.datalogger.models.GrandExchangeOfferData;
-import com.datalogger.models.colosseum.ColosseumWave;
 import java.io.File;
-import java.util.function.Function;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import net.runelite.client.RuneLite;
@@ -37,21 +34,17 @@ import net.runelite.client.RuneLite;
 public enum LogType
 {
 	GRAND_EXCHANGE(
-		"Grand Exchange",
-		GrandExchangeOfferData::fromCsv),
+		"Grand Exchange"),
 	COLOSSEUM(
-		"Colosseum",
-		ColosseumWave::fromCsv);
+		"Colosseum");
 
 	private final String name;
 	private final String directoryName;
-	private final Function<String, ? extends DataRow> parser;
 
 	private final File logDirectory;
 
-	LogType(String logTypeName, Function<String, ? extends DataRow> parser) {
+	LogType(String logTypeName) {
 		this.name = logTypeName;
-		this.parser = parser;
 
 		this.directoryName = logTypeName.toLowerCase().replace(" ", "-");
 

@@ -27,12 +27,11 @@ package com.datalogger.framework;
 import com.datalogger.DataLoggerConfig;
 import com.datalogger.services.FileIOService;
 import java.io.File;
-import java.io.IOException;
 import javax.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
-import net.runelite.api.Player;
 import net.runelite.api.GameState;
+import net.runelite.api.Player;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.eventbus.Subscribe;
@@ -75,11 +74,7 @@ public abstract class AbstractLogger implements Loggable {
 		String currentAccount = getAccountName();
 		File logFile = utils.getTargetFile(getLogType(), currentAccount);
 
-		try {
-			utils.atomicWrite(logFile, getCsvHeader(), csvRow);
-		} catch (IOException e) {
-			log.error("Error writing {} log for {}", getLogType(), currentAccount, e);
-		}
+		utils.atomicWrite(logFile, getCsvHeader(), csvRow);
 	}
 
 	/**

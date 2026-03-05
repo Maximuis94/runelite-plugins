@@ -26,7 +26,6 @@ package com.datalogger.services;
 
 import com.datalogger.DataLoggerConfig;
 import com.datalogger.dto.ColosseumStateDTO;
-import com.datalogger.framework.DataRow;
 import com.datalogger.framework.LogType;
 import com.datalogger.models.colosseum.ColosseumAttempt;
 import com.datalogger.models.colosseum.ColosseumState;
@@ -37,7 +36,6 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonSerializationContext;
 import com.google.gson.JsonSerializer;
 import java.awt.image.BufferedImage;
-import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
@@ -51,7 +49,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
-import java.util.function.Function;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.stream.Collectors;
 import javax.imageio.ImageIO;
 import javax.inject.Inject;
@@ -66,8 +64,11 @@ public class FileIOService
 {
 	private final Gson gson;
 
+	private final ScheduledExecutorService executor;
+
 	@Inject
-	private FileIOService(DataLoggerConfig config, Gson gson) {
+	private FileIOService(DataLoggerConfig config, Gson gson, ScheduledExecutorService executor) {
+		this.executor = executor;
 		this.gson = gson.newBuilder()
 			.registerTypeAdapter(WorldPoint.class, new WorldPointSerializer())
 			.setPrettyPrinting()
@@ -86,61 +87,39 @@ public class FileIOService
 	private final File COLOSSEUM_SCREENSHOT_DIR = new File(COLOSSEUM_ROOT_DIR, "screenshot");
 
 	/**
-	 * Parse the rows associated with the given LogType and account
-	 * @param type The log that is to be parsed
-	 * @param account The account of which the entries are to be parsed
-	 * @return A List of DataRow instances parsed from the associated log file
-	 * @param <T> The DataRow class associated with LogType
-	 */
-	public <T extends DataRow> List<T> loadLogs(LogType type, String account) {
-		File file = getTargetFile(type, account);
-		List<T> data = new ArrayList<>();
-
-		if (!file.exists()) return data;
-
-		// The enum now provides the parser!
-		Function<String, T> parser = (Function<String, T>) type.getParser();
-
-		try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
-			reader.readLine(); // Skip header
-			String line;
-			while ((line = reader.readLine()) != null) {
-				T obj = parser.apply(line);
-				if (obj != null) data.add(obj);
-			}
-		} catch (IOException e) {
-			log.error("Failed to read logs for {}", type, e);
-		}
-		return data;
-	}
-
-	/**
 	 * Performs an atomic append to a file.
 	 * Handles directory creation on-the-fly to prevent crashes if folders are moved/deleted.
 	 * @param file The file that is to be modified
 	 * @param header The header of the CSV file that will be added if the file does not exist
 	 * @param row The content of the line that is to be added to the file
 	 */
-	public void atomicWrite(File file, String header, String row) throws IOException {
-		File parent = file.getParentFile();
-		if (parent != null && !parent.exists() && !parent.mkdirs()) {
-			throw new IOException("Failed to create directory: " + parent.getAbsolutePath());
-		}
+	public void atomicWrite(File file, String header, String row) {
+		// Push the disk write to the background thread
+		executor.submit(() -> {
+			try {
+				File parent = file.getParentFile();
+				if (parent != null && !parent.exists() && !parent.mkdirs()) {
+					throw new IOException("Failed to create directory: " + parent.getAbsolutePath());
+				}
 
-		StringBuilder sb = new StringBuilder();
-		boolean isNew = !file.exists() || file.length() == 0;
+				StringBuilder sb = new StringBuilder();
+				boolean isNew = !file.exists() || file.length() == 0;
 
-		if (isNew && header != null) {
-			sb.append(header).append("\n");
-		}
-		sb.append(row).append("\n");
+				if (isNew && header != null) {
+					sb.append(header).append("\n");
+				}
+				sb.append(row).append("\n");
 
-		java.nio.file.Files.write(
-			file.toPath(),
-			sb.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8),
-			java.nio.file.StandardOpenOption.CREATE,
-			java.nio.file.StandardOpenOption.APPEND
-		);
+				java.nio.file.Files.write(
+					file.toPath(),
+					sb.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8),
+					java.nio.file.StandardOpenOption.CREATE,
+					java.nio.file.StandardOpenOption.APPEND
+				);
+			} catch (IOException e) {
+				log.error("Failed to write to file: {}", file.getName(), e);
+			}
+		});
 	}
 
 	/**
@@ -260,7 +239,7 @@ public class FileIOService
 			.map(ColosseumState::toDTO)
 			.collect(Collectors.toList());
 
-		new Thread(() -> {
+		executor.submit(() -> {
 			if (!COLOSSEUM_TEMP_DIR.exists() && !COLOSSEUM_TEMP_DIR.mkdirs()) {
 				log.error("Could not create directory: {}", COLOSSEUM_TEMP_DIR.getAbsolutePath());
 				return;
@@ -273,7 +252,7 @@ public class FileIOService
 			} catch (IOException e) {
 				log.error("Failed to save Colosseum JSON", e);
 			}
-		}).start();
+		});
 	}
 
 	private List<ColosseumStateDTO> loadWaveStates(File file) {
@@ -298,7 +277,7 @@ public class FileIOService
 	 * entries to the log. Remove source files upon completion.
 	 */
 	public void mergeTimelineFiles(String attemptId) {
-		new Thread(() -> {
+		executor.submit(() -> {
 			try
 			{
 				List<ColosseumStateDTO> fullRunData = new ArrayList<>();
@@ -329,7 +308,7 @@ public class FileIOService
 			{
 				log.error("Failed to merge timeline files for attempt {}", attemptId);
 			}
-		}).start();
+		});
 	}
 
 	/**
