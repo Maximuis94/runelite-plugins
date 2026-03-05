@@ -149,6 +149,7 @@ public class ColosseumAttemptLogger extends AbstractLogger
 				log.info("Colosseum logging was disabled mid-run. Cleaning up state.");
 				finalStatus = WaveStatus.CONFIG_DISABLED;
 				endWave();
+				failWave();
 				endAttempt();
 			}
 		}
@@ -412,11 +413,16 @@ public class ColosseumAttemptLogger extends AbstractLogger
 		waitingForIntermission = false;
 	}
 
+	/**
+	 * Ongoing wave has failed
+	 */
 	private void failWave() {
-		if (currentAttempt == null || finalStatus != null) return;
+		if (currentAttempt == null || finalStatus != null && finalStatus != WaveStatus.CONFIG_DISABLED) return;
 
 		activeWave = false;
-		finalStatus = WaveStatus.FAILED;
+
+		if (finalStatus == null)
+			finalStatus = WaveStatus.FAILED;
 
 		endWave();
 
@@ -425,7 +431,7 @@ public class ColosseumAttemptLogger extends AbstractLogger
 		double timeTaken = getWaveTimeTaken();
 		ColosseumWave failedWave = ColosseumWave.builder()
 			.wave(currentWave)
-			.status(WaveStatus.FAILED)
+			.status(finalStatus)
 			.accountName(entryAccount)
 			.tag(entryTag)
 			.earnedLoot(loot)
@@ -464,6 +470,9 @@ public class ColosseumAttemptLogger extends AbstractLogger
 		endAttempt();
 	}
 
+	/**
+	 * Reset all wave-specific values and notify that a new wave has started
+	 */
 	private void buildWave() {
 		if (activeWave) return;
 
