@@ -32,7 +32,10 @@ import com.datalogger.models.colosseum.ColosseumAttempt;
 import com.datalogger.models.colosseum.ColosseumState;
 import com.datalogger.models.colosseum.ColosseumWave;
 import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonSerializationContext;
+import com.google.gson.JsonSerializer;
 import java.awt.image.BufferedImage;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -43,6 +46,7 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.Reader;
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -53,21 +57,23 @@ import javax.imageio.ImageIO;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import lombok.extern.slf4j.Slf4j;
+import net.runelite.api.coords.WorldPoint;
 import net.runelite.client.RuneLite;
 
 @Slf4j
 @Singleton
 public class FileIOService
 {
+	private final Gson gson;
 
 	@Inject
 	private FileIOService(DataLoggerConfig config, Gson gson) {
 		this.gson = gson.newBuilder()
+			.registerTypeAdapter(WorldPoint.class, new WorldPointSerializer())
 			.setPrettyPrinting()
 			.create();
 	}
 
-	private final Gson gson;
 
 	public final File PLUGIN_ROOT = new File(RuneLite.RUNELITE_DIR, "data-logger");
 	private final File STATE_DIR = new File(PLUGIN_ROOT, "state");
@@ -330,17 +336,11 @@ public class FileIOService
 	 * Log the given attempt
 	 */
 	public void logColosseumAttempt(ColosseumAttempt attempt) {
-		// 1. Define the directory: .runelite/colosseum-logs/
-
-		// 2. Ensure the directory exists
 		if (!COLOSSEUM_LOG_DIR.exists()) {
 			COLOSSEUM_LOG_DIR.mkdirs();
 		}
 
-		// 3. Create a unique filename using the attempt ID (Timestamp)
 		File targetFile = logFile(attempt.getStartTime());
-
-		Gson gson = new GsonBuilder().setPrettyPrinting().create();
 
 		try (FileWriter writer = new FileWriter(targetFile)) {
 			gson.toJson(attempt, writer);
@@ -423,6 +423,16 @@ public class FileIOService
 			log.info("Successfully saved Colosseum CSV log to {}", outFile.getName());
 		} catch (IOException e) {
 			log.error("Failed to write Colosseum CSV log for attempt {}", attemptId, e);
+		}
+	}
+
+	public static class WorldPointSerializer implements JsonSerializer<WorldPoint> {
+		@Override
+		public JsonElement serialize(WorldPoint src, Type typeOfSrc, JsonSerializationContext context) {
+			JsonObject obj = new JsonObject();
+			obj.addProperty("x", src.getX());
+			obj.addProperty("y", src.getY());
+			return obj;
 		}
 	}
 }

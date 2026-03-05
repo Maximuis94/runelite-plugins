@@ -305,7 +305,7 @@ public class ColosseumAttemptLogger extends AbstractLogger
 					else
 					{
 						manticoreSpawnB = loc;
-						scanner.setManticoreIndexA(npc.getIndex());
+						scanner.setManticoreIndexB(npc.getIndex());
 					}
 					break;
 				case SHOCKWAVE_COLOSSUS_NPC_ID:
