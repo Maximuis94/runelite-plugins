@@ -36,6 +36,8 @@ import java.util.stream.Collectors;
 import lombok.Builder;
 import lombok.Data;
 import lombok.Singular;
+import net.runelite.api.World;
+import net.runelite.api.coords.WorldPoint;
 
 /**
  * Data of a particular wave in a Colosseum attempt. It reflects data after completion/failure.
@@ -46,6 +48,10 @@ public class ColosseumWave implements DataRow
 {
 	private int wave;
 	private WaveStatus status;
+
+	private String accountName;
+	private String tag;
+
 	private List<ItemBundle> earnedLoot;
 
 	@Singular
@@ -68,10 +74,30 @@ public class ColosseumWave implements DataRow
 	private int waveGlory;
 	private int totalGlory;
 
+	private WorldPoint serpentShamanSpawn;
+
+	private WorldPoint javelinColossusSpawnA;
+	private WorldPoint javelinColossusSpawnB;
+
+	private WorldPoint manticoreSpawnA;
+	ManticoreAttackSequence manticoreSequenceA;
+	private WorldPoint manticoreSpawnB;
+	ManticoreAttackSequence manticoreSequenceB;
+
+	private WorldPoint shockwaveColossusSpawnA;
+	private WorldPoint shockwaveColossusSpawnB;
+
+	private WorldPoint jaguarWarriorReinforcementsSpawn;
+	private WorldPoint serpentShamanReinforcementsSpawn;
+	private WorldPoint minotaurReinforcementsSpawn;
+
+
 	public ColosseumWaveDTO toDTO() {
 		return ColosseumWaveDTO.builder()
 			.wave(this.wave)
 			.status(this.status != null ? this.status.name() : "UNKNOWN")
+			.accountName(this.accountName)
+			.tag(this.tag)
 
 			.earnedLoot(this.earnedLoot != null ? this.earnedLoot : new java.util.ArrayList<>())
 
@@ -87,6 +113,36 @@ public class ColosseumWave implements DataRow
 			.completionBonus(this.completionBonus)
 			.totalGlory(this.totalGlory)
 			.waveGlory(this.waveGlory)
+
+			.serpentShamanSpawnX(this.serpentShamanSpawn != null ? this.serpentShamanSpawn.getX() : null)
+			.serpentShamanSpawnY(this.serpentShamanSpawn != null ? this.serpentShamanSpawn.getY() : null)
+
+			.javelinColossusSpawnAX(this.javelinColossusSpawnA != null ? this.javelinColossusSpawnA.getX() : null)
+			.javelinColossusSpawnAY(this.javelinColossusSpawnA != null ? this.javelinColossusSpawnA.getY() : null)
+			.javelinColossusSpawnBX(this.javelinColossusSpawnB != null ? this.javelinColossusSpawnB.getX() : null)
+			.javelinColossusSpawnBY(this.javelinColossusSpawnB != null ? this.javelinColossusSpawnB.getY() : null)
+
+			.manticoreSpawnAX(this.manticoreSpawnA != null ? this.manticoreSpawnA.getX() : null)
+			.manticoreSpawnAY(this.manticoreSpawnA != null ? this.manticoreSpawnA.getY() : null)
+			.manticoreSequenceA(this.manticoreSequenceA != null ? manticoreSequenceA.getOrbs() : null)
+
+			.manticoreSpawnBX(this.manticoreSpawnB != null ? this.manticoreSpawnB.getX() : null)
+			.manticoreSpawnBY(this.manticoreSpawnB != null ? this.manticoreSpawnB.getY() : null)
+			.manticoreSequenceB(this.manticoreSequenceB != null ? manticoreSequenceB.getOrbs() : null)
+
+			.shockwaveColossusSpawnAX(this.shockwaveColossusSpawnA != null ? this.shockwaveColossusSpawnA.getX() : null)
+			.shockwaveColossusSpawnAY(this.shockwaveColossusSpawnA != null ? this.shockwaveColossusSpawnA.getY() : null)
+			.shockwaveColossusSpawnBX(this.shockwaveColossusSpawnB != null ? this.shockwaveColossusSpawnB.getX() : null)
+			.shockwaveColossusSpawnBY(this.shockwaveColossusSpawnB != null ? this.shockwaveColossusSpawnB.getY() : null)
+
+			.jaguarWarriorReinforcementsSpawnX(this.jaguarWarriorReinforcementsSpawn != null ? this.jaguarWarriorReinforcementsSpawn.getX() : null)
+			.jaguarWarriorReinforcementsSpawnY(this.jaguarWarriorReinforcementsSpawn != null ? this.jaguarWarriorReinforcementsSpawn.getY() : null)
+
+			.serpentShamanReinforcementsSpawnX(this.serpentShamanReinforcementsSpawn != null ? this.serpentShamanReinforcementsSpawn.getX() : null)
+			.serpentShamanReinforcementsSpawnY(this.serpentShamanReinforcementsSpawn != null ? this.serpentShamanReinforcementsSpawn.getY() : null)
+
+			.minotaurReinforcementsSpawnX(this.minotaurReinforcementsSpawn != null ? this.minotaurReinforcementsSpawn.getX() : null)
+			.minotaurReinforcementsSpawnY(this.minotaurReinforcementsSpawn != null ? this.minotaurReinforcementsSpawn.getY() : null)
 			.build();
 	}
 
@@ -102,7 +158,7 @@ public class ColosseumWave implements DataRow
 	}
 
 	public static String csvHeader() {
-		return "wave,status,itemIds,itemNames,quantities,modifierChoice_I,modifierChoice_II,modifierChoice_III,chosenModifier,timeTaken,damageTaken,speedBonus,damageBonus,modifierGlory,completionBonus,waveGlory,totalGlory";
+		return "wave,status,accountName,tag,itemIds,itemNames,quantities,modifierChoice_I,modifierChoice_II,modifierChoice_III,chosenModifier,timeTaken,damageTaken,speedBonus,damageBonus,modifierGlory,completionBonus,waveGlory,totalGlory,serpentShamanSpawnX,serpentShamanSpawnY,javelinColossusSpawnAX,javelinColossusSpawnAY,javelinColossusSpawnBX,javelinColossusSpawnBY,manticoreSpawnAX,manticoreSpawnAY,manticoreSequenceA,manticoreSpawnBX,manticoreSpawnBY,manticoreSequenceB,shockwaveColossusSpawnAX,shockwaveColossusSpawnAY,shockwaveColossusSpawnBX,shockwaveColossusSpawnBY,jaguarWarriorReinfSpawnX,jaguarWarriorReinfSpawnY,serpentShamanReinfSpawnX,serpentShamanReinfSpawnY,minotaurReinfSpawnX,minotaurReinfSpawnY";
 	}
 
 	public String toCsvRow() {
@@ -110,7 +166,7 @@ public class ColosseumWave implements DataRow
 			earnedLoot.stream().map(i -> String.valueOf(i.getItemId())).collect(Collectors.joining("|"));
 
 		String itemNames = earnedLoot == null || earnedLoot.isEmpty() ? "" :
-			earnedLoot.stream().map(i -> "\"" + i.getItemName() + "\"").collect(Collectors.joining("|"));
+			earnedLoot.stream().map(ItemBundle::getItemName).collect(Collectors.joining("|"));
 
 		String quantities = earnedLoot == null || earnedLoot.isEmpty() ? "0" :
 			earnedLoot.stream().map(i -> String.valueOf(i.getQuantity())).collect(Collectors.joining("|"));
@@ -126,6 +182,8 @@ public class ColosseumWave implements DataRow
 		return String.join(",",
 			String.valueOf(wave),
 			modStatus,
+			accountName,
+			tag,
 			itemIds,
 			itemNames,
 			quantities,
@@ -140,69 +198,34 @@ public class ColosseumWave implements DataRow
 			String.valueOf(modifierGlory),
 			String.valueOf(completionBonus),
 			String.valueOf(waveGlory),
-			String.valueOf(totalGlory)
+			String.valueOf(totalGlory),
+
+			serpentShamanSpawn != null ? String.valueOf(serpentShamanSpawn.getX()) : "",
+			serpentShamanSpawn != null ? String.valueOf(serpentShamanSpawn.getY()) : "",
+
+			javelinColossusSpawnA != null ? String.valueOf(javelinColossusSpawnA.getX()) : "",
+			javelinColossusSpawnA != null ? String.valueOf(javelinColossusSpawnA.getY()) : "",
+			javelinColossusSpawnB != null ? String.valueOf(javelinColossusSpawnB.getX()) : "",
+			javelinColossusSpawnB != null ? String.valueOf(javelinColossusSpawnB.getY()) : "",
+
+			manticoreSpawnA != null ? String.valueOf(manticoreSpawnA.getX()) : "",
+			manticoreSpawnA != null ? String.valueOf(manticoreSpawnA.getY()) : "",
+			manticoreSequenceA != null ? manticoreSequenceA.toCsvFormat() : "",
+			manticoreSpawnB != null ? String.valueOf(manticoreSpawnB.getX()) : "",
+			manticoreSpawnB != null ? String.valueOf(manticoreSpawnB.getY()) : "",
+			manticoreSequenceB != null ? manticoreSequenceB.toCsvFormat() : "",
+
+			shockwaveColossusSpawnA != null ? String.valueOf(shockwaveColossusSpawnA.getX()) : "",
+			shockwaveColossusSpawnA != null ? String.valueOf(shockwaveColossusSpawnA.getY()) : "",
+			shockwaveColossusSpawnB != null ? String.valueOf(shockwaveColossusSpawnB.getX()) : "",
+			shockwaveColossusSpawnB != null ? String.valueOf(shockwaveColossusSpawnB.getY()) : "",
+
+			jaguarWarriorReinforcementsSpawn != null ? String.valueOf(jaguarWarriorReinforcementsSpawn.getX()) : "",
+			jaguarWarriorReinforcementsSpawn != null ? String.valueOf(jaguarWarriorReinforcementsSpawn.getY()) : "",
+			serpentShamanReinforcementsSpawn != null ? String.valueOf(serpentShamanReinforcementsSpawn.getX()) : "",
+			serpentShamanReinforcementsSpawn != null ? String.valueOf(serpentShamanReinforcementsSpawn.getY()) : "",
+			minotaurReinforcementsSpawn != null ? String.valueOf(minotaurReinforcementsSpawn.getX()) : "",
+			minotaurReinforcementsSpawn != null ? String.valueOf(minotaurReinforcementsSpawn.getY()) : ""
 		);
-	}
-
-	public static ColosseumWave fromCsv(String csv) {
-		if (csv == null || csv.trim().isEmpty()) {
-			return null;
-		}
-
-		// Split by comma, but ignore any commas that are inside double quotes.
-		// The -1 ensures trailing empty columns aren't discarded.
-		String[] parts = csv.split(",(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)", -1);
-
-		if (parts.length < 16) {
-			throw new IllegalArgumentException("Invalid CSV row, expected 16 columns but got " + parts.length);
-		}
-
-		int wave = Integer.parseInt(parts[0]);
-		WaveStatus status = "UNKNOWN".equals(parts[1]) || parts[1].isEmpty() ? null : WaveStatus.valueOf(parts[1]);
-
-		// 1. Rebuild the Loot List
-		List<ItemBundle> loot = new java.util.ArrayList<>();
-		if (!parts[2].isEmpty() && !parts[2].equals("-1")) {
-			String[] ids = parts[2].split("\\|");
-			String[] names = parts[3].split("\\|");
-			String[] quantities = parts[4].split("\\|");
-
-			for (int i = 0; i < ids.length; i++) {
-				int itemId = Integer.parseInt(ids[i]);
-				// Remove the extra double quotes we added during toCsvRow()
-				String itemName = names.length > i ? names[i].replace("\"", "") : "";
-				int quantity = quantities.length > i ? Integer.parseInt(quantities[i]) : 0;
-
-				// Adjust this line if your ItemBundle constructor uses different arguments or a builder!
-				loot.add(new ItemBundle(itemId, itemName, quantity));
-			}
-		}
-
-		// 2. Extract Integers
-		int endIdx = Integer.parseInt(parts[6]);
-
-		// 3. Rebuild Modifier Choices
-		List<ColosseumModifier> choices = new java.util.ArrayList<>();
-		if (!parts[7].isEmpty()) choices.add(ColosseumModifier.valueOf(parts[7]));
-		if (!parts[8].isEmpty()) choices.add(ColosseumModifier.valueOf(parts[8]));
-		if (!parts[9].isEmpty()) choices.add(ColosseumModifier.valueOf(parts[9]));
-
-		ColosseumModifier chosen = parts[10].isEmpty() ? null : ColosseumModifier.valueOf(parts[10]);
-
-		// 4. Build and return the object
-		return ColosseumWave.builder()
-			.wave(wave)
-			.status(status)
-			.earnedLoot(loot) // Uses the list directly
-			.timeTaken(endIdx*0.6)
-			.modifierChoices(choices) // Passes the rebuilt list
-			.chosenModifier(chosen)
-			.speedBonus(Integer.parseInt(parts[12]))
-			.damageTaken(Integer.parseInt(parts[13]))
-			.damageBonus(Integer.parseInt(parts[14]))
-			.modifierGlory(Integer.parseInt(parts[15]))
-			.completionBonus(Integer.parseInt(parts[16]))
-			.totalGlory(Integer.parseInt(parts[17]))
-			.build();
 	}
 }

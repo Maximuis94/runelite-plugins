@@ -25,6 +25,7 @@
 
 package com.datalogger.dto;
 
+import com.datalogger.models.colosseum.ManticoreAttackSequence;
 import com.datalogger.models.common.ItemBundle;
 import lombok.Builder;
 import lombok.Data;
@@ -35,6 +36,9 @@ import java.util.List;
 public class ColosseumWaveDTO {
 	private int wave;
 	private String status; // WaveStatus.name()
+
+	private String accountName;
+	private String tag;
 
 	private List<ItemBundle> earnedLoot;
 
@@ -51,4 +55,33 @@ public class ColosseumWaveDTO {
 	private int waveGlory;
 	private int totalGlory;
 	private int totalTime;
+
+	private Integer serpentShamanSpawnX;
+	private Integer serpentShamanSpawnY;
+
+	private Integer javelinColossusSpawnAX;
+	private Integer javelinColossusSpawnAY;
+	private Integer javelinColossusSpawnBX;
+	private Integer javelinColossusSpawnBY;
+
+	private Integer manticoreSpawnAX;
+	private Integer manticoreSpawnAY;
+	public List<ManticoreAttackSequence.ManticoreOrb> manticoreSequenceA;
+	private Integer manticoreSpawnBX;
+	private Integer manticoreSpawnBY;
+	private List<ManticoreAttackSequence.ManticoreOrb> manticoreSequenceB;
+
+	private Integer shockwaveColossusSpawnAX;
+	private Integer shockwaveColossusSpawnAY;
+	private Integer shockwaveColossusSpawnBX;
+	private Integer shockwaveColossusSpawnBY;
+
+	private Integer jaguarWarriorReinforcementsSpawnX;
+	private Integer jaguarWarriorReinforcementsSpawnY;
+
+	private Integer serpentShamanReinforcementsSpawnX;
+	private Integer serpentShamanReinforcementsSpawnY;
+
+	private Integer minotaurReinforcementsSpawnX;
+	private Integer minotaurReinforcementsSpawnY;
 }

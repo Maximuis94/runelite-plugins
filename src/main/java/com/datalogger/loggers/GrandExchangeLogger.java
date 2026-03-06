@@ -25,12 +25,11 @@
 package com.datalogger.loggers;
 
 import com.datalogger.DataLoggerConfig;
-import com.datalogger.framework.LogType;
-import com.datalogger.services.FileIOService;
 import com.datalogger.framework.AbstractLogger;
+import com.datalogger.framework.LogType;
 import com.datalogger.models.GrandExchangeOfferData;
+import com.datalogger.services.FileIOService;
 import java.io.File;
-import java.io.IOException;
 import java.time.Instant;
 import java.util.Properties;
 import javax.inject.Inject;
@@ -214,11 +213,7 @@ public class GrandExchangeLogger extends AbstractLogger
 		File logFile = utils.getTargetFile(getLogType(), currentAccount);
 		String row = formatCsvRow(slot, offer, createdTs, currentAccount);
 
-		try {
-			utils.atomicWrite(logFile, CSV_HEADER, row);
-		} catch (IOException e) {
-			log.error("Error writing GE log for {}", currentAccount, e);
-		}
+		utils.atomicWrite(logFile, CSV_HEADER, row);
 	}
 
 	/**

@@ -22,36 +22,11 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package com.datalogger.framework;
+package com.datalogger.events;
+import lombok.Value;
 
-import java.io.File;
-import lombok.Getter;
-import lombok.RequiredArgsConstructor;
-import net.runelite.client.RuneLite;
-
-@Getter
-@RequiredArgsConstructor
-public enum LogType
-{
-	GRAND_EXCHANGE(
-		"Grand Exchange"),
-	COLOSSEUM(
-		"Colosseum");
-
-	private final String name;
-	private final String directoryName;
-
-	private final File logDirectory;
-
-	LogType(String logTypeName) {
-		this.name = logTypeName;
-
-		this.directoryName = logTypeName.toLowerCase().replace(" ", "-");
-
-		File baseDir = new File(RuneLite.RUNELITE_DIR, "data-logger");
-		this.logDirectory = new File(baseDir, directoryName);
-	}
-
-	@Override
-	public String toString() { return name; }
+@Value
+public class ColosseumWaveEnded {
+	String attemptId;
+	int waveNumber;
 }

@@ -25,7 +25,9 @@
 package com.datalogger;
 
 import com.datalogger.loggers.ColosseumAttemptLogger;
+import com.datalogger.loggers.ColosseumTimelineLogger;
 import com.datalogger.loggers.GrandExchangeLogger;
+import com.datalogger.loggers.ScreenshotLogger;
 import com.datalogger.services.ColosseumScanner;
 import com.datalogger.ui.DataLoggerPanel;
 import com.google.inject.Provides;
@@ -45,8 +47,14 @@ import net.runelite.client.util.ImageUtil;
 @Slf4j
 @PluginDescriptor(
 	name = "Data Logger",
-	description = "Logs various types of game data",
-	tags = {"ge", "grand exchange", "logger", "data"}
+	description = "Logs game data for various activities, like Fortis Colosseum results or the Grand Exchange",
+	tags = {
+		"logger", "data", "history", "screenshot", "tracker", "csv", "json",
+
+		"ge", "grand exchange",
+
+		"fortis", "colosseum"
+	}
 )
 public class DataLoggerPlugin extends Plugin
 {
@@ -61,6 +69,8 @@ public class DataLoggerPlugin extends Plugin
 	@Inject private GrandExchangeLogger geLogger;
 	@Inject private ColosseumAttemptLogger coloLogger;
 	@Inject private ColosseumScanner coloScanner;
+	@Inject private ScreenshotLogger screenshotLogger;
+	@Inject private ColosseumTimelineLogger timelineLogger;
 
 	@Inject private DataLoggerPanel panel;
 
@@ -78,17 +88,18 @@ public class DataLoggerPlugin extends Plugin
 		eventBus.register(geLogger);
 		eventBus.register(coloLogger);
 		eventBus.register(coloScanner);
+		eventBus.register(screenshotLogger);
+		eventBus.register(timelineLogger);
 		coloScanner.updateConfigFlags(true);
 
 		final BufferedImage icon = ImageUtil.loadImageResource(getClass(), "icon.png");
 		navButton = NavigationButton.builder()
 			.tooltip("Data Logger Viewer")
 			.icon(icon)
-			.priority(5) // Adjust priority to move it up or down in the sidebar
+			.priority(5)
 			.panel(panel)
 			.build();
 
-		// 3. Add it to the sidebar
 		clientToolbar.addNavigation(navButton);
 	}
 
@@ -98,6 +109,8 @@ public class DataLoggerPlugin extends Plugin
 		eventBus.unregister(geLogger);
 		eventBus.unregister(coloLogger);
 		eventBus.unregister(coloScanner);
+		eventBus.unregister(screenshotLogger);
+		eventBus.unregister(timelineLogger);
 		clientToolbar.removeNavigation(navButton);
 	}
 }
