@@ -24,20 +24,27 @@
  */
 package com.datalogger;
 
+import com.datalogger.events.AccountHashResolved;
 import com.datalogger.loggers.ColosseumAttemptLogger;
 import com.datalogger.loggers.ColosseumTimelineLogger;
 import com.datalogger.loggers.GrandExchangeLogger;
 import com.datalogger.loggers.ScreenshotLogger;
 import com.datalogger.services.ColosseumScanner;
+import com.datalogger.services.FileIOService;
+import com.datalogger.services.GrandExchangeHistoryParser;
 import com.datalogger.ui.DataLoggerPanel;
 import com.google.inject.Provides;
 import java.awt.image.BufferedImage;
 import javax.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
+import net.runelite.api.GameState;
+import net.runelite.api.events.GameStateChanged;
+import net.runelite.api.events.GameTick;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.EventBus;
+import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.ClientToolbar;
@@ -71,10 +78,16 @@ public class DataLoggerPlugin extends Plugin
 	@Inject private ColosseumScanner coloScanner;
 	@Inject private ScreenshotLogger screenshotLogger;
 	@Inject private ColosseumTimelineLogger timelineLogger;
+	@Inject private GrandExchangeHistoryParser grandExchangeHistoryParser;
+	@Inject private FileIOService fileIOService;
 
 	@Inject private DataLoggerPanel panel;
 
 	private NavigationButton navButton;
+
+	private long lastAccountHash = -1;
+
+	private boolean sessionInitialized = false;
 
 	@Provides
 	DataLoggerConfig provideConfig(ConfigManager configManager)
@@ -90,6 +103,7 @@ public class DataLoggerPlugin extends Plugin
 		eventBus.register(coloScanner);
 		eventBus.register(screenshotLogger);
 		eventBus.register(timelineLogger);
+		eventBus.register(grandExchangeHistoryParser);
 		coloScanner.updateConfigFlags(true);
 
 		final BufferedImage icon = ImageUtil.loadImageResource(getClass(), "icon.png");
@@ -106,11 +120,46 @@ public class DataLoggerPlugin extends Plugin
 	@Override
 	protected void shutDown()
 	{
+		if (fileIOService != null) {
+			fileIOService.flushAll();
+		}
 		eventBus.unregister(geLogger);
 		eventBus.unregister(coloLogger);
 		eventBus.unregister(coloScanner);
 		eventBus.unregister(screenshotLogger);
 		eventBus.unregister(timelineLogger);
+		eventBus.unregister(grandExchangeHistoryParser);
 		clientToolbar.removeNavigation(navButton);
+	}
+
+	@Subscribe
+	public void onGameStateChanged(GameStateChanged event)
+	{
+		if (event.getGameState() == GameState.LOGIN_SCREEN)
+		{
+			sessionInitialized = false;
+			lastAccountHash = -1;
+		}
+	}
+
+	@Subscribe
+	public void onGameTick(GameTick event)
+	{
+		if (client.getGameState() == GameState.LOGGED_IN && !sessionInitialized)
+		{
+			long currentHash = client.getAccountHash();
+
+			if (currentHash != -1 && client.getLocalPlayer() != null && client.getLocalPlayer().getName() != null)
+			{
+				lastAccountHash = currentHash;
+				sessionInitialized = true;
+
+				String hashString = String.valueOf(currentHash);
+				String accountName = client.getLocalPlayer().getName();
+
+				log.debug("Session ready! Hash: {}, Name: {}. Broadcasting event.", hashString, accountName);
+				eventBus.post(new AccountHashResolved(hashString, accountName));
+			}
+		}
 	}
 }

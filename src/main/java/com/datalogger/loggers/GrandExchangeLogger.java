@@ -24,83 +24,120 @@
  */
 package com.datalogger.loggers;
 
-import com.datalogger.DataLoggerConfig;
 import com.datalogger.framework.AbstractLogger;
 import com.datalogger.framework.LogType;
-import com.datalogger.models.GrandExchangeOfferData;
-import com.datalogger.services.FileIOService;
+import com.datalogger.models.grandexchange.ActiveGeOffer;
+import com.datalogger.models.grandexchange.GeLedgerEntry;
 import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.PrintWriter;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Objects;
 import java.util.Properties;
+import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import lombok.extern.slf4j.Slf4j;
-import net.runelite.api.Client;
 import net.runelite.api.GrandExchangeOffer;
 import net.runelite.api.GrandExchangeOfferState;
 import net.runelite.api.events.GrandExchangeOfferChanged;
-import net.runelite.api.gameval.InterfaceID;
-import net.runelite.api.events.WidgetLoaded;
+import net.runelite.client.RuneLite;
 import net.runelite.client.eventbus.Subscribe;
+import net.runelite.client.game.ItemManager;
 
 @Slf4j
 @Singleton
 public class GrandExchangeLogger extends AbstractLogger
 {
-	@Inject private DataLoggerConfig config;
-	@Inject private Client client;
-	@Inject private FileIOService utils;
+	// The other dependencies (Client, FileIOService, Config) are inherited from AbstractLogger!
+	@Inject private ItemManager itemManager;
 
-	private static final String CSV_HEADER = "item_id,timestamp,timestamp_created,is_buy,quantity,offer_quantity,price,offer_price,value,account,ge_slot";
+	private static final String CSV_HEADER = "ItemId,ItemName,OfferCreationTime,Timestamp,TradeType,Quantity,OfferQuantity,Price,OfferPrice,Value,Tax,AccountName,AccountHash,GeSlot,IsHistoryEntry,IsCancelled";
+
+	// Memory cache for Wealth Tracker
+	private ActiveGeOffer[] currentActiveOffers = new ActiveGeOffer[8];
 
 	@Override
 	public LogType getLogType() { return LogType.GRAND_EXCHANGE; }
 
 	@Override
-	public String getCsvHeader() {return "item_id,timestamp,timestamp_created,is_buy,quantity,offer_quantity,price,offer_price,value,account,ge_slot";}
+	public String getCsvHeader() { return CSV_HEADER; }
 
 	@Override
 	public boolean isEnabled() { return config.logGrandExchange(); }
 
+	/**
+	 * Triggered automatically by AbstractLogger when a valid session begins.
+	 */
 	@Override
 	public void setup()
 	{
+		String hash = getAccountHashString();
+		if (hash.equals("-1")) return;
+
+		List<ActiveGeOffer> savedState = utils.loadActiveGeOffers(hash);
+		currentActiveOffers = new ActiveGeOffer[8];
+		for (ActiveGeOffer offer : savedState) {
+			if (offer != null && offer.getSlot() >= 0 && offer.getSlot() < 8) {
+				currentActiveOffers[offer.getSlot()] = offer;
+			}
+		}
 		initialScan();
 	}
 
 	@Subscribe
 	public void onGrandExchangeOfferChanged(GrandExchangeOfferChanged event) {
-		handleOffer(event.getSlot(), event.getOffer());
-	}
+		String hash = getAccountHashString();
+		if (hash.equals("-1")) return;
 
-	private GrandExchangeOfferData assembleData(int slot, GrandExchangeOffer offer, String createdTs) {
-		int quantity = offer.getQuantitySold();
-		long averagePrice = (quantity > 0) ? (offer.getSpent() / quantity) : offer.getPrice();
+		int slot = event.getSlot();
+		GrandExchangeOffer offer = event.getOffer();
 
-		return new GrandExchangeOfferData(
-			offer.getItemId(),
-			Instant.now().toString(),
-			createdTs,
-			isBuy(offer.getState()),
-			quantity,
-			offer.getTotalQuantity(),
-			averagePrice,
-			offer.getPrice(),
-			offer.getSpent(),
-			getAccountName(),
-			slot
-		);
+		updateActiveOfferState(slot, offer, hash);
+		handleOffer(slot, offer);
 	}
 
 	/**
-	 * Process the given offer with the given slot index info
-	 * @param slot The Grand Exchange slot index of the trade
-	 * @param offer The offer that is to be processed
+	 * Maintains the 8-slot array of active GE offers and saves to disk on change.
 	 */
-	public void handleOffer(int slot, GrandExchangeOffer offer) {
-		if (!isEnabled()) {
-			return;
+	private void updateActiveOfferState(int slot, GrandExchangeOffer offer, String hash) {
+		if (offer.getState() == GrandExchangeOfferState.EMPTY) {
+			currentActiveOffers[slot] = null;
+		} else {
+			boolean isBuy = isBuy(offer.getState());
+			String itemName = itemManager.getItemComposition(offer.getItemId()).getName();
+
+			ActiveGeOffer activeOffer = ActiveGeOffer.builder()
+				.accountName(getAccountName())
+				.slot(slot)
+				.itemId(offer.getItemId())
+				.itemName(itemName)
+				.isBuy(isBuy)
+				.state(offer.getState())
+				.totalQuantity(offer.getTotalQuantity())
+				.quantitySold(offer.getQuantitySold())
+				.offerPrice(offer.getPrice())
+				.spent(offer.getSpent())
+				.build();
+
+			currentActiveOffers[slot] = activeOffer;
 		}
+
+		List<ActiveGeOffer> listToSave = Arrays.stream(currentActiveOffers)
+			.filter(Objects::nonNull)
+			.collect(Collectors.toList());
+
+		utils.saveActiveGeOffers(hash, listToSave);
+	}
+
+	public void handleOffer(int slot, GrandExchangeOffer offer) {
+		if (!isEnabled()) return;
 
 		if (offer.getState() == GrandExchangeOfferState.EMPTY) {
 			clearSlotMemory(slot);
@@ -112,14 +149,12 @@ public class GrandExchangeLogger extends AbstractLogger
 
 		String createdTs = getOrSetCreatedTimestamp(slot, offer, state, accountHash);
 		String fingerprint = generateFingerprint(offer);
-
 		String lastLoggedFp = state.getProperty("last_fp_" + slot);
 
 		if (isFinalState(offer.getState()) && offer.getSpent() > 0) {
 			if (!fingerprint.equals(lastLoggedFp)) {
-				logFinalTrade(slot, offer, createdTs);
+				logFinalTrade(slot, offer, createdTs, accountHash);
 
-				// Update local file memory
 				state.setProperty("last_fp_" + slot, fingerprint);
 				utils.saveAccountState(accountHash, state);
 				log.debug("Logged GE trade for slot {}. FP: {}", slot, fingerprint);
@@ -127,103 +162,252 @@ public class GrandExchangeLogger extends AbstractLogger
 		}
 	}
 
-	/**
-	 * Scan the offers active on the account that is logged in. Compare the data with previously logged completed offer
-	 * data and store fingerprints of unlogged completed offers.
-	 */
 	public void initialScan() {
 		GrandExchangeOffer[] offers = client.getGrandExchangeOffers();
 		if (offers == null) return;
 
 		String accountHash = getAccountHashString();
 		Properties state = utils.getAccountState(accountHash);
-		boolean changed = false;
+		boolean propertiesChanged = false;
 
 		for (int i = 0; i < offers.length; i++) {
 			GrandExchangeOffer offer = offers[i];
-			if (offer == null || offer.getState() == GrandExchangeOfferState.EMPTY) continue;
+
+			if (offer == null || offer.getState() == GrandExchangeOfferState.EMPTY) {
+				currentActiveOffers[i] = null;
+				continue;
+			} else {
+				boolean isBuy = isBuy(offer.getState());
+				String itemName = itemManager.getItemComposition(offer.getItemId()).getName();
+
+				currentActiveOffers[i] = ActiveGeOffer.builder()
+					.slot(i)
+					.itemId(offer.getItemId())
+					.itemName(itemName)
+					.isBuy(isBuy)
+					.state(offer.getState())
+					.totalQuantity(offer.getTotalQuantity())
+					.quantitySold(offer.getQuantitySold())
+					.offerPrice(offer.getPrice())
+					.spent(offer.getSpent())
+					.build();
+			}
 
 			getOrSetCreatedTimestamp(i, offer, state, accountHash);
 
 			if (isFinalState(offer.getState())) {
-				state.setProperty("last_fp_" + i, generateFingerprint(offer));
-				changed = true;
+				String fp = generateFingerprint(offer);
+				if (!fp.equals(state.getProperty("last_fp_" + i))) {
+					state.setProperty("last_fp_" + i, fp);
+					propertiesChanged = true;
+				}
 			}
 		}
 
-		if (changed) {
+		if (propertiesChanged) {
 			utils.saveAccountState(accountHash, state);
+		}
+
+		List<ActiveGeOffer> listToSave = Arrays.stream(currentActiveOffers)
+			.filter(Objects::nonNull)
+			.collect(Collectors.toList());
+
+		utils.saveActiveGeOffers(accountHash, listToSave);
+		log.debug("Initial GE scan complete. Live active offers saved to disk for {}", getAccountName());
+	}
+
+	private boolean isCancelledState(GrandExchangeOfferState state)
+	{
+		return state == GrandExchangeOfferState.CANCELLED_BUY || state == GrandExchangeOfferState.CANCELLED_SELL;
+	}
+
+	/**
+	 * Approximate the tax paid using the offer data that is available. Note that this is not a perfect estimate.
+	 */
+	private int approximateTax(boolean isBuy, int quantity, int price)
+	{
+		int estimatedTaxPaid = 0;
+
+		if (!isBuy && price >= 99) {
+			int approxTaxPerItem;
+
+			if (price >= 245_000_000) {
+				approxTaxPerItem = 5_000_000;
+			} else {
+				long approxGrossPerItem = Math.round(price / 0.98);
+				approxTaxPerItem = (int) (approxGrossPerItem - price);
+			}
+
+			estimatedTaxPaid = approxTaxPerItem * quantity;
+		}
+		return estimatedTaxPaid;
+	}
+
+	/**
+	 * Submits a completed trade to the internal ledger and adds it to the CSV file
+	 */
+	private void logFinalTrade(int slot, GrandExchangeOffer offer, String createdTs, String accountHash) {
+		String currentAccountName = getAccountName();
+		int quantity = offer.getQuantitySold();
+
+		if (quantity == 0) {
+			log.error("Encountered an offer with quantity=0; {}", offer);
+			return;
+		}
+
+		int totalSpent = offer.getSpent();
+		int price = totalSpent / quantity;
+		boolean isBuy = isBuy(offer.getState());
+		int estimatedTaxPaid = approximateTax(isBuy, quantity, price);
+
+
+		Instant creationInstant = null;
+		if (createdTs != null && !createdTs.isEmpty()) {
+			try {
+				creationInstant = Instant.parse(createdTs);
+			} catch (Exception e) {
+				log.debug("Could not parse createdTs: {}", createdTs);
+			}
+		}
+
+		GeLedgerEntry ledgerEntry = GeLedgerEntry.builder()
+			.itemId(offer.getItemId())
+			.itemName(itemManager.getItemComposition(offer.getItemId()).getName())
+			.isBuy(isBuy)
+			.quantity(quantity)
+			.price(price)
+			.value(totalSpent)
+			.tax(estimatedTaxPaid)
+			.accountName(currentAccountName)
+			.accountHash(accountHash)
+			.geSlot(slot)
+			.isHistoryEntry(false)
+			.isCancelled(isCancelledState(offer.getState()))
+			.offerCreationTime(creationInstant)
+			.exactTimestamp(Instant.now())
+			.originalOfferQuantity(offer.getTotalQuantity())
+			.originalOfferPrice(offer.getPrice())
+			.build();
+
+
+		List<GeLedgerEntry> internalLedger = utils.loadInternalGeLedger(accountHash);
+		internalLedger.add(ledgerEntry);
+		utils.saveInternalGeLedger(accountHash, internalLedger);
+
+		String row = formatCsvRow(ledgerEntry);
+		logRow(row);
+	}
+
+	/**
+	 * Extracts all Grand Exchange trades for a specific date from the internal ledger
+	 * and exports them to a standalone CSV file.
+	 * @param targetDate The specific day to extract (e.g., LocalDate.now())
+	 */
+	public void exportLedgerForDay(LocalDate targetDate) {
+		String hash = getAccountHashString();
+		String accountName = getAccountName();
+
+		if (hash.equals("-1") || accountName.equals("unknown")) {
+			return;
+		}
+
+		List<GeLedgerEntry> fullLedger = utils.loadInternalGeLedger(hash);
+		if (fullLedger == null || fullLedger.isEmpty()) {
+			log.info("No GE history found in the internal ledger for {}.", accountName);
+			return;
+		}
+
+		List<GeLedgerEntry> dailyEntries = fullLedger.stream()
+			.filter(entry -> {
+				Instant ts = entry.getExactTimestamp() != null ? entry.getExactTimestamp() : entry.getParseTime();
+				if (ts == null) return false;
+
+				LocalDate entryDate = ts.atZone(ZoneId.systemDefault()).toLocalDate();
+				return entryDate.equals(targetDate);
+			})
+			.collect(Collectors.toList());
+
+		if (dailyEntries.isEmpty()) {
+			log.info("No GE entries found for {} on {}", accountName, targetDate);
+			return;
+		}
+
+		String dateString = targetDate.format(DateTimeFormatter.ISO_LOCAL_DATE);
+		File exportDir = new File(RuneLite.RUNELITE_DIR, "data-logger/exports/grand-exchange");
+		if (!exportDir.exists() && !exportDir.mkdirs()) {
+			log.error("Failed to create export directory: {}", exportDir.getAbsolutePath());
+			return;
+		}
+
+		File exportFile = new File(exportDir, accountName + "_" + dateString + ".csv");
+
+		try (PrintWriter writer = new PrintWriter(new FileWriter(exportFile))) {
+			writer.println(CSV_HEADER);
+
+			for (GeLedgerEntry entry : dailyEntries) {
+				Instant ts = entry.getExactTimestamp() != null ? entry.getExactTimestamp() : entry.getParseTime();
+				String timestampStr = ts != null ? ts.toString() : "";
+
+				int totalValue = entry.getQuantity() * entry.getPrice();
+
+				String row = String.format("%d,%s,%s,%b,%d,%d,%d,%d,%d,%s,%d",
+					entry.getItemId(),
+					timestampStr,
+					"",
+					entry.isBuy(),
+					entry.getQuantity(),
+					entry.getOriginalOfferQuantity(),
+					entry.getPrice(),
+					entry.getOriginalOfferPrice(),
+					totalValue,
+					accountName,
+					-1
+				);
+				writer.println(row);
+			}
+			log.info("Successfully exported {} GE trades for {} to {}", dailyEntries.size(), accountName, exportFile.getAbsolutePath());
+		} catch (IOException e) {
+			log.error("Failed to export GE ledger for day {}", targetDate, e);
 		}
 	}
 
 	/**
-	 * Format given data into a CSV row that will be appended to the CSV log for the acocunt.
-	 * @param slot The Grand Exchange slot index of the trade
-	 * @param offer The offer that is to be logged
-	 * @param createdTs The timestamp on which the offer was created
-	 * @param account The account on which the offer was submitted
-	 * @return A String that contains a formatted row for the CSV file
+	 * Converts a GeLedgerEntry into a comma-separated string aligning with:
+	 * ItemId,ItemName,OfferCreationTime,Timestamp,TradeType,Quantity,OfferQuantity,Price,OfferPrice,Value,Tax,AccountName,AccountHash,GeSlot,IsHistoryEntry,IsCancelled
 	 */
-	private String formatCsvRow(int slot, GrandExchangeOffer offer, String createdTs, String account) {
-		int value = offer.getSpent();
-		int quantity = offer.getQuantitySold();
-		int averagePrice = (quantity > 0) ? (value / quantity) : offer.getPrice();
+	private String formatCsvRow(GeLedgerEntry entry) {
+		String safeItemName = entry.getItemName() != null ? entry.getItemName() : "Unknown";
+		if (safeItemName.contains(",")) {
+			safeItemName = "\"" + safeItemName + "\"";
+		}
 
-		return String.format("%d,%s,%s,%b,%d,%d,%d,%d,%d,%s,%d",
-			offer.getItemId(),
-			Instant.now().toString(),
-			createdTs,
-			isBuy(offer.getState()),
-			quantity,
-			offer.getTotalQuantity(),
-			averagePrice,
-			offer.getPrice(),
-			offer.getSpent(),
-			account,
-			slot
+		String creationTimeStr = entry.getOfferCreationTime() != null ? entry.getOfferCreationTime().toString() : "";
+
+		Instant mainTime = entry.getExactTimestamp() != null ? entry.getExactTimestamp() : entry.getParseTime();
+		String timeStr = mainTime != null ? mainTime.toString() : "";
+
+		String tradeType = entry.isBuy() ? "BUY" : "SELL";
+
+		return String.join(",",
+			String.valueOf(entry.getItemId()),
+			safeItemName,
+			creationTimeStr,
+			timeStr,
+			tradeType,
+			String.valueOf(entry.getQuantity()),
+			String.valueOf(entry.getOriginalOfferQuantity()),
+			String.valueOf(entry.getPrice()),
+			String.valueOf(entry.getOriginalOfferPrice()),
+			String.valueOf(entry.getValue()),
+			String.valueOf(entry.getTax()),
+			entry.getAccountName() != null ? entry.getAccountName() : "",
+			entry.getAccountHash() != null ? entry.getAccountHash() : "",
+			String.valueOf(entry.getGeSlot()),
+			String.valueOf(entry.isHistoryEntry()),
+			String.valueOf(entry.isCancelled())
 		);
 	}
 
-	@Subscribe
-	public void onWidgetLoaded(WidgetLoaded event) {
-		// Using the modern InterfaceID check
-		if (event.getGroupId() == InterfaceID.GE_HISTORY) {
-
-			// Give the client thread a tick to populate the text fields
-			clientThread.invokeLater(this::processGEHistory);
-		}
-	}
-
-	/**
-	 * Iterate over GE history entries and attempt to match them to previously logged transactions.
-	 */
-	private void processGEHistory()
-	{
-
-	}
-
-	/**
-	 * Format the data into a CSV file row and append it to the appropriate file
-	 * @param slot The Grand Exchange slot index of the trade
-	 * @param offer The offer that is to be logged
-	 * @param createdTs The timestamp on which the offer was created
-	 */
-	private void logFinalTrade(int slot, GrandExchangeOffer offer, String createdTs) {
-		String currentAccount = getAccountName();
-		File logFile = utils.getTargetFile(getLogType(), currentAccount);
-		String row = formatCsvRow(slot, offer, createdTs, currentAccount);
-
-		utils.atomicWrite(logFile, CSV_HEADER, row);
-	}
-
-	/**
-	 * Fetch the created timestamp that is relevant given the args that are provided. Register the timestamp if need be.
-	 * @param slot The Grand Exchange slot index of the trade
-	 * @param offer The offer of which the created timestamp is to be fetched
-	 * @param state The state of the offer
-	 * @param hash The hash of the account that placed the offer
-	 * @return The created timestamp of the offer.
-	 */
 	private String getOrSetCreatedTimestamp(int slot, GrandExchangeOffer offer, Properties state, String hash) {
 		String tsKey = "slot_created_" + slot;
 		String itemKey = "slot_item_" + slot;
@@ -231,7 +415,6 @@ public class GrandExchangeLogger extends AbstractLogger
 		String existing = state.getProperty(tsKey);
 		String lastItemId = state.getProperty(itemKey);
 
-		// If no timestamp exists or the item in the slot changed, reset
 		if (existing == null || lastItemId == null || Integer.parseInt(lastItemId) != offer.getItemId()) {
 			existing = Instant.now().toString();
 			state.setProperty(tsKey, existing);
@@ -241,10 +424,6 @@ public class GrandExchangeLogger extends AbstractLogger
 		return existing;
 	}
 
-	/**
-	 * Reset the data logged for a particular slot of the hashed account string and save the properties file.
-	 * @param slot The index of the grand exchange slot that is to be reset
-	 */
 	private void clearSlotMemory(int slot) {
 		String hash = getAccountHashString();
 		Properties state = utils.getAccountState(hash);
@@ -252,23 +431,14 @@ public class GrandExchangeLogger extends AbstractLogger
 		if (state.containsKey("slot_created_" + slot)) {
 			state.remove("slot_created_" + slot);
 			state.remove("slot_item_" + slot);
-			// We don't remove last_fp so that if the same trade re-appears (lag), we don't double log
 			utils.saveAccountState(hash, state);
 		}
 	}
 
-	/**
-	 * Generate a unique fingerprint of a completed trade that will be used to prevent duplicate log submissions.
-	 * @param offer The offer to extract the data from
-	 * @return A specifically formatted String that captures offer data to store
-	 */
 	private String generateFingerprint(GrandExchangeOffer offer) {
 		return offer.getItemId() + "_" + offer.getTotalQuantity() + "_" + offer.getSpent() + "_" + offer.getState();
 	}
 
-	/**
-	 * Return true if state refers to a completed or cancelled offer
-	 */
 	private boolean isFinalState(GrandExchangeOfferState state) {
 		return state == GrandExchangeOfferState.BOUGHT ||
 			state == GrandExchangeOfferState.SOLD ||
@@ -276,9 +446,6 @@ public class GrandExchangeLogger extends AbstractLogger
 			state == GrandExchangeOfferState.CANCELLED_SELL;
 	}
 
-	/**
-	 * Return true if state refers to a buy offer
-	 */
 	private boolean isBuy(GrandExchangeOfferState state) {
 		return state == GrandExchangeOfferState.BUYING ||
 			state == GrandExchangeOfferState.BOUGHT ||

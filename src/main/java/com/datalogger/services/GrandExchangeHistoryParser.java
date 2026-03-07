@@ -25,178 +25,241 @@
 
 package com.datalogger.services;
 
-import com.datalogger.services.FileIOService;
-import com.datalogger.models.grandexchange.GrandExchangeHistoryEntry;
+import com.datalogger.DataLoggerConfig;
+import static com.datalogger.constants.GrandExchange.InterfaceID.GE_GROUP_ID;
+import static com.datalogger.constants.GrandExchange.InterfaceID.GE_HISTORY_CHILD_ID;
+import com.datalogger.events.AccountHashResolved;
+import com.datalogger.models.grandexchange.GeLedgerEntry;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
+import net.runelite.api.GameState;
+import net.runelite.api.ItemComposition;
+import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.WidgetLoaded;
-import net.runelite.api.gameval.InterfaceID;
+import net.runelite.api.widgets.Widget;
 import net.runelite.client.callback.ClientThread;
-import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
+import net.runelite.client.game.ItemManager;
+import net.runelite.client.util.Text;
 
 @Slf4j
 @Singleton
 public class GrandExchangeHistoryParser
 {
-	/**
-	// Inject your existing dependencies
 	@Inject
 	private Client client;
 	@Inject
 	private ClientThread clientThread;
 	@Inject
-	private FileIOService fileIOService; // Your existing file reader/writer
+	private FileIOService fileIOService;
 	@Inject
-	private EventBus eventBus;
+	private DataLoggerConfig config;
 
+	@Inject
+	private GeHistoryReconciler reconciler;
 
-	public void startUp() {eventBus.register(this);}
+	@Inject
+	private ItemManager itemManager;
 
-	public void shutDown() {eventBus.unregister(this);}
+	private String accountHash = null;
+	private String accountName = null;
+
+	private boolean hasParsed = false;
+	private long lastParsed = 0;
+	private static final int ELEMENTS_PER_ROW = 6;
+	private static final long COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes in milliseconds
+
+	/**
+	 * Listens for our custom event and caches the account hash globally for this class.
+	 */
+	@Subscribe
+	public void onAccountHashResolved(AccountHashResolved event)
+	{
+		this.accountHash = event.getAccountHash();
+		this.accountName = event.getAccountName(); // Ready for your CSVs!
+		this.hasParsed = false;
+	}
 
 	@Subscribe
 	public void onWidgetLoaded(WidgetLoaded event)
 	{
-		if (event.getGroupId() == InterfaceID.GE_HISTORY)
+		if (!hasParsed && config.logGrandExchange() && event.getGroupId() == GE_GROUP_ID)
 		{
-			clientThread.invokeLater(this::processHistoryInterface);
+			log.info("Attempting to parse GE history....");
+			clientThread.invokeLater(this::parseGeHistory);
 		}
 	}
 
-	// 2. The Coordinator
-	private void processHistoryInterface()
+	// Reset accountHash and hasParsed when logging out
+	@Subscribe
+	public void onGameStateChanged(GameStateChanged event) {
+		GameState state = event.getGameState();
+		if (state == GameState.LOGIN_SCREEN) {
+			hasParsed = false;
+			accountHash = null;
+			log.debug("Session ended. GE History Parser state cleared.");
+		}
+	}
+
+	/**
+	 * Return true if history was parsed more than 5 minutes ago and has not been parsed during this session
+	 */
+	private boolean allowedToParseHistory()
 	{
-		// A. Parse the UI into a list of entries
-		List<GrandExchangeHistoryEntry> uiEntries = parseUiWidgets();
-		if (uiEntries.isEmpty())
-		{
+		if (!config.logGrandExchange() || accountHash == null || hasParsed) return false;
+
+		if (System.currentTimeMillis() - lastParsed < COOLDOWN_MS) {
+			log.debug("Skipping GE history parse; history was parsed less than 5 minutes ago.");
+			hasParsed = true;
+			return false;
+		}
+		return true;
+	}
+
+	/**
+	 * Parse the GE History UI and submit the parsed entries. Check encountered entries against existing entries and
+	 * skip them if they are already logged.
+	 */
+	public void parseGeHistory() {
+		if (!allowedToParseHistory()) return;
+
+		Widget historyContainer = client.getWidget(GE_GROUP_ID, GE_HISTORY_CHILD_ID);
+
+		if (historyContainer == null || historyContainer.isHidden()) {
 			return;
 		}
 
-		// B. Read your past N logs from your CSV (e.g., last 100 lines)
-		List<GrandExchangeHistoryEntry> localLogs = fileIOService.readRecentGeLogs(100);
+		Widget[] children = historyContainer.getDynamicChildren();
+		if (children == null || children.length == 0) {
+			return;
+		}
 
-		// C. Run the chronological consumption algorithm
-		List<GrandExchangeHistoryEntry> newOrphans = reconcile(uiEntries, localLogs);
+		List<GeLedgerEntry> parsedEntries = new ArrayList<>();
+		Instant currentParseTime = Instant.now();
 
-		// D. Assign the earliestTime/latestTime bounds to the new orphans
-		assignTimespans(newOrphans, localLogs);
+		for (int i = 0; i < children.length; i += ELEMENTS_PER_ROW) {
+			if (i + (ELEMENTS_PER_ROW - 1) >= children.length) {
+				break;
+			}
 
-		// E. Write the newly discovered transactions to the CSV
-		for (GrandExchangeHistoryEntry orphan : newOrphans)
+			Widget typeWidget = children[i + 2];
+			Widget itemWidget = children[i + 4];
+			Widget valueWidget = children[i + 5];
+
+			if (typeWidget == null || itemWidget == null || valueWidget == null) {
+				continue;
+			}
+
+			String typeText = Text.removeTags(typeWidget.getText()).trim();
+			boolean isBuy = typeText.equalsIgnoreCase("Bought:");
+
+			int itemId = itemWidget.getItemId();
+			ItemComposition item = itemManager.getItemComposition(itemId);
+			String itemName = item.getName();
+
+			try {
+				String rawValueText = valueWidget.getText();
+				ExtractedHistoryValue historyEntry = parseValueWidgetText(rawValueText);
+
+				GeLedgerEntry entry = GeLedgerEntry.builder()
+					.itemId(itemId)
+					.itemName(itemName)
+					.isBuy(isBuy)
+					.price(historyEntry.getPriceEach())
+					.quantity(historyEntry.getQuantity())
+					.value(historyEntry.getNetCoins())
+					.tax(historyEntry.getTax())
+					.accountName(accountName)
+					.accountHash(accountHash)
+					.geSlot(-1)
+					.isHistoryEntry(true)
+					.isCancelled(false)
+					.parseTime(currentParseTime)
+					.build();
+
+				parsedEntries.add(entry);
+
+			} catch (IllegalStateException e) {
+				log.error("Failed to parse history entry (possible quantity=0). Raw text: {}", valueWidget.getText(), e);
+			}
+		}
+
+		if (!parsedEntries.isEmpty()) {
+			Collections.reverse(parsedEntries);
+
+			List<GeLedgerEntry> savedEntries = fileIOService.loadInternalGeLedger(accountHash);
+
+			List<GeLedgerEntry> mergedEntries = reconciler.weaveLedgers(savedEntries, parsedEntries);
+
+			fileIOService.saveInternalGeLedger(accountHash, mergedEntries);
+
+			log.info("Successfully parsed and saved GE History.");
+		}
+
+		lastParsed = System.currentTimeMillis();
+		hasParsed = true;
+	}
+
+	@Data
+	private static class ExtractedHistoryValue {
+		private int netCoins;
+		private int grossCoins;
+		private int taxPaid;
+		private int priceEach;
+		private int quantity;
+
+		public int getTax()
 		{
-			fileIOService.writeRow(orphan); // Or whatever your log appending method is called
+			return taxPaid / quantity;
 		}
 	}
 
-	// 3. The Parsers and Algorithms (Private internal methods)
-	private List<GrandExchangeHistoryEntry> parseUiWidgets()
-	{
-		// ... The getChildren() loop we discussed ...
-		return new java.util.ArrayList<>();
-	}
+	/**
+	 * Parses the complex OSRS GE History Value widget text.
+	 * Handles color tags, commas, taxes, and dynamic line rendering.
+	 */
+	private ExtractedHistoryValue parseValueWidgetText(String rawText) throws IllegalStateException {
+		String preProcessed = rawText.replaceAll("(?i)<br\\s*/?>", "\n");
+		String cleanText = preProcessed.replaceAll("<[^>]+>", "").replace(",", "");
+		String[] lines = cleanText.split("\\n");
 
-	public void reconcileGeHistory(List<GrandExchangeHistoryEntry> uiEntries, List<GrandExchangeHistoryEntry> localLogs) {
-		// 1. Reverse both lists so we process Oldest -> Newest
-		// (Assuming index 0 is currently the newest in both lists)
-		List<GrandExchangeHistoryEntry> reversedUi = reverseList(uiEntries);
-		List<GrandExchangeHistoryEntry> reversedLocal = reverseList(localLogs);
+		ExtractedHistoryValue result = new ExtractedHistoryValue();
+		result.setNetCoins(Integer.parseInt(lines[0].replace(" coins", "").trim()));
+		result.setGrossCoins(result.getNetCoins());
+		result.setPriceEach(result.getNetCoins());
+		result.setTaxPaid(0);
 
-		int localPointer = 0;
-		List<GrandExchangeHistoryEntry> newOrphans = new ArrayList<>();
+		for (int i = 1; i < lines.length; i++) {
+			String line = lines[i].trim();
 
-		// 2. Iterate through the UI entries
-		for (GrandExchangeHistoryEntry uiEntry : reversedUi) {
-			boolean matched = false;
-
-			// 3. Scan the local logs starting from our current pointer
-			for (int i = localPointer; i < reversedLocal.size(); i++) {
-				GrandExchangeHistoryEntry localEntry = reversedLocal.get(i);
-
-				// Compare our fingerprints
-				if (uiEntry.getFingerprint().equals(localEntry.getFingerprint())) {
-					// We found a match in chronological order!
-					matched = true;
-
-					// Inherit the exact time from our local logs
-					uiEntry.setEarliestTime(localEntry.getEarliestTime());
-					uiEntry.setLatestTime(localEntry.getEarliestTime());
-
-					// Advance the pointer so we don't match this local log ever again
-					localPointer = i + 1;
-					break;
+			if (line.startsWith("(")) {
+				line = line.replace("(", "").replace(")", "");
+				String[] parts = line.split("-");
+				if (parts.length == 2) {
+					result.setGrossCoins(Integer.parseInt(parts[0].trim()));
+					result.setTaxPaid(Integer.parseInt(parts[1].trim()));
 				}
-			}
 
-			// 4. If we scanned forward and found no match, it's a new transaction
-			if (!matched) {
-				newOrphans.add(uiEntry);
-			}
-		}
-
-		// Now process the newOrphans list (assign their timespans using the bounding
-		// logic we discussed earlier, then write them to the CSV).
-		processOrphans(newOrphans);
-	}
-
-	private void processOrphans(List<GrandExchangeHistoryEntry> fullUiList, List<GrandExchangeHistoryEntry> newOrphans) {
-		if (newOrphans.isEmpty()) {
-			return; // Everything is perfectly synced, nothing to do!
-		}
-
-		// 1. Deduce the timespans for the orphans using their matched neighbors
-		assignTimespans(fullUiList);
-
-		// 2. Save only the orphans to the CSV file
-		for (GrandExchangeHistoryEntry orphan : newOrphans) {
-			fileIOService.writeRow(orphan);
-			// Optional: log it to your RuneLite client console so you know it worked!
-			log.info("Recovered missing GE transaction: " + orphan.getFingerprint());
-		}
-	}
-
-	private void assignTimespans(List<GrandExchangeHistoryEntry> fullUiList) {
-		// --- PASS 1: Top-Down (Propagate the latestTime / Upper Bound) ---
-		Instant currentUpperBound = Instant.now();
-
-		for (GrandExchangeHistoryEntry entry : fullUiList) {
-			if (entry.getEarliestTime() != null && entry.getEarliestTime().equals(entry.getLatestTime())) {
-				// This is a matched entry! It has an exact known time.
-				// It becomes the new upper bound for the older orphans beneath it.
-				currentUpperBound = entry.getLatestTime();
-			} else {
-				// This is an orphan. We know it happened on or before the current upper bound.
-				entry.setLatestTime(currentUpperBound);
+			} else if (line.startsWith("=")) {
+				line = line.replace("=", "").replace("each", "").trim();
+				result.setPriceEach(Integer.parseInt(line));
 			}
 		}
 
-		// --- PASS 2: Bottom-Up (Propagate the earliestTime / Lower Bound) ---
-		Instant currentLowerBound = null;
-
-		for (int i = fullUiList.size() - 1; i >= 0; i--) {
-			GrandExchangeHistoryEntry entry = fullUiList.get(i);
-
-			if (entry.getEarliestTime() != null && entry.getEarliestTime().equals(entry.getLatestTime())) {
-				// It's a matched entry. Update our lower bound tracker.
-				currentLowerBound = entry.getEarliestTime();
-			} else {
-				// It's an orphan. We know it happened on or after the transaction below it.
-				entry.setEarliestTime(currentLowerBound);
-			}
+		if (result.getPriceEach() > 0) {
+			int derivedQuantity = Math.round((float) result.getNetCoins() / result.getPriceEach());
+			result.setQuantity(Math.max(1, derivedQuantity));
+		} else {
+			result.setQuantity(0);
+			throw new IllegalStateException("Calculated quantity resulted in 0 or less. Raw text:\n" + rawText);
 		}
+		return result;
 	}
-
-	private Instant findExactTimeInLocalLogs(GrandExchangeHistoryEntry entry) {
-		// Implement your fingerprint/matching logic here.
-		// For example:
-		// if (localLogs.contains(entry.getFingerprint())) return localLogs.getExactTime();
-		return null;
-	}
-	**/
 }

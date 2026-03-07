@@ -25,15 +25,14 @@
 package com.datalogger.framework;
 
 import com.datalogger.DataLoggerConfig;
+import com.datalogger.events.AccountHashResolved;
 import com.datalogger.services.FileIOService;
 import java.io.File;
 import javax.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
-import net.runelite.api.Player;
 import net.runelite.api.events.GameStateChanged;
-import net.runelite.client.callback.ClientThread;
 import net.runelite.client.eventbus.Subscribe;
 
 @Slf4j
@@ -41,25 +40,22 @@ public abstract class AbstractLogger implements Loggable {
 	@Inject protected Client client;
 	@Inject protected FileIOService utils;
 	@Inject protected DataLoggerConfig config;
-	@Inject protected ClientThread clientThread;
 
-	private String accountNameCache;
+	private String accountNameCache = "unknown";
+	private String accountHashCache = "-1";
 
 	/**
 	 * Logic for getting an account name, which is used as a folder in the file structure
 	 */
 	protected String getAccountName() {
-		if (accountNameCache != null && !accountNameCache.equals("unknown")) {
-			return accountNameCache;
-		}
-		Player player = client.getLocalPlayer();
-		accountNameCache = (player != null && player.getName() != null) ?
-			player.getName() : "unknown";
 		return accountNameCache;
 	}
 
-	public void setAccountName(String name) {
-		this.accountNameCache = name;
+	/**
+	 * A numerical hash string associated with the OSRS account.
+	 */
+	protected String getAccountHashString() {
+		return accountHashCache;
 	}
 
 	/**
@@ -67,43 +63,47 @@ public abstract class AbstractLogger implements Loggable {
 	 * It automatically resolves the target file based on the logger type.
 	 */
 	protected void logRow(String csvRow) {
-		if (!isEnabled()) {
+		if (!isEnabled() || accountNameCache.equals("unknown")) {
 			return;
 		}
 
-		String currentAccount = getAccountName();
-		File logFile = utils.getTargetFile(getLogType(), currentAccount);
-
+		File logFile = utils.getTargetFile(getLogType(), accountNameCache);
 		utils.atomicWrite(logFile, getCsvHeader(), csvRow);
 	}
 
 	/**
-	 * A numerical hash string associated with the OSRS account. Uses account name as fallback.
+	 * Listens for our custom global session event.
+	 * This guarantees the hash and name are valid, and it runs on the ClientThread.
 	 */
-	protected String getAccountHashString() {
-		long accountHash = client.getAccountHash();
-		if (accountHash != -1L)
-			return String.valueOf(accountHash);
-		else
-			return getAccountName().toLowerCase().replace(" ", "_");
+	@Subscribe
+	public void onAccountHashResolved(AccountHashResolved event) {
+		this.accountNameCache = event.getAccountName();
+		this.accountHashCache = event.getAccountHash();
+
+		log.debug("[{}] Session initialized for {} ({})", getLogType(), accountNameCache, accountHashCache);
+
+		if (isEnabled()) {
+			setup();
+		}
 	}
 
+	/**
+	 * Handles wiping the session state.
+	 */
 	@Subscribe
-	public void onGameStateChanged(GameStateChanged gameStateChanged) {
-		GameState state = gameStateChanged.getGameState();
-		if (state == GameState.LOGGED_IN) {
-			clientThread.invokeLater(() -> {
-				Player local = client.getLocalPlayer();
-				if (local != null && local.getName() != null) {
-					setAccountName(local.getName());
+	public void onGameStateChanged(GameStateChanged event) {
+		GameState state = event.getGameState();
 
-					if (isEnabled()) {
-						setup();
-					}
-				}
-			});
-		} else if (state == GameState.LOGIN_SCREEN || state == GameState.HOPPING) {
-			setAccountName("unknown");
+		// ONLY reset on LOGIN_SCREEN.
+		// Hopping maintains the session, so we keep our caches active!
+		if (state == GameState.LOGIN_SCREEN) {
+			this.accountNameCache = "unknown";
+			this.accountHashCache = "-1";
 		}
+	}
+
+	public void shutDown() {
+		this.accountNameCache = "unknown";
+		this.accountHashCache = "-1";
 	}
 }

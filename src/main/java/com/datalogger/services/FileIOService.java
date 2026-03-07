@@ -30,6 +30,8 @@ import com.datalogger.framework.LogType;
 import com.datalogger.models.colosseum.ColosseumAttempt;
 import com.datalogger.models.colosseum.ColosseumState;
 import com.datalogger.models.colosseum.ColosseumWave;
+import com.datalogger.models.grandexchange.ActiveGeOffer;
+import com.datalogger.models.grandexchange.GeLedgerEntry;
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -43,12 +45,19 @@ import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.io.Reader;
 import java.lang.reflect.Type;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.stream.Collectors;
 import javax.imageio.ImageIO;
@@ -66,6 +75,8 @@ public class FileIOService
 
 	private final ScheduledExecutorService executor;
 
+	private final Map<File, Queue<String>> failedWrites = new ConcurrentHashMap<>();
+
 	@Inject
 	private FileIOService(DataLoggerConfig config, Gson gson, ScheduledExecutorService executor) {
 		this.executor = executor;
@@ -77,7 +88,10 @@ public class FileIOService
 
 
 	public final File PLUGIN_ROOT = new File(RuneLite.RUNELITE_DIR, "data-logger");
-	private final File STATE_DIR = new File(PLUGIN_ROOT, "state");
+	private final File INTERNAL_ROOT_DIR = new File(PLUGIN_ROOT, "internal");
+	private final File INTERNAL_GE_DIR = new File(INTERNAL_ROOT_DIR, "ge-history");
+	private final File GE_STATE_DIR = new File(INTERNAL_ROOT_DIR, "state");
+	private final File INTERNAL_ACTIVE_OFFERS_DIR = new File(INTERNAL_ROOT_DIR, "active-offers");
 	private final File COLOSSEUM_ROOT_DIR = new File(PLUGIN_ROOT, "colosseum");
 	private final File COLOSSEUM_TIMELINE_DIR = new File(COLOSSEUM_ROOT_DIR, "timeline");
 	private final File COLOSSEUM_LOG_DIR = new File(COLOSSEUM_ROOT_DIR, "log");
@@ -87,37 +101,41 @@ public class FileIOService
 	private final File COLOSSEUM_SCREENSHOT_DIR = new File(COLOSSEUM_ROOT_DIR, "screenshot");
 
 	/**
-	 * Performs an atomic append to a file.
-	 * Handles directory creation on-the-fly to prevent crashes if folders are moved/deleted.
-	 * @param file The file that is to be modified
-	 * @param header The header of the CSV file that will be added if the file does not exist
-	 * @param row The content of the line that is to be added to the file
+	 * Appends a row to a CSV file. If the file is locked, it queues the row and attempts to flush the queue on the
+	 * next write attempt.
 	 */
 	public void atomicWrite(File file, String header, String row) {
-		// Push the disk write to the background thread
 		executor.submit(() -> {
+			Queue<String> backlog = failedWrites.computeIfAbsent(file, k -> new ConcurrentLinkedQueue<>());
+			backlog.add(row);
+
 			try {
-				File parent = file.getParentFile();
-				if (parent != null && !parent.exists() && !parent.mkdirs()) {
-					throw new IOException("Failed to create directory: " + parent.getAbsolutePath());
+				File parentDir = file.getParentFile();
+				if (parentDir != null && !parentDir.exists() && !parentDir.mkdirs()) {
+					log.error("Failed to create log directory: {}", parentDir.getAbsolutePath());
+					return;
 				}
 
-				StringBuilder sb = new StringBuilder();
-				boolean isNew = !file.exists() || file.length() == 0;
+				boolean isNewFile = !file.exists();
 
-				if (isNew && header != null) {
-					sb.append(header).append("\n");
+				try (FileWriter fw = new FileWriter(file, true);
+					 BufferedWriter bw = new BufferedWriter(fw);
+					 PrintWriter out = new PrintWriter(bw)) {
+
+					if (isNewFile && header != null) {
+						out.println(header);
+					}
+
+					String queuedRow;
+					while ((queuedRow = backlog.poll()) != null) {
+						out.println(queuedRow);
+					}
+
+					log.debug("Successfully wrote to {}. Remaining backlog: {}", file.getName(), backlog.size());
 				}
-				sb.append(row).append("\n");
-
-				java.nio.file.Files.write(
-					file.toPath(),
-					sb.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8),
-					java.nio.file.StandardOpenOption.CREATE,
-					java.nio.file.StandardOpenOption.APPEND
-				);
 			} catch (IOException e) {
-				log.error("Failed to write to file: {}", file.getName(), e);
+				log.warn("File {} is currently locked or inaccessible. Queued {} rows for next attempt.",
+					file.getName(), backlog.size());
 			}
 		});
 	}
@@ -142,10 +160,10 @@ public class FileIOService
 	 * Ensures the state directory exists and returns the file path for an account's state
 	 */
 	private File getStateFile(String accountHash) {
-		if (!STATE_DIR.exists()) {
-			STATE_DIR.mkdirs();
+		if (!GE_STATE_DIR.exists()) {
+			GE_STATE_DIR.mkdirs();
 		}
-		return new File(STATE_DIR, "state_" + accountHash + ".properties");
+		return new File(GE_STATE_DIR, "state_" + accountHash + ".properties");
 	}
 
 	/**
@@ -257,10 +275,8 @@ public class FileIOService
 
 	private List<ColosseumStateDTO> loadWaveStates(File file) {
 		try (Reader reader = new FileReader(file)) {
-			// 1. Parse directly into an array using the standard .class reference
 			ColosseumStateDTO[] dataArray = gson.fromJson(reader, ColosseumStateDTO[].class);
 
-			// 2. Convert the array to a List (or return an empty list if null)
 			if (dataArray != null) {
 				return new ArrayList<>(Arrays.asList(dataArray));
 			}
@@ -297,7 +313,6 @@ public class FileIOService
 				File finalFile = new File(COLOSSEUM_TIMELINE_DIR, String.format("timeline-%s.json", attemptId));
 				saveJson(finalFile, fullRunData);
 
-				// Delete the temp directory
 				for (File f : toDelete)
 				{
 					if (f.delete())
@@ -414,4 +429,187 @@ public class FileIOService
 			return obj;
 		}
 	}
+
+	/**
+	 * Safely loads the internal Grand Exchange ledger for a specific account.
+	 * Uses String interning to prevent reading while the file is actively being saved.
+	 *
+	 * @param accountHash The unique hash of the logged-in account
+	 * @return A list of ledger entries, or an empty list if no file exists
+	 */
+	public List<GeLedgerEntry> loadInternalGeLedger(String accountHash) {
+		if (accountHash == null || accountHash.isEmpty()) {
+			return new ArrayList<>();
+		}
+
+		File file = new File(INTERNAL_GE_DIR, accountHash + ".json");
+
+		// Synchronize on the interned account hash so we don't read halfway through a write
+		synchronized (accountHash.intern()) {
+			if (!file.exists()) {
+				return new ArrayList<>();
+			}
+
+			try (Reader reader = new FileReader(file)) {
+				// Read directly into an array to avoid Gson TypeToken generic erasure
+				GeLedgerEntry[] arr = gson.fromJson(reader, GeLedgerEntry[].class);
+				return arr != null ? new ArrayList<>(Arrays.asList(arr)) : new ArrayList<>();
+			} catch (Exception e) {
+				log.error("Failed to load internal GE ledger for account hash: {}", accountHash, e);
+				return new ArrayList<>();
+			}
+		}
+	}
+
+	/**
+	 * Safely saves the internal Grand Exchange ledger for a specific account.
+	 * Offloads to a background thread and uses an atomic file swap to prevent data corruption.
+	 *
+	 * @param accountHash The unique hash of the logged-in account
+	 * @param ledger The full merged list of ledger entries to save
+	 */
+	public void saveInternalGeLedger(String accountHash, List<GeLedgerEntry> ledger) {
+		if (accountHash == null || accountHash.isEmpty() || ledger == null) {
+			return;
+		}
+
+		// Push the heavy disk write to the background executor to prevent freezing the game client
+		executor.submit(() -> {
+			if (!INTERNAL_GE_DIR.exists() && !INTERNAL_GE_DIR.mkdirs()) {
+				log.error("Failed to create internal GE ledger directory: {}", INTERNAL_GE_DIR.getAbsolutePath());
+				return;
+			}
+
+			File finalFile = new File(INTERNAL_GE_DIR, accountHash + ".json");
+			File tempFile = new File(INTERNAL_GE_DIR, accountHash + ".tmp");
+
+			// Synchronize on the interned hash to prevent two rapid GE updates from writing simultaneously
+			synchronized (accountHash.intern()) {
+				try {
+					// 1. Write the full JSON to a temporary file first
+					try (FileWriter writer = new FileWriter(tempFile)) {
+						gson.toJson(ledger, writer);
+					}
+
+					// 2. Atomic Swap: Instantly overwrite the real file with the temp file.
+					// If RuneLite crashes during step 1, the real JSON file remains perfectly safe!
+					Files.move(
+						tempFile.toPath(),
+						finalFile.toPath(),
+						StandardCopyOption.ATOMIC_MOVE,
+						StandardCopyOption.REPLACE_EXISTING
+					);
+
+					log.debug("Successfully saved internal GE ledger for account hash: {}", accountHash);
+
+				} catch (Exception e) {
+					log.error("Failed to save internal GE ledger for account hash: {}", accountHash, e);
+					// Clean up the temp file if something went catastrophically wrong
+					if (tempFile.exists()) {
+						tempFile.delete();
+					}
+				}
+			}
+		});
+	}
+
+	/**
+	 * Safely loads the active Grand Exchange offers (Wealth Tracker state) for a specific account.
+	 */
+	public List<ActiveGeOffer> loadActiveGeOffers(String accountHash) {
+		if (accountHash == null || accountHash.isEmpty()) {
+			return new ArrayList<>();
+		}
+
+		File file = new File(INTERNAL_ACTIVE_OFFERS_DIR, accountHash + ".json");
+
+		synchronized (accountHash.intern()) {
+			if (!file.exists()) {
+				return new ArrayList<>();
+			}
+
+			try (Reader reader = new FileReader(file)) {
+				ActiveGeOffer[] arr = gson.fromJson(reader, ActiveGeOffer[].class);
+				return arr != null ? new ArrayList<>(Arrays.asList(arr)) : new ArrayList<>();
+			} catch (Exception e) {
+				log.error("Failed to load active GE offers for account hash: {}", accountHash, e);
+				return new ArrayList<>();
+			}
+		}
+	}
+
+	/**
+	 * Safely saves the active Grand Exchange offers (Wealth Tracker state) for a specific account.
+	 */
+	public void saveActiveGeOffers(String accountHash, List<ActiveGeOffer> offers) {
+		if (accountHash == null || accountHash.isEmpty() || offers == null) {
+			log.debug("Unable to save active GE offers for account hash: {}", accountHash);
+			return;
+		}
+
+		executor.submit(() -> {
+			if (!INTERNAL_ACTIVE_OFFERS_DIR.exists() && !INTERNAL_ACTIVE_OFFERS_DIR.mkdirs()) {
+				log.error("Failed to create internal active GE offers directory: {}", INTERNAL_ACTIVE_OFFERS_DIR.getAbsolutePath());
+				return;
+			}
+
+			File finalFile = new File(INTERNAL_ACTIVE_OFFERS_DIR, accountHash + ".json");
+			File tempFile = new File(INTERNAL_ACTIVE_OFFERS_DIR, accountHash + ".tmp");
+
+			synchronized (accountHash.intern()) {
+				try {
+					// Write to temp file first
+					try (FileWriter writer = new FileWriter(tempFile)) {
+						gson.toJson(offers, writer);
+					}
+
+					// Atomic swap
+					Files.move(
+						tempFile.toPath(),
+						finalFile.toPath(),
+						StandardCopyOption.ATOMIC_MOVE,
+						StandardCopyOption.REPLACE_EXISTING
+					);
+
+				} catch (Exception e) {
+					log.error("Failed to save active GE offers for account hash: {}", accountHash, e);
+					if (tempFile.exists()) {
+						tempFile.delete();
+					}
+				}
+			}
+		});
+	}
+
+	/**
+	 * Final attempt to write all rows that previously failed to write.
+	 */
+	public void flushAll() {
+		for (Map.Entry<File, Queue<String>> entry : failedWrites.entrySet()) {
+			File file = entry.getKey();
+			Queue<String> backlog = entry.getValue();
+
+			if (backlog.isEmpty()) continue;
+
+			log.info("Attempting final flush of {} rows to {} before shutdown...", backlog.size(), file.getName());
+
+			try (FileWriter fw = new FileWriter(file, true);
+				 BufferedWriter bw = new BufferedWriter(fw);
+				 PrintWriter out = new PrintWriter(bw)) {
+
+				String queuedRow;
+				while ((queuedRow = backlog.poll()) != null) {
+					out.println(queuedRow);
+				}
+				log.info("Successfully flushed remaining backlog for {}", file.getName());
+
+			} catch (IOException e) {
+				log.error(
+					"Failed to write rows to file {} due to lock during shutdown! {} rows were not written to CSV.",
+					file.getName(), backlog.size());
+			}
+		}
+	}
+
+
 }
