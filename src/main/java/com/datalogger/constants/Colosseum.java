@@ -121,4 +121,13 @@ public final class Colosseum
 		public static final String BOSS_WAVE_START_PREFIX = "Sol Heredit jumps down from his seat...";
 		public static final String END_ATTEMPT_MESSAGE = "Search the chest nearby to retrieve your earned rewards";
 	}
+
+	/**
+	 * Script IDs used to identify specific ScriptFiredEvents
+	 */
+	public static class Script
+	{
+		public static final int POPULATE_INTERMISSION_UI_SCRIPT_ID = 4931;
+		public static final int POPULATE_REWARDS_CHEST_UI_SCRIPT_ID = 4929;
+	}
 }

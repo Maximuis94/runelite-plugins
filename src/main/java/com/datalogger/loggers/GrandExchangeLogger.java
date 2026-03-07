@@ -24,6 +24,9 @@
  */
 package com.datalogger.loggers;
 
+import static com.datalogger.constants.GrandExchange.Values.MAX_ITEM_TAX;
+import static com.datalogger.constants.GrandExchange.Values.MAX_TAXED_PRICE;
+import static com.datalogger.constants.GrandExchange.Values.TAX_MULTIPLIER;
 import com.datalogger.framework.AbstractLogger;
 import com.datalogger.framework.LogType;
 import com.datalogger.models.grandexchange.ActiveGeOffer;
@@ -216,8 +219,7 @@ public class GrandExchangeLogger extends AbstractLogger
 		log.debug("Initial GE scan complete. Live active offers saved to disk for {}", getAccountName());
 	}
 
-	private boolean isCancelledState(GrandExchangeOfferState state)
-	{
+	private boolean isCancelledState(GrandExchangeOfferState state) {
 		return state == GrandExchangeOfferState.CANCELLED_BUY || state == GrandExchangeOfferState.CANCELLED_SELL;
 	}
 
@@ -228,13 +230,13 @@ public class GrandExchangeLogger extends AbstractLogger
 	{
 		int estimatedTaxPaid = 0;
 
-		if (!isBuy && price >= 99) {
+		if (!isBuy && price >= 49) {
 			int approxTaxPerItem;
 
-			if (price >= 245_000_000) {
-				approxTaxPerItem = 5_000_000;
+			if (price >= MAX_TAXED_PRICE) {
+				approxTaxPerItem = MAX_ITEM_TAX;
 			} else {
-				long approxGrossPerItem = Math.round(price / 0.98);
+				long approxGrossPerItem = Math.round(price / TAX_MULTIPLIER);
 				approxTaxPerItem = (int) (approxGrossPerItem - price);
 			}
 

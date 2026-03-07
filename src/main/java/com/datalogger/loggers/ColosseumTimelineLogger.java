@@ -53,10 +53,10 @@ public class ColosseumTimelineLogger {
 
 	@Subscribe
 	public void onColosseumWaveStarted(ColosseumWaveStarted event) {
-		this.currentWave = event.getWaveNumber();
-		this.waveStartTick = event.getStartTick();
-		this.states.clear();
-		this.isRecording = true;
+		currentWave = event.getWaveNumber();
+		waveStartTick = event.getStartTick();
+		states.clear();
+		isRecording = true;
 	}
 
 	@Subscribe
@@ -69,14 +69,14 @@ public class ColosseumTimelineLogger {
 	@Subscribe
 	public void onColosseumWaveEnded(ColosseumWaveEnded event) {
 		if (!isRecording) return;
-		this.isRecording = false;
+		isRecording = false;
 
 		if (states.isEmpty()) return;
 
 		// Snapshot to avoid concurrent modifications while saving
-		List<ColosseumState> snapshot = new ArrayList<>(this.states);
+		List<ColosseumState> snapshot = new ArrayList<>(states);
 		fileIOService.saveWaveStates(event.getAttemptId(), event.getWaveNumber(), snapshot);
-		this.states.clear();
+		states.clear();
 	}
 
 	@Subscribe

@@ -28,6 +28,9 @@ package com.datalogger.models.colosseum;
 import lombok.Builder;
 import lombok.Value;
 
+/**
+ * A ColosseumNPC as seen in a ColosseumState
+ */
 @Value
 @Builder
 public class ColosseumNPC {

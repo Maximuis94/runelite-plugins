@@ -38,16 +38,9 @@ import lombok.Data;
 public class ColosseumStateDTO {
 	private int wave;
 	private int tick;
+	private int playerHp;
+	private int playerPrayer;
 	private int playerX;
 	private int playerY;
 	private List<ColosseumNPC> npcs;
-
-//	@Data
-//	@Builder
-//	public static class NPCDataDTO {
-//		private int id;
-//		private String name;
-//		private int x;
-//		private int y;
-//	}
 }

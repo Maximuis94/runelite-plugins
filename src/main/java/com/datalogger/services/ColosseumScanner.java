@@ -54,7 +54,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -67,7 +66,6 @@ import javax.inject.Singleton;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.ActorSpotAnim;
 import net.runelite.api.Client;
-import net.runelite.api.IterableHashTable;
 import net.runelite.api.NPC;
 import net.runelite.api.NPCComposition;
 import net.runelite.api.Player;
@@ -97,6 +95,10 @@ public class ColosseumScanner
 	private Integer manticoreIndexB = null;
 	private final Map<Integer, ManticoreAttackSequence> manticoreSequences = new HashMap<>();
 
+	public int getManticoreIndexA() {
+		return manticoreIndexA;
+	}
+
 	public void setManticoreIndexA(int index) {
 		manticoreIndexA = index;
 	}
@@ -104,6 +106,10 @@ public class ColosseumScanner
 	public ManticoreAttackSequence getManticoreSequenceA()
 	{
 		return manticoreIndexA != null ? manticoreSequences.get(manticoreIndexA) : null;
+	}
+
+	public int getManticoreIndexB() {
+		return manticoreIndexB;
 	}
 
 	public void setManticoreIndexB(int index) {
@@ -117,7 +123,6 @@ public class ColosseumScanner
 
 	private final Map<Integer, List<Integer>> manticoreAttackSequences = new HashMap<>();
 
-	// Wave 12 reward instead of Dizana's quiver, if the option is active
 	private final ItemBundle SWAPPED_DIZANAS_QUIVER = new ItemBundle(SUNFIRE_SPLINTERS_ID, "Sunfire splinters", 4000);
 
 	private final Set<Integer> CORE_COLOSSEUM_MOBS = ImmutableSet.of(
@@ -158,21 +163,20 @@ public class ColosseumScanner
 	/**
 	 * Return true if all Manticores have an identified orb sequence, false if not. Cache result until end of wave.
 	 */
-	public boolean scannedManticoreSequences(int currentWave)
-	{
-		if (scannedManticores) {
-			return true;
-		}
+	public boolean scannedManticoreSequences(int currentWave) {
+		if (scannedManticores) return true;
+
+		boolean manticoreADone = getManticoreSequenceA() != null;
+		boolean manticoreBDone = getManticoreSequenceB() != null;
 
 		if (currentWave < 4) {
 			scannedManticores = true;
+		} else if (currentWave <= 8) {
+			scannedManticores = manticoreADone;
+		} else {
+			scannedManticores = manticoreADone && manticoreBDone;
 		}
-		else if (currentWave <= 8) {
-			scannedManticores = getManticoreSequenceA() != null;
-		}
-		else if (currentWave <= 11) {
-			scannedManticores = getManticoreSequenceA() != null && getManticoreSequenceB() != null;
-		}
+
 		return scannedManticores;
 	}
 
@@ -180,23 +184,23 @@ public class ColosseumScanner
 	 * Identify the orb order of npc, provided it is a Manticore, it is not already logged and it has three orbs
 	 */
 	public void parseManticoreAttackSequence(NPC npc) {
-		if (manticoreSequences.containsKey(npc.getIndex()) || npc.getSpotAnims() == null) {
-			return;
-		}
+		if (npc == null || manticoreSequences.containsKey(npc.getIndex())) return;
 
-		List<ActorSpotAnim> activeOrbs = new ArrayList<>();
-		for (ActorSpotAnim anim : npc.getSpotAnims()) {
+		Iterable<ActorSpotAnim> anims = npc.getSpotAnims();
+		if (anims == null) return;
+
+		List<ActorSpotAnim> activeOrbs = new ArrayList<>(3);
+
+		for (ActorSpotAnim anim : anims) {
 			int id = anim.getId();
-			if (id == MAGIC_ORB_ID ||
-				id == RANGED_ORB_ID ||
-				id == MELEE_ORB_ID) {
+			if (id == MAGIC_ORB_ID || id == RANGED_ORB_ID || id == MELEE_ORB_ID) {
 				activeOrbs.add(anim);
 			}
 		}
 
 		if (activeOrbs.size() == 3) {
-			ManticoreAttackSequence sequence = new ManticoreAttackSequence(activeOrbs);
-			manticoreSequences.put(npc.getIndex(), sequence);
+			manticoreSequences.put(npc.getIndex(), new ManticoreAttackSequence(activeOrbs));
+			log.debug("Manticore {} sequence identified.", npc.getIndex());
 		}
 	}
 
@@ -305,17 +309,17 @@ public class ColosseumScanner
 	/**
 	 * Handler for scanning rewards chest UI / wave intermission UI
 	 */
-	public IntermissionUI scanUI(boolean rewardsChestUI)
+	public IntermissionUI scanUI(boolean rewardsChestUI, int currentWave)
 	{
-		return rewardsChestUI ? scanRewardsChestUI() : scanIntermissionUI();
+		return rewardsChestUI ? scanRewardsChestUI(currentWave) : scanIntermissionUI(currentWave);
 	}
 
 	/**
 	 * Extract relevant data from the UI that appears in-between waves.
 	 */
-	private IntermissionUI scanIntermissionUI()
+	private IntermissionUI scanIntermissionUI(int currentWave)
 	{
-		log.debug("Scanning intermission UI");
+		log.debug("Scanning intermission UI for wave {}", currentWave);
 		int speedBonusTimeSeconds = -1;
 		int damageTakenAmount = -1;
 
@@ -405,13 +409,9 @@ public class ColosseumScanner
 	/**
 	 * Extract relevant data from the rewards chest UI and return them
 	 */
-	private IntermissionUI scanRewardsChestUI()
+	private IntermissionUI scanRewardsChestUI(int currentWave)
 	{
-		log.debug("Scanning rewards chest UI");
-
-		int speedBonusTimeSeconds = -1;
-		int damageTakenAmount = -1;
-
+		log.debug("Scanning rewards chest UI for wave {}", currentWave);
 		Widget lootContainer = client.getWidget(REWARDS_CHEST_GROUP_ID, REWARDS_CHEST_REWARDS_TAB_CHILD_ID);
 		List<ItemBundle> allLoot = parseNextLoot(lootContainer);
 		if (!allLoot.isEmpty())
@@ -461,7 +461,6 @@ public class ColosseumScanner
 
 		String name = "Unknown";
 
-		// These names are undefined as the NPC entities cannot be targeted
 		if (id == BOSS_WAVE_BEAM_CRYSTAL)
 			name = BOSS_WAVE_BEAM_CRYSTAL_NPC_NAME;
 		else if (id == SOLAR_FLARE_NPC_ID)
@@ -515,9 +514,7 @@ public class ColosseumScanner
 
 			NPCComposition composition = npc.getComposition();
 			int npcId = npc.getId();
-			String npcName = npc.getName();
-			if (composition != null)
-			{
+			if (composition != null) {
 				npcId = composition.getId();
 			}
 

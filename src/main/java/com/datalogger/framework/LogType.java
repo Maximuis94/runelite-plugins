@@ -44,12 +44,12 @@ public enum LogType
 	private final File logDirectory;
 
 	LogType(String logTypeName) {
-		this.name = logTypeName;
+		name = logTypeName;
 
-		this.directoryName = logTypeName.toLowerCase().replace(" ", "-");
+		directoryName = logTypeName.toLowerCase().replace(" ", "-");
 
 		File baseDir = new File(RuneLite.RUNELITE_DIR, "data-logger");
-		this.logDirectory = new File(baseDir, directoryName);
+		logDirectory = new File(baseDir, directoryName);
 	}
 
 	@Override

@@ -35,6 +35,9 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
+/**
+ * Class that encodes a Manticores' attack sequence
+ */
 @Getter
 public class ManticoreAttackSequence {
 
@@ -66,13 +69,10 @@ public class ManticoreAttackSequence {
 	 * sorts them by height, and safely maps them to our Enums!
 	 */
 	public ManticoreAttackSequence(List<ActorSpotAnim> rawSpotAnims) {
-		this.orbs = new ArrayList<>();
-
-		// Sort by height ascending (Bottom to Top)
+		orbs = new ArrayList<>();
 		rawSpotAnims.sort(Comparator.comparingInt(ActorSpotAnim::getHeight));
-
 		for (ActorSpotAnim anim : rawSpotAnims) {
-			this.orbs.add(ManticoreOrb.fromId(anim.getId()));
+			orbs.add(ManticoreOrb.fromId(anim.getId()));
 		}
 	}
 

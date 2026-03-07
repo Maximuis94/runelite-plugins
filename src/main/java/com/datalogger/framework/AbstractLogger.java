@@ -77,8 +77,8 @@ public abstract class AbstractLogger implements Loggable {
 	 */
 	@Subscribe
 	public void onAccountHashResolved(AccountHashResolved event) {
-		this.accountNameCache = event.getAccountName();
-		this.accountHashCache = event.getAccountHash();
+		accountNameCache = event.getAccountName();
+		accountHashCache = event.getAccountHash();
 
 		log.debug("[{}] Session initialized for {} ({})", getLogType(), accountNameCache, accountHashCache);
 
@@ -88,22 +88,18 @@ public abstract class AbstractLogger implements Loggable {
 	}
 
 	/**
-	 * Handles wiping the session state.
+	 * Resets account hash and cache
 	 */
 	@Subscribe
 	public void onGameStateChanged(GameStateChanged event) {
-		GameState state = event.getGameState();
-
-		// ONLY reset on LOGIN_SCREEN.
-		// Hopping maintains the session, so we keep our caches active!
-		if (state == GameState.LOGIN_SCREEN) {
-			this.accountNameCache = "unknown";
-			this.accountHashCache = "-1";
+		if (event.getGameState() == GameState.LOGIN_SCREEN) {
+			accountNameCache = "unknown";
+			accountHashCache = "-1";
 		}
 	}
 
 	public void shutDown() {
-		this.accountNameCache = "unknown";
-		this.accountHashCache = "-1";
+		accountNameCache = "unknown";
+		accountHashCache = "-1";
 	}
 }

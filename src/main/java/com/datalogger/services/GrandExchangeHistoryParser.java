@@ -82,9 +82,9 @@ public class GrandExchangeHistoryParser
 	@Subscribe
 	public void onAccountHashResolved(AccountHashResolved event)
 	{
-		this.accountHash = event.getAccountHash();
-		this.accountName = event.getAccountName(); // Ready for your CSVs!
-		this.hasParsed = false;
+		accountHash = event.getAccountHash();
+		accountName = event.getAccountName(); // Ready for your CSVs!
+		hasParsed = false;
 	}
 
 	@Subscribe

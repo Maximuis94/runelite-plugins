@@ -1,3 +1,28 @@
+/*
+ * Copyright (c) 2026, maximuis94 <https://github.com/maximuis94>
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright notice, this
+ *    list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ *    this list of conditions and the following disclaimer in the documentation
+ *    and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
+ * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
 package com.datalogger.loggers;
 
 import com.datalogger.DataLoggerConfig;
@@ -18,8 +43,11 @@ import static com.datalogger.constants.Colosseum.NPC.SHOCKWAVE_COLOSSUS_NPC_ID;
 import static com.datalogger.constants.Colosseum.Region.COLOSSEUM_REGION_ID;
 import static com.datalogger.constants.Colosseum.RewardsChest.REWARDS_CHEST_GROUP_ID;
 import static com.datalogger.constants.Colosseum.RewardsChest.REWARDS_CHEST_REWARDS_TAB_CHILD_ID;
+import static com.datalogger.constants.Colosseum.Script.POPULATE_INTERMISSION_UI_SCRIPT_ID;
+import static com.datalogger.constants.Colosseum.Script.POPULATE_REWARDS_CHEST_UI_SCRIPT_ID;
 import static com.datalogger.constants.Colosseum.Varbit.COLOSSEUM_SELECTED_MODIFIER_VARBIT;
 import com.datalogger.events.ColosseumAttemptEnded;
+import com.datalogger.events.ColosseumAttemptStarted;
 import com.datalogger.events.ColosseumWaveEnded;
 import com.datalogger.events.ColosseumWaveStarted;
 import com.datalogger.framework.AbstractLogger;
@@ -43,7 +71,6 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
-import net.runelite.api.IndexedObjectSet;
 import net.runelite.api.NPC;
 import net.runelite.api.WorldView;
 import net.runelite.api.coords.WorldPoint;
@@ -51,10 +78,9 @@ import net.runelite.api.events.ChatMessage;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.NpcSpawned;
+import net.runelite.api.events.ScriptPostFired;
 import net.runelite.api.events.VarbitChanged;
-import net.runelite.api.events.WidgetLoaded;
 import net.runelite.api.widgets.Widget;
-import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
@@ -93,7 +119,6 @@ public class ColosseumAttemptLogger extends AbstractLogger
 	private final Client client;
 	private final FileIOService fileIOService;
 	private final DataLoggerConfig config;
-	private final ConfigManager configManager;
 	private final EventBus eventBus;
 
 	private boolean waitingForIntermission;
@@ -112,12 +137,11 @@ public class ColosseumAttemptLogger extends AbstractLogger
 	private WorldPoint minotaurReinforcementsSpawn;
 
 	@Inject
-	public ColosseumAttemptLogger(ColosseumScanner scanner, Client client, FileIOService fileIOService, DataLoggerConfig config, ConfigManager configManager, EventBus eventBus) {
+	public ColosseumAttemptLogger(ColosseumScanner scanner, Client client, FileIOService fileIOService, DataLoggerConfig config, EventBus eventBus) {
 		this.scanner = scanner;
 		this.client = client;
 		this.fileIOService = fileIOService;
 		this.config = config;
-		this.configManager = configManager;
 		this.eventBus = eventBus;
 
 		updateConfigFlags();
@@ -150,17 +174,37 @@ public class ColosseumAttemptLogger extends AbstractLogger
 		}
 	}
 
+	/**
+	 * Return true if the UI intermission/rewards chest UI is ready to be parsed
+	 */
+	private boolean isPostWaveUI(int scriptId) {
+		return scriptId == POPULATE_INTERMISSION_UI_SCRIPT_ID || scriptId == POPULATE_REWARDS_CHEST_UI_SCRIPT_ID;
+	}
+
+	/**
+	 * Event used to identify a post-wave intermission or rewards chest UI
+	 */
 	@Subscribe
-	public void onChatMessage(ChatMessage event)
-	{
-		IndexedObjectSet<? extends NPC> npcs = client.getTopLevelWorldView().npcs();
-		NPC npc = npcs.byIndex(0);
+	public void onScriptPostFired(ScriptPostFired event) {
 		if (!enabledLogging || !inColosseum) return;
 
-		if (event.getType() != ChatMessageType.NPC_SAY && event.getType() != ChatMessageType.GAMEMESSAGE  && event.getType() != ChatMessageType.CONSOLE)
-		{
-			return;
+		if (!widgetIsOpen && isPostWaveUI(event.getScriptId())) {
+			widgetIsOpen = true;
 		}
+	}
+
+	/**
+	 * Return true if the given ChatMessageType is used to detect wave transitions or the start/end of an attempt
+	 */
+	private boolean isRelevantChatMessageType(ChatMessageType chatMessageType) {
+		return chatMessageType != ChatMessageType.NPC_SAY &&
+			chatMessageType != ChatMessageType.GAMEMESSAGE &&
+			chatMessageType != ChatMessageType.CONSOLE;
+	}
+
+	@Subscribe
+	public void onChatMessage(ChatMessage event) {
+		if (!enabledLogging || !inColosseum || !isRelevantChatMessageType(event.getType())) return;
 
 		String message = Text.removeTags(event.getMessage());
 
@@ -214,17 +258,11 @@ public class ColosseumAttemptLogger extends AbstractLogger
 		if (!enabledLogging || !inColosseum) return;
 		if (event.getVarbitId() == COLOSSEUM_SELECTED_MODIFIER_VARBIT) {
 			if (event.getValue() > 0) {
-				selectedModifierIdx = event.getValue()-1;
+				int selectedModifierIdx = event.getValue()-1;
 				selectedModifier = parsedTransitionUI.getModifierChoices().get(selectedModifierIdx);
 				parsedTransitionUI.setSelectedModifier(selectedModifier);
 			}
 		}
-	}
-
-	private void parseNpcAnimations(NPC npc)
-	{
-		if (npc.getId() != MANTICORE_NPC_ID || scanner.scannedManticoreSequences(currentWave)) return;
-		scanner.parseManticoreAttackSequence(npc);
 	}
 
 	@Subscribe
@@ -240,23 +278,12 @@ public class ColosseumAttemptLogger extends AbstractLogger
 			}
 		}
 
-		if (widgetIsOpen)
+		if (widgetIsOpen && !waitingForIntermission)
 		{
-			if (widgetDataIsLoaded())
-			{
-				widgetIsOpen = false;
-				parseUI();
-			}
+			widgetIsOpen = false;
+			parseUI();
 		}
-	}
 
-	@Subscribe
-	public void onWidgetLoaded(WidgetLoaded event) {
-		if (!inColosseum) return;
-
-		if (isColosseumUI(event)) {
-			widgetIsOpen = true;
-		}
 	}
 
 	@Subscribe
@@ -345,6 +372,9 @@ public class ColosseumAttemptLogger extends AbstractLogger
 		}
 	}
 
+	/**
+	 * Reset all variables relevant for tracking an attempt to the initial state
+	 */
 	private void startAttempt() {
 		attemptStartTick = client.getTickCount();
 		currentWave = 1;
@@ -354,19 +384,18 @@ public class ColosseumAttemptLogger extends AbstractLogger
 		activeTrial = true;
 		waitingForIntermission = true;
 		parsedTransitionUI = null;
+		entryAccount = getAccountName();
 
 		try
 		{
 			entryTag = config.colosseumTag();
-			entryAccount = getAccountName();
 		}
 		catch (NullPointerException e)
 		{
 			entryTag = "";
-			entryAccount = "";
 		}
 
-
+		eventBus.post(new ColosseumAttemptStarted(currentAttempt.getStartTime()));
 		log.info("Starting a new Colosseum attempt.");
 	}
 
@@ -374,8 +403,7 @@ public class ColosseumAttemptLogger extends AbstractLogger
 	 * Wrap up the ongoing attempt by merging the timeline of states, logging the current attempt and writing the CSV log,
 	 * depending on user-defined configurations.
 	 */
-	private void endAttempt()
-	{
+	private void endAttempt() {
 		eventBus.post(new ColosseumAttemptEnded(currentAttempt.getStartTime()));
 		currentAttempt.setFinalStatus(finalStatus);
 		fileIOService.logColosseumAttempt(currentAttempt);
@@ -386,9 +414,9 @@ public class ColosseumAttemptLogger extends AbstractLogger
 	}
 
 	private void parseUI() {
-		if (!waitingForIntermission) return;
+		if (!widgetIsOpen) return;
 
-		IntermissionUI newUI = scanner.scanUI(finalStatus != null);
+		IntermissionUI newUI = scanner.scanUI(finalStatus != null, currentWave);
 
 		if (parsedTransitionUI != null && (finalStatus == null || finalStatus == WaveStatus.COMPLETED || finalStatus == WaveStatus.CLAIMED))
 		{
@@ -409,10 +437,11 @@ public class ColosseumAttemptLogger extends AbstractLogger
 	}
 
 	/**
-	 * Ongoing wave has failed
+	 * Ongoing wave has failed. Submit data extracted from pre-wave UI
 	 */
 	private void failWave() {
 		if (currentAttempt == null || finalStatus != null && finalStatus != WaveStatus.CONFIG_DISABLED) return;
+		log.info("Failed attempt at wave {}", currentWave);
 
 		activeWave = false;
 
@@ -487,27 +516,19 @@ public class ColosseumAttemptLogger extends AbstractLogger
 		jaguarWarriorReinforcementsSpawn = null;
 		serpentShamanReinforcementsSpawn = null;
 		minotaurReinforcementsSpawn = null;
-		
-		log.debug("Starting Wave {}", currentWave);
-		
-		
+
+		log.debug("Starting wave {}", currentWave);
+
+
 	}
 
 	/**
-	 * Ends the wave; flag is updated and a log message is produced.
+	 * Ends the wave; flag is updated, the eventBus is updated and a log message is produced.
 	 */
 	public void endWave() {
 		activeWave = false;
 		eventBus.post(new ColosseumWaveEnded(currentAttempt.getStartTime(), currentWave));
 		log.debug("Wave {} ended", currentWave);
-	}
-
-	/**
-	 * Return true if event is an intermission/rewards chest widget, or false if not
-	 */
-	private boolean isColosseumUI(WidgetLoaded event) {
-		int groupId = event.getGroupId();
-		return groupId == INTERMISSION_GROUP_ID || groupId == REWARDS_CHEST_GROUP_ID;
 	}
 
 	/**
@@ -660,6 +681,36 @@ public class ColosseumAttemptLogger extends AbstractLogger
 		}
 
 		return sb.toString();
+	}
+
+	private boolean isDeathMessage(String message)
+	{
+		return message.startsWith(DEATH_MESSAGE);
+	}
+
+	private boolean isWaveStartedMessage(String message)
+	{
+		return message.startsWith(START_ATTEMPT_MESSAGE);
+	}
+
+	private boolean isStartAttemptMessage(String message)
+	{
+		return currentWave < 11 && message.startsWith(WAVE_START_PREFIX);
+	}
+
+	private boolean isBossWaveStartedMessage(String message)
+	{
+		return currentWave == 11 && message.startsWith(BOSS_WAVE_START_PREFIX);
+	}
+
+	public static boolean isWaveCompletedMessage(String message)
+	{
+		return message.startsWith("Wave ") && message.contains("completed! Wave duration:");
+	}
+
+	public static boolean isAttemptCompletedMessage(String message)
+	{
+		return message.startsWith(END_ATTEMPT_MESSAGE);
 	}
 
 }

@@ -41,7 +41,7 @@ public class ColosseumAttempt
 {
 	private final long id;
 
-	private int startTick;
+	private final int startTick;
 
 	private final String startTime;
 
@@ -64,11 +64,11 @@ public class ColosseumAttempt
 
 	public ColosseumAttemptDTO toDTO() {
 		return ColosseumAttemptDTO.builder()
-			.attemptId(this.id)
-			.timestamp(this.id)
-			.result(this.finalStatus != null ? this.finalStatus.name() : "UNKNOWN")
-			.totalGlory(this.waves.isEmpty() ? 0 : this.waves.get(this.waves.size() - 1).getTotalGlory())
-			.waves(this.waves.stream()
+			.attemptId(id)
+			.timestamp(id)
+			.result(finalStatus != null ? finalStatus.name() : "UNKNOWN")
+			.totalGlory(waves.isEmpty() ? 0 : waves.get(waves.size() - 1).getTotalGlory())
+			.waves(waves.stream()
 				.map(ColosseumWave::toDTO)
 				.collect(Collectors.toList()))
 			.build();
@@ -81,7 +81,7 @@ public class ColosseumAttempt
 	{
 		if (waves.isEmpty())
 		{
-			this.waves.add(wave);
+			waves.add(wave);
 		}
 		else
 		{

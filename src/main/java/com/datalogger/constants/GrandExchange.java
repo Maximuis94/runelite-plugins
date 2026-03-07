@@ -35,4 +35,17 @@ public final class GrandExchange
 		public static final int GE_GROUP_ID = 383;
 		public static final int GE_HISTORY_CHILD_ID = 3;
 	}
+
+	/**
+	 * Various constant values that are in some way relevant for Grand Exchange offers
+	 */
+	public static class Values
+	{
+		public static final double TAX_RATE = 0.02;
+		public static final double TAX_MULTIPLIER = 1.-TAX_RATE;
+		public static final int MAX_ITEM_TAX = 5000000;
+		public static final int MAX_TAX_PRICE = (int) (MAX_ITEM_TAX / TAX_RATE);
+		public static final int MAX_TAXED_PRICE = MAX_TAX_PRICE - MAX_ITEM_TAX;
+
+	}
 }

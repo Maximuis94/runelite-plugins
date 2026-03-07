@@ -25,13 +25,12 @@
 package com.datalogger.loggers;
 
 import com.datalogger.DataLoggerConfig;
-import com.datalogger.events.ColosseumAttemptStarted;
-import static com.datalogger.constants.Colosseum.Intermission.INTERMISSION_GROUP_ID;
 import static com.datalogger.constants.Colosseum.Message.BOSS_WAVE_START_PREFIX;
 import static com.datalogger.constants.Colosseum.Message.WAVE_START_PREFIX;
-import static com.datalogger.constants.Colosseum.RewardsChest.REWARDS_CHEST_GROUP_ID;
+import static com.datalogger.constants.Colosseum.Script.POPULATE_INTERMISSION_UI_SCRIPT_ID;
+import static com.datalogger.constants.Colosseum.Script.POPULATE_REWARDS_CHEST_UI_SCRIPT_ID;
+import com.datalogger.events.ColosseumAttemptStarted;
 import com.datalogger.services.FileIOService;
-
 import java.awt.image.BufferedImage;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -41,17 +40,19 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.ChatMessageType;
-import net.runelite.api.Client;
 import net.runelite.api.events.ChatMessage;
+import net.runelite.api.events.ScriptPostFired;
 import net.runelite.api.events.WidgetLoaded;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.ui.DrawManager;
 import net.runelite.client.util.Text;
 
+/**
+ * Centralized class that handles the creation and logging of screenshots.
+ */
 @Slf4j
 @Singleton
 public class ScreenshotLogger {
-	@Inject private Client client;
 	@Inject private DataLoggerConfig config;
 	@Inject private DrawManager drawManager;
 	@Inject private ScheduledExecutorService executor;
@@ -61,46 +62,96 @@ public class ScreenshotLogger {
 	private int colosseumCurrentWave = 0;
 
 	private String colosseumAttemptId = null;
+	private String colosseumAttemptDir;
 
 	@Subscribe
 	public void onColosseumAttemptStarted(ColosseumAttemptStarted event) {
-		this.colosseumAttemptId = event.getStartTime();
-		this.colosseumCurrentWave = 1;
-		this.colosseumScreenshotPending = true;
-		log.debug("Screenshot logger synced with attempt ID: {}", this.colosseumAttemptId);
+		colosseumAttemptId = event.getStartTime();
+		colosseumCurrentWave = 1;
+		colosseumScreenshotPending = true;
+		colosseumAttemptDir = "colosseum/" + colosseumAttemptId;
+		log.debug("Screenshot logger synced with attempt ID: {}", colosseumAttemptId);
 	}
 
 	/**
 	 * Gets the synced Attempt ID, or generates a fallback if none exists.
 	 */
-	private String getOrCreateAttemptId() {
-		if (this.colosseumAttemptId == null) {
-			this.colosseumAttemptId = Instant.ofEpochMilli(System.currentTimeMillis())
+	private String getOrCreateColosseumAttemptId() {
+		if (colosseumAttemptId == null) {
+			colosseumAttemptId = Instant.ofEpochMilli(System.currentTimeMillis())
 				.atZone(ZoneId.systemDefault())
 				.format(DateTimeFormatter.ofPattern("yyMMdd_HHmmss"));
-			log.debug("No active attempt ID found. Generated fallback ID: {}", this.colosseumAttemptId);
+			colosseumAttemptDir = "colosseum/" + colosseumAttemptId;
+			log.debug("No active attempt ID found. Generated fallback ID: {}", colosseumAttemptId);
 		}
-		return this.colosseumAttemptId;
+		return colosseumAttemptDir;
 	}
 
-	public void captureAndSaveScreenshot(String subDirectory, String fileName) {
-		drawManager.requestNextFrameListener(image -> {
-			executor.submit(() -> {
-				fileIOService.saveScreenshot((BufferedImage) image, subDirectory, fileName);
-			});
-		});
+	/**
+	 * Create a screenshot and save it in the given fileName in the given subDirectory
+	 */
+	private void captureAndSaveScreenshot(String subDirectory, String fileName) {
+		drawManager.requestNextFrameListener(image ->
+			executor.submit(() -> fileIOService.saveScreenshot((BufferedImage) image, subDirectory, fileName)));
+	}
+
+	/**
+	 * Return true if the given messageType is to be ignored
+	 */
+	private boolean ignoreChatMessageType(ChatMessageType messageType)
+	{
+		return messageType != ChatMessageType.NPC_SAY &&
+			messageType != ChatMessageType.GAMEMESSAGE &&
+			messageType != ChatMessageType.CONSOLE;
 	}
 
 	@Subscribe
 	public void onChatMessage(ChatMessage event) {
-		if (!config.screenshotBetweenWaves()) return;
-
-		if (event.getType() != ChatMessageType.NPC_SAY && event.getType() != ChatMessageType.GAMEMESSAGE && event.getType() != ChatMessageType.CONSOLE) {
+		if (!config.screenshotBetweenWaves() || ignoreChatMessageType(event.getType())) {
 			return;
 		}
 
 		String message = Text.removeTags(event.getMessage());
 
+		if (!colosseumScreenshotPending)
+			updateColosseumScreenshotPending(message);
+	}
+
+//	@Subscribe
+//	public void onWidgetLoaded(WidgetLoaded event) {
+//		if (config.screenshotBetweenWaves() && colosseumScreenshotPending)
+//		{
+//			takeColosseumScreenshot(event.getGroupId());
+//		}
+//	}
+
+
+	/**
+	 * Return true if the UI intermission/rewards chest UI is ready to be parsed
+	 */
+	private boolean isPostColosseumWaveUI(int scriptId)
+	{
+		return scriptId == POPULATE_INTERMISSION_UI_SCRIPT_ID || scriptId == POPULATE_REWARDS_CHEST_UI_SCRIPT_ID;
+	}
+
+	@Subscribe
+	public void onScriptPostFired(ScriptPostFired event) {
+		if (colosseumScreenshotPending)
+		{
+			int scriptId = event.getScriptId();
+			if (isPostColosseumWaveUI(scriptId))
+			{
+				takeColosseumScreenshot(scriptId);
+				colosseumScreenshotPending = false;
+			}
+		}
+	}
+
+	/**
+	 * Set the colosseumScreenshotPending variable to true if a new wave has started, in case of specific chat messages
+	 */
+	private void updateColosseumScreenshotPending(String message)
+	{
 		if (colosseumCurrentWave < 11 && message.startsWith(WAVE_START_PREFIX)) {
 			colosseumCurrentWave = Integer.parseInt(message.replace("Wave: ", "").trim());
 			colosseumScreenshotPending = true;
@@ -110,23 +161,17 @@ public class ScreenshotLogger {
 		}
 	}
 
-	@Subscribe
-	public void onWidgetLoaded(WidgetLoaded event) {
-		if (!config.screenshotBetweenWaves() || !colosseumScreenshotPending) return;
+	/**
+	 * Take a screenshot in case the intermission or rewards chest UI has appeared
+	 * @param scriptId The scriptId of the script that populates the UI
+	 */
+	private void takeColosseumScreenshot(int scriptId)
+	{
+		String fileName = String.format("wave-%02d", colosseumCurrentWave);
+		captureAndSaveScreenshot(getOrCreateColosseumAttemptId(), fileName);
 
-		int groupId = event.getGroupId();
-		if (groupId == INTERMISSION_GROUP_ID || groupId == REWARDS_CHEST_GROUP_ID) {
-			String attemptId = getOrCreateAttemptId();
-
-			String subDir = "colosseum/" + attemptId;
-			String fileName = String.format("wave-%02d", colosseumCurrentWave);
-
-			captureAndSaveScreenshot(subDir, fileName);
-			colosseumScreenshotPending = false;
-
-			if (groupId == REWARDS_CHEST_GROUP_ID) {
-				this.colosseumAttemptId = null;
-			}
+		if (scriptId == POPULATE_REWARDS_CHEST_UI_SCRIPT_ID) {
+			colosseumAttemptId = null;
 		}
 	}
 }

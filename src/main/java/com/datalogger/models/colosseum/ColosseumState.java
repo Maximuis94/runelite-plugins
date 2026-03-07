@@ -26,12 +26,9 @@
 package com.datalogger.models.colosseum;
 
 import com.datalogger.dto.ColosseumStateDTO;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 import lombok.Builder;
 import lombok.Data;
-import net.runelite.api.NPC;
 import net.runelite.api.coords.WorldPoint;
 
 /**
@@ -47,18 +44,20 @@ public class ColosseumState
 	private int playerHp;
 	private int playerPrayer;
 	private WorldPoint playerLocation;
-	private List<ColosseumNPC> npcs; // Changed to List for better API practice
+	private List<ColosseumNPC> npcs;
 
 	/**
 	 * Converts this live engine state into a static DTO for saving.
 	 */
 	public ColosseumStateDTO toDTO() {
 		return ColosseumStateDTO.builder()
-			.wave(this.wave)
-			.tick(this.tick)
-			.playerX(this.playerLocation != null ? this.playerLocation.getX() : 0)
-			.playerY(this.playerLocation != null ? this.playerLocation.getY() : 0)
-			.npcs(this.npcs)
+			.wave(wave)
+			.tick(tick)
+			.playerHp(playerHp)
+			.playerPrayer(playerPrayer)
+			.playerX(playerLocation != null ? playerLocation.getX() : 0)
+			.playerY(playerLocation != null ? playerLocation.getY() : 0)
+			.npcs(npcs)
 			.build();
 	}
 }
