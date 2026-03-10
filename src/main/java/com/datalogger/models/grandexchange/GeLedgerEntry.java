@@ -62,11 +62,4 @@ public class GeLedgerEntry {
 
 	private int originalOfferQuantity;
 	private int originalOfferPrice;
-
-	/**
-	 * Helper to get the best available time for this trade.
-	 */
-	public Instant getBestTimestamp() {
-		return exactTimestamp != null ? exactTimestamp : parseTime;
-	}
 }

@@ -37,6 +37,8 @@ import lombok.Data;
 @Builder
 public class ColosseumStateDTO {
 	private int wave;
+	private String timestampHms;
+	private Long timestampUnix;
 	private int tick;
 	private int playerHp;
 	private int playerPrayer;

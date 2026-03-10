@@ -24,10 +24,14 @@
  */
 package com.datalogger;
 
+import com.datalogger.models.colosseum.enums.TimestampFormat;
 import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
 import net.runelite.client.config.ConfigSection;
+
+
+
 
 @ConfigGroup(DataLoggerConfig.CONFIG_GROUP)
 public interface DataLoggerConfig extends Config {
@@ -73,6 +77,24 @@ public interface DataLoggerConfig extends Config {
 		section = grandExchangeSection
 	)
 	default boolean logGrandExchange() { return true; }
+
+	@ConfigItem(
+		keyName = "logGrandExchangeCSV",
+		name = "Log Grand Exchange (CSV)",
+		description = "If enabled, Grand Exchange offers are added to a CSV log upon completion.",
+		position = 1,
+		section = grandExchangeSection
+	)
+	default boolean logGrandExchangeCSV() { return true; }
+
+	@ConfigItem(
+		keyName = "logGrandExchangeJSON",
+		name = "Log Grand Exchange (JSON)",
+		description = "If enabled, a copy of the internal ledger JSON is created after updating it.",
+		position = 2,
+		section = grandExchangeSection
+	)
+	default boolean logGrandExchangeJSON() { return true; }
 
 	// --- Colosseum Items ---
 
@@ -124,10 +146,21 @@ public interface DataLoggerConfig extends Config {
 	default boolean logWaveTimeline() { return true; }
 
 	@ConfigItem(
+		keyName = "logTimestamp",
+		name = "Log Timestamp",
+		description = "Select the format of the timestamp added to the timeline data.",
+		position = 1,
+		section = colosseumTimelineSection
+	)
+	default TimestampFormat logTimestamp() {
+		return TimestampFormat.NONE;
+	}
+
+	@ConfigItem(
 		keyName = "logFremenniks",
 		name = "Track Fremenniks",
 		description = "Include Fremennik warband NPC data in the timeline",
-		position = 1,
+		position = 2,
 		section = colosseumTimelineSection
 	)
 	default boolean logFremenniks() { return false; }
@@ -136,7 +169,7 @@ public interface DataLoggerConfig extends Config {
 		keyName = "logSolarFlare",
 		name = "Track Solar Flares",
 		description = "Include Solarflare locations in timeline data",
-		position = 2,
+		position = 3,
 		section = colosseumTimelineSection
 	)
 	default boolean logSolarFlare() { return false; }
@@ -145,7 +178,7 @@ public interface DataLoggerConfig extends Config {
 		keyName = "logHealingTotem",
 		name = "Track Healing Totems",
 		description = "Include Healing totem locations in timeline data",
-		position = 3,
+		position = 4,
 		section = colosseumTimelineSection
 	)
 	default boolean logHealingTotem() { return false; }
@@ -154,7 +187,7 @@ public interface DataLoggerConfig extends Config {
 		keyName = "logBeeSwarm",
 		name = "Track Bee Swarms",
 		description = "Include Bee Swarm locations in timeline data",
-		position = 4,
+		position = 5,
 		section = colosseumTimelineSection
 	)
 	default boolean logBeeSwarm() { return false; }
@@ -163,7 +196,7 @@ public interface DataLoggerConfig extends Config {
 		keyName = "logBeamCrystal",
 		name = "Track Beam Crystals",
 		description = "Include Beam Crystal locations during wave 12 in timeline data",
-		position = 5,
+		position = 6,
 		section = colosseumTimelineSection
 	)
 	default boolean logBeamCrystal() { return false; }

@@ -30,6 +30,7 @@ import lombok.Value;
 
 /**
  * A ColosseumNPC as seen in a ColosseumState
+ * orbSequence only applies to Manticores; it is either Unknown or a triplet of attack styles, from bottom to top.
  */
 @Value
 @Builder
@@ -40,6 +41,7 @@ public class ColosseumNPC {
 	int y;
 	int hp;
 	int maxHp;
+	String orbSequence;
 
 	/**
 	 * Converts this snapshot into a CSV-friendly string.

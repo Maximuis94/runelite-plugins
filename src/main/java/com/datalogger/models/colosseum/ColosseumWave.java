@@ -36,7 +36,6 @@ import java.util.stream.Collectors;
 import lombok.Builder;
 import lombok.Data;
 import lombok.Singular;
-import net.runelite.api.World;
 import net.runelite.api.coords.WorldPoint;
 
 /**
@@ -114,35 +113,35 @@ public class ColosseumWave implements DataRow
 			.totalGlory(totalGlory)
 			.waveGlory(waveGlory)
 
-			.serpentShamanSpawnX(serpentShamanSpawn != null ? serpentShamanSpawn.getX() : null)
-			.serpentShamanSpawnY(serpentShamanSpawn != null ? serpentShamanSpawn.getY() : null)
+			.serpentShamanSpawnX(serpentShamanSpawn != null ? serpentShamanSpawn.getRegionX() : null)
+			.serpentShamanSpawnY(serpentShamanSpawn != null ? serpentShamanSpawn.getRegionY() : null)
 
-			.javelinColossusSpawnAX(javelinColossusSpawnA != null ? javelinColossusSpawnA.getX() : null)
-			.javelinColossusSpawnAY(javelinColossusSpawnA != null ? javelinColossusSpawnA.getY() : null)
-			.javelinColossusSpawnBX(javelinColossusSpawnB != null ? javelinColossusSpawnB.getX() : null)
-			.javelinColossusSpawnBY(javelinColossusSpawnB != null ? javelinColossusSpawnB.getY() : null)
+			.javelinColossusSpawnAX(javelinColossusSpawnA != null ? javelinColossusSpawnA.getRegionX() : null)
+			.javelinColossusSpawnAY(javelinColossusSpawnA != null ? javelinColossusSpawnA.getRegionY() : null)
+			.javelinColossusSpawnBX(javelinColossusSpawnB != null ? javelinColossusSpawnB.getRegionX() : null)
+			.javelinColossusSpawnBY(javelinColossusSpawnB != null ? javelinColossusSpawnB.getRegionY() : null)
 
-			.manticoreSpawnAX(manticoreSpawnA != null ? manticoreSpawnA.getX() : null)
-			.manticoreSpawnAY(manticoreSpawnA != null ? manticoreSpawnA.getY() : null)
+			.manticoreSpawnAX(manticoreSpawnA != null ? manticoreSpawnA.getRegionX() : null)
+			.manticoreSpawnAY(manticoreSpawnA != null ? manticoreSpawnA.getRegionY() : null)
 			.manticoreSequenceA(manticoreSequenceA != null ? manticoreSequenceA.getOrbs() : null)
 
-			.manticoreSpawnBX(manticoreSpawnB != null ? manticoreSpawnB.getX() : null)
-			.manticoreSpawnBY(manticoreSpawnB != null ? manticoreSpawnB.getY() : null)
+			.manticoreSpawnBX(manticoreSpawnB != null ? manticoreSpawnB.getRegionX() : null)
+			.manticoreSpawnBY(manticoreSpawnB != null ? manticoreSpawnB.getRegionY() : null)
 			.manticoreSequenceB(manticoreSequenceB != null ? manticoreSequenceB.getOrbs() : null)
 
-			.shockwaveColossusSpawnAX(shockwaveColossusSpawnA != null ? shockwaveColossusSpawnA.getX() : null)
-			.shockwaveColossusSpawnAY(shockwaveColossusSpawnA != null ? shockwaveColossusSpawnA.getY() : null)
-			.shockwaveColossusSpawnBX(shockwaveColossusSpawnB != null ? shockwaveColossusSpawnB.getX() : null)
-			.shockwaveColossusSpawnBY(shockwaveColossusSpawnB != null ? shockwaveColossusSpawnB.getY() : null)
+			.shockwaveColossusSpawnAX(shockwaveColossusSpawnA != null ? shockwaveColossusSpawnA.getRegionX() : null)
+			.shockwaveColossusSpawnAY(shockwaveColossusSpawnA != null ? shockwaveColossusSpawnA.getRegionY() : null)
+			.shockwaveColossusSpawnBX(shockwaveColossusSpawnB != null ? shockwaveColossusSpawnB.getRegionX() : null)
+			.shockwaveColossusSpawnBY(shockwaveColossusSpawnB != null ? shockwaveColossusSpawnB.getRegionY() : null)
 
-			.jaguarWarriorReinforcementsSpawnX(jaguarWarriorReinforcementsSpawn != null ? jaguarWarriorReinforcementsSpawn.getX() : null)
-			.jaguarWarriorReinforcementsSpawnY(jaguarWarriorReinforcementsSpawn != null ? jaguarWarriorReinforcementsSpawn.getY() : null)
+			.jaguarWarriorReinforcementsSpawnX(jaguarWarriorReinforcementsSpawn != null ? jaguarWarriorReinforcementsSpawn.getRegionX() : null)
+			.jaguarWarriorReinforcementsSpawnY(jaguarWarriorReinforcementsSpawn != null ? jaguarWarriorReinforcementsSpawn.getRegionY() : null)
 
-			.serpentShamanReinforcementsSpawnX(serpentShamanReinforcementsSpawn != null ? serpentShamanReinforcementsSpawn.getX() : null)
-			.serpentShamanReinforcementsSpawnY(serpentShamanReinforcementsSpawn != null ? serpentShamanReinforcementsSpawn.getY() : null)
+			.serpentShamanReinforcementsSpawnX(serpentShamanReinforcementsSpawn != null ? serpentShamanReinforcementsSpawn.getRegionX() : null)
+			.serpentShamanReinforcementsSpawnY(serpentShamanReinforcementsSpawn != null ? serpentShamanReinforcementsSpawn.getRegionY() : null)
 
-			.minotaurReinforcementsSpawnX(minotaurReinforcementsSpawn != null ? minotaurReinforcementsSpawn.getX() : null)
-			.minotaurReinforcementsSpawnY(minotaurReinforcementsSpawn != null ? minotaurReinforcementsSpawn.getY() : null)
+			.minotaurReinforcementsSpawnX(minotaurReinforcementsSpawn != null ? minotaurReinforcementsSpawn.getRegionX() : null)
+			.minotaurReinforcementsSpawnY(minotaurReinforcementsSpawn != null ? minotaurReinforcementsSpawn.getRegionY() : null)
 			.build();
 	}
 
@@ -200,32 +199,32 @@ public class ColosseumWave implements DataRow
 			String.valueOf(waveGlory),
 			String.valueOf(totalGlory),
 
-			serpentShamanSpawn != null ? String.valueOf(serpentShamanSpawn.getX()) : "",
-			serpentShamanSpawn != null ? String.valueOf(serpentShamanSpawn.getY()) : "",
+			serpentShamanSpawn != null ? String.valueOf(serpentShamanSpawn.getRegionX()) : "",
+			serpentShamanSpawn != null ? String.valueOf(serpentShamanSpawn.getRegionY()) : "",
 
-			javelinColossusSpawnA != null ? String.valueOf(javelinColossusSpawnA.getX()) : "",
-			javelinColossusSpawnA != null ? String.valueOf(javelinColossusSpawnA.getY()) : "",
-			javelinColossusSpawnB != null ? String.valueOf(javelinColossusSpawnB.getX()) : "",
-			javelinColossusSpawnB != null ? String.valueOf(javelinColossusSpawnB.getY()) : "",
+			javelinColossusSpawnA != null ? String.valueOf(javelinColossusSpawnA.getRegionX()) : "",
+			javelinColossusSpawnA != null ? String.valueOf(javelinColossusSpawnA.getRegionY()) : "",
+			javelinColossusSpawnB != null ? String.valueOf(javelinColossusSpawnB.getRegionX()) : "",
+			javelinColossusSpawnB != null ? String.valueOf(javelinColossusSpawnB.getRegionY()) : "",
 
-			manticoreSpawnA != null ? String.valueOf(manticoreSpawnA.getX()) : "",
-			manticoreSpawnA != null ? String.valueOf(manticoreSpawnA.getY()) : "",
+			manticoreSpawnA != null ? String.valueOf(manticoreSpawnA.getRegionX()) : "",
+			manticoreSpawnA != null ? String.valueOf(manticoreSpawnA.getRegionY()) : "",
 			manticoreSequenceA != null ? manticoreSequenceA.toCsvFormat() : "",
-			manticoreSpawnB != null ? String.valueOf(manticoreSpawnB.getX()) : "",
-			manticoreSpawnB != null ? String.valueOf(manticoreSpawnB.getY()) : "",
+			manticoreSpawnB != null ? String.valueOf(manticoreSpawnB.getRegionX()) : "",
+			manticoreSpawnB != null ? String.valueOf(manticoreSpawnB.getRegionY()) : "",
 			manticoreSequenceB != null ? manticoreSequenceB.toCsvFormat() : "",
 
-			shockwaveColossusSpawnA != null ? String.valueOf(shockwaveColossusSpawnA.getX()) : "",
-			shockwaveColossusSpawnA != null ? String.valueOf(shockwaveColossusSpawnA.getY()) : "",
-			shockwaveColossusSpawnB != null ? String.valueOf(shockwaveColossusSpawnB.getX()) : "",
-			shockwaveColossusSpawnB != null ? String.valueOf(shockwaveColossusSpawnB.getY()) : "",
+			shockwaveColossusSpawnA != null ? String.valueOf(shockwaveColossusSpawnA.getRegionX()) : "",
+			shockwaveColossusSpawnA != null ? String.valueOf(shockwaveColossusSpawnA.getRegionY()) : "",
+			shockwaveColossusSpawnB != null ? String.valueOf(shockwaveColossusSpawnB.getRegionX()) : "",
+			shockwaveColossusSpawnB != null ? String.valueOf(shockwaveColossusSpawnB.getRegionY()) : "",
 
-			jaguarWarriorReinforcementsSpawn != null ? String.valueOf(jaguarWarriorReinforcementsSpawn.getX()) : "",
-			jaguarWarriorReinforcementsSpawn != null ? String.valueOf(jaguarWarriorReinforcementsSpawn.getY()) : "",
-			serpentShamanReinforcementsSpawn != null ? String.valueOf(serpentShamanReinforcementsSpawn.getX()) : "",
-			serpentShamanReinforcementsSpawn != null ? String.valueOf(serpentShamanReinforcementsSpawn.getY()) : "",
-			minotaurReinforcementsSpawn != null ? String.valueOf(minotaurReinforcementsSpawn.getX()) : "",
-			minotaurReinforcementsSpawn != null ? String.valueOf(minotaurReinforcementsSpawn.getY()) : ""
+			jaguarWarriorReinforcementsSpawn != null ? String.valueOf(jaguarWarriorReinforcementsSpawn.getRegionX()) : "",
+			jaguarWarriorReinforcementsSpawn != null ? String.valueOf(jaguarWarriorReinforcementsSpawn.getRegionY()) : "",
+			serpentShamanReinforcementsSpawn != null ? String.valueOf(serpentShamanReinforcementsSpawn.getRegionX()) : "",
+			serpentShamanReinforcementsSpawn != null ? String.valueOf(serpentShamanReinforcementsSpawn.getRegionY()) : "",
+			minotaurReinforcementsSpawn != null ? String.valueOf(minotaurReinforcementsSpawn.getRegionX()) : "",
+			minotaurReinforcementsSpawn != null ? String.valueOf(minotaurReinforcementsSpawn.getRegionY()) : ""
 		);
 	}
 }

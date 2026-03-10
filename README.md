@@ -2,7 +2,7 @@
 Data logger that will store various types of data locally.
 Logged data is stored in subfolders located in ${user.home}/.runelite/data-logger
 
-## Account-specific data loggers
+## Item-related data loggers
 These loggers have been written to accommodate using multiple clients simultaneously and minimize risk for I/O errors.
 
 <details>
@@ -72,10 +72,79 @@ Logger that keeps track of Colosseum data per wave. If enabled, the following da
 - Manticore sequence: Orb sequences of manticores encountered during the wave (bottom-top)
 
 The data described above is always generated as JSON file, and may additionally also be generated as CSV file.
-Logs are stored in the csv and log folder in .runelite/data-logger/colosseum
+Logs are stored in the csv and log folder in .runelite/data-logger/colosseum. 
+
+
+<details>
+    <summary>Colosseum json log entry</summary>
+
+```JSON
+[
+  {
+    "wave": 8,
+    "status": "COMPLETED",
+    "accountName": "ACCOUNT",
+    "tag": "",
+    "earnedLoot": [
+        {
+        "itemId": 28942,
+        "itemName": "Echo crystal",
+        "quantity": 3
+        }
+    ],
+    "modifierChoices": [
+        "BLASPHEMY_III",
+        "MANTIMAYHEM_II",
+        "MYOPIA_I"
+    ],
+    "chosenModifier": "MANTIMAYHEM_II",
+    "startTick": 1430,
+    "endTick": 1728,
+    "timeTaken": 178.8,
+    "speedBonus": 1616,
+    "damageTaken": 0,
+    "damageBonus": 800,
+    "modifierGlory": 1300,
+    "completionBonus": 800,
+    "waveGlory": 4516,
+    "totalGlory": 23590,
+    "javelinColossusSpawnA": {
+        "x": 40,
+        "y": 35
+    },
+    "javelinColossusSpawnB": {
+        "x": 35,
+        "y": 31
+    },
+    "manticoreSpawnA": {
+        "x": 33,
+        "y": 42
+    },
+    "manticoreSequenceA": {
+    "orbs": [
+        "MAGIC",
+        "RANGE",
+        "MELEE"
+    ]
+    },
+    "shockwaveColossusSpawnA": {
+        "x": 44,
+        "y": 37
+    },
+    "minotaurReinforcementsSpawn": {
+        "x": 33,
+        "y": 48
+    }
+  }
+]
+```
+_An example entry in the Colosseum JSON log_
+
+</details>
+
 
 ![img.png](images/example-colosseum-log-entry-csv.png)
-_Example CSV row of the Colosseum wave logger, note that it does not show the entire row_
+_Example of a partial CSV row of the Colosseum wave logger_
 </details>
 
 <details>
@@ -84,22 +153,70 @@ _Example CSV row of the Colosseum wave logger, note that it does not show the en
 If enabled, during every tick of each wave a game state is parsed and added to a timeline.
 A state is composed of the following values;
 - Wave number
+- Timestamp (optional; unix and/or hh:mm:ss.ms)
 - Tick number, relative to wave start, starting at 0
 - Player X and Y coordinates
+- Player HP and Prayer
 - NPC list. For each relevant NPC, the following data is stored;
   - NpcId
   - Name
   - X and Y coordinate
   - HP and Max HP
+  - (Manticores only) Orb sequence
 
     Fremenniks, Solarflares, Healing totems, Bee Swarms and Beam crystals are optional and can be disabled via configurations.
 Timelines are stored in .runelite/data-logger/colosseum/timeline as a JSON file, each attempt is given its own timeline file.
 
-![img.png](images/example-colosseum-timeline-state.png)
 
-_Example of state data at a particular tick during a particular wave_
+<details>
+    <summary>Colosseum timeline entry</summary>
 
-This data could for instance be used to review previous attempts, simulate alternatives, or to observe NPC behaviour.
+```json
+[
+  {
+    "wave": 8,
+    "timestampHms": "19:40:57.6",
+    "timestampUnix": 1773168057681,
+    "tick": 175,
+    "playerHp": 99,
+    "playerPrayer": 37,
+    "playerX": 25,
+    "playerY": 40,
+    "npcs": [
+      {
+        "npcId": 12818,
+        "name": "Manticore",
+        "x": 27,
+        "y": 40,
+        "hp": 42,
+        "maxHp": 250,
+        "orbSequence": "MAGIC-RANGE-MELEE"
+      },
+      {
+        "npcId": 12817,
+        "name": "Javelin Colossus",
+        "x": 30,
+        "y": 41,
+        "hp": 220,
+        "maxHp": 220
+      },
+      {
+        "npcId": 12819,
+        "name": "Shockwave Colossus",
+        "x": 42,
+        "y": 40,
+        "hp": 125,
+        "maxHp": 125
+      }
+    ]
+  }
+ ]
+```
+
+_Example of state data_
+
+</details>
+
 
 </details>
 

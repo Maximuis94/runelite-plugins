@@ -45,10 +45,9 @@ public class ActiveGeOffer {
 	private int spent;
 
 	/**
-	 * Cash reserved by the GE that has not yet been spent on items.
-	 * (Only applies to incomplete BUY offers).
+	 * GP from incomplete buy offers that has not yet been spent
 	 */
-	public int getStuckCash() {
+	public int getStuckGP() {
 		if (isBuy && state != GrandExchangeOfferState.EMPTY) {
 			int totalReservedCash = totalQuantity * offerPrice;
 			return totalReservedCash - spent;

@@ -22,12 +22,14 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
 package com.datalogger.models.colosseum;
 
 import lombok.Builder;
 import lombok.Value;
 
+/**
+ * Model of data found in the results tab of the Intermission UI / Rewards chest UI
+ */
 @Value
 @Builder
 public class SummaryUI {

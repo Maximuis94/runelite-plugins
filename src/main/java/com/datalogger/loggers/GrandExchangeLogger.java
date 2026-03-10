@@ -31,14 +31,7 @@ import com.datalogger.framework.AbstractLogger;
 import com.datalogger.framework.LogType;
 import com.datalogger.models.grandexchange.ActiveGeOffer;
 import com.datalogger.models.grandexchange.GeLedgerEntry;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.io.PrintWriter;
 import java.time.Instant;
-import java.time.LocalDate;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
@@ -50,7 +43,6 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.GrandExchangeOffer;
 import net.runelite.api.GrandExchangeOfferState;
 import net.runelite.api.events.GrandExchangeOfferChanged;
-import net.runelite.client.RuneLite;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.game.ItemManager;
 
@@ -58,12 +50,10 @@ import net.runelite.client.game.ItemManager;
 @Singleton
 public class GrandExchangeLogger extends AbstractLogger
 {
-	// The other dependencies (Client, FileIOService, Config) are inherited from AbstractLogger!
 	@Inject private ItemManager itemManager;
 
 	private static final String CSV_HEADER = "ItemId,ItemName,OfferCreationTime,Timestamp,TradeType,Quantity,OfferQuantity,Price,OfferPrice,Value,Tax,AccountName,AccountHash,GeSlot,IsHistoryEntry,IsCancelled";
 
-	// Memory cache for Wealth Tracker
 	private ActiveGeOffer[] currentActiveOffers = new ActiveGeOffer[8];
 
 	@Override
@@ -248,11 +238,13 @@ public class GrandExchangeLogger extends AbstractLogger
 	/**
 	 * Submits a completed trade to the internal ledger and adds it to the CSV file
 	 */
-	private void logFinalTrade(int slot, GrandExchangeOffer offer, String createdTs, String accountHash) {
+	private void logFinalTrade(int slot, GrandExchangeOffer offer, String createdTs, String accountHash)
+	{
 		String currentAccountName = getAccountName();
 		int quantity = offer.getQuantitySold();
 
-		if (quantity == 0) {
+		if (quantity == 0)
+		{
 			log.error("Encountered an offer with quantity=0; {}", offer);
 			return;
 		}
@@ -264,10 +256,14 @@ public class GrandExchangeLogger extends AbstractLogger
 
 
 		Instant creationInstant = null;
-		if (createdTs != null && !createdTs.isEmpty()) {
-			try {
+		if (createdTs != null && !createdTs.isEmpty())
+		{
+			try
+			{
 				creationInstant = Instant.parse(createdTs);
-			} catch (Exception e) {
+			}
+			catch (Exception e)
+			{
 				log.debug("Could not parse createdTs: {}", createdTs);
 			}
 		}
@@ -294,82 +290,12 @@ public class GrandExchangeLogger extends AbstractLogger
 
 		List<GeLedgerEntry> internalLedger = utils.loadInternalGeLedger(accountHash);
 		internalLedger.add(ledgerEntry);
-		utils.saveInternalGeLedger(accountHash, internalLedger);
+		utils.saveInternalGeLedger(currentAccountName, accountHash, internalLedger);
 
-		String row = formatCsvRow(ledgerEntry);
-		logRow(row);
-	}
-
-	/**
-	 * Extracts all Grand Exchange trades for a specific date from the internal ledger
-	 * and exports them to a standalone CSV file.
-	 * @param targetDate The specific day to extract (e.g., LocalDate.now())
-	 */
-	public void exportLedgerForDay(LocalDate targetDate) {
-		String hash = getAccountHashString();
-		String accountName = getAccountName();
-
-		if (hash.equals("-1") || accountName.equals("unknown")) {
-			return;
-		}
-
-		List<GeLedgerEntry> fullLedger = utils.loadInternalGeLedger(hash);
-		if (fullLedger == null || fullLedger.isEmpty()) {
-			log.info("No GE history found in the internal ledger for {}.", accountName);
-			return;
-		}
-
-		List<GeLedgerEntry> dailyEntries = fullLedger.stream()
-			.filter(entry -> {
-				Instant ts = entry.getExactTimestamp() != null ? entry.getExactTimestamp() : entry.getParseTime();
-				if (ts == null) return false;
-
-				LocalDate entryDate = ts.atZone(ZoneId.systemDefault()).toLocalDate();
-				return entryDate.equals(targetDate);
-			})
-			.collect(Collectors.toList());
-
-		if (dailyEntries.isEmpty()) {
-			log.info("No GE entries found for {} on {}", accountName, targetDate);
-			return;
-		}
-
-		String dateString = targetDate.format(DateTimeFormatter.ISO_LOCAL_DATE);
-		File exportDir = new File(RuneLite.RUNELITE_DIR, "data-logger/exports/grand-exchange");
-		if (!exportDir.exists() && !exportDir.mkdirs()) {
-			log.error("Failed to create export directory: {}", exportDir.getAbsolutePath());
-			return;
-		}
-
-		File exportFile = new File(exportDir, accountName + "_" + dateString + ".csv");
-
-		try (PrintWriter writer = new PrintWriter(new FileWriter(exportFile))) {
-			writer.println(CSV_HEADER);
-
-			for (GeLedgerEntry entry : dailyEntries) {
-				Instant ts = entry.getExactTimestamp() != null ? entry.getExactTimestamp() : entry.getParseTime();
-				String timestampStr = ts != null ? ts.toString() : "";
-
-				int totalValue = entry.getQuantity() * entry.getPrice();
-
-				String row = String.format("%d,%s,%s,%b,%d,%d,%d,%d,%d,%s,%d",
-					entry.getItemId(),
-					timestampStr,
-					"",
-					entry.isBuy(),
-					entry.getQuantity(),
-					entry.getOriginalOfferQuantity(),
-					entry.getPrice(),
-					entry.getOriginalOfferPrice(),
-					totalValue,
-					accountName,
-					-1
-				);
-				writer.println(row);
-			}
-			log.info("Successfully exported {} GE trades for {} to {}", dailyEntries.size(), accountName, exportFile.getAbsolutePath());
-		} catch (IOException e) {
-			log.error("Failed to export GE ledger for day {}", targetDate, e);
+		if (config.logGrandExchangeCSV())
+		{
+			String row = formatCsvRow(ledgerEntry);
+			logRow(row);
 		}
 	}
 

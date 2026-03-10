@@ -40,6 +40,8 @@ import net.runelite.api.coords.WorldPoint;
 public class ColosseumState
 {
 	private int wave;
+	private String timestampHmsm;
+	private Long timestampUnix;
 	private int tick;
 	private int playerHp;
 	private int playerPrayer;
@@ -50,14 +52,19 @@ public class ColosseumState
 	 * Converts this live engine state into a static DTO for saving.
 	 */
 	public ColosseumStateDTO toDTO() {
-		return ColosseumStateDTO.builder()
+		ColosseumStateDTO.ColosseumStateDTOBuilder dto = ColosseumStateDTO.builder()
 			.wave(wave)
 			.tick(tick)
 			.playerHp(playerHp)
 			.playerPrayer(playerPrayer)
-			.playerX(playerLocation != null ? playerLocation.getX() : 0)
-			.playerY(playerLocation != null ? playerLocation.getY() : 0)
-			.npcs(npcs)
-			.build();
+			.playerX(playerLocation != null ? playerLocation.getRegionX() : 0)
+			.playerY(playerLocation != null ? playerLocation.getRegionY() : 0)
+			.npcs(npcs);
+
+		if (timestampHmsm!=null && !timestampHmsm.isEmpty())
+			dto.timestampHms(timestampHmsm);
+		if (timestampUnix!=null && timestampUnix != 0)
+			dto.timestampUnix(timestampUnix);
+		return dto.build();
 	}
 }

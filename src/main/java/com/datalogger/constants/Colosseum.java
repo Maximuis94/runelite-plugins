@@ -24,13 +24,15 @@
  */
 package com.datalogger.constants;
 
+import com.datalogger.models.common.ItemBundle;
+
 /**
  * Centralized constants related to Fortis Colosseum
  */
 public final class Colosseum
 {
 	/**
-	 * Widget child IDs
+	 * Widget child IDs of the Intermission UI
 	 */
 	public static class Intermission {
 		public static final int INTERMISSION_GROUP_ID = 865;
@@ -41,7 +43,7 @@ public final class Colosseum
 	}
 
 	/**
-	 * Widget child IDs
+	 * Widget child IDs of the Rewards chest UI
 	 */
 	public static class RewardsChest {
 		public static final int REWARDS_CHEST_GROUP_ID = 864;
@@ -50,14 +52,23 @@ public final class Colosseum
 		public static final int REWARDS_CHEST_MODIFIER_LIST_CONTAINER_ID = 11;
 	}
 
+	/**
+	 * Selection of Varbit IDs used by Colosseum loggers
+	 */
 	public static class Varbit
 	{
+		public static final int COLOSSEUM_TOTAL_WAVES_COMPLETED_VARBIT = 4131;
+		public static final int COLOSSEUM_CURRENT_GLORY_VARBIT = 4132;
+		public static final int COLOSSEUM_WAVE_START_TIME_VARBIT = 4133;
+		public static final int COLOSSEUM_LAST_WAVE_DURATION_VARBIT = 4136;
+		public static final int COLOSSEUM_TOTAL_DURATION_VARBIT = 4137;
 		public static final int COLOSSEUM_SELECTED_MODIFIER_VARBIT = 9788;
+		public static final int COLOSSEUM_LOOT_OPENED_VARBIT = 9802;
 
 	}
 
 	/**
-	 * NPC IDs of relevant Colosseum encounters
+	 * NPC IDs of relevant Colosseum encounters. Some entries have a
 	 */
 	public static class NPC
 	{
@@ -75,12 +86,18 @@ public final class Colosseum
 		public static final int SOL_HEREDIT_NPC_ID = 12821;
 		public static final int BEE_SWARM_NPC_ID = 12823;
 		public static final int BOSS_WAVE_BEAM_CRYSTAL = 12824;
-		public static final String BOSS_WAVE_BEAM_CRYSTAL_NPC_NAME = "Beam crystal";
 		public static final int HEALING_TOTEM_NPC_ID = 12825;
 		public static final int SOLAR_FLARE_NPC_ID = 12826;
-		public static final String SOLARFLARE_NPC_NAME = "Solarflare";
 		public static final int SITTING_SOL_HEREDIT_NPC_ID = 12827;
+	}
 
+	/**
+	 * NPC name overrides that are to be applied, mostly accounts for missing names
+	 */
+	public static class NPC_ALIAS
+	{
+		public static final String BOSS_WAVE_BEAM_CRYSTAL_NPC_NAME = "Beam crystal";
+		public static final String SOLARFLARE_NPC_NAME = "Solarflare";
 	}
 
 	public static class ManticoreAttack
@@ -93,12 +110,14 @@ public final class Colosseum
 	}
 
 	/**
-	 * NPC IDs of relevant Colosseum encounters
+	 * Item data related to Colosseum
 	 */
 	public static class Item
 	{
 		public static final int SUNFIRE_SPLINTERS_ID = 28924;
 		public static final int DIZANAS_QUIVER_UNCHARGED_ID = 28947;
+
+		public static final ItemBundle SWAPPED_DIZANAS_QUIVER_ITEM_BUNDLE = new ItemBundle(SUNFIRE_SPLINTERS_ID, "Sunfire splinters", 4000);
 	}
 
 	/**
@@ -117,9 +136,17 @@ public final class Colosseum
 	{
 		public static final String START_ATTEMPT_MESSAGE = "Minimus|Let me know when you want to begin.";
 		public static final String DEATH_MESSAGE = "Oh dear, you are dead!";
+		public static final String WAVE_1_HEADER = "Fortis Colosseum";
 		public static final String WAVE_START_PREFIX = "Wave: ";
 		public static final String BOSS_WAVE_START_PREFIX = "Sol Heredit jumps down from his seat...";
 		public static final String END_ATTEMPT_MESSAGE = "Search the chest nearby to retrieve your earned rewards";
+		public static final String BOSS_WAVE_P1_MESSAGE = "Sol Heredit|Let's start by testing your footwork.";
+		public static final String BOSS_WAVE_P2_MESSAGE = "Sol Heredit|Not bad. Let's try something else...";
+		public static final String BOSS_WAVE_P3_MESSAGE = "Sol Heredit|Impressive. Let's see how you handle this...";
+		public static final String BOSS_WAVE_P4_MESSAGE = "Sol Heredit|You can't win!";
+		public static final String BOSS_WAVE_P5_MESSAGE = "Sol Heredit|Ralos guides my hand!";
+		public static final String BOSS_WAVE_P6_MESSAGE = "Sol Heredit|LET'S END THIS!";
+
 	}
 
 	/**

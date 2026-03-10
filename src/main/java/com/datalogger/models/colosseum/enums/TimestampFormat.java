@@ -22,29 +22,23 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package com.datalogger.models.grandexchange;
 
-import com.datalogger.framework.DataRow;
-import lombok.Value;
+package com.datalogger.models.colosseum.enums;
 
-@Value
-public class GrandExchangeOfferData implements DataRow {
-	int itemId;
-	String timestamp;
-	String timestampCreated;
-	boolean isBuy;
-	int quantity;
-	int offerQuantity;
-	int price;
-	int offerPrice;
-	int value;
-	String account;
-	int slot;
+public enum TimestampFormat {
+	NONE("None"),
+	UNIX("UNIX"),
+	HHMMSS_M("hh:mm:ss.m"),
+	BOTH("Both");
+
+	private final String name;
+
+	TimestampFormat(String name) {
+		this.name = name;
+	}
 
 	@Override
-	public String toCsvRow() {
-		return String.format("%d,%s,%s,%b,%d,%d,%d,%d,%d,%s,%d",
-			itemId, timestamp, timestampCreated, isBuy, quantity,
-			offerQuantity, price, offerPrice, value, account, slot);
+	public String toString() {
+		return name;
 	}
 }

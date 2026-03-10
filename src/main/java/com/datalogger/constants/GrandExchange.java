@@ -37,7 +37,7 @@ public final class GrandExchange
 	}
 
 	/**
-	 * Various constant values that are in some way relevant for Grand Exchange offers
+	 * Fixed values that are related to processing Grand Exchange offers
 	 */
 	public static class Values
 	{

@@ -33,17 +33,17 @@ import net.runelite.client.RuneLite;
 @RequiredArgsConstructor
 public enum LogType
 {
-	GRAND_EXCHANGE(
-		"Grand Exchange"),
-	COLOSSEUM(
-		"Colosseum");
+	GRAND_EXCHANGE("Grand Exchange"),
+	COLOSSEUM("Colosseum"),
+	SCREENSHOT("Screenshot");
 
 	private final String name;
 	private final String directoryName;
 
 	private final File logDirectory;
 
-	LogType(String logTypeName) {
+	LogType(String logTypeName)
+	{
 		name = logTypeName;
 
 		directoryName = logTypeName.toLowerCase().replace(" ", "-");
@@ -53,5 +53,8 @@ public enum LogType
 	}
 
 	@Override
-	public String toString() { return name; }
+	public String toString()
+	{
+		return name;
+	}
 }

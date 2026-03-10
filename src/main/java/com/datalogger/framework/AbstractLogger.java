@@ -97,9 +97,4 @@ public abstract class AbstractLogger implements Loggable {
 			accountHashCache = "-1";
 		}
 	}
-
-	public void shutDown() {
-		accountNameCache = "unknown";
-		accountHashCache = "-1";
-	}
 }

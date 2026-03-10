@@ -50,7 +50,6 @@ public class ColosseumAttempt
 
 	private final List<ColosseumWave> waves;
 
-
 	public ColosseumAttempt(int startTick)
 	{
 		id = System.currentTimeMillis();
@@ -77,8 +76,7 @@ public class ColosseumAttempt
 	/**
 	 * Add the given wave to the list of waves, provided it has not been submitted yet.
 	 */
-	public void submitWave(ColosseumWave wave)
-	{
+	public void submitWave(ColosseumWave wave) {
 		if (waves.isEmpty())
 		{
 			waves.add(wave);
@@ -87,8 +85,9 @@ public class ColosseumAttempt
 		{
 			ColosseumWave lastLogged = waves.get(waves.size() - 1);
 			if (lastLogged.getWave() != wave.getWave())
+			{
 				waves.add(wave);
+			}
 		}
 	}
-
 }

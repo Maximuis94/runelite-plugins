@@ -33,6 +33,9 @@ import java.util.Set;
 
 public class GeHistoryReconciler {
 
+	/**
+	 * Updated previous completed GE submissions with data from the GE history entries.
+	 */
 	public List<GeLedgerEntry> weaveLedgers(List<GeLedgerEntry> masterLedger, List<GeLedgerEntry> scrapedHistory) {
 		List<GeLedgerEntry> updatedLedger = new ArrayList<>(masterLedger);
 		Set<Integer> consumedIndices = new HashSet<>();
@@ -73,6 +76,12 @@ public class GeHistoryReconciler {
 		return updatedLedger;
 	}
 
+	/**
+	 * Return true if the scraped entry matches the history entry
+	 * @param existing Previously submitted completed Grand Exchange offer
+	 * @param scraped Grand Exchange history entry data scraped from the UI
+	 * @return true if both entries match
+	 */
 	private boolean isExactMatch(GeLedgerEntry existing, GeLedgerEntry scraped) {
 		return existing.getItemId() == scraped.getItemId() &&
 			existing.isBuy() == scraped.isBuy() &&

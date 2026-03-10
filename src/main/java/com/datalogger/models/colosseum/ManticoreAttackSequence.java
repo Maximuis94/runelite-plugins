@@ -84,4 +84,18 @@ public class ManticoreAttackSequence {
 			.map(Enum::name)
 			.collect(Collectors.joining("-"));
 	}
+
+	/**
+	 * String used to display the Sequence in the State of a timeline
+	 */
+	public String stateString()
+	{
+		if (orbs == null || orbs.size() < 3) {
+			return "UNKNOWN";
+		}
+
+		return orbs.get(0).name() + "-" +
+			orbs.get(1).name() + "-" +
+			orbs.get(2).name();
+	}
 }

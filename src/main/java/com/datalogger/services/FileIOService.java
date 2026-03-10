@@ -67,6 +67,9 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.coords.WorldPoint;
 import net.runelite.client.RuneLite;
 
+/**
+ * Service that handles writing and reading operations of local files.
+ */
 @Slf4j
 @Singleton
 public class FileIOService
@@ -77,28 +80,30 @@ public class FileIOService
 
 	private final Map<File, Queue<String>> failedWrites = new ConcurrentHashMap<>();
 
+	private final DataLoggerConfig config;
+
 	@Inject
-	private FileIOService(DataLoggerConfig config, Gson gson, ScheduledExecutorService executor) {
+	private FileIOService(Gson gson, ScheduledExecutorService executor, DataLoggerConfig config) {
 		this.executor = executor;
 		this.gson = gson.newBuilder()
 			.registerTypeAdapter(WorldPoint.class, new WorldPointSerializer())
 			.setPrettyPrinting()
 			.create();
+		this.config = config;
 	}
 
-
 	public final File PLUGIN_ROOT = new File(RuneLite.RUNELITE_DIR, "data-logger");
-	private final File INTERNAL_ROOT_DIR = new File(PLUGIN_ROOT, "internal");
-	private final File INTERNAL_GE_DIR = new File(INTERNAL_ROOT_DIR, "ge-history");
-	private final File GE_STATE_DIR = new File(INTERNAL_ROOT_DIR, "state");
-	private final File INTERNAL_ACTIVE_OFFERS_DIR = new File(INTERNAL_ROOT_DIR, "active-offers");
-	private final File COLOSSEUM_ROOT_DIR = new File(PLUGIN_ROOT, "colosseum");
-	private final File COLOSSEUM_TIMELINE_DIR = new File(COLOSSEUM_ROOT_DIR, "timeline");
-	private final File COLOSSEUM_LOG_DIR = new File(COLOSSEUM_ROOT_DIR, "log");
-	private final File COLOSSEUM_CSV_DIR = new File(COLOSSEUM_ROOT_DIR, "csv");
-	private final File COLOSSEUM_TEMP_DIR = new File(COLOSSEUM_ROOT_DIR, "temp");
-	private final File SCREENSHOT_DIR = new File(PLUGIN_ROOT, "screenshot");
-	private final File COLOSSEUM_SCREENSHOT_DIR = new File(COLOSSEUM_ROOT_DIR, "screenshot");
+	public final File INTERNAL_ROOT_DIR = new File(PLUGIN_ROOT, "internal");
+	public final File INTERNAL_GE_DIR = new File(INTERNAL_ROOT_DIR, "ge-history");
+	public final File INTERNAL_TEMP_DIR = new File(INTERNAL_ROOT_DIR, "temp");
+	public final File GE_STATE_DIR = new File(INTERNAL_ROOT_DIR, "state");
+	public final File INTERNAL_ACTIVE_OFFERS_DIR = new File(INTERNAL_ROOT_DIR, "active-offers");
+	public final File GRAND_EXCHANGE_ROOT = new File(PLUGIN_ROOT, "grand-exchange");
+	public final File COLOSSEUM_ROOT_DIR = new File(PLUGIN_ROOT, "colosseum");
+	public final File COLOSSEUM_TIMELINE_DIR = new File(COLOSSEUM_ROOT_DIR, "timeline");
+	public final File COLOSSEUM_LOG_DIR = new File(COLOSSEUM_ROOT_DIR, "log");
+	public final File COLOSSEUM_CSV_DIR = new File(COLOSSEUM_ROOT_DIR, "csv");
+	public final File COLOSSEUM_SCREENSHOT_DIR = new File(COLOSSEUM_ROOT_DIR, "screenshot");
 
 	/**
 	 * Appends a row to a CSV file. If the file is locked, it queues the row and attempts to flush the queue on the
@@ -150,7 +155,6 @@ public class FileIOService
 		String date = java.time.LocalDate.now().toString();
 		File accountDir = new File(type.getLogDirectory(), account.toLowerCase());
 
-		// Ensure the directory exists
 		if (!accountDir.exists()) accountDir.mkdirs();
 
 		return new File(accountDir, type.getDirectoryName() + "_" + date + ".csv");
@@ -200,19 +204,6 @@ public class FileIOService
 	}
 
 	/**
-	 * Returns the File associated with timelineId
-	 */
-	private File getColosseumTimeLineFile(String timelineId)
-	{
-		return new File(COLOSSEUM_TIMELINE_DIR, String.format("timeline_%s.json", timelineId));
-	}
-
-	public void submitColosseumTimeline(String timelineId, List<ColosseumState> timeline){
-		File file = getColosseumTimeLineFile(timelineId);
-		saveJson(file, timeline);
-	}
-
-	/**
 	 * Serializes any object to a JSON file.
 	 */
 	public void saveJson(File file, Object data) {
@@ -238,7 +229,7 @@ public class FileIOService
 	 */
 	private File tmpWaveFile(String attemptId, int waveId)
 	{
-		return new File(COLOSSEUM_TEMP_DIR, String.format("%s-%02d.tmp", attemptId, waveId));
+		return new File(INTERNAL_TEMP_DIR, String.format("%s-%02d.tmp", attemptId, waveId));
 	}
 
 	/**
@@ -250,7 +241,7 @@ public class FileIOService
 	}
 
 	/**
-	 * Save the ColosseumStates for a single wave of an ongoing attempt in the temporary directory.
+	 * Save the ColosseumStates for a single wave of an ongoing attempt in a temporary file in the temporary directory.
 	 */
 	public void saveWaveStates(String attemptId, int waveId, List<ColosseumState> liveStates) {
 		List<ColosseumStateDTO> dtos = liveStates.stream()
@@ -258,8 +249,8 @@ public class FileIOService
 			.collect(Collectors.toList());
 
 		executor.submit(() -> {
-			if (!COLOSSEUM_TEMP_DIR.exists() && !COLOSSEUM_TEMP_DIR.mkdirs()) {
-				log.error("Could not create directory: {}", COLOSSEUM_TEMP_DIR.getAbsolutePath());
+			if (!INTERNAL_TEMP_DIR.exists() && !INTERNAL_TEMP_DIR.mkdirs()) {
+				log.error("Could not create directory: {}", INTERNAL_TEMP_DIR.getAbsolutePath());
 				return;
 			}
 
@@ -273,6 +264,9 @@ public class FileIOService
 		});
 	}
 
+	/**
+	 * Attempt to load the states from a temporary file and return it. If it fails, return an empty List instead.
+	 */
 	private List<ColosseumStateDTO> loadWaveStates(File file) {
 		try (Reader reader = new FileReader(file)) {
 			ColosseumStateDTO[] dataArray = gson.fromJson(reader, ColosseumStateDTO[].class);
@@ -289,8 +283,8 @@ public class FileIOService
 	}
 
 	/**
-	 * Parse all the components that constitute the ongoing attempt and merge them into log entries. Add these log
-	 * entries to the log. Remove source files upon completion.
+	 * Parse all the components that constitute the ongoing attempt and merge them into a single timeline. Save this
+	 * timeline and subsequently delete the temporary files.
 	 */
 	public void mergeTimelineFiles(String attemptId) {
 		executor.submit(() -> {
@@ -327,7 +321,7 @@ public class FileIOService
 	}
 
 	/**
-	 * Log the given attempt
+	 * Logs the given attempt
 	 */
 	public void logColosseumAttempt(ColosseumAttempt attempt) {
 		if (!COLOSSEUM_LOG_DIR.exists()) {
@@ -339,55 +333,30 @@ public class FileIOService
 		try (FileWriter writer = new FileWriter(targetFile)) {
 			gson.toJson(attempt, writer);
 			log.info("Successfully saved Colosseum attempt to {}", targetFile.getAbsolutePath());
+			log.info("Attempt waves: {} finalStatus: {}", attempt.getWaves().size(), attempt.getFinalStatus());
 		} catch (IOException e) {
 			log.error("Failed to save Colosseum attempt log!", e);
 		}
 	}
 
 	/**
-	 * Save the given screenshot in the appropriate folder.
-	 */
-	public void logColosseumScreenshot(BufferedImage screenshot, String attemptId, int waveId)
-	{
-		try {
-			File dir = new File(COLOSSEUM_SCREENSHOT_DIR, attemptId);
-			if (!dir.exists())
-			{
-				if (dir.mkdirs())
-					log.debug("Created screenshot directory: {}", dir.getAbsolutePath());
-				else
-					log.error("Failed to create screenshot directory: {}", dir.getAbsolutePath());
-			}
-
-			File file = new File(dir, String.format("wave-%02d.png", waveId));
-			ImageIO.write(screenshot, "png", file);
-
-			log.info("Saved wave completion screenshot of Wave {} to {}", waveId, file.getName());
-		} catch (IOException e) {
-			log.error("Failed to save Colosseum screenshot", e);
-		}
-
-	}
-
-	/**
 	 * Saves a screenshot to a specified sub-directory with a specific file name.
 	 * * @param screenshot   The image to save
-	 * @param subDirectory The path relative to the root screenshots folder (e.g., "colosseum/231012_143000")
+	 * @param directory The path relative to the root screenshots folder (e.g., "colosseum/231012_143000")
 	 * @param fileName     The name of the file without the extension (e.g., "wave-01")
 	 */
-	public void saveScreenshot(BufferedImage screenshot, String subDirectory, String fileName) {
+	public void saveScreenshot(BufferedImage screenshot, File directory, String fileName) {
 		try {
-			File dir = new File(SCREENSHOT_DIR, subDirectory);
-			if (!dir.exists()) {
-				if (dir.mkdirs()) {
-					log.debug("Created screenshot directory: {}", dir.getAbsolutePath());
+			if (!directory.exists()) {
+				if (directory.mkdirs()) {
+					log.debug("Created screenshot directory: {}", directory.getAbsolutePath());
 				} else {
-					log.error("Failed to create screenshot directory: {}", dir.getAbsolutePath());
+					log.error("Failed to create screenshot directory: {}", directory.getAbsolutePath());
 					return;
 				}
 			}
 
-			File file = new File(dir, fileName + ".png");
+			File file = new File(directory, fileName + ".png");
 			ImageIO.write(screenshot, "png", file);
 
 			log.info("Saved screenshot to {}", file.getAbsolutePath());
@@ -424,8 +393,8 @@ public class FileIOService
 		@Override
 		public JsonElement serialize(WorldPoint src, Type typeOfSrc, JsonSerializationContext context) {
 			JsonObject obj = new JsonObject();
-			obj.addProperty("x", src.getX());
-			obj.addProperty("y", src.getY());
+			obj.addProperty("x", src.getRegionX());
+			obj.addProperty("y", src.getRegionY());
 			return obj;
 		}
 	}
@@ -468,12 +437,11 @@ public class FileIOService
 	 * @param accountHash The unique hash of the logged-in account
 	 * @param ledger The full merged list of ledger entries to save
 	 */
-	public void saveInternalGeLedger(String accountHash, List<GeLedgerEntry> ledger) {
-		if (accountHash == null || accountHash.isEmpty() || ledger == null) {
+	public void saveInternalGeLedger(String accountName, String accountHash, List<GeLedgerEntry> ledger) {
+		if (accountName == null || accountHash == null || accountHash.isEmpty() || ledger == null) {
 			return;
 		}
 
-		// Push the heavy disk write to the background executor to prevent freezing the game client
 		executor.submit(() -> {
 			if (!INTERNAL_GE_DIR.exists() && !INTERNAL_GE_DIR.mkdirs()) {
 				log.error("Failed to create internal GE ledger directory: {}", INTERNAL_GE_DIR.getAbsolutePath());
@@ -482,17 +450,14 @@ public class FileIOService
 
 			File finalFile = new File(INTERNAL_GE_DIR, accountHash + ".json");
 			File tempFile = new File(INTERNAL_GE_DIR, accountHash + ".tmp");
+			File copyTo = new File(GRAND_EXCHANGE_ROOT, accountName + "/grand-exchange.json");
 
-			// Synchronize on the interned hash to prevent two rapid GE updates from writing simultaneously
 			synchronized (accountHash.intern()) {
 				try {
-					// 1. Write the full JSON to a temporary file first
 					try (FileWriter writer = new FileWriter(tempFile)) {
 						gson.toJson(ledger, writer);
 					}
 
-					// 2. Atomic Swap: Instantly overwrite the real file with the temp file.
-					// If RuneLite crashes during step 1, the real JSON file remains perfectly safe!
 					Files.move(
 						tempFile.toPath(),
 						finalFile.toPath(),
@@ -502,9 +467,29 @@ public class FileIOService
 
 					log.debug("Successfully saved internal GE ledger for account hash: {}", accountHash);
 
+					if (config.logGrandExchangeJSON())
+					{
+						try
+						{
+							File copyToParent = copyTo.getParentFile();
+							if (copyToParent != null && !copyToParent.exists())
+							{
+								copyToParent.mkdirs();
+							}
+							Files.copy(
+								finalFile.toPath(),
+								copyTo.toPath(),
+								StandardCopyOption.REPLACE_EXISTING
+							);
+						}
+						catch (Exception ignored)
+						{
+							log.info("Failed to copy the json to the grand-exchange directory.");
+						}
+					}
+
 				} catch (Exception e) {
 					log.error("Failed to save internal GE ledger for account hash: {}", accountHash, e);
-					// Clean up the temp file if something went catastrophically wrong
 					if (tempFile.exists()) {
 						tempFile.delete();
 					}
@@ -517,9 +502,8 @@ public class FileIOService
 	 * Safely loads the active Grand Exchange offers (Wealth Tracker state) for a specific account.
 	 */
 	public List<ActiveGeOffer> loadActiveGeOffers(String accountHash) {
-		if (accountHash == null || accountHash.isEmpty()) {
+		if (accountHash == null || accountHash.isEmpty())
 			return new ArrayList<>();
-		}
 
 		File file = new File(INTERNAL_ACTIVE_OFFERS_DIR, accountHash + ".json");
 
@@ -558,12 +542,10 @@ public class FileIOService
 
 			synchronized (accountHash.intern()) {
 				try {
-					// Write to temp file first
 					try (FileWriter writer = new FileWriter(tempFile)) {
 						gson.toJson(offers, writer);
 					}
 
-					// Atomic swap
 					Files.move(
 						tempFile.toPath(),
 						finalFile.toPath(),
@@ -610,6 +592,4 @@ public class FileIOService
 			}
 		}
 	}
-
-
 }

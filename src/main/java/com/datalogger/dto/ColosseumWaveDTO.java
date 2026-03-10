@@ -35,7 +35,7 @@ import java.util.List;
 @Builder
 public class ColosseumWaveDTO {
 	private int wave;
-	private String status; // WaveStatus.name()
+	private String status;
 
 	private String accountName;
 	private String tag;

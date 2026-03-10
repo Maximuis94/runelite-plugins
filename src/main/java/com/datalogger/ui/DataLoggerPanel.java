@@ -25,31 +25,25 @@
 package com.datalogger.ui;
 
 import com.datalogger.framework.LogType;
-import com.datalogger.services.FileIOService;
-import com.google.inject.Injector;
 import java.awt.BorderLayout;
+import java.awt.Desktop;
 import java.awt.GridLayout;
+import java.io.File;
+import java.io.IOException;
 import javax.inject.Inject;
-import javax.swing.JComboBox;
-import javax.swing.JLabel;
+import javax.swing.JButton;
 import javax.swing.JPanel;
-import javax.swing.border.CompoundBorder;
 import javax.swing.border.EmptyBorder;
-import javax.swing.border.MatteBorder;
 import lombok.extern.slf4j.Slf4j;
-import net.runelite.api.Client;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.PluginPanel;
 
 @Slf4j
 public class DataLoggerPanel extends PluginPanel {
-	private final JComboBox<LogType> logTypeSelector = new JComboBox<>(LogType.values());
 	private final JPanel logContentDisplay = new JPanel();
-	@Inject private Injector injector; // Needed to spawn sub-panels
-	@Inject private Client client;
 
 	@Inject
-	public DataLoggerPanel(FileIOService fileService) {
+	public DataLoggerPanel() {
 
 		// Matches the standard RuneLite sidebar padding
 		this.setBorder(new EmptyBorder(0, 0, 10, 0));
@@ -57,45 +51,62 @@ public class DataLoggerPanel extends PluginPanel {
 		this.getScrollPane().setBorder(new EmptyBorder(10, 10, 10, 10));
 		this.getScrollPane().setBackground(ColorScheme.DARKER_GRAY_COLOR);
 
-		// --- TOP NAVIGATION SECTION ---
-		JPanel navContainer = new JPanel();
-		navContainer.setLayout(new GridLayout(2, 1, 2, 7));
-		// Subtle bottom border to separate the selector from content
-		navContainer.setBorder(new CompoundBorder(
-			new MatteBorder(0, 0, 1, 0, ColorScheme.DARKER_GRAY_COLOR),
-			new EmptyBorder(0, 4, 1, 4)
-		));
-		navContainer.setBackground(ColorScheme.DARK_GRAY_COLOR);
-
-
-
-		JLabel label = new JLabel("Select Log Type");
-		label.setForeground(ColorScheme.BRAND_ORANGE); // Branding orange from your image
-		label.setFont(net.runelite.client.ui.FontManager.getRunescapeBoldFont());
-		navContainer.add(label, BorderLayout.WEST);
-
-		JPanel comboWrapper = new JPanel(new BorderLayout());
-		comboWrapper.setBackground(ColorScheme.DARK_GRAY_COLOR);
-		comboWrapper.setBorder(new EmptyBorder(0, 4, 0, 4));
-		logTypeSelector.addActionListener(e -> updateView());
-		logTypeSelector.setForeground(ColorScheme.TEXT_COLOR);
-		logTypeSelector.setBackground(ColorScheme.DARKER_GRAY_COLOR);
-		logTypeSelector.setFocusable(false);
-
-		comboWrapper.add(logTypeSelector, BorderLayout.CENTER);
-
-		navContainer.add(comboWrapper);
-		add(navContainer, BorderLayout.NORTH);
-
 		// --- CENTER CONTENT SECTION ---
 		logContentDisplay.setLayout(new BorderLayout());
 		logContentDisplay.setBackground(ColorScheme.DARK_GRAY_COLOR);
 		add(logContentDisplay, BorderLayout.CENTER);
 
-		updateView();
+		// --- BOTTOM BUTTONS SECTION ---
+		JPanel buttonContainer = new JPanel();
+		buttonContainer.setLayout(new GridLayout(3, 1, 0, 8));
+		buttonContainer.setBorder(new EmptyBorder(10, 5, 0, 5));
+		buttonContainer.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+
+		JButton openLogsBtn = createStyledButton("Colosseum log directory");
+		openLogsBtn.addActionListener(e -> openDirectory(LogType.COLOSSEUM.getLogDirectory().getAbsolutePath()));
+
+		JButton openScreenshotsBtn = createStyledButton("Screenshot directory");
+		openScreenshotsBtn.addActionListener(e -> openDirectory(LogType.SCREENSHOT.getLogDirectory().getAbsolutePath()));
+
+		JButton openDataBtn = createStyledButton("Grand exchange directory");
+		openDataBtn.addActionListener(e -> openDirectory(LogType.GRAND_EXCHANGE.getLogDirectory().getAbsolutePath()));
+
+		buttonContainer.add(openLogsBtn);
+		buttonContainer.add(openScreenshotsBtn);
+		buttonContainer.add(openDataBtn);
+
+		// Add the button panel to the bottom of the PluginPanel
+		add(buttonContainer, BorderLayout.SOUTH);
 	}
 
-	private void updateView() {
+	/**
+	 * Helper to style the buttons to match the RuneLite aesthetic.
+	 */
+	private JButton createStyledButton(String text) {
+		JButton button = new JButton(text);
+		button.setFocusable(false); // Removes the annoying selection box around text when clicked
+		return button;
+	}
 
+	/**
+	 * Helper method to open a directory in the native OS file explorer.
+	 */
+	private void openDirectory(String directoryPath) {
+		File dir = new File(directoryPath);
+
+		if (!dir.exists()) {
+			log.warn("Directory does not exist, attempting to create: {}", directoryPath);
+			dir.mkdirs(); // Creates the directory if it doesn't exist
+		}
+
+		try {
+			if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.OPEN)) {
+				Desktop.getDesktop().open(dir);
+			} else {
+				log.warn("Desktop API is not supported on this platform. Cannot open file explorer.");
+			}
+		} catch (IOException ex) {
+			log.error("Failed to open directory: {}", directoryPath, ex);
+		}
 	}
 }

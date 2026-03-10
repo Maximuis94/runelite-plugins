@@ -32,11 +32,13 @@ import static com.datalogger.constants.Colosseum.Intermission.INTERMISSION_MODIF
 import static com.datalogger.constants.Colosseum.Intermission.INTERMISSION_NEXT_LOOT_CONTAINER;
 import static com.datalogger.constants.Colosseum.Intermission.INTERMISSION_RESULT_CONTAINER;
 import static com.datalogger.constants.Colosseum.Item.DIZANAS_QUIVER_UNCHARGED_ID;
-import static com.datalogger.constants.Colosseum.Item.SUNFIRE_SPLINTERS_ID;
+import static com.datalogger.constants.Colosseum.Item.SWAPPED_DIZANAS_QUIVER_ITEM_BUNDLE;
 import static com.datalogger.constants.Colosseum.ManticoreAttack.MAGIC_ORB_ID;
 import static com.datalogger.constants.Colosseum.ManticoreAttack.MELEE_ORB_ID;
 import static com.datalogger.constants.Colosseum.ManticoreAttack.RANGED_ORB_ID;
 import static com.datalogger.constants.Colosseum.NPC.*;
+import static com.datalogger.constants.Colosseum.NPC_ALIAS.BOSS_WAVE_BEAM_CRYSTAL_NPC_NAME;
+import static com.datalogger.constants.Colosseum.NPC_ALIAS.SOLARFLARE_NPC_NAME;
 import static com.datalogger.constants.Colosseum.RewardsChest.REWARDS_CHEST_GROUP_ID;
 import static com.datalogger.constants.Colosseum.RewardsChest.REWARDS_CHEST_MODIFIER_LIST_CONTAINER_ID;
 import static com.datalogger.constants.Colosseum.RewardsChest.REWARDS_CHEST_REWARDS_TAB_CHILD_ID;
@@ -47,9 +49,13 @@ import com.datalogger.models.colosseum.IntermissionUI;
 import com.datalogger.models.colosseum.ManticoreAttackSequence;
 import com.datalogger.models.colosseum.SummaryUI;
 import com.datalogger.models.colosseum.enums.ColosseumModifier;
+import com.datalogger.models.colosseum.enums.TimestampFormat;
 import com.datalogger.models.common.ItemBundle;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -60,12 +66,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.BooleanSupplier;
-import java.util.function.Function;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.ActorSpotAnim;
 import net.runelite.api.Client;
+import net.runelite.api.IndexedObjectSet;
 import net.runelite.api.NPC;
 import net.runelite.api.NPCComposition;
 import net.runelite.api.Player;
@@ -81,7 +87,6 @@ import net.runelite.client.util.Text;
 @Singleton
 public class ColosseumScanner
 {
-
 	private final Client client;
 
 	private final ItemManager itemManager;
@@ -89,15 +94,16 @@ public class ColosseumScanner
 	private final DataLoggerConfig config;
 
 	private boolean enabledSwapQuiverLoot;
+	private TimestampFormat timestampFormat;
 
 	private boolean scannedManticores;
 	private Integer manticoreIndexA = null;
 	private Integer manticoreIndexB = null;
-	private final Map<Integer, ManticoreAttackSequence> manticoreSequences = new HashMap<>();
 
-	public int getManticoreIndexA() {
-		return manticoreIndexA;
-	}
+	private final Map<Integer, ManticoreAttackSequence> manticoreSequences = new HashMap<>();
+	private final Map<Integer, String> manticoreSequenceStrings = new HashMap<>();
+
+	public int getManticoreIndexA() {return manticoreIndexA;}
 
 	public void setManticoreIndexA(int index) {
 		manticoreIndexA = index;
@@ -120,10 +126,6 @@ public class ColosseumScanner
 	{
 		return manticoreIndexB != null ? manticoreSequences.get(manticoreIndexB) : null;
 	}
-
-	private final Map<Integer, List<Integer>> manticoreAttackSequences = new HashMap<>();
-
-	private final ItemBundle SWAPPED_DIZANAS_QUIVER = new ItemBundle(SUNFIRE_SPLINTERS_ID, "Sunfire splinters", 4000);
 
 	private final Set<Integer> CORE_COLOSSEUM_MOBS = ImmutableSet.of(
 		JAVELIN_COLOSSUS_NPC_ID,
@@ -152,8 +154,7 @@ public class ColosseumScanner
 	@Subscribe
 	public void onConfigChanged(ConfigChanged event)
 	{
-		if (!event.getGroup().equals(DataLoggerConfig.CONFIG_GROUP))
-		{
+		if (!event.getGroup().equals(DataLoggerConfig.CONFIG_GROUP)) {
 			return;
 		}
 
@@ -186,6 +187,8 @@ public class ColosseumScanner
 	public void parseManticoreAttackSequence(NPC npc) {
 		if (npc == null || manticoreSequences.containsKey(npc.getIndex())) return;
 
+		int npcIndex = npc.getIndex();
+
 		Iterable<ActorSpotAnim> anims = npc.getSpotAnims();
 		if (anims == null) return;
 
@@ -199,8 +202,27 @@ public class ColosseumScanner
 		}
 
 		if (activeOrbs.size() == 3) {
-			manticoreSequences.put(npc.getIndex(), new ManticoreAttackSequence(activeOrbs));
-			log.debug("Manticore {} sequence identified.", npc.getIndex());
+			ManticoreAttackSequence sequence = new ManticoreAttackSequence(activeOrbs);
+			manticoreSequences.put(npcIndex, sequence);
+			manticoreSequenceStrings.put(npcIndex, sequence.stateString());
+
+			String manticoreTag = manticoreIndexA == npcIndex ? "A" : "B";
+
+			log.info("Manticore {} sequence identified as {} at tick={}", manticoreTag, sequence, client.getTickCount());
+		}
+	}
+
+	/**
+	 * Attempt to assign attack sequences to Manticores if they are not registered yet
+	 */
+	public void parseManticoreAttackSequences(IndexedObjectSet<? extends NPC> npcs)
+	{
+		if (manticoreIndexA != null && !manticoreSequences.containsKey(manticoreIndexA)) {
+			parseManticoreAttackSequence(npcs.byIndex(manticoreIndexA));
+		}
+
+		if (manticoreIndexB != null && !manticoreSequences.containsKey(manticoreIndexB)) {
+			parseManticoreAttackSequence(npcs.byIndex(manticoreIndexB));
 		}
 	}
 
@@ -209,7 +231,8 @@ public class ColosseumScanner
 	 */
 	public void resetManticoreSequences()
 	{
-		manticoreAttackSequences.clear();
+		manticoreSequences.clear();
+		manticoreSequenceStrings.clear();
 		manticoreIndexA = null;
 		manticoreIndexB = null;
 		scannedManticores = false;
@@ -320,8 +343,6 @@ public class ColosseumScanner
 	private IntermissionUI scanIntermissionUI(int currentWave)
 	{
 		log.debug("Scanning intermission UI for wave {}", currentWave);
-		int speedBonusTimeSeconds = -1;
-		int damageTakenAmount = -1;
 
 		Widget modContainer = client.getWidget(INTERMISSION_GROUP_ID, INTERMISSION_MODIFIER_LIST_CONTAINER);
 		List<ColosseumModifier> activeModifiers = parseActiveModifiers(modContainer);
@@ -329,48 +350,7 @@ public class ColosseumScanner
 		Widget lootContainer = client.getWidget(INTERMISSION_GROUP_ID, INTERMISSION_NEXT_LOOT_CONTAINER);
 		List<ItemBundle> nextLoot = parseNextLoot(lootContainer);
 
-		Widget stats = client.getWidget(INTERMISSION_GROUP_ID, INTERMISSION_RESULT_CONTAINER);
-		if (stats == null)
-		{
-			return null;
-		}
-		Function<Integer, String> clean = (id) -> {
-			Widget w = stats.getChild(id);
-			return w != null ? Text.removeTags(w.getText()) : "";
-		};
-
-		Function<String, Integer> parseNum = (s) -> {
-			String val = s.replaceAll("[^0-9-]", "");
-			return val.isEmpty() ? 0 : Integer.parseInt(val);
-		};
-
-		Function<String, Integer> parseTime = (s) -> {
-			if (!s.contains(":")) return 0;
-			String[] parts = s.split(":");
-			return (Integer.parseInt(parts[0].trim()) * 60) + Integer.parseInt(parts[1].trim());
-		};
-
-		int waveBonusGlory = parseNum.apply(clean.apply(1));
-
-		String speedText = clean.apply(3);
-		int speedBonusGlory = parseNum.apply(speedText.split("\\(")[0]);
-		if (speedText.contains("("))
-		{
-			speedBonusTimeSeconds = parseTime.apply(speedText.substring(speedText.indexOf("(") + 1, speedText.indexOf(")")));
-		}
-
-		int modChoiceGlory = parseNum.apply(clean.apply(5));
-
-		String dmgText = clean.apply(7);
-		int damageTakenGlory = parseNum.apply(dmgText.split("\\(")[0]);
-		if (dmgText.contains("("))
-		{
-			damageTakenAmount = parseNum.apply(dmgText.substring(dmgText.indexOf("(") + 1, dmgText.indexOf(")")));
-		}
-
-		int waveGlory = waveBonusGlory + modChoiceGlory + damageTakenGlory + speedBonusGlory;
-		int totalGlory = parseNum.apply(clean.apply(10));
-		int totalTimeSeconds = parseTime.apply(clean.apply(11));
+		SummaryUI summary = parseSummaryUI(client.getWidget(INTERMISSION_GROUP_ID, INTERMISSION_RESULT_CONTAINER));
 
 		List<ColosseumModifier> modifierChoices = new ArrayList<>();
 		for (int childId : INTERMISSION_MODIFIER_CHOICES)
@@ -393,16 +373,16 @@ public class ColosseumScanner
 		return IntermissionUI.builder()
 			.potentialLoot(nextLoot)
 			.modifierChoices(modifierChoices)
-			.waveBonusGlory(waveBonusGlory)
-			.speedBonusGlory(speedBonusGlory)
-			.speedBonusTimeSeconds(speedBonusTimeSeconds)
-			.modChoiceGlory(modChoiceGlory)
-			.damageTakenGlory(damageTakenGlory)
-			.damageTakenAmount(damageTakenAmount)
-			.waveGlory(waveGlory)
-			.totalTimeSeconds(totalTimeSeconds)
 			.activeModifiers(activeModifiers)
-			.totalGlory(totalGlory)
+			.damageTakenGlory(summary == null ? 0 : summary.getDamageTakenGlory())
+			.speedBonusGlory(summary == null ? 0 : summary.getSpeedBonusGlory())
+			.speedBonusTimeSeconds(summary == null ? -1 : summary.getSpeedBonusTimeSeconds())
+			.damageTakenAmount(summary == null ? -1 : summary.getDamageTakenAmount())
+			.waveBonusGlory(summary == null ? 0 : summary.getWaveBonusGlory())
+			.waveGlory(summary == null ? 0 : summary.getWaveGlory())
+			.totalGlory(summary == null ? 0 : summary.getTotalGlory())
+			.totalTimeSeconds(summary == null ? 0 : summary.getTotalTimeSeconds())
+			.modChoiceGlory(summary == null ? 0 : summary.getModChoiceGlory())
 			.build();
 	}
 
@@ -459,40 +439,54 @@ public class ColosseumScanner
 	{
 		int id = (npcComposition != null) ? npcComposition.getId() : npc.getId();
 
-		String name = "Unknown";
-
+		final String name;
 		if (id == BOSS_WAVE_BEAM_CRYSTAL)
 			name = BOSS_WAVE_BEAM_CRYSTAL_NPC_NAME;
 		else if (id == SOLAR_FLARE_NPC_ID)
 			name = SOLARFLARE_NPC_NAME;
-
 		else if (npcComposition != null)
 			name = npcComposition.getName();
 		else if (npc.getName() != null)
 			name = npc.getName();
+		else
+			name = "Unknown";
 
 		int[] stats = npcComposition == null ? new int[0] : npcComposition.getStats();
 		int ratio = npc.getHealthRatio();
 		int scale = npc.getHealthScale();
-		int maxHp = npcComposition == null ? -1 : stats[3];
 
-		int currentHp = maxHp;
+		int maxHp = npcComposition == null ? -1 : stats[3];
+		final int currentHp;
 		if (maxHp != -1 && ratio >= 0 && scale > 0)
-		{
 			currentHp = (int) Math.ceil((double) ratio * maxHp / scale);
-		}
+		else
+			currentHp = maxHp;
 
 		WorldPoint location = npc.getWorldLocation();
 		npc.getHealthScale();
-		return ColosseumNPC.builder()
+
+		ColosseumNPC.ColosseumNPCBuilder builder = ColosseumNPC.builder()
 			.npcId(id)
 			.name(Text.removeTags(name))
-			.x(location.getX())
-			.y(location.getY())
+			.x(location.getRegionX())
+			.y(location.getRegionY())
 			.hp(currentHp)
-			.maxHp(maxHp)
-			.build();
+			.maxHp(maxHp);
+		if (id == MANTICORE_NPC_ID) {
+			int npcIndex = npc.getIndex();
+			String sequence = manticoreSequences.containsKey(npcIndex)
+				? manticoreSequenceStrings.get(npcIndex)
+				: "Unknown";
+
+			builder.orbSequence(sequence);
+		}
+		return builder.build();
 	}
+
+	private static final DateTimeFormatter HHMMSS_FORMATTER = DateTimeFormatter
+		.ofPattern("HH:mm:ss.S")
+		.withZone(ZoneId.systemDefault());
+
 
 	/**
 	 * Scan the State on a particular tick and return it. The contents of the resulting State is dictated by
@@ -508,18 +502,14 @@ public class ColosseumScanner
 		for (NPC npc : client.getTopLevelWorldView().npcs())
 		{
 			if (npc == null || npc.isDead())
-			{
 				continue;
-			}
 
 			NPCComposition composition = npc.getComposition();
 			int npcId = npc.getId();
-			if (composition != null) {
+			if (composition != null)
 				npcId = composition.getId();
-			}
 
-			if (trackedNpcIds.contains(npcId))
-			{
+			if (trackedNpcIds.contains(npcId)) {
 				ColosseumNPC colosseumNpc = generateNpc(npc, composition);
 				detectedNpcs.add(colosseumNpc);
 			}
@@ -527,14 +517,25 @@ public class ColosseumScanner
 		int playerHp = client.getBoostedSkillLevel(Skill.HITPOINTS);
 		int playerPrayer = client.getBoostedSkillLevel(Skill.PRAYER);
 
-		return ColosseumState.builder()
+		ColosseumState.ColosseumStateBuilder state = ColosseumState.builder()
 			.wave(currentWave)
 			.tick(client.getTickCount() - waveStart)
 			.playerHp(playerHp)
 			.playerPrayer(playerPrayer)
 			.playerLocation(playerLocation)
-			.npcs(detectedNpcs)
-			.build();
+			.npcs(detectedNpcs);
+
+		switch (timestampFormat)
+		{
+			case UNIX:
+				state.timestampUnix(Instant.now().toEpochMilli());
+			case HHMMSS_M:
+				state.timestampHmsm(HHMMSS_FORMATTER.format(Instant.now()));
+			case BOTH:
+				state.timestampUnix(Instant.now().toEpochMilli());
+				state.timestampHmsm(HHMMSS_FORMATTER.format(Instant.now()));
+		}
+		return state.build();
 	}
 
 	/**
@@ -548,27 +549,17 @@ public class ColosseumScanner
 
 		String speedText = clean(stats, 3);
 		int speedBonusGlory = parseNum(speedText.split("\\(")[0]);
-		int speedBonusTimeSeconds = 0;
-		if (speedText.contains("("))
-		{
-			speedBonusTimeSeconds = parseTime(speedText.substring(speedText.indexOf("(") + 1, speedText.indexOf(")")));
-		}
+		int speedBonusTimeSeconds = speedText.contains("(") ?
+			parseTime(speedText.substring(speedText.indexOf("(") + 1, speedText.indexOf(")"))) : 0;
 
 		int modChoiceGlory = parseNum(clean(stats, 5));
 
 		String dmgText = clean(stats, 7);
 		int damageTakenGlory = parseNum(dmgText.split("\\(")[0]);
-		int damageTakenAmount = 0;
-		if (dmgText.contains("("))
-		{
-			damageTakenAmount = parseNum(dmgText.substring(dmgText.indexOf("(") + 1, dmgText.indexOf(")")));
-		}
+		int damageTakenAmount = dmgText.contains("(") ?
+			parseNum(dmgText.substring(dmgText.indexOf("(") + 1, dmgText.indexOf(")"))) : 0;
 
-		int totalGlory = parseNum(clean(stats, 10));
-		int totalTime = parseTime(clean(stats, 11));
-
-
-		return SummaryUI.builder()
+		SummaryUI result = SummaryUI.builder()
 			.waveBonusGlory(waveBonusGlory)
 			.speedBonusGlory(speedBonusGlory)
 			.speedBonusTimeSeconds(speedBonusTimeSeconds)
@@ -576,9 +567,19 @@ public class ColosseumScanner
 			.damageTakenGlory(damageTakenGlory)
 			.damageTakenAmount(damageTakenAmount)
 			.waveGlory(waveBonusGlory + modChoiceGlory + damageTakenGlory + speedBonusGlory)
-			.totalGlory(totalGlory)
-			.totalTimeSeconds(totalTime)
+			.totalGlory(parseNum(clean(stats, 10)))
+			.totalTimeSeconds(parseTime(clean(stats, 11)))
 			.build();
+
+		if (result != null)
+		{
+			log.info("Parsed the Results from intermissionUI: {}", result);
+		}
+		else {
+			log.info("Failed to parse results from intermission UI");
+		}
+
+		return result;
 	}
 
 	private String clean(Widget parent, int childId)
@@ -615,7 +616,7 @@ public class ColosseumScanner
 				ItemBundle nextItem = ItemBundle.fromComp(itemManager.getItemComposition(id), quantity);
 
 				if (enabledSwapQuiverLoot && nextItem.getItemId() == DIZANAS_QUIVER_UNCHARGED_ID)
-					nextLoot.add(SWAPPED_DIZANAS_QUIVER);
+					nextLoot.add(SWAPPED_DIZANAS_QUIVER_ITEM_BUNDLE);
 				else
 					nextLoot.add(nextItem);
 			}
@@ -646,10 +647,12 @@ public class ColosseumScanner
 
 	/**
 	 * Update flags that are derived from (combinations of) configurations.
+	 * @param startUp If true, initializes certain variables during startup
 	 */
 	public void updateConfigFlags(boolean startUp)
 	{
 		enabledSwapQuiverLoot = config.logQuiverAsSplinters();
+		timestampFormat = config.logTimestamp();
 
 		if (startUp)
 		{

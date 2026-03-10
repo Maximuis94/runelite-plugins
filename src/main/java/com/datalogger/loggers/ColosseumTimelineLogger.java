@@ -39,6 +39,13 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.events.GameTick;
 import net.runelite.client.eventbus.Subscribe;
 
+/**
+ * Timeline logger of the colosseum logger.
+ * The timeline is composed of states that are generated every tick.
+ * A state describes player- and NPC data, NPC data is restricted to a subset of NPCs, of which may be enabled via
+ * plugin configurations.
+ *
+ */
 @Slf4j
 @Singleton
 public class ColosseumTimelineLogger {
@@ -51,6 +58,10 @@ public class ColosseumTimelineLogger {
 	private int waveStartTick;
 	private final List<ColosseumState> states = new ArrayList<>();
 
+	/**
+	 * Invoked at wave start by the ColosseumAttemptLogger. Ensures the appropriate flags and basic data are set and
+	 * that the states List is empty.
+	 */
 	@Subscribe
 	public void onColosseumWaveStarted(ColosseumWaveStarted event) {
 		currentWave = event.getWaveNumber();
@@ -59,6 +70,9 @@ public class ColosseumTimelineLogger {
 		isRecording = true;
 	}
 
+	/**
+	 * Scan and store game state data on a particular tick
+	 */
 	@Subscribe
 	public void onGameTick(GameTick event) {
 		if (!isRecording || !config.logWaveTimeline()) return;
@@ -73,7 +87,6 @@ public class ColosseumTimelineLogger {
 
 		if (states.isEmpty()) return;
 
-		// Snapshot to avoid concurrent modifications while saving
 		List<ColosseumState> snapshot = new ArrayList<>(states);
 		fileIOService.saveWaveStates(event.getAttemptId(), event.getWaveNumber(), snapshot);
 		states.clear();
