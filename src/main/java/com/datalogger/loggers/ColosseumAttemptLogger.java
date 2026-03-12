@@ -431,7 +431,6 @@ public class ColosseumAttemptLogger extends AbstractLogger
 		attemptId = String.format("%s_%s", getAccountName(), startTime);
 		currentAttempt = new ColosseumAttempt(attemptStartTick, getAccountName());
 		attemptRoot = new File(FileIOService.COLOSSEUM_ROOT_DIR, attemptId);
-		attemptRoot.mkdirs();
 		finalStatus = null;
 		activeTrial = true;
 		waitingForIntermission = true;
@@ -481,7 +480,7 @@ public class ColosseumAttemptLogger extends AbstractLogger
 		{
 			log.debug("Completing ColosseumWave for wave {}", currentWave);
 			ColosseumWave completedWave = completeWave(newUI);
-			log.debug(completedWave.toString());
+			log.debug("{}", completedWave.toDTO());
 			currentAttempt.submitWave(completedWave);
 			selectedModifier = null;
 		}

@@ -56,8 +56,8 @@ public class ColosseumState
 			.tick(tick)
 			.playerHp(playerHp)
 			.playerPrayer(playerPrayer)
-			.playerX(playerLocation != null ? playerLocation.getRegionX() : 0)
-			.playerY(playerLocation != null ? playerLocation.getRegionY() : 0)
+			.playerX(playerLocation != null ? playerLocation.getRegionX() : -1)
+			.playerY(playerLocation != null ? playerLocation.getRegionY() : -1)
 			.npcs(npcs);
 
 		if (timestampHmsm!=null && !timestampHmsm.isEmpty())

@@ -65,7 +65,6 @@ public class ColosseumAttempt
 		waves = new ArrayList<>();
 		finalStatus = WaveStatus.FAILED;
 		account = accountName;
-		canSave();
 	}
 
 	public ColosseumAttemptDTO toDTO() {
@@ -101,14 +100,5 @@ public class ColosseumAttempt
 	public File getRootDirectory()
 	{
 		return new File(FileIOService.COLOSSEUM_ROOT_DIR, String.format("%s_%s", account, startTime));
-	}
-
-	/**
-	 * Return true if the root exists or was successfully created
-	 */
-	public boolean canSave()
-	{
-		File rootDir = getRootDirectory();
-		return rootDir.exists() || rootDir.mkdirs();
 	}
 }

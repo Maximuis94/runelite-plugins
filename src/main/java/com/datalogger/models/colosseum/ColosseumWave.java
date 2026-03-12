@@ -29,8 +29,6 @@ import com.datalogger.framework.DataRow;
 import com.datalogger.models.colosseum.enums.ColosseumModifier;
 import com.datalogger.models.colosseum.enums.WaveStatus;
 import com.datalogger.models.itemvault.ItemBundle;
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 import java.util.List;
 import java.util.stream.Collectors;
 import lombok.Builder;
@@ -143,17 +141,6 @@ public class ColosseumWave implements DataRow
 			.minotaurReinforcementsSpawnX(minotaurReinforcementsSpawn != null ? minotaurReinforcementsSpawn.getRegionX() : null)
 			.minotaurReinforcementsSpawnY(minotaurReinforcementsSpawn != null ? minotaurReinforcementsSpawn.getRegionY() : null)
 			.build();
-	}
-
-	@Override
-	public String toString()
-	{
-		Gson gson = new GsonBuilder()
-			.setPrettyPrinting()
-			.disableHtmlEscaping()
-			.create();
-
-		return gson.toJson(this);
 	}
 
 	public static String csvHeader() {

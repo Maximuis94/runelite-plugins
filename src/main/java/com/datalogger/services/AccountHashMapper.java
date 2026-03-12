@@ -25,14 +25,12 @@
 package com.datalogger.services;
 
 import com.datalogger.events.AccountSessionStarted;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ScheduledExecutorService;
+import javax.inject.Inject;
 import javax.inject.Singleton;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.client.eventbus.Subscribe;
@@ -42,6 +40,17 @@ import net.runelite.client.eventbus.Subscribe;
 public class AccountHashMapper
 {
 	private final Map<Long, String> hashToNameCache = new ConcurrentHashMap<>();
+
+	private final FileIOService fileIOService;
+	private final ScheduledExecutorService executor;
+
+	@Inject
+	private AccountHashMapper(FileIOService fileIOService, ScheduledExecutorService executor)
+	{
+		this.fileIOService = fileIOService;
+		this.executor = executor;
+	}
+
 
 	/**
 	 * Listens for the custom global session event.
@@ -79,32 +88,15 @@ public class AccountHashMapper
 
 	public void loadMappings()
 	{
-		File mappingFile = FileIOService.ACCOUNT_HASH_MAPPINGS;
+		executor.submit(() -> {
+			Map<Long, String> diskMappings = fileIOService.loadAccountHashMappingsRaw();
 
-		if (mappingFile.exists())
-		{
-			try (FileInputStream in = new FileInputStream(mappingFile))
-			{
-				Properties properties = new Properties();
-				properties.load(in);
-
-				for (String key : properties.stringPropertyNames())
-				{
-					try {
-						long hash = Long.parseLong(key);
-						hashToNameCache.put(hash, properties.getProperty(key));
-					} catch (NumberFormatException e) {
-						log.warn("Found invalid account hash in mappings file: {}", key);
-					}
-				}
-
-				log.info("Loaded {} account hash mappings into memory.", hashToNameCache.size());
+			if (!diskMappings.isEmpty()) {
+				hashToNameCache.putAll(diskMappings);
 			}
-			catch (Exception e)
-			{
-				log.error("Failed to read existing account hash mappings", e);
-			}
-		}
+
+			log.info("Loaded {} account hash mappings into memory.", hashToNameCache.size());
+		});
 	}
 
 	/**
@@ -127,41 +119,7 @@ public class AccountHashMapper
 		}
 
 		hashToNameCache.put(accountHash, accountName);
-
-		File mappingFile = FileIOService.ACCOUNT_HASH_MAPPINGS;
-		File parentDir = mappingFile.getParentFile();
-		if (parentDir != null && !parentDir.exists())
-		{
-			parentDir.mkdirs();
-		}
-
-		synchronized (mappingFile.getAbsolutePath().intern())
-		{
-			Properties properties = new Properties();
-
-			if (mappingFile.exists())
-			{
-				try (FileInputStream in = new FileInputStream(mappingFile))
-				{
-					properties.load(in);
-				}
-				catch (Exception e)
-				{
-					log.error("Failed to read existing account hash mappings during update", e);
-				}
-			}
-			properties.setProperty(String.valueOf(accountHash), accountName);
-
-			try (FileOutputStream out = new FileOutputStream(mappingFile))
-			{
-				properties.store(out, "Account Hash to Account Name Mappings");
-				log.debug("Successfully updated account hash mapping for: {}", accountName);
-			}
-			catch (Exception e)
-			{
-				log.error("Failed to write updated account hash mappings", e);
-			}
-		}
+		fileIOService.saveAccountHashMappingAsync(accountHash, accountName);
 	}
 
 	/**

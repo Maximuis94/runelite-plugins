@@ -1,6 +1,6 @@
 # Data Logger
 Data logger that will store various types of data locally.
-Logged data is stored in subfolders located in ${user.home}/.runelite/data-logger
+Logged data is stored in directories located in ${user.home}/.runelite/data-logger
 
 ## Item-related data loggers
 These loggers have been written to accommodate using multiple clients simultaneously and minimize risk for I/O errors.
@@ -104,7 +104,8 @@ Logger that keeps track of Colosseum data per wave. If enabled, the following da
 - Manticore sequence: Orb sequences of manticores encountered during the wave (bottom-top)
 
 The data described above is always generated as JSON file, and may additionally also be generated as CSV file.
-Logs are stored in the csv and log folder in .runelite/data-logger/colosseum. 
+Generated files are bundled per attempt in a separate directory, which is named as `<ACCOUNT_NAME>_<YYMMDD>_<HHMMSS>`, 
+and stored in ${user.home}/.runelite/data-logger/colosseum
 
 
 <details>
@@ -197,8 +198,6 @@ A state is composed of the following values;
   - (Manticores only) Orb sequence
 
     Fremenniks, Solarflares, Healing totems, Bee Swarms and Beam crystals are optional and can be disabled via configurations.
-Timelines are stored in .runelite/data-logger/colosseum/timeline as a JSON file, each attempt is given its own timeline file.
-
 
 <details>
     <summary>Colosseum timeline entry</summary>
@@ -256,9 +255,7 @@ _Example of state data_
   <summary>Colosseum wave completion screenshots</summary>
 
 
-If enabled, a screenshot is created and stored in .runelite/data-logger/screenshot/colosseum when the
-interface between waves or the rewards chest interface pops up.
-For each attempt, a new directory is created and all screenshots taken during that attempt are stored in that directory.
+If enabled, a screenshot is created and stored in the directory created for that attempt when the interface between waves or the rewards chest interface pops up.
 ![img_1.png](images/example-wave-completion-screenshot.png)
 _An example of a screenshot taken after wave 12 is completed_
 

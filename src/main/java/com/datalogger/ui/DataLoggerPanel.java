@@ -33,6 +33,7 @@ import java.awt.Dimension;
 import java.awt.GridLayout;
 import java.io.File;
 import java.io.IOException;
+import java.util.concurrent.ScheduledExecutorService;
 import javax.inject.Inject;
 import javax.swing.JButton;
 import javax.swing.JPanel;
@@ -45,10 +46,12 @@ import net.runelite.client.ui.PluginPanel;
 public class DataLoggerPanel extends PluginPanel {
 	private final JPanel logContentDisplay = new JPanel();
 	private final ItemVaultLogger itemVaultLogger;
+	private final ScheduledExecutorService executor;
 
 	@Inject
-	public DataLoggerPanel(ItemVaultLogger itemVaultLogger) {
+	public DataLoggerPanel(ItemVaultLogger itemVaultLogger, ScheduledExecutorService executor) {
 		this.itemVaultLogger = itemVaultLogger;
+		this.executor = executor;
 
 		// Matches the standard RuneLite sidebar padding
 		this.setBorder(new EmptyBorder(0, 0, 10, 0));
@@ -63,7 +66,6 @@ public class DataLoggerPanel extends PluginPanel {
 
 		// --- BOTTOM BUTTONS SECTION ---
 		JPanel buttonContainer = new JPanel();
-		// Increased rows to 4 to accommodate the new button
 		buttonContainer.setLayout(new GridLayout(5, 1, 0, 8));
 		buttonContainer.setBorder(new EmptyBorder(10, 5, 0, 5));
 		buttonContainer.setBackground(ColorScheme.DARK_GRAY_COLOR);
@@ -87,7 +89,6 @@ public class DataLoggerPanel extends PluginPanel {
 		buttonContainer.add(openItemVaultBtn);
 		buttonContainer.add(openDataBtn);
 
-		// Add the button panel to the bottom of the PluginPanel
 		add(buttonContainer, BorderLayout.SOUTH);
 	}
 
@@ -95,22 +96,27 @@ public class DataLoggerPanel extends PluginPanel {
 	 * Helper method to open a directory in the native OS file explorer.
 	 */
 	private void openDirectory(String directoryPath) {
-		File dir = new File(directoryPath);
+		executor.submit(() -> {
+			File dir = new File(directoryPath);
 
-		if (!dir.exists()) {
-			log.warn("Directory does not exist, attempting to create: {}", directoryPath);
-			dir.mkdirs(); // Creates the directory if it doesn't exist
-		}
-
-		try {
-			if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.OPEN)) {
-				Desktop.getDesktop().open(dir);
-			} else {
-				log.warn("Desktop API is not supported on this platform. Cannot open file explorer.");
+			if (!dir.exists()) {
+				log.warn("Directory does not exist, attempting to create: {}", directoryPath);
+				if (!dir.mkdirs()) {
+					log.error("Failed to create directory: {}", directoryPath);
+					return;
+				}
 			}
-		} catch (IOException ex) {
-			log.error("Failed to open directory: {}", directoryPath, ex);
-		}
+
+			try {
+				if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.OPEN)) {
+					Desktop.getDesktop().open(dir);
+				} else {
+					log.warn("Desktop API is not supported on this platform. Cannot open file explorer.");
+				}
+			} catch (IOException ex) {
+				log.error("Failed to open directory: {}", directoryPath, ex);
+			}
+		});
 	}
 
 	private JButton createStyledButton(String text) {

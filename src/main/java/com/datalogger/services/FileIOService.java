@@ -25,6 +25,7 @@
 package com.datalogger.services;
 
 import com.datalogger.DataLoggerConfig;
+import com.datalogger.dto.ColosseumAttemptDTO;
 import com.datalogger.dto.ColosseumStateDTO;
 import com.datalogger.events.ColosseumAttemptStarted;
 import com.datalogger.framework.LogType;
@@ -33,6 +34,7 @@ import com.datalogger.models.colosseum.ColosseumState;
 import com.datalogger.models.colosseum.ColosseumWave;
 import com.datalogger.models.grandexchange.ActiveGeOffer;
 import com.datalogger.models.grandexchange.GeLedgerEntry;
+import com.datalogger.models.itemvault.BankedItem;
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -51,10 +53,12 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.Reader;
 import java.lang.reflect.Type;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -196,8 +200,6 @@ public class FileIOService
 		String date = java.time.LocalDate.now().toString();
 		File accountDir = new File(type.getLogDirectory(), account.toLowerCase());
 
-		if (!accountDir.exists()) accountDir.mkdirs();
-
 		return new File(accountDir, type.getDirectoryName() + "_" + date + ".csv");
 	}
 
@@ -236,33 +238,43 @@ public class FileIOService
 	 * @param props Properties that are to be saved.
 	 */
 	public void saveAccountState(String accountHash, Properties props) {
-		File file = getStateFile(accountHash);
-		try (FileOutputStream out = new FileOutputStream(file)) {
-			props.store(out, "Account-specific ongoing Grand Exchange offers");
-		} catch (IOException e) {
-			log.error("Could not save state to {}", file.getName(), e);
-		}
+		Future<?> future = executor.submit(() -> {
+			File file = getStateFile(accountHash); // Note: getStateFile has a .mkdirs() in it, so it's good this is async now!
+			try (FileOutputStream out = new FileOutputStream(file)) {
+				props.store(out, "Account-specific ongoing Grand Exchange offers");
+			} catch (IOException e) {
+				log.error("Could not save state to {}", file.getName(), e);
+			}
+		});
+
+		pendingWrites.add(future);
 	}
 
 	/**
 	 * Serializes any object to a JSON file.
 	 */
 	public void saveJson(File file, Object data) {
-		File directory = file.getParentFile();
-		if (!directory.exists() && !directory.mkdirs()) {
-			log.error("Could not create directory: {}", directory.getAbsolutePath());
-			return;
-		}
-		String filename = file.getName();
-		String cleanName = filename.endsWith(".json") ? filename : filename + ".json";
-		file = new File(directory, cleanName);
+		Future<?> future = executor.submit(() -> {
+			File directory = file.getParentFile();
+			if (!directory.exists() && !directory.mkdirs()) {
+				log.error("Could not create directory: {}", directory.getAbsolutePath());
+				return;
+			}
 
-		try (BufferedWriter writer = new BufferedWriter(new FileWriter(file))) {
-			gson.toJson(data, writer);
-			log.debug("Successfully integrated data to {}", file.getName());
-		} catch (IOException e) {
-			log.error("Error saving integrated JSON to {}", file.getName(), e);
-		}
+			String filename = file.getName();
+			String cleanName = filename.endsWith(".json") ? filename : filename + ".json";
+			File finalFile = new File(directory, cleanName);
+
+			// StandardCharsets.UTF_8 recommended for clean JSON encoding
+			try (BufferedWriter writer = Files.newBufferedWriter(finalFile.toPath(), StandardCharsets.UTF_8)) {
+				gson.toJson(data, writer);
+				log.debug("Successfully integrated data to {}", finalFile.getName());
+			} catch (IOException e) {
+				log.error("Error saving integrated JSON to {}", finalFile.getName(), e);
+			}
+		});
+
+		pendingWrites.add(future);
 	}
 
 	/**
@@ -277,24 +289,27 @@ public class FileIOService
 	 * Save the ColosseumStates for a single wave of an ongoing attempt in a temporary file in the temporary directory.
 	 */
 	public void saveWaveStates(String attemptId, int waveId, List<ColosseumState> liveStates) {
-		List<ColosseumStateDTO> dtos = liveStates.stream()
-			.map(ColosseumState::toDTO)
-			.collect(Collectors.toList());
-
 		Future<?> future = executor.submit(() -> {
+			// 1. Move the DTO mapping inside the async block to save Client Thread CPU cycles
+			List<ColosseumStateDTO> dtos = liveStates.stream()
+				.map(ColosseumState::toDTO)
+				.collect(Collectors.toList());
+
 			if (!INTERNAL_TEMP_DIR.exists() && !INTERNAL_TEMP_DIR.mkdirs()) {
 				log.error("Could not create directory: {}", INTERNAL_TEMP_DIR.getAbsolutePath());
 				return;
 			}
 
 			File file = tmpWaveFile(attemptId, waveId);
-			try (BufferedWriter writer = new BufferedWriter(new FileWriter(file))) {
+
+			try (BufferedWriter writer = Files.newBufferedWriter(file.toPath(), StandardCharsets.UTF_8)) {
 				gson.toJson(dtos, writer);
 				log.info("Successfully saved Colosseum run to: {}", file.getName());
 			} catch (IOException e) {
 				log.error("Failed to save Colosseum JSON", e);
 			}
 		});
+
 		pendingWrites.add(future);
 	}
 
@@ -375,19 +390,28 @@ public class FileIOService
 	 * Logs the given attempt
 	 */
 	public void logColosseumAttempt(ColosseumAttempt attempt) {
-		if (!COLOSSEUM_LOG_DIR.exists()) {
-			COLOSSEUM_LOG_DIR.mkdirs();
-		}
-
-		File targetFile = attemptWaveLogFile(attempt.getAccount(), attempt.getStartTime(), "json");
 		Future<?> future = executor.submit(() -> {
+			// 1. Move disk I/O (directory checks) inside the async block
+			if (!COLOSSEUM_LOG_DIR.exists()) {
+				COLOSSEUM_LOG_DIR.mkdirs();
+			}
+
+			File targetFile = attemptWaveLogFile(attempt.getAccount(), attempt.getStartTime(), "json");
+
+			// 2. Use the DTO to ensure your JSON output is formatted correctly
+			ColosseumAttemptDTO attemptDto = attempt.toDTO();
+
+			// Note: FileWriter is fine, but Files.newBufferedWriter is the modern standard
+			// for Java 11+ as it lets you explicitly set UTF-8 encoding.
 			try (FileWriter writer = new FileWriter(targetFile)) {
-				gson.toJson(attempt, writer);
+				gson.toJson(attemptDto, writer);
 				log.info("Successfully saved Colosseum attempt to {}", targetFile.getAbsolutePath());
 				log.info("Attempt waves: {} finalStatus: {}", attempt.getWaves().size(), attempt.getFinalStatus());
 			} catch (IOException e) {
 				log.error("Failed to save Colosseum attempt log!", e);
-			}});
+			}
+		});
+
 		pendingWrites.add(future);
 	}
 
@@ -677,31 +701,179 @@ public class FileIOService
 			return;
 		}
 
-		File parentDir = ACCOUNT_HASH_MAPPINGS.getParentFile();
-		if (parentDir != null && !parentDir.exists()) {
-			parentDir.mkdirs();
-		}
+		Future<?> future = executor.submit(() -> {
+			File parentDir = ACCOUNT_HASH_MAPPINGS.getParentFile();
+			if (parentDir != null && !parentDir.exists()) {
+				parentDir.mkdirs();
+			}
 
-		synchronized (mappingsLock) {
-			Properties properties = new Properties();
+			synchronized (mappingsLock) {
+				Properties properties = new Properties();
 
-			if (ACCOUNT_HASH_MAPPINGS.exists()) {
-				try (FileInputStream in = new FileInputStream(ACCOUNT_HASH_MAPPINGS)) {
-					properties.load(in);
+				if (ACCOUNT_HASH_MAPPINGS.exists()) {
+					try (FileInputStream in = new FileInputStream(ACCOUNT_HASH_MAPPINGS)) {
+						properties.load(in);
+					} catch (Exception e) {
+						log.error("Failed to read existing account hash mappings", e);
+					}
+				}
+
+				properties.setProperty(accountHash, accountName);
+
+				try (FileOutputStream out = new FileOutputStream(ACCOUNT_HASH_MAPPINGS)) {
+					properties.store(out, "Account Hash to Account Name Mappings");
+					log.debug("Successfully updated account hash mapping for: {}", accountName);
 				} catch (Exception e) {
-					log.error("Failed to read existing account hash mappings", e);
+					log.error("Failed to write updated account hash mappings", e);
 				}
 			}
+		});
 
-			properties.setProperty(accountHash, accountName);
+		pendingWrites.add(future);
+	}
 
-			try (FileOutputStream out = new FileOutputStream(ACCOUNT_HASH_MAPPINGS)) {
-				properties.store(out, "Account Hash to Account Name Mappings");
-				log.debug("Successfully updated account hash mapping for: {}", accountName);
+	/**
+	 * Safely exports Item Vault contents to a CSV file on a background thread.
+	 */
+	public void writeVaultCsv(File csvFile, List<BankedItem> items, boolean includeMetadata) {
+		Future<?> future = executor.submit(() -> {
+			File parentDir = csvFile.getParentFile();
+
+			// Fix: Actually create the parent directories if they don't exist!
+			if (parentDir != null && !parentDir.exists() && !parentDir.mkdirs()) {
+				log.error("Failed to create directory for vault CSV: {}", parentDir.getAbsolutePath());
+				return;
+			}
+
+			try (BufferedWriter bw = Files.newBufferedWriter(csvFile.toPath(), StandardCharsets.UTF_8);
+				 PrintWriter out = new PrintWriter(bw)) {
+
+				if (includeMetadata) {
+					out.println("AccountName,Vault,ItemID,ItemName,Quantity");
+					for (BankedItem item : items) {
+						out.printf("%s,%s,%d,%s,%d%n",
+							item.getAccountName(),
+							item.getVaultType(),
+							item.getItemId(),
+							item.getItemName(),
+							item.getQuantity());
+					}
+				} else {
+					out.println("ItemID,ItemName,Quantity");
+					for (BankedItem item : items) {
+						out.printf("%d,%s,%d%n",
+							item.getItemId(),
+							item.getItemName(),
+							item.getQuantity());
+					}
+				}
+				log.info("Successfully exported vault to CSV: {}", csvFile.getName());
 			} catch (Exception e) {
-				log.error("Failed to write updated account hash mappings", e);
+				log.error("Failed to write vault contents to CSV: {}", csvFile.getName(), e);
+			}
+		});
+
+		pendingWrites.add(future);
+	}
+
+	/**
+	 * Reads all vault JSON files from the disk.
+	 * Returns a Map where the key is the filename and the value is the array of raw items.
+	 */
+	public Map<String, BankedItem[]> readAllVaultFilesRaw() {
+		File directory = INTERNAL_VAULT_DIR;
+		if (!directory.exists() || !directory.isDirectory()) {
+			return new HashMap<>(); // Return empty map if directory doesn't exist
+		}
+
+		File[] vaultFiles = directory.listFiles((dir, name) -> name.endsWith(".json"));
+		if (vaultFiles == null || vaultFiles.length == 0) {
+			return new HashMap<>();
+		}
+
+		Map<String, BankedItem[]> fileContents = new HashMap<>();
+		for (File file : vaultFiles) {
+			try (Reader reader = new FileReader(file)) {
+				BankedItem[] parsedItems = gson.fromJson(reader, BankedItem[].class);
+				if (parsedItems != null) {
+					fileContents.put(file.getName(), parsedItems);
+				}
+			} catch (Exception e) {
+				log.error("Failed to read items from vault file: {}", file.getName(), e);
 			}
 		}
+		return fileContents;
+	}
+
+	/**
+	 * Safely saves an account hash mapping to disk on a background thread.
+	 */
+	public void saveAccountHashMappingAsync(long accountHash, String accountName)
+	{
+		Future<?> future = executor.submit(() -> {
+			File mappingFile = ACCOUNT_HASH_MAPPINGS;
+			File parentDir = mappingFile.getParentFile();
+
+			if (parentDir != null && !parentDir.exists() && !parentDir.mkdirs()) {
+				log.error("Failed to create directory for account hash mappings.");
+				return;
+			}
+
+			synchronized (mappingFile.getAbsolutePath().intern()) {
+				Properties properties = new Properties();
+
+				if (mappingFile.exists()) {
+					try (FileInputStream in = new FileInputStream(mappingFile)) {
+						properties.load(in);
+					} catch (Exception e) {
+						log.error("Failed to read existing account hash mappings during update", e);
+					}
+				}
+
+				properties.setProperty(String.valueOf(accountHash), accountName);
+				try (FileOutputStream out = new FileOutputStream(mappingFile)) {
+					properties.store(out, "Account Hash to Account Name Mappings");
+					log.debug("Successfully updated account hash mapping for: {}", accountName);
+				} catch (Exception e) {
+					log.error("Failed to write updated account hash mappings", e);
+				}
+			}
+		});
+
+		pendingWrites.add(future);
+	}
+
+	/**
+	 * Reads the account hash mappings from the disk.
+	 * @return A map of account hashes to account names.
+	 */
+	public Map<Long, String> loadAccountHashMappingsRaw()
+	{
+		Map<Long, String> mappings = new HashMap<>();
+
+		if (ACCOUNT_HASH_MAPPINGS.exists())
+		{
+			try (FileInputStream in = new FileInputStream(ACCOUNT_HASH_MAPPINGS))
+			{
+				Properties properties = new Properties();
+				properties.load(in);
+
+				for (String key : properties.stringPropertyNames())
+				{
+					try {
+						long hash = Long.parseLong(key);
+						mappings.put(hash, properties.getProperty(key));
+					} catch (NumberFormatException e) {
+						log.warn("Found invalid account hash in mappings file: {}", key);
+					}
+				}
+			}
+			catch (Exception e)
+			{
+				log.error("Failed to read existing account hash mappings", e);
+			}
+		}
+		return mappings;
 	}
 
 	public File attemptTimelineFile()

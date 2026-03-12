@@ -106,7 +106,7 @@ public interface DataLoggerConfig extends Config {
 	@ConfigItem(
 		keyName = "logItemVaultCSV",
 		name = "Log Item Vaults (CSV)",
-		description = "If enabled, a copy of the internal (aggregated) vaults are created as JSON files.",
+		description = "If enabled, a copy of the internal (aggregated) vaults are created as CSV files.",
 		position = 4,
 		section = ITEM_LOGGER_SECTION
 	)
@@ -163,7 +163,7 @@ public interface DataLoggerConfig extends Config {
 	@ConfigItem(
 		keyName = "colosseumTag",
 		name = "Tag",
-		description = "A custom tag that will be assigned to logged entries",
+		description = "A custom tag that will be assigned to logged entries (e.g. tag a specific setup)",
 		position = 3,
 		section = COLOSSEUM_SECTION
 	)
@@ -183,7 +183,7 @@ public interface DataLoggerConfig extends Config {
 	@ConfigItem(
 		keyName = "logTimestamp",
 		name = "Log Timestamp",
-		description = "Select the format of the timestamp added to the timeline data.",
+		description = "Select the format of the timestamp added to the timeline data, if any.",
 		position = 1,
 		section = COLOSSEUM_TIMELINE_SECTION
 	)
