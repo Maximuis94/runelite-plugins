@@ -104,8 +104,8 @@ public interface DataLoggerConfig extends Config {
 	default boolean logItemVault() { return true; }
 
 	@ConfigItem(
-		keyName = "logGrandExchangeCSV",
-		name = "Log Grand Exchange (CSV)",
+		keyName = "logItemVaultCSV",
+		name = "Log Item Vaults (CSV)",
 		description = "If enabled, a copy of the internal (aggregated) vaults are created as JSON files.",
 		position = 4,
 		section = itemLoggerSection
@@ -114,8 +114,8 @@ public interface DataLoggerConfig extends Config {
 
 	@ConfigItem(
 		keyName = "logItemVaultJSON",
-		name = "Log Item vault (JSON)",
-		description = "If enabled, a copy of the internal (aggregated) vaults are created as CSV files.",
+		name = "Log Item vaults (JSON)",
+		description = "If enabled, a copy of the internal (aggregated) vaults are created as JSON files.",
 		position = 5,
 		section = itemLoggerSection
 	)

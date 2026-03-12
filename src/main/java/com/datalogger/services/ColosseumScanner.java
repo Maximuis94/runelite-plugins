@@ -77,6 +77,9 @@ import net.runelite.api.NPCComposition;
 import net.runelite.api.Player;
 import net.runelite.api.Skill;
 import net.runelite.api.coords.WorldPoint;
+import net.runelite.api.events.NpcChanged;
+import net.runelite.api.events.NpcDespawned;
+import net.runelite.api.events.NpcSpawned;
 import net.runelite.api.widgets.Widget;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
@@ -95,6 +98,9 @@ public class ColosseumScanner
 
 	private boolean enabledSwapQuiverLoot;
 	private TimestampFormat timestampFormat;
+
+	private final Set<NPC> activeTrackedNpcs = new HashSet<>();
+	private final Map<Integer, String> npcNameCache = new HashMap<>();
 
 	private boolean scannedManticores;
 	private Integer manticoreIndexA = null;
@@ -152,6 +158,58 @@ public class ColosseumScanner
 		}
 
 		updateConfigFlags(false);
+	}
+
+	@Subscribe
+	public void onNpcSpawned(NpcSpawned event)
+	{
+		NPC npc = event.getNpc();
+		NPCComposition comp = npc.getComposition();
+		int npcId = (comp != null) ? comp.getId() : npc.getId();
+
+		if (trackedNpcIds.contains(npcId))
+		{
+			activeTrackedNpcs.add(npc);
+
+			// Cache the cleaned name immediately
+			String name = (comp != null) ? comp.getName() : npc.getName();
+			if (name != null)
+			{
+				npcNameCache.put(npc.getIndex(), Text.removeTags(name));
+			}
+		}
+	}
+
+	@Subscribe
+	public void onNpcDespawned(NpcDespawned event)
+	{
+		NPC npc = event.getNpc();
+		activeTrackedNpcs.remove(npc);
+		npcNameCache.remove(npc.getIndex());
+	}
+
+	@Subscribe
+	public void onNpcChanged(NpcChanged event)
+	{
+		// Called when an NPC transforms (e.g., changes phases)
+		NPC npc = event.getNpc();
+		NPCComposition comp = npc.getComposition();
+		int npcId = (comp != null) ? comp.getId() : npc.getId();
+
+		if (trackedNpcIds.contains(npcId))
+		{
+			activeTrackedNpcs.add(npc);
+			String name = (comp != null) ? comp.getName() : npc.getName();
+			if (name != null)
+			{
+				npcNameCache.put(npc.getIndex(), Text.removeTags(name));
+			}
+		}
+		else
+		{
+			activeTrackedNpcs.remove(npc);
+			npcNameCache.remove(npc.getIndex());
+		}
 	}
 
 	/**
@@ -492,15 +550,13 @@ public class ColosseumScanner
 
 		ArrayList<ColosseumNPC> detectedNpcs = new ArrayList<>();
 
-		for (NPC npc : client.getTopLevelWorldView().npcs())
+		for (NPC npc : activeTrackedNpcs)
 		{
 			if (npc == null || npc.isDead())
 				continue;
 
 			NPCComposition composition = npc.getComposition();
-			int npcId = npc.getId();
-			if (composition != null)
-				npcId = composition.getId();
+			int npcId = composition == null ? npc.getId() : composition.getId();
 
 			if (trackedNpcIds.contains(npcId)) {
 				ColosseumNPC colosseumNpc = generateNpc(npc, composition);

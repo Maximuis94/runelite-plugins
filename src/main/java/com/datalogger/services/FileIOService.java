@@ -59,7 +59,9 @@ import java.util.Properties;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import javax.imageio.ImageIO;
 import javax.inject.Inject;
@@ -82,11 +84,17 @@ public class FileIOService
 
 	private final Map<File, Queue<String>> failedWrites = new ConcurrentHashMap<>();
 
+	private final ConcurrentHashMap<String, Object> accountLocks = new ConcurrentHashMap<>();
+
+	private final Queue<Future<?>> pendingWrites = new ConcurrentLinkedQueue<>();
+
 	private final DataLoggerConfig config;
 
 	private String account;
 	private String attemptRoot;
 	private String startTime;
+
+	private final int MAX_BACKLOG_ROWS = 5000;
 
 	@Inject
 	private FileIOService(Gson gson, ScheduledExecutorService executor, DataLoggerConfig config) {
@@ -133,8 +141,12 @@ public class FileIOService
 	 * next write attempt.
 	 */
 	public void atomicWrite(File file, String header, String row) {
-		executor.submit(() -> {
+		Future<?> future = executor.submit(() -> {
 			Queue<String> backlog = failedWrites.computeIfAbsent(file, k -> new ConcurrentLinkedQueue<>());
+			if (backlog.size() >= MAX_BACKLOG_ROWS) {
+				log.error("Write backlog full for {}. Dropping row to prevent OOM.", file.getName());
+				return;
+			}
 			backlog.add(row);
 
 			try {
@@ -166,6 +178,8 @@ public class FileIOService
 					file.getName(), backlog.size());
 			}
 		});
+
+		pendingWrites.add(future);
 	}
 
 	/**
@@ -263,7 +277,7 @@ public class FileIOService
 			.map(ColosseumState::toDTO)
 			.collect(Collectors.toList());
 
-		executor.submit(() -> {
+		Future<?> future = executor.submit(() -> {
 			if (!INTERNAL_TEMP_DIR.exists() && !INTERNAL_TEMP_DIR.mkdirs()) {
 				log.error("Could not create directory: {}", INTERNAL_TEMP_DIR.getAbsolutePath());
 				return;
@@ -277,6 +291,7 @@ public class FileIOService
 				log.error("Failed to save Colosseum JSON", e);
 			}
 		});
+		pendingWrites.add(future);
 	}
 
 	/**
@@ -302,7 +317,7 @@ public class FileIOService
 	 * timeline and subsequently delete the temporary files.
 	 */
 	public void mergeTimelineFiles(File outFile, String attemptId) {
-		executor.submit(() -> {
+		Future<?> future = executor.submit(() -> {
 			try
 			{
 				List<ColosseumStateDTO> fullRunData = new ArrayList<>();
@@ -330,6 +345,7 @@ public class FileIOService
 				log.error("Failed to merge timeline files for attempt {} at file {}", attemptId, outFile.getAbsolutePath());
 			}
 		});
+		pendingWrites.add(future);
 	}
 
 	/**
@@ -425,8 +441,10 @@ public class FileIOService
 
 		File file = new File(INTERNAL_GE_DIR, accountHash + ".json");
 
-		// Synchronize on the interned account hash so we don't read halfway through a write
-		synchronized (accountHash.intern()) {
+		// Safely retrieve or create a lock specific to this account hash
+		Object lock = accountLocks.computeIfAbsent(accountHash, k -> new Object());
+
+		synchronized (lock) {
 			if (!file.exists()) {
 				return new ArrayList<>();
 			}
@@ -454,7 +472,7 @@ public class FileIOService
 			return;
 		}
 
-		executor.submit(() -> {
+		Future<?> future = executor.submit(() -> {
 			if (!INTERNAL_GE_DIR.exists() && !INTERNAL_GE_DIR.mkdirs()) {
 				log.error("Failed to create internal GE ledger directory: {}", INTERNAL_GE_DIR.getAbsolutePath());
 				return;
@@ -508,6 +526,7 @@ public class FileIOService
 				}
 			}
 		});
+		pendingWrites.add(future);
 	}
 
 	/**
@@ -543,7 +562,7 @@ public class FileIOService
 			return;
 		}
 
-		executor.submit(() -> {
+		Future<?> future = executor.submit(() -> {
 			if (!INTERNAL_ACTIVE_OFFERS_DIR.exists() && !INTERNAL_ACTIVE_OFFERS_DIR.mkdirs()) {
 				log.error("Failed to create internal active GE offers directory: {}", INTERNAL_ACTIVE_OFFERS_DIR.getAbsolutePath());
 				return;
@@ -573,12 +592,26 @@ public class FileIOService
 				}
 			}
 		});
+		pendingWrites.add(future);
 	}
 
 	/**
 	 * Final attempt to write all rows that previously failed to write.
 	 */
 	public void flushAll() {
+		log.info("Waiting for pending background file writes to complete...");
+
+		Future<?> future;
+		while ((future = pendingWrites.poll()) != null) {
+			try {
+				if (!future.isDone() && !future.isCancelled()) {
+					future.get(2, TimeUnit.SECONDS);
+				}
+			} catch (Exception e) {
+				log.warn("A pending file write timed out or was interrupted during shutdown.", e);
+			}
+		}
+
 		for (Map.Entry<File, Queue<String>> entry : failedWrites.entrySet()) {
 			File file = entry.getKey();
 			Queue<String> backlog = entry.getValue();
