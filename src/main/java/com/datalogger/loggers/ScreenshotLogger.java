@@ -86,16 +86,16 @@ public class ScreenshotLogger {
 	 * Create a screenshot and save it in the given fileName in the given subDirectory
 	 */
 	private void captureAndSaveScreenshot() {
-
 		if (!root.exists() && !root.mkdirs()) {
 			log.error("Failed to save screenshot - Failed to create directory {}", root.getAbsolutePath());
 			return;
 		}
+
 		String fileName = getScreenshotFileName(colosseumCurrentWave, rewardChestSpawned);
 
 		drawManager.requestNextFrameListener(image ->
-			executor.submit(() -> fileIOService.saveScreenshot((BufferedImage) image, root, fileName)));
-		log.info("Saved screenshot with filename {} at '{}'", fileName, root);
+			fileIOService.saveScreenshot((BufferedImage) image, root, fileName)
+		);
 	}
 
 	/**

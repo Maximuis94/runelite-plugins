@@ -38,6 +38,8 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonSerializationContext;
 import com.google.gson.JsonSerializer;
+import com.google.gson.stream.JsonReader;
+import com.google.gson.stream.JsonWriter;
 import java.awt.image.BufferedImage;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -83,6 +85,8 @@ public class FileIOService
 	private final ScheduledExecutorService executor;
 
 	private final Map<File, Queue<String>> failedWrites = new ConcurrentHashMap<>();
+
+	private final Object mappingsLock = new Object();
 
 	private final ConcurrentHashMap<String, Object> accountLocks = new ConcurrentHashMap<>();
 
@@ -318,31 +322,50 @@ public class FileIOService
 	 */
 	public void mergeTimelineFiles(File outFile, String attemptId) {
 		Future<?> future = executor.submit(() -> {
-			try
-			{
-				List<ColosseumStateDTO> fullRunData = new ArrayList<>();
-				List<File> toDelete = new ArrayList<>();
+			List<File> toDelete = new ArrayList<>();
 
-				for (int i = 1; i <= 12; i++)
-				{
-					File tempFile = tmpWaveFile(attemptId, i);
-					if (tempFile.exists())
-					{
-						List<ColosseumStateDTO> waveData = loadWaveStates(tempFile);
-						fullRunData.addAll(waveData);
-						toDelete.add(tempFile);
+			try {
+				File parentDir = outFile.getParentFile();
+				if (parentDir != null && !parentDir.exists()) {
+					parentDir.mkdirs();
+				}
+
+				try (JsonWriter writer = new JsonWriter(new FileWriter(outFile))) {
+					writer.setIndent("  ");
+					writer.beginArray();
+
+					for (int i = 1; i <= 12; i++) {
+						File tempFile = tmpWaveFile(attemptId, i);
+						if (tempFile.exists()) {
+							try (JsonReader reader = new JsonReader(new FileReader(tempFile))) {
+								reader.beginArray();
+
+								while (reader.hasNext()) {
+									ColosseumStateDTO dto = gson.fromJson(reader, ColosseumStateDTO.class);
+									gson.toJson(dto, ColosseumStateDTO.class, writer);
+								}
+
+								reader.endArray();
+							}
+							toDelete.add(tempFile);
+						}
+					}
+					writer.endArray();
+				}
+
+				log.info("Successfully merged timeline for attempt {} at {}", attemptId, outFile.getAbsolutePath());
+
+				// Clean up temporary files
+				for (File f : toDelete) {
+					if (f.delete()) {
+						log.debug("Deleted temp file '{}'", f.getName());
+					} else {
+						log.error("Failed to delete temp file '{}'", f.getName());
 					}
 				}
-				saveJson(outFile, fullRunData);
-				for (File f : toDelete)
-				{
-					if (f.delete())
-						log.debug("Deleted temp file '{}'", f.getName());
-					else log.error("Failed to delete temp file '{}'", f.getName());
-				}
-			} catch (Exception e)
-			{
-				log.error("Failed to merge timeline files for attempt {} at file {}", attemptId, outFile.getAbsolutePath());
+
+			} catch (Exception e) {
+				log.error("Failed to merge timeline files for attempt {} at file {}", attemptId, outFile.getAbsolutePath(), e);
 			}
 		});
 		pendingWrites.add(future);
@@ -357,14 +380,15 @@ public class FileIOService
 		}
 
 		File targetFile = attemptWaveLogFile(attempt.getAccount(), attempt.getStartTime(), "json");
-
-		try (FileWriter writer = new FileWriter(targetFile)) {
-			gson.toJson(attempt, writer);
-			log.info("Successfully saved Colosseum attempt to {}", targetFile.getAbsolutePath());
-			log.info("Attempt waves: {} finalStatus: {}", attempt.getWaves().size(), attempt.getFinalStatus());
-		} catch (IOException e) {
-			log.error("Failed to save Colosseum attempt log!", e);
-		}
+		Future<?> future = executor.submit(() -> {
+			try (FileWriter writer = new FileWriter(targetFile)) {
+				gson.toJson(attempt, writer);
+				log.info("Successfully saved Colosseum attempt to {}", targetFile.getAbsolutePath());
+				log.info("Attempt waves: {} finalStatus: {}", attempt.getWaves().size(), attempt.getFinalStatus());
+			} catch (IOException e) {
+				log.error("Failed to save Colosseum attempt log!", e);
+			}});
+		pendingWrites.add(future);
 	}
 
 	/**
@@ -374,47 +398,48 @@ public class FileIOService
 	 * @param fileName     The name of the file without the extension (e.g., "wave-01")
 	 */
 	public void saveScreenshot(BufferedImage screenshot, File directory, String fileName) {
-		try {
-			if (!directory.exists()) {
-				if (directory.mkdirs()) {
-					log.debug("Created screenshot directory: {}", directory.getAbsolutePath());
-				} else {
+		Future<?> future = executor.submit(() -> {
+			try {
+				if (!directory.exists() && !directory.mkdirs()) {
 					log.error("Failed to create screenshot directory: {}", directory.getAbsolutePath());
 					return;
 				}
+
+				File file = new File(directory, fileName + ".png");
+				ImageIO.write(screenshot, "png", file);
+
+				log.info("Saved screenshot to {}", file.getAbsolutePath());
+			} catch (IOException e) {
+				log.error("Failed to save screenshot", e);
 			}
+		});
 
-			File file = new File(directory, fileName + ".png");
-			ImageIO.write(screenshot, "png", file);
-
-			log.info("Saved screenshot to {}", file.getAbsolutePath());
-		} catch (IOException e) {
-			log.error("Failed to save screenshot", e);
-		}
+		pendingWrites.add(future);
 	}
 
 	public void writeColosseumCSVLog(ColosseumAttempt attempt, String rows) {
 		String header = ColosseumWave.csvHeader();
 		File outFile = attemptWaveLogFile(attempt.getAccount(), attempt.getStartTime(), "csv");
+		Future<?> future = executor.submit(() -> {
+			try {
+				File parent = outFile.getParentFile();
+				if (parent != null && !parent.exists()) {
+					parent.mkdirs();
+				}
+				String content = header + "\n" + rows.trim() + "\n";
 
-		try {
-			File parent = outFile.getParentFile();
-			if (parent != null && !parent.exists()) {
-				parent.mkdirs();
-			}
-			String content = header + "\n" + rows.trim() + "\n";
+				java.nio.file.Files.write(
+					outFile.toPath(),
+					content.getBytes(java.nio.charset.StandardCharsets.UTF_8),
+					java.nio.file.StandardOpenOption.CREATE,
+					java.nio.file.StandardOpenOption.TRUNCATE_EXISTING
+				);
 
-			java.nio.file.Files.write(
-				outFile.toPath(),
-				content.getBytes(java.nio.charset.StandardCharsets.UTF_8),
-				java.nio.file.StandardOpenOption.CREATE,
-				java.nio.file.StandardOpenOption.TRUNCATE_EXISTING
-			);
-
-			log.info("Successfully saved Colosseum CSV log to {}", outFile.getAbsolutePath());
-		} catch (IOException e) {
-			log.error("Failed to write Colosseum CSV log for attempt {}", outFile.getName(), e);
-		}
+				log.info("Successfully saved Colosseum CSV log to {}", outFile.getAbsolutePath());
+			} catch (IOException e) {
+				log.error("Failed to write Colosseum CSV log for attempt {}", outFile.getName(), e);
+			}});
+		pendingWrites.add(future);
 	}
 
 	public static class WorldPointSerializer implements JsonSerializer<WorldPoint> {
@@ -482,7 +507,9 @@ public class FileIOService
 			File tempFile = new File(INTERNAL_GE_DIR, accountHash + ".tmp");
 			File copyTo = new File(GRAND_EXCHANGE_DIR, accountName + "/grand-exchange.json");
 
-			synchronized (accountHash.intern()) {
+			Object lock = accountLocks.computeIfAbsent(accountHash, k -> new Object());
+
+			synchronized (lock) {
 				try {
 					try (FileWriter writer = new FileWriter(tempFile)) {
 						gson.toJson(ledger, writer);
@@ -538,7 +565,9 @@ public class FileIOService
 
 		File file = new File(INTERNAL_ACTIVE_OFFERS_DIR, accountHash + ".json");
 
-		synchronized (accountHash.intern()) {
+		Object lock = accountLocks.computeIfAbsent(accountHash, k -> new Object());
+
+		synchronized (lock) {
 			if (!file.exists()) {
 				return new ArrayList<>();
 			}
@@ -571,7 +600,9 @@ public class FileIOService
 			File finalFile = new File(INTERNAL_ACTIVE_OFFERS_DIR, accountHash + ".json");
 			File tempFile = new File(INTERNAL_ACTIVE_OFFERS_DIR, accountHash + ".tmp");
 
-			synchronized (accountHash.intern()) {
+			Object lock = accountLocks.computeIfAbsent(accountHash, k -> new Object());
+
+			synchronized (lock) {
 				try {
 					try (FileWriter writer = new FileWriter(tempFile)) {
 						gson.toJson(offers, writer);
@@ -651,7 +682,7 @@ public class FileIOService
 			parentDir.mkdirs();
 		}
 
-		synchronized (ACCOUNT_HASH_MAPPINGS.getAbsolutePath().intern()) {
+		synchronized (mappingsLock) {
 			Properties properties = new Properties();
 
 			if (ACCOUNT_HASH_MAPPINGS.exists()) {

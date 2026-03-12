@@ -42,28 +42,28 @@ public interface DataLoggerConfig extends Config {
 		description = "Settings for logging Grand Exchange activity",
 		position = 0
 	)
-	String itemLoggerSection = "itemLogger";
+	String ITEM_LOGGER_SECTION = "itemLogger";
 
 	@ConfigSection(
 		name = "Colosseum",
 		description = "Settings for Fortis Colosseum trial logging",
 		position = 1
 	)
-	String colosseumSection = "colosseum";
+	String COLOSSEUM_SECTION = "colosseum";
 
 	@ConfigSection(
 		name = "Colosseum timeline logger",
 		description = "Toggle to track player and NPC data during Colosseum waves",
 		position = 2
 	)
-	String colosseumTimelineSection = "colosseumTimeline";
+	String COLOSSEUM_TIMELINE_SECTION = "colosseumTimeline";
 
 	@ConfigSection(
 		name = "Screenshots",
 		description = "Settings for automatic screenshot capturing",
 		position = 3
 	)
-	String screenshotSection = "screenshot";
+	String SCREENSHOT_SECTION = "screenshot";
 
 	// --- Grand Exchange Items ---
 
@@ -72,7 +72,7 @@ public interface DataLoggerConfig extends Config {
 		name = "Log Grand Exchange",
 		description = "If enabled, Grand Exchange offers are logged upon completion.",
 		position = 0,
-		section = itemLoggerSection
+		section = ITEM_LOGGER_SECTION
 	)
 	default boolean logGrandExchange() { return true; }
 
@@ -81,7 +81,7 @@ public interface DataLoggerConfig extends Config {
 		name = "Log Grand Exchange (CSV)",
 		description = "If enabled, Grand Exchange offers are added to a CSV log upon completion.",
 		position = 1,
-		section = itemLoggerSection
+		section = ITEM_LOGGER_SECTION
 	)
 	default boolean logGrandExchangeCSV() { return true; }
 
@@ -90,7 +90,7 @@ public interface DataLoggerConfig extends Config {
 		name = "Log Grand Exchange (JSON)",
 		description = "If enabled, a copy of the internal ledger JSON is created after updating it.",
 		position = 2,
-		section = itemLoggerSection
+		section = ITEM_LOGGER_SECTION
 	)
 	default boolean logGrandExchangeJSON() { return true; }
 
@@ -99,7 +99,7 @@ public interface DataLoggerConfig extends Config {
 		name = "Log Item vaults",
 		description = "If enabled, Item vaults (bank/seed vault) are parsed and saved when interacting with them.",
 		position = 3,
-		section = itemLoggerSection
+		section = ITEM_LOGGER_SECTION
 	)
 	default boolean logItemVault() { return true; }
 
@@ -108,7 +108,7 @@ public interface DataLoggerConfig extends Config {
 		name = "Log Item Vaults (CSV)",
 		description = "If enabled, a copy of the internal (aggregated) vaults are created as JSON files.",
 		position = 4,
-		section = itemLoggerSection
+		section = ITEM_LOGGER_SECTION
 	)
 	default boolean logItemVaultCSV() { return true; }
 
@@ -117,7 +117,7 @@ public interface DataLoggerConfig extends Config {
 		name = "Log Item vaults (JSON)",
 		description = "If enabled, a copy of the internal (aggregated) vaults are created as JSON files.",
 		position = 5,
-		section = itemLoggerSection
+		section = ITEM_LOGGER_SECTION
 	)
 	default boolean logItemVaultJSON() { return true; }
 
@@ -126,7 +126,7 @@ public interface DataLoggerConfig extends Config {
 		name = "Exclude accounts",
 		description = "Accounts that should not be included by the Item Vault logger. Accounts should be separated using ','; e.g. ACCOUNT_NAME,OTHER_ACCOUNT_NAME",
 		position = 6,
-		section = itemLoggerSection
+		section = ITEM_LOGGER_SECTION
 	)
 	default String skipItemVaultAccountList() { return ""; }
 
@@ -137,7 +137,7 @@ public interface DataLoggerConfig extends Config {
 		name = "Log Colosseum Trials",
 		description = "If enabled, Fortis Colosseum trials are logged.",
 		position = 0,
-		section = colosseumSection
+		section = COLOSSEUM_SECTION
 	)
 	default boolean logColosseum() { return true; }
 
@@ -147,7 +147,7 @@ public interface DataLoggerConfig extends Config {
 		name = "Log Colosseum Trials (CSV)",
 		description = "If enabled, Fortis Colosseum waves are also logged in a CSV file.",
 		position = 1,
-		section = colosseumSection
+		section = COLOSSEUM_SECTION
 	)
 	default boolean logColosseumCSV() { return true; }
 
@@ -156,7 +156,7 @@ public interface DataLoggerConfig extends Config {
 		name = "Log Dizana's quiver (uncharged) Sunfire splinters",
 		description = "If enabled, the Dizana's quiver (uncharged) reward is logged as 4,000 Sunfire splinters instead.",
 		position = 2,
-		section = colosseumSection
+		section = COLOSSEUM_SECTION
 	)
 	default boolean logQuiverAsSplinters() { return true; }
 
@@ -165,7 +165,7 @@ public interface DataLoggerConfig extends Config {
 		name = "Tag",
 		description = "A custom tag that will be assigned to logged entries",
 		position = 3,
-		section = colosseumSection
+		section = COLOSSEUM_SECTION
 	)
 	default String colosseumTag() { return ""; }
 
@@ -176,7 +176,7 @@ public interface DataLoggerConfig extends Config {
 		name = "Log Colosseum wave timeline",
 		description = "If enabled, player- and NPC- data is logged every game tick during waves and added to a timeline.",
 		position = 0,
-		section = colosseumTimelineSection
+		section = COLOSSEUM_TIMELINE_SECTION
 	)
 	default boolean logWaveTimeline() { return true; }
 
@@ -185,7 +185,7 @@ public interface DataLoggerConfig extends Config {
 		name = "Log Timestamp",
 		description = "Select the format of the timestamp added to the timeline data.",
 		position = 1,
-		section = colosseumTimelineSection
+		section = COLOSSEUM_TIMELINE_SECTION
 	)
 	default TimestampFormat logTimestamp() {
 		return TimestampFormat.NONE;
@@ -196,7 +196,7 @@ public interface DataLoggerConfig extends Config {
 		name = "Track Fremenniks",
 		description = "Include Fremennik warband NPC data in the timeline",
 		position = 2,
-		section = colosseumTimelineSection
+		section = COLOSSEUM_TIMELINE_SECTION
 	)
 	default boolean logFremenniks() { return false; }
 
@@ -205,7 +205,7 @@ public interface DataLoggerConfig extends Config {
 		name = "Track Solar Flares",
 		description = "Include Solarflare locations in timeline data",
 		position = 3,
-		section = colosseumTimelineSection
+		section = COLOSSEUM_TIMELINE_SECTION
 	)
 	default boolean logSolarFlare() { return false; }
 
@@ -214,7 +214,7 @@ public interface DataLoggerConfig extends Config {
 		name = "Track Healing Totems",
 		description = "Include Healing totem locations in timeline data",
 		position = 4,
-		section = colosseumTimelineSection
+		section = COLOSSEUM_TIMELINE_SECTION
 	)
 	default boolean logHealingTotem() { return false; }
 
@@ -223,7 +223,7 @@ public interface DataLoggerConfig extends Config {
 		name = "Track Bee Swarms",
 		description = "Include Bee Swarm locations in timeline data",
 		position = 5,
-		section = colosseumTimelineSection
+		section = COLOSSEUM_TIMELINE_SECTION
 	)
 	default boolean logBeeSwarm() { return false; }
 
@@ -232,7 +232,7 @@ public interface DataLoggerConfig extends Config {
 		name = "Track Beam Crystals",
 		description = "Include Beam Crystal locations during wave 12 in timeline data",
 		position = 6,
-		section = colosseumTimelineSection
+		section = COLOSSEUM_TIMELINE_SECTION
 	)
 	default boolean logBeamCrystal() { return false; }
 
@@ -243,7 +243,7 @@ public interface DataLoggerConfig extends Config {
 		name = "Colosseum Wave Completion",
 		description = "Automatically take a screenshot after completing a wave when the intermission/rewards chest UI is visible",
 		position = 0,
-		section = screenshotSection
+		section = SCREENSHOT_SECTION
 	)
 	default boolean screenshotBetweenWaves() { return false; }
 }
