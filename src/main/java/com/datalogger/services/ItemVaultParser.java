@@ -24,7 +24,7 @@
  */
 package com.datalogger.services;
 
-import com.datalogger.events.AccountHashResolved;
+import com.datalogger.events.AccountSessionStarted;
 import com.datalogger.loggers.ItemVaultLogger;
 import com.datalogger.models.itemvault.BankedItem;
 import com.datalogger.models.itemvault.enums.VaultType;
@@ -46,19 +46,33 @@ public class ItemVaultParser
 {
 	private long accountHash = -1;
 	private String accountName;
+	private boolean isMembersWorld;
 
 	@Inject private Client client;
 	@Inject private ItemVaultLogger itemVaultLogger;
 
 	@Subscribe
-	private void onAccountHashResolved(AccountHashResolved event)
+	private void onAccountSessionStarted(AccountSessionStarted event)
 	{
 		accountHash = event.getAccountHash();
 		accountName = event.getAccountName();
-		log.debug("BankParser received account hash for: {}", accountName);
+		isMembersWorld = event.isOnMembersWorld();
+		log.debug("BankParser received account session data for: {} and is using a {}members slot parser", accountName, isMembersWorld ? "" : "non-");
 	}
 
-	private BankedItem parseSlot(VaultType vaultType, Widget slot)
+	private BankedItem parseSlotFree(VaultType vaultType, Widget slot)
+	{
+		return new BankedItem(
+			vaultType.name(),
+			accountHash,
+			accountName,
+			slot.getItemId(),
+			Text.removeTags(slot.getName()).replace(" (Members)", ""),
+			slot.getItemQuantity()
+		);
+	}
+
+	private BankedItem parseSlotMembers(VaultType vaultType, Widget slot)
 	{
 		return new BankedItem(
 			vaultType.name(),
@@ -80,13 +94,25 @@ public class ItemVaultParser
 			log.info("Unable to extract or parse widget for vault {}", vaultType.name());
 			return parsedItems;
 		}
-
-		for (Widget w : widget.getChildren())
+		if (isMembersWorld)
 		{
-			if (w == null || w.getItemId() <= 0 || w.getItemQuantity() <= 0) {
-				continue;
+			for (Widget w : widget.getChildren())
+			{
+				if (w == null || w.getItemId() <= 0 || w.getItemQuantity() <= 0)
+				{
+					continue;
+				}
+				parsedItems.add(parseSlotFree(vaultType, w));
 			}
-			parsedItems.add(parseSlot(vaultType, w));
+		} else {
+			for (Widget w : widget.getChildren())
+			{
+				if (w == null || w.getItemId() <= 0 || w.getItemQuantity() <= 0)
+				{
+					continue;
+				}
+				parsedItems.add(parseSlotMembers(vaultType, w));
+			}
 		}
 
 		log.info("Parsed a total of {} different items for vault {}", parsedItems.size(), vaultType.name());

@@ -33,9 +33,10 @@ import lombok.RequiredArgsConstructor;
  */
 @Getter
 @RequiredArgsConstructor
-public class AccountHashResolved
+public class AccountSessionStarted
 {
 	private final String accountHashString;
 	private final long accountHash;
 	private final String accountName;
+	private final boolean onMembersWorld;
 }

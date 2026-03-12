@@ -26,9 +26,10 @@ package com.datalogger.ui;
 
 import com.datalogger.framework.LogType;
 import com.datalogger.loggers.ItemVaultLogger;
-import com.datalogger.services.FileIOService;
 import java.awt.BorderLayout;
+import java.awt.Color;
 import java.awt.Desktop;
+import java.awt.Dimension;
 import java.awt.GridLayout;
 import java.io.File;
 import java.io.IOException;
@@ -51,9 +52,9 @@ public class DataLoggerPanel extends PluginPanel {
 
 		// Matches the standard RuneLite sidebar padding
 		this.setBorder(new EmptyBorder(0, 0, 10, 0));
-		this.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+		this.setBackground(ColorScheme.DARK_GRAY_COLOR);
 		this.getScrollPane().setBorder(new EmptyBorder(10, 10, 10, 10));
-		this.getScrollPane().setBackground(ColorScheme.DARKER_GRAY_COLOR);
+		this.getScrollPane().setBackground(ColorScheme.DARK_GRAY_COLOR);
 
 		// --- CENTER CONTENT SECTION ---
 		logContentDisplay.setLayout(new BorderLayout());
@@ -65,13 +66,10 @@ public class DataLoggerPanel extends PluginPanel {
 		// Increased rows to 4 to accommodate the new button
 		buttonContainer.setLayout(new GridLayout(5, 1, 0, 8));
 		buttonContainer.setBorder(new EmptyBorder(10, 5, 0, 5));
-		buttonContainer.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+		buttonContainer.setBackground(ColorScheme.DARK_GRAY_COLOR);
 
 		JButton openLogsBtn = createStyledButton("Colosseum log directory");
 		openLogsBtn.addActionListener(e -> openDirectory(LogType.COLOSSEUM.getLogDirectory().getAbsolutePath()));
-
-		JButton openScreenshotsBtn = createStyledButton("Screenshot directory");
-		openScreenshotsBtn.addActionListener(e -> openDirectory(LogType.SCREENSHOT.getLogDirectory().getAbsolutePath()));
 
 		JButton openDataBtn = createStyledButton("Grand exchange directory");
 		openDataBtn.addActionListener(e -> openDirectory(LogType.GRAND_EXCHANGE.getLogDirectory().getAbsolutePath()));
@@ -86,21 +84,11 @@ public class DataLoggerPanel extends PluginPanel {
 
 		buttonContainer.add(exportVaultBtn);
 		buttonContainer.add(openLogsBtn);
-		buttonContainer.add(openScreenshotsBtn);
 		buttonContainer.add(openItemVaultBtn);
 		buttonContainer.add(openDataBtn);
 
 		// Add the button panel to the bottom of the PluginPanel
 		add(buttonContainer, BorderLayout.SOUTH);
-	}
-
-	/**
-	 * Helper to style the buttons to match the RuneLite aesthetic.
-	 */
-	private JButton createStyledButton(String text) {
-		JButton button = new JButton(text);
-		button.setFocusable(false); // Removes the annoying selection box around text when clicked
-		return button;
 	}
 
 	/**
@@ -123,5 +111,31 @@ public class DataLoggerPanel extends PluginPanel {
 		} catch (IOException ex) {
 			log.error("Failed to open directory: {}", directoryPath, ex);
 		}
+	}
+
+	private JButton createStyledButton(String text) {
+		JButton button = new JButton(text);
+		button.setFocusable(false);
+		button.setPreferredSize(new Dimension(0, 30)); // Standard height for panel buttons
+
+		// RuneLite Standard Button Colors
+		button.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+		button.setForeground(Color.WHITE);
+
+		// Remove the default border and add padding
+		button.setBorder(new EmptyBorder(5, 5, 5, 5));
+
+		// Hover effects to match the RuneLite UI
+		button.addMouseListener(new java.awt.event.MouseAdapter() {
+			public void mouseEntered(java.awt.event.MouseEvent evt) {
+				button.setBackground(ColorScheme.DARKER_GRAY_HOVER_COLOR);
+			}
+
+			public void mouseExited(java.awt.event.MouseEvent evt) {
+				button.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+			}
+		});
+
+		return button;
 	}
 }

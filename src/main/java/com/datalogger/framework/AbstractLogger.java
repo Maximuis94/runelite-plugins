@@ -25,7 +25,7 @@
 package com.datalogger.framework;
 
 import com.datalogger.DataLoggerConfig;
-import com.datalogger.events.AccountHashResolved;
+import com.datalogger.events.AccountSessionStarted;
 import com.datalogger.services.FileIOService;
 import java.io.File;
 import javax.inject.Inject;
@@ -85,7 +85,7 @@ public abstract class AbstractLogger implements Loggable {
 	 * This guarantees the hash and name are valid, and it runs on the ClientThread.
 	 */
 	@Subscribe
-	public void onAccountHashResolved(AccountHashResolved event) {
+	public void onAccountSessionStarted(AccountSessionStarted event) {
 		accountName = event.getAccountName();
 		accountHashString = event.getAccountHashString();
 		accountHashLong = Long.parseLong(accountHashString);

@@ -24,7 +24,7 @@
  */
 package com.datalogger.services;
 
-import com.datalogger.events.AccountHashResolved;
+import com.datalogger.events.AccountSessionStarted;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -48,7 +48,7 @@ public class AccountHashMapper
 	 * Automatically updates the hash-to-name mapping cache and file.
 	 */
 	@Subscribe
-	public void onAccountHashResolved(AccountHashResolved event)
+	public void onAccountSessionStarted(AccountSessionStarted event)
 	{
 		long accountHashLong = event.getAccountHash();
 		String accountName = event.getAccountName();

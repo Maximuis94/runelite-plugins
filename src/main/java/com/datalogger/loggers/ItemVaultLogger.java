@@ -48,6 +48,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ScheduledExecutorService;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import lombok.extern.slf4j.Slf4j;
@@ -63,6 +64,7 @@ public class ItemVaultLogger extends AbstractLogger
 	@Inject private DataLoggerConfig config;
 	@Inject private Gson gson;
 	@Inject private AccountHashMapper accountHashMapper;
+	@Inject private ScheduledExecutorService executor;
 
 	private final Map<Long, Map<VaultType, List<BankedItem>>> vaultCache = new ConcurrentHashMap<>();
 	private Set<Long> ignoredAccountHashes;
@@ -347,6 +349,12 @@ public class ItemVaultLogger extends AbstractLogger
 			}
 		}
 
+		for (long accountHash : vaultCache.keySet())
+		{
+			loadGeVaultIntoMemory(accountHash);
+		}
+
+
 		log.info("Successfully loaded {} vault files into memory across {} accounts.", loadedFiles, vaultCache.size());
 	}
 
@@ -363,22 +371,31 @@ public class ItemVaultLogger extends AbstractLogger
 		}
 
 		updateVault(accountHash, vaultType, items);
+		executor.submit(() -> {
+			List<java.util.Map<String, Object>> slimItems = items.stream()
+				.map(item -> {
+					java.util.Map<String, Object> map = new java.util.LinkedHashMap<>();
+					map.put("itemId", item.getItemId());
+					map.put("itemName", item.getItemName());
+					map.put("quantity", item.getQuantity());
+					return map;
+				}).collect(java.util.stream.Collectors.toList());
 
-		File internalJson = vaultType.getInternalFile(accountHash);
+			File internalJson = vaultType.getInternalFile(accountHash);
+			fileIOService.saveJson(internalJson, slimItems);
 
-		fileIOService.saveJson(internalJson, items);
+			if (config.logItemVaultJSON())
+			{
+				File externalJson = vaultType.getExternalJSONFile(accountHash);
+				fileIOService.saveJson(externalJson, slimItems);
+			}
 
-		if (config.logItemVaultJSON())
-		{
-			File externalJson = vaultType.getExternalJSONFile(accountHash);
-			fileIOService.saveJson(externalJson, items);
-		}
-
-		if (config.logItemVaultCSV())
-		{
-			File csvFile = vaultType.getExternalCSVFile(accountHash);
-			writeToCsv(csvFile, items);
-		}
+			if (config.logItemVaultCSV())
+			{
+				File csvFile = vaultType.getExternalCSVFile(accountHash);
+				writeToCsv(csvFile, items, false);
+			}
+		});
 	}
 
 	/**
@@ -395,7 +412,7 @@ public class ItemVaultLogger extends AbstractLogger
 		}
 
 		fileIOService.saveJson(AGGREGATED_ITEM_VAULT_JSON, items);
-		writeToCsv(AGGREGATED_ITEM_VAULT_CSV, items);
+		writeToCsv(AGGREGATED_ITEM_VAULT_CSV, items, true);
 
 		log.info("Successfully exported aggregated wealth summary for {} unique items.", items.size());
 	}
@@ -438,7 +455,13 @@ public class ItemVaultLogger extends AbstractLogger
 		ignoredAccountHashes = ignoredHashes;
 	}
 
-	private void writeToCsv(File csvFile, List<BankedItem> items)
+	/**
+	 * Write the BankedItem List items to csvFile.
+	 * @param csvFile Output CSV file
+	 * @param items Item list to write
+	 * @param includeMetadata If true, add account and vault-type to each row. Only recommended for aggregated lists.
+	 */
+	private void writeToCsv(File csvFile, List<BankedItem> items, boolean includeMetadata)
 	{
 		File parentDir = csvFile.getParentFile();
 		if (parentDir != null && !parentDir.exists()) {
@@ -449,10 +472,23 @@ public class ItemVaultLogger extends AbstractLogger
 			 BufferedWriter bw = new BufferedWriter(fw);
 			 PrintWriter out = new PrintWriter(bw))
 		{
-			out.println("AccountName,Vault,ItemID,ItemName,Quantity");
-			for (BankedItem item : items)
+			if (includeMetadata) {
+				out.println("AccountName,Vault,ItemID,ItemName,Quantity");
+			} else
 			{
-				out.printf("%s,%s,%d,%s,%d%n", item.getAccountName(),item.getVaultType(),item.getItemId(), item.getItemName(), item.getQuantity());
+				out.println("ItemID,ItemName,Quantity");
+			}
+			if (includeMetadata)
+			{
+				for (BankedItem item : items)
+				{
+					out.printf("%s,%s,%d,%s,%d%n", item.getAccountName(), item.getVaultType(), item.getItemId(), item.getItemName(), item.getQuantity());
+				}
+			} else {
+				for (BankedItem item : items)
+				{
+					out.printf("%d,%s,%d%n", item.getItemId(), item.getItemName(), item.getQuantity());
+				}
 			}
 			log.info("Successfully exported vault to CSV: {}", csvFile.getName());
 		}
@@ -542,12 +578,11 @@ public class ItemVaultLogger extends AbstractLogger
 					accountName,
 					existing.getItemId(),
 					existing.getItemName(),
-					existing.getQuantity() + incoming.getQuantity()
+					(long) (existing.getQuantity() + incoming.getQuantity())
 				)
 				);
 		}
 
-		// Update the logger's memory cache with the cleanly merged list
 		if (!mergedGeVault.isEmpty()) {
 			List<BankedItem> finalVaultItems = new ArrayList<>(mergedGeVault.values());
 			updateVault(accountHash, VaultType.GRAND_EXCHANGE, finalVaultItems);

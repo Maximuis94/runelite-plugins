@@ -36,7 +36,7 @@ public class BankedItem
 	String vaultType;
 	int itemId;
 	String itemName;
-	int quantity;
+	long quantity;
 
 	public BankedItem(VaultType vaultType, long accountHash, String accountName, int itemId, String itemName, int quantity)
 	{
@@ -49,6 +49,16 @@ public class BankedItem
 	}
 
 	public BankedItem(String vaultType, long accountHash, String accountName, int itemId, String itemName, int quantity)
+	{
+		this.vaultType = vaultType;
+		this.accountHash = accountHash;
+		this.accountName = accountName;
+		this.itemId = itemId;
+		this.itemName = itemName;
+		this.quantity = quantity;
+	}
+
+	public BankedItem(String vaultType, long accountHash, String accountName, int itemId, String itemName, long quantity)
 	{
 		this.vaultType = vaultType;
 		this.accountHash = accountHash;

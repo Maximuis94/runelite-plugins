@@ -24,7 +24,7 @@
  */
 package com.datalogger;
 
-import com.datalogger.events.AccountHashResolved;
+import com.datalogger.events.AccountSessionStarted;
 import com.datalogger.loggers.ColosseumAttemptLogger;
 import com.datalogger.loggers.ColosseumTimelineLogger;
 import com.datalogger.loggers.GrandExchangeLogger;
@@ -42,6 +42,7 @@ import javax.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
+import net.runelite.api.WorldType;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
 import net.runelite.client.callback.ClientThread;
@@ -107,6 +108,7 @@ public class DataLoggerPlugin extends Plugin
 		accountHashMapper.loadMappings();
 		eventBus.register(fileIOService);
 		eventBus.register(itemVaultLogger);
+		itemVaultLogger.updateIgnoredAccountHashes();
 
 		toggleItemVault(config.logItemVault());
 		toggleGrandExchange(config.logGrandExchange());
@@ -279,9 +281,10 @@ public class DataLoggerPlugin extends Plugin
 
 				String hashString = String.valueOf(currentHash);
 				String accountName = client.getLocalPlayer().getName();
+				boolean isMembers = client.getWorldType().contains(WorldType.MEMBERS);
 
 				log.debug("Session ready! Hash: {}, Name: {}. Broadcasting event.", hashString, accountName);
-				eventBus.post(new AccountHashResolved(hashString, currentHash, accountName));
+				eventBus.post(new AccountSessionStarted(hashString, currentHash, accountName, isMembers));
 
 				fileIOService.updateAccountHashMapping(hashString, accountName);
 			}

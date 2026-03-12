@@ -28,7 +28,7 @@ package com.datalogger.services;
 import com.datalogger.DataLoggerConfig;
 import static com.datalogger.constants.Item.InterfaceID.GE_GROUP_ID;
 import static com.datalogger.constants.Item.InterfaceID.GE_HISTORY_CHILD_ID;
-import com.datalogger.events.AccountHashResolved;
+import com.datalogger.events.AccountSessionStarted;
 import com.datalogger.models.grandexchange.GeLedgerEntry;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -80,7 +80,7 @@ public class GrandExchangeHistoryParser
 	 * Listens for our custom event and caches the account hash globally for this class.
 	 */
 	@Subscribe
-	public void onAccountHashResolved(AccountHashResolved event)
+	public void onAccountSessionStarted(AccountSessionStarted event)
 	{
 		String hash = event.getAccountHashString().strip();
 		if (hash.matches("\\d+"))
@@ -169,7 +169,7 @@ public class GrandExchangeHistoryParser
 			int itemId = itemWidget.getItemId();
 			int itemQuantity = itemWidget.getItemQuantity();
 			ItemComposition item = itemManager.getItemComposition(itemId);
-			String itemName = item.getName();
+			String itemName = item.getMembersName();
 
 			try {
 				String rawValueText = valueWidget.getText();
