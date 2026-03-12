@@ -23,29 +23,38 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.datalogger.constants;
+package com.datalogger.models.itemvault;
 
-public final class GrandExchange
+import com.datalogger.models.itemvault.enums.VaultType;
+import lombok.Value;
+
+@Value
+public class BankedItem
 {
-	/**
-	 * Widget child IDs
-	 */
-	public static class InterfaceID
+	long accountHash;
+	String accountName;
+	String vaultType;
+	int itemId;
+	String itemName;
+	int quantity;
+
+	public BankedItem(VaultType vaultType, long accountHash, String accountName, int itemId, String itemName, int quantity)
 	{
-		public static final int GE_GROUP_ID = 383;
-		public static final int GE_HISTORY_CHILD_ID = 3;
+		this.vaultType = vaultType.name();
+		this.accountHash = accountHash;
+		this.accountName = accountName;
+		this.itemId = itemId;
+		this.itemName = itemName;
+		this.quantity = quantity;
 	}
 
-	/**
-	 * Fixed values that are related to processing Grand Exchange offers
-	 */
-	public static class Values
+	public BankedItem(String vaultType, long accountHash, String accountName, int itemId, String itemName, int quantity)
 	{
-		public static final double TAX_RATE = 0.02;
-		public static final double TAX_MULTIPLIER = 1.-TAX_RATE;
-		public static final int MAX_ITEM_TAX = 5000000;
-		public static final int MAX_TAX_PRICE = (int) (MAX_ITEM_TAX / TAX_RATE);
-		public static final int MAX_TAXED_PRICE = MAX_TAX_PRICE - MAX_ITEM_TAX;
-
+		this.vaultType = vaultType;
+		this.accountHash = accountHash;
+		this.accountName = accountName;
+		this.itemId = itemId;
+		this.itemName = itemName;
+		this.quantity = quantity;
 	}
 }

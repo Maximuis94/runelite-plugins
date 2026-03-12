@@ -25,6 +25,8 @@
 package com.datalogger.ui;
 
 import com.datalogger.framework.LogType;
+import com.datalogger.loggers.ItemVaultLogger;
+import com.datalogger.services.FileIOService;
 import java.awt.BorderLayout;
 import java.awt.Desktop;
 import java.awt.GridLayout;
@@ -41,9 +43,11 @@ import net.runelite.client.ui.PluginPanel;
 @Slf4j
 public class DataLoggerPanel extends PluginPanel {
 	private final JPanel logContentDisplay = new JPanel();
+	private final ItemVaultLogger itemVaultLogger;
 
 	@Inject
-	public DataLoggerPanel() {
+	public DataLoggerPanel(ItemVaultLogger itemVaultLogger) {
+		this.itemVaultLogger = itemVaultLogger;
 
 		// Matches the standard RuneLite sidebar padding
 		this.setBorder(new EmptyBorder(0, 0, 10, 0));
@@ -58,7 +62,8 @@ public class DataLoggerPanel extends PluginPanel {
 
 		// --- BOTTOM BUTTONS SECTION ---
 		JPanel buttonContainer = new JPanel();
-		buttonContainer.setLayout(new GridLayout(3, 1, 0, 8));
+		// Increased rows to 4 to accommodate the new button
+		buttonContainer.setLayout(new GridLayout(5, 1, 0, 8));
 		buttonContainer.setBorder(new EmptyBorder(10, 5, 0, 5));
 		buttonContainer.setBackground(ColorScheme.DARKER_GRAY_COLOR);
 
@@ -71,8 +76,18 @@ public class DataLoggerPanel extends PluginPanel {
 		JButton openDataBtn = createStyledButton("Grand exchange directory");
 		openDataBtn.addActionListener(e -> openDirectory(LogType.GRAND_EXCHANGE.getLogDirectory().getAbsolutePath()));
 
+		JButton openItemVaultBtn = createStyledButton("Item Vault directory");
+		openItemVaultBtn.addActionListener(e -> openDirectory(LogType.ITEM_VAULT.getLogDirectory().getAbsolutePath()));
+
+		JButton exportVaultBtn = createStyledButton("Export Vault Summary");
+		exportVaultBtn.addActionListener(e -> {
+			itemVaultLogger.exportAggregatedData();
+		});
+
+		buttonContainer.add(exportVaultBtn);
 		buttonContainer.add(openLogsBtn);
 		buttonContainer.add(openScreenshotsBtn);
+		buttonContainer.add(openItemVaultBtn);
 		buttonContainer.add(openDataBtn);
 
 		// Add the button panel to the bottom of the PluginPanel

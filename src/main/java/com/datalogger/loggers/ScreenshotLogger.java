@@ -33,9 +33,7 @@ import static com.datalogger.constants.Colosseum.Script.POPULATE_REWARDS_CHEST_U
 import com.datalogger.events.ColosseumAttemptStarted;
 import com.datalogger.services.FileIOService;
 import java.awt.image.BufferedImage;
-import java.time.Instant;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
+import java.io.File;
 import java.util.concurrent.ScheduledExecutorService;
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -63,7 +61,8 @@ public class ScreenshotLogger {
 	private int colosseumCurrentWave = 0;
 
 	private String colosseumAttemptId = null;
-	private String colosseumAttemptDir;
+
+	private File root;
 
 	@Subscribe
 	public void onColosseumAttemptStarted(ColosseumAttemptStarted event) {
@@ -71,31 +70,32 @@ public class ScreenshotLogger {
 		colosseumCurrentWave = 1;
 		intermissionScreenshotPending = true;
 		rewardChestSpawned = false;
-		colosseumAttemptDir = "colosseum/" + colosseumAttemptId;
+		root = new File(event.getRoot());
 		log.debug("Screenshot logger synced with attempt ID: {}", colosseumAttemptId);
 	}
 
 	/**
-	 * Gets the synced Attempt ID, or generates a fallback if none exists.
+	 * Return the File for the screenshot for a specific wave / whether it is a reward
 	 */
-	private String getOrCreateColosseumAttemptId() {
-		if (colosseumAttemptId == null) {
-			colosseumAttemptId = Instant.ofEpochMilli(System.currentTimeMillis())
-				.atZone(ZoneId.systemDefault())
-				.format(DateTimeFormatter.ofPattern("yyMMdd_HHmmss"));
-			colosseumAttemptDir = "colosseum/" + colosseumAttemptId;
-			log.debug("No active attempt ID found. Generated fallback ID: {}", colosseumAttemptId);
-		}
-		return colosseumAttemptDir;
+	private String getScreenshotFileName(int waveNumber, boolean isReward)
+	{
+		return String.format("wave-%02d%s", waveNumber, isReward ? "-reward" : "");
 	}
 
 	/**
 	 * Create a screenshot and save it in the given fileName in the given subDirectory
 	 */
-	private void captureAndSaveScreenshot(String subDirectory, String fileName) {
+	private void captureAndSaveScreenshot() {
+
+		if (!root.exists() && !root.mkdirs()) {
+			log.error("Failed to save screenshot - Failed to create directory {}", root.getAbsolutePath());
+			return;
+		}
+		String fileName = getScreenshotFileName(colosseumCurrentWave, rewardChestSpawned);
+
 		drawManager.requestNextFrameListener(image ->
-			executor.submit(() -> fileIOService.saveScreenshot((BufferedImage) image, fileIOService.COLOSSEUM_SCREENSHOT_DIR, fileName)));
-		log.info("Saved screenshot with filename {} at '{}'", fileName, subDirectory);
+			executor.submit(() -> fileIOService.saveScreenshot((BufferedImage) image, root, fileName)));
+		log.info("Saved screenshot with filename {} at '{}'", fileName, root);
 	}
 
 	/**
@@ -156,18 +156,16 @@ public class ScreenshotLogger {
 		}
 	}
 
+
+
+
 	/**
-	 * Take a screenshot in case the intermission or rewards chest UI has appeared
+	 * Take a screenshot in case the intermission or rewards chest UI has appeared and subsequently update flags
 	 * @param scriptId The scriptId of the script that populates the UI
 	 */
 	private void takeColosseumScreenshot(int scriptId)
 	{
-		String fileName = rewardChestSpawned ?
-			String.format("wave-%02d-reward", colosseumCurrentWave) :
-			String.format("wave-%02d", colosseumCurrentWave);
-
-		captureAndSaveScreenshot(getOrCreateColosseumAttemptId(), fileName);
-
+		captureAndSaveScreenshot();
 		intermissionScreenshotPending = false;
 		rewardChestSpawned = false;
 

@@ -22,7 +22,6 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
 package com.datalogger.services;
 
 import com.datalogger.models.grandexchange.GeLedgerEntry;
@@ -33,19 +32,16 @@ import java.util.Set;
 
 public class GeHistoryReconciler {
 
-	/**
-	 * Updated previous completed GE submissions with data from the GE history entries.
-	 */
 	public List<GeLedgerEntry> weaveLedgers(List<GeLedgerEntry> masterLedger, List<GeLedgerEntry> scrapedHistory) {
 		List<GeLedgerEntry> updatedLedger = new ArrayList<>(masterLedger);
 		Set<Integer> consumedIndices = new HashSet<>();
 
-		int j = Math.max(0, updatedLedger.size() - 200);
+		int windowStart = Math.max(0, updatedLedger.size() - 200);
 
 		for (GeLedgerEntry scraped : scrapedHistory) {
 			boolean foundMatch = false;
 
-			for (int i = j; i < updatedLedger.size(); i++) {
+			for (int i = windowStart; i < updatedLedger.size(); i++) {
 				if (consumedIndices.contains(i)) {
 					continue;
 				}
@@ -61,31 +57,23 @@ public class GeHistoryReconciler {
 						existing.setPrice(scraped.getPrice());
 						existing.setValue(scraped.getValue());
 					}
-
-					j = i + 1;
 					break;
 				}
 			}
 
 			if (!foundMatch) {
 				updatedLedger.add(scraped);
-				j = updatedLedger.size();
 			}
 		}
-
 		return updatedLedger;
 	}
 
 	/**
-	 * Return true if the scraped entry matches the history entry
-	 * @param existing Previously submitted completed Grand Exchange offer
-	 * @param scraped Grand Exchange history entry data scraped from the UI
-	 * @return true if both entries match
+	 * Determine if two entries refer to the same completed offer, given possible discrepancies
 	 */
 	private boolean isExactMatch(GeLedgerEntry existing, GeLedgerEntry scraped) {
 		return existing.getItemId() == scraped.getItemId() &&
 			existing.isBuy() == scraped.isBuy() &&
-			existing.getQuantity() == scraped.getQuantity() &&
-			existing.getValue() == scraped.getValue();
+			existing.getPrice() == scraped.getPrice()+scraped.getTax();
 	}
 }

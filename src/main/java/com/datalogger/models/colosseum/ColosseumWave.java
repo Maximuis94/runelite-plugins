@@ -28,7 +28,7 @@ import com.datalogger.dto.ColosseumWaveDTO;
 import com.datalogger.framework.DataRow;
 import com.datalogger.models.colosseum.enums.ColosseumModifier;
 import com.datalogger.models.colosseum.enums.WaveStatus;
-import com.datalogger.models.common.ItemBundle;
+import com.datalogger.models.itemvault.ItemBundle;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import java.util.List;

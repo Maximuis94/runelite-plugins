@@ -41,21 +41,30 @@ public abstract class AbstractLogger implements Loggable {
 	@Inject protected FileIOService utils;
 	@Inject protected DataLoggerConfig config;
 
-	private String accountNameCache = "unknown";
-	private String accountHashCache = "-1";
+	// Currently active account
+	private String accountName = "unknown";
+	private String accountHashString = "-1";
+	private long accountHashLong = -1;
 
 	/**
 	 * Logic for getting an account name, which is used as a folder in the file structure
 	 */
 	protected String getAccountName() {
-		return accountNameCache;
+		return accountName;
 	}
 
 	/**
 	 * A numerical hash string associated with the OSRS account.
 	 */
 	protected String getAccountHashString() {
-		return accountHashCache;
+		return accountHashString;
+	}
+
+	/**
+	 * A numerical hash string associated with the OSRS account.
+	 */
+	protected long getAccountHashLong() {
+		return accountHashLong;
 	}
 
 	/**
@@ -63,11 +72,11 @@ public abstract class AbstractLogger implements Loggable {
 	 * It automatically resolves the target file based on the logger type.
 	 */
 	protected void logRow(String csvRow) {
-		if (!isEnabled() || accountNameCache.equals("unknown")) {
+		if (!isEnabled() || accountName.equals("unknown")) {
 			return;
 		}
 
-		File logFile = utils.getTargetFile(getLogType(), accountNameCache);
+		File logFile = utils.getTargetFile(getLogType(), accountName);
 		utils.atomicWrite(logFile, getCsvHeader(), csvRow);
 	}
 
@@ -77,10 +86,11 @@ public abstract class AbstractLogger implements Loggable {
 	 */
 	@Subscribe
 	public void onAccountHashResolved(AccountHashResolved event) {
-		accountNameCache = event.getAccountName();
-		accountHashCache = event.getAccountHash();
+		accountName = event.getAccountName();
+		accountHashString = event.getAccountHashString();
+		accountHashLong = Long.parseLong(accountHashString);
 
-		log.debug("[{}] Session initialized for {} ({})", getLogType(), accountNameCache, accountHashCache);
+		log.debug("[{}] Session initialized for {} ({})", getLogType(), accountName, accountHashString);
 
 		if (isEnabled()) {
 			setup();
@@ -93,8 +103,8 @@ public abstract class AbstractLogger implements Loggable {
 	@Subscribe
 	public void onGameStateChanged(GameStateChanged event) {
 		if (event.getGameState() == GameState.LOGIN_SCREEN) {
-			accountNameCache = "unknown";
-			accountHashCache = "-1";
+			accountName = "unknown";
+			accountHashString = "-1";
 		}
 	}
 }

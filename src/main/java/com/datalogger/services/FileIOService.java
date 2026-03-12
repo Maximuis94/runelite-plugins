@@ -26,6 +26,7 @@ package com.datalogger.services;
 
 import com.datalogger.DataLoggerConfig;
 import com.datalogger.dto.ColosseumStateDTO;
+import com.datalogger.events.ColosseumAttemptStarted;
 import com.datalogger.framework.LogType;
 import com.datalogger.models.colosseum.ColosseumAttempt;
 import com.datalogger.models.colosseum.ColosseumState;
@@ -66,6 +67,7 @@ import javax.inject.Singleton;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.coords.WorldPoint;
 import net.runelite.client.RuneLite;
+import net.runelite.client.eventbus.Subscribe;
 
 /**
  * Service that handles writing and reading operations of local files.
@@ -82,28 +84,49 @@ public class FileIOService
 
 	private final DataLoggerConfig config;
 
+	private String account;
+	private String attemptRoot;
+	private String startTime;
+
 	@Inject
 	private FileIOService(Gson gson, ScheduledExecutorService executor, DataLoggerConfig config) {
 		this.executor = executor;
 		this.gson = gson.newBuilder()
 			.registerTypeAdapter(WorldPoint.class, new WorldPointSerializer())
 			.setPrettyPrinting()
+			.disableHtmlEscaping()
 			.create();
 		this.config = config;
 	}
 
-	public final File PLUGIN_ROOT = new File(RuneLite.RUNELITE_DIR, "data-logger");
-	public final File INTERNAL_ROOT_DIR = new File(PLUGIN_ROOT, "internal");
-	public final File INTERNAL_GE_DIR = new File(INTERNAL_ROOT_DIR, "ge-history");
-	public final File INTERNAL_TEMP_DIR = new File(INTERNAL_ROOT_DIR, "temp");
-	public final File GE_STATE_DIR = new File(INTERNAL_ROOT_DIR, "state");
-	public final File INTERNAL_ACTIVE_OFFERS_DIR = new File(INTERNAL_ROOT_DIR, "active-offers");
-	public final File GRAND_EXCHANGE_ROOT = new File(PLUGIN_ROOT, "grand-exchange");
-	public final File COLOSSEUM_ROOT_DIR = new File(PLUGIN_ROOT, "colosseum");
-	public final File COLOSSEUM_TIMELINE_DIR = new File(COLOSSEUM_ROOT_DIR, "timeline");
-	public final File COLOSSEUM_LOG_DIR = new File(COLOSSEUM_ROOT_DIR, "log");
-	public final File COLOSSEUM_CSV_DIR = new File(COLOSSEUM_ROOT_DIR, "csv");
-	public final File COLOSSEUM_SCREENSHOT_DIR = new File(COLOSSEUM_ROOT_DIR, "screenshot");
+	@Subscribe
+	public void onColosseumAttemptStarted(ColosseumAttemptStarted event)
+	{
+		attemptRoot = event.getRoot();
+		account = event.getAccountName();
+		startTime = event.getStartTime();
+		log.info("Initialized Colosseum FileIOService vars with root={}, account={}, startTime={}", attemptRoot, account, startTime);
+	}
+
+	public static final File PLUGIN_ROOT = new File(RuneLite.RUNELITE_DIR, "data-logger");
+	public static final File INTERNAL_ROOT_DIR = new File(PLUGIN_ROOT, "internal");
+	public static final File INTERNAL_GE_DIR = new File(INTERNAL_ROOT_DIR, "ge-history");
+	public static final File INTERNAL_VAULT_DIR = new File(INTERNAL_ROOT_DIR, "item-vault");
+	public static final File INTERNAL_TEMP_DIR = new File(INTERNAL_ROOT_DIR, "temp");
+	public static final File GE_STATE_DIR = new File(INTERNAL_ROOT_DIR, "state");
+	public static final File INTERNAL_ACTIVE_OFFERS_DIR = new File(INTERNAL_ROOT_DIR, "active-offers");
+	public static final File GRAND_EXCHANGE_DIR = new File(PLUGIN_ROOT, "grand-exchange");
+	public static final File ITEM_VAULT_DIR = new File(PLUGIN_ROOT, "item-vault");
+	public static final File COLOSSEUM_ROOT_DIR = new File(PLUGIN_ROOT, "colosseum");
+	public static final File COLOSSEUM_TIMELINE_DIR = new File(COLOSSEUM_ROOT_DIR, "timeline");
+	public static final File COLOSSEUM_LOG_DIR = new File(COLOSSEUM_ROOT_DIR, "log");
+	public static final File COLOSSEUM_CSV_DIR = new File(COLOSSEUM_ROOT_DIR, "csv");
+	public static final File COLOSSEUM_SCREENSHOT_DIR = new File(COLOSSEUM_ROOT_DIR, "screenshot");
+
+	public static final File ACCOUNT_HASH_MAPPINGS = new File(INTERNAL_ROOT_DIR, "account-hash-mappings.json");
+	public static final File AGGREGATED_ITEM_VAULT_JSON = new File(ITEM_VAULT_DIR, "aggregated-wealth-summary.json");
+	public static final File AGGREGATED_ITEM_VAULT_CSV = new File(ITEM_VAULT_DIR, "aggregated-wealth-summary.csv");
+
 
 	/**
 	 * Appends a row to a CSV file. If the file is locked, it queues the row and attempts to flush the queue on the
@@ -233,14 +256,6 @@ public class FileIOService
 	}
 
 	/**
-	 * Convert the given attemptId to the log file that is to be used
-	 */
-	private File logFile(String attemptId)
-	{
-		return new File(COLOSSEUM_LOG_DIR, String.format("log-%s.json", attemptId));
-	}
-
-	/**
 	 * Save the ColosseumStates for a single wave of an ongoing attempt in a temporary file in the temporary directory.
 	 */
 	public void saveWaveStates(String attemptId, int waveId, List<ColosseumState> liveStates) {
@@ -286,7 +301,7 @@ public class FileIOService
 	 * Parse all the components that constitute the ongoing attempt and merge them into a single timeline. Save this
 	 * timeline and subsequently delete the temporary files.
 	 */
-	public void mergeTimelineFiles(String attemptId) {
+	public void mergeTimelineFiles(File outFile, String attemptId) {
 		executor.submit(() -> {
 			try
 			{
@@ -303,10 +318,7 @@ public class FileIOService
 						toDelete.add(tempFile);
 					}
 				}
-
-				File finalFile = new File(COLOSSEUM_TIMELINE_DIR, String.format("timeline-%s.json", attemptId));
-				saveJson(finalFile, fullRunData);
-
+				saveJson(outFile, fullRunData);
 				for (File f : toDelete)
 				{
 					if (f.delete())
@@ -315,7 +327,7 @@ public class FileIOService
 				}
 			} catch (Exception e)
 			{
-				log.error("Failed to merge timeline files for attempt {}", attemptId);
+				log.error("Failed to merge timeline files for attempt {} at file {}", attemptId, outFile.getAbsolutePath());
 			}
 		});
 	}
@@ -328,7 +340,7 @@ public class FileIOService
 			COLOSSEUM_LOG_DIR.mkdirs();
 		}
 
-		File targetFile = logFile(attempt.getStartTime());
+		File targetFile = attemptWaveLogFile(attempt.getAccount(), attempt.getStartTime(), "json");
 
 		try (FileWriter writer = new FileWriter(targetFile)) {
 			gson.toJson(attempt, writer);
@@ -365,9 +377,9 @@ public class FileIOService
 		}
 	}
 
-	public void writeColosseumCSVLog(String account, String attemptId, String rows) {
-		File outFile = new File(COLOSSEUM_CSV_DIR, String.format("Colosseum-waves-%s-%s.csv", account, attemptId));
+	public void writeColosseumCSVLog(ColosseumAttempt attempt, String rows) {
 		String header = ColosseumWave.csvHeader();
+		File outFile = attemptWaveLogFile(attempt.getAccount(), attempt.getStartTime(), "csv");
 
 		try {
 			File parent = outFile.getParentFile();
@@ -383,9 +395,9 @@ public class FileIOService
 				java.nio.file.StandardOpenOption.TRUNCATE_EXISTING
 			);
 
-			log.info("Successfully saved Colosseum CSV log to {}", outFile.getName());
+			log.info("Successfully saved Colosseum CSV log to {}", outFile.getAbsolutePath());
 		} catch (IOException e) {
-			log.error("Failed to write Colosseum CSV log for attempt {}", attemptId, e);
+			log.error("Failed to write Colosseum CSV log for attempt {}", outFile.getName(), e);
 		}
 	}
 
@@ -450,7 +462,7 @@ public class FileIOService
 
 			File finalFile = new File(INTERNAL_GE_DIR, accountHash + ".json");
 			File tempFile = new File(INTERNAL_GE_DIR, accountHash + ".tmp");
-			File copyTo = new File(GRAND_EXCHANGE_ROOT, accountName + "/grand-exchange.json");
+			File copyTo = new File(GRAND_EXCHANGE_DIR, accountName + "/grand-exchange.json");
 
 			synchronized (accountHash.intern()) {
 				try {
@@ -591,5 +603,55 @@ public class FileIOService
 					file.getName(), backlog.size());
 			}
 		}
+	}
+
+	/**
+	 * Update a cached accountHash-accountName mapping JSON file with the given accountHash and accountName
+	 */
+	public void updateAccountHashMapping(String accountHash, String accountName) {
+		if (accountHash == null || accountHash.isEmpty() || accountName == null || accountName.isEmpty()) {
+			return;
+		}
+
+		File parentDir = ACCOUNT_HASH_MAPPINGS.getParentFile();
+		if (parentDir != null && !parentDir.exists()) {
+			parentDir.mkdirs();
+		}
+
+		synchronized (ACCOUNT_HASH_MAPPINGS.getAbsolutePath().intern()) {
+			Properties properties = new Properties();
+
+			if (ACCOUNT_HASH_MAPPINGS.exists()) {
+				try (FileInputStream in = new FileInputStream(ACCOUNT_HASH_MAPPINGS)) {
+					properties.load(in);
+				} catch (Exception e) {
+					log.error("Failed to read existing account hash mappings", e);
+				}
+			}
+
+			properties.setProperty(accountHash, accountName);
+
+			try (FileOutputStream out = new FileOutputStream(ACCOUNT_HASH_MAPPINGS)) {
+				properties.store(out, "Account Hash to Account Name Mappings");
+				log.debug("Successfully updated account hash mapping for: {}", accountName);
+			} catch (Exception e) {
+				log.error("Failed to write updated account hash mappings", e);
+			}
+		}
+	}
+
+	public File attemptTimelineFile()
+	{
+		return new File(attemptRoot, String.format("%s_%s_timeline.json", account, startTime));
+	}
+
+	public File attemptWaveLogFile(String account, String startTime, String extension)
+	{
+		String attemptId = String.format("%s_%s", account, startTime);
+		return new File(new File(FileIOService.COLOSSEUM_ROOT_DIR, attemptId), String.format("%s_wave-log.%s", attemptId, extension.replace(".","")));	}
+
+	public File attemptWaveLogCsvFile()
+	{
+		return new File(attemptRoot, String.format("%s_%s_wave-log.csv", account, startTime));
 	}
 }

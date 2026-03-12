@@ -24,32 +24,32 @@
  */
 package com.datalogger.framework;
 
+import static com.datalogger.services.FileIOService.COLOSSEUM_ROOT_DIR;
+import static com.datalogger.services.FileIOService.COLOSSEUM_SCREENSHOT_DIR;
+import static com.datalogger.services.FileIOService.GRAND_EXCHANGE_DIR;
+import static com.datalogger.services.FileIOService.ITEM_VAULT_DIR;
 import java.io.File;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
-import net.runelite.client.RuneLite;
 
 @Getter
 @RequiredArgsConstructor
 public enum LogType
 {
-	GRAND_EXCHANGE("Grand Exchange"),
-	COLOSSEUM("Colosseum"),
-	SCREENSHOT("Screenshot");
+	GRAND_EXCHANGE("Grand Exchange", GRAND_EXCHANGE_DIR),
+	COLOSSEUM("Colosseum", COLOSSEUM_ROOT_DIR),
+	ITEM_VAULT("Item Vault", ITEM_VAULT_DIR),
+	SCREENSHOT("Screenshot", COLOSSEUM_SCREENSHOT_DIR);
 
 	private final String name;
 	private final String directoryName;
-
 	private final File logDirectory;
 
-	LogType(String logTypeName)
+	LogType(String logTypeName, File root)
 	{
 		name = logTypeName;
-
 		directoryName = logTypeName.toLowerCase().replace(" ", "-");
-
-		File baseDir = new File(RuneLite.RUNELITE_DIR, "data-logger");
-		logDirectory = new File(baseDir, directoryName);
+		logDirectory = root;
 	}
 
 	@Override

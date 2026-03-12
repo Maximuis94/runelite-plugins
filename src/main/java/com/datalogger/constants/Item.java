@@ -22,48 +22,37 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package com.datalogger.models.colosseum;
 
-import com.datalogger.dto.ColosseumStateDTO;
-import java.util.List;
-import lombok.Builder;
-import lombok.Data;
-import net.runelite.api.coords.WorldPoint;
+package com.datalogger.constants;
 
 /**
- * The state of the Colosseum at a particular tick during a particular wave. It encodes the coordinates of the player
- * and the NPCs, as well as the wave id and tick number
+ * Constants related to logging of Item / Grand Exchange offers
  */
-@Data
-@Builder
-public class ColosseumState
+public final class Item
 {
-	private int wave;
-	private String timestampHmsm;
-	private Long timestampUnix;
-	private int tick;
-	private int playerHp;
-	private int playerPrayer;
-	private WorldPoint playerLocation;
-	private List<ColosseumNPC> npcs;
+	/**
+	 * Widget child IDs
+	 */
+	public static class InterfaceID
+	{
+		public static final int GE_GROUP_ID = 383;
+		public static final int GE_HISTORY_CHILD_ID = 3;
+		public static final int BANK_GROUP_ID = 12;
+		public static final int BANK_CHILD_ID = 12;
+		public static final int SEED_VAULT_GROUP_ID = 631;
+		public static final int SEED_VAULT_CHILD_ID = 15;
+	}
 
 	/**
-	 * Converts this live engine state into a static DTO for saving.
+	 * Fixed values that are related to processing Grand Exchange offers
 	 */
-	public ColosseumStateDTO toDTO() {
-		ColosseumStateDTO.ColosseumStateDTOBuilder dto = ColosseumStateDTO.builder()
-			.wave(wave)
-			.tick(tick)
-			.playerHp(playerHp)
-			.playerPrayer(playerPrayer)
-			.playerX(playerLocation != null ? playerLocation.getRegionX() : 0)
-			.playerY(playerLocation != null ? playerLocation.getRegionY() : 0)
-			.npcs(npcs);
+	public static class Values
+	{
+		public static final double TAX_RATE = 0.02;
+		public static final double TAX_MULTIPLIER = 1.-TAX_RATE;
+		public static final int MAX_ITEM_TAX = 5000000;
+		public static final int MAX_TAX_PRICE = (int) (MAX_ITEM_TAX / TAX_RATE);
+		public static final int MAX_TAXED_PRICE = MAX_TAX_PRICE - MAX_ITEM_TAX;
 
-		if (timestampHmsm!=null && !timestampHmsm.isEmpty())
-			dto.timestampHms(timestampHmsm);
-		if (timestampUnix!=null && timestampUnix != 0)
-			dto.timestampUnix(timestampUnix);
-		return dto.build();
 	}
 }

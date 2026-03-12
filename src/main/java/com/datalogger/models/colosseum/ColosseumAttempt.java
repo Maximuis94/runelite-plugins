@@ -27,6 +27,8 @@ package com.datalogger.models.colosseum;
 
 import com.datalogger.dto.ColosseumAttemptDTO;
 import com.datalogger.models.colosseum.enums.WaveStatus;
+import com.datalogger.services.FileIOService;
+import java.io.File;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -41,6 +43,8 @@ public class ColosseumAttempt
 {
 	private final long id;
 
+	private final String account;
+
 	private final int startTick;
 
 	private final String startTime;
@@ -50,7 +54,8 @@ public class ColosseumAttempt
 
 	private final List<ColosseumWave> waves;
 
-	public ColosseumAttempt(int startTick)
+
+	public ColosseumAttempt(int startTick, String accountName)
 	{
 		id = System.currentTimeMillis();
 		this.startTick = startTick;
@@ -59,6 +64,8 @@ public class ColosseumAttempt
 			.format(DateTimeFormatter.ofPattern("yyMMdd_HHmmss"));
 		waves = new ArrayList<>();
 		finalStatus = WaveStatus.FAILED;
+		account = accountName;
+		canSave();
 	}
 
 	public ColosseumAttemptDTO toDTO() {
@@ -89,5 +96,19 @@ public class ColosseumAttempt
 				waves.add(wave);
 			}
 		}
+	}
+
+	public File getRootDirectory()
+	{
+		return new File(FileIOService.COLOSSEUM_ROOT_DIR, String.format("%s_%s", account, startTime));
+	}
+
+	/**
+	 * Return true if the root exists or was successfully created
+	 */
+	public boolean canSave()
+	{
+		File rootDir = getRootDirectory();
+		return rootDir.exists() || rootDir.mkdirs();
 	}
 }

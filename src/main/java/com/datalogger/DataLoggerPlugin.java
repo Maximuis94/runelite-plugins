@@ -28,10 +28,13 @@ import com.datalogger.events.AccountHashResolved;
 import com.datalogger.loggers.ColosseumAttemptLogger;
 import com.datalogger.loggers.ColosseumTimelineLogger;
 import com.datalogger.loggers.GrandExchangeLogger;
+import com.datalogger.loggers.ItemVaultLogger;
 import com.datalogger.loggers.ScreenshotLogger;
+import com.datalogger.services.AccountHashMapper;
 import com.datalogger.services.ColosseumScanner;
 import com.datalogger.services.FileIOService;
 import com.datalogger.services.GrandExchangeHistoryParser;
+import com.datalogger.services.ItemVaultParser;
 import com.datalogger.ui.DataLoggerPanel;
 import com.google.inject.Provides;
 import java.awt.image.BufferedImage;
@@ -45,6 +48,7 @@ import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
+import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.ClientToolbar;
@@ -55,39 +59,38 @@ import net.runelite.client.util.ImageUtil;
 @PluginDescriptor(
 	name = "Data Logger",
 	description = "Logs game data for various activities, like Fortis Colosseum results or the Grand Exchange",
-	tags = {
-		"logger", "data", "history", "screenshot", "tracker", "csv", "json",
-
-		"ge", "grand exchange",
-
-		"fortis", "colosseum"
-	}
+	tags = {"logger", "data", "history", "screenshot", "tracker", "csv", "json", "ge", "grand exchange", "bank", "item", "fortis", "colosseum"}
 )
 public class DataLoggerPlugin extends Plugin
 {
 	@Inject private ClientThread clientThread;
-
 	@Inject private Client client;
-
 	@Inject private ClientToolbar clientToolbar;
-
 	@Inject private EventBus eventBus;
+	@Inject private DataLoggerConfig config;
 
+	@Inject private AccountHashMapper accountHashMapper;
+	@Inject private FileIOService fileIOService;
+	@Inject private DataLoggerPanel panel;
+	@Inject private ItemVaultLogger itemVaultLogger;
+
+	@Inject private ItemVaultParser itemVaultParser;
 	@Inject private GrandExchangeLogger geLogger;
+	@Inject private GrandExchangeHistoryParser grandExchangeHistoryParser;
 	@Inject private ColosseumAttemptLogger coloLogger;
 	@Inject private ColosseumScanner coloScanner;
-	@Inject private ScreenshotLogger screenshotLogger;
 	@Inject private ColosseumTimelineLogger timelineLogger;
-	@Inject private GrandExchangeHistoryParser grandExchangeHistoryParser;
-	@Inject private FileIOService fileIOService;
-
-	@Inject private DataLoggerPanel panel;
+	@Inject private ScreenshotLogger screenshotLogger;
 
 	private NavigationButton navButton;
-
-	private long lastAccountHash = -1;
-
 	private boolean sessionInitialized = false;
+
+	// Registration State Trackers
+	private boolean isItemVaultRegistered = false;
+	private boolean isGeRegistered = false;
+	private boolean isColosseumRegistered = false;
+	private boolean isTimelineRegistered = false;
+	private boolean isScreenshotRegistered = false;
 
 	@Provides
 	DataLoggerConfig provideConfig(ConfigManager configManager)
@@ -98,14 +101,20 @@ public class DataLoggerPlugin extends Plugin
 	@Override
 	protected void startUp() throws Exception
 	{
-		eventBus.register(geLogger);
-		eventBus.register(coloLogger);
-		eventBus.register(coloScanner);
-		eventBus.register(screenshotLogger);
-		eventBus.register(timelineLogger);
-		eventBus.register(grandExchangeHistoryParser);
-		coloScanner.updateConfigFlags(true);
+		log.info("Data Logger starting up...");
 
+		eventBus.register(accountHashMapper);
+		accountHashMapper.loadMappings();
+		eventBus.register(fileIOService);
+		eventBus.register(itemVaultLogger);
+
+		toggleItemVault(config.logItemVault());
+		toggleGrandExchange(config.logGrandExchange());
+		toggleColosseum(config.logColosseum());
+		toggleTimeline(config.logWaveTimeline());
+		toggleScreenshots(config.screenshotBetweenWaves());
+
+		// 3. Setup UI
 		final BufferedImage icon = ImageUtil.loadImageResource(getClass(), "icon.png");
 		navButton = NavigationButton.builder()
 			.tooltip("Data Logger Viewer")
@@ -120,16 +129,132 @@ public class DataLoggerPlugin extends Plugin
 	@Override
 	protected void shutDown()
 	{
+		log.info("Data Logger shutting down...");
+
 		if (fileIOService != null) {
 			fileIOService.flushAll();
 		}
-		eventBus.unregister(geLogger);
-		eventBus.unregister(coloLogger);
-		eventBus.unregister(coloScanner);
-		eventBus.unregister(screenshotLogger);
-		eventBus.unregister(timelineLogger);
-		eventBus.unregister(grandExchangeHistoryParser);
+
 		clientToolbar.removeNavigation(navButton);
+
+		eventBus.unregister(accountHashMapper);
+		eventBus.unregister(fileIOService);
+
+		toggleItemVault(false);
+		toggleGrandExchange(false);
+		toggleColosseum(false);
+		toggleTimeline(false);
+		toggleScreenshots(false);
+	}
+
+	@Subscribe
+	public void onConfigChanged(ConfigChanged event)
+	{
+		if (!event.getGroup().equals(DataLoggerConfig.CONFIG_GROUP))
+		{
+			return;
+		}
+
+		switch (event.getKey())
+		{
+			case "logItemVault":
+				toggleItemVault(config.logItemVault());
+				break;
+			case "logGrandExchange":
+				toggleGrandExchange(config.logGrandExchange());
+				break;
+			case "logColosseum":
+				toggleColosseum(config.logColosseum());
+				break;
+			case "logWaveTimeline":
+				toggleTimeline(config.logWaveTimeline());
+				break;
+			case "screenshotBetweenWaves":
+				toggleScreenshots(config.screenshotBetweenWaves());
+				break;
+		}
+	}
+
+	private void toggleItemVault(boolean enable)
+	{
+		if (enable && !isItemVaultRegistered) {
+			eventBus.register(itemVaultParser);
+			isItemVaultRegistered = true;
+			log.debug("Item Vault tracking enabled.");
+		} else if (!enable && isItemVaultRegistered) {
+			eventBus.unregister(itemVaultParser);
+			isItemVaultRegistered = false;
+			log.debug("Item Vault tracking disabled.");
+		}
+	}
+
+	private void toggleGrandExchange(boolean enable)
+	{
+		if (enable && !isGeRegistered) {
+			eventBus.register(grandExchangeHistoryParser);
+			eventBus.register(geLogger);
+			isGeRegistered = true;
+			log.debug("Grand Exchange tracking enabled.");
+		} else if (!enable && isGeRegistered) {
+			eventBus.unregister(grandExchangeHistoryParser);
+			eventBus.unregister(geLogger);
+			isGeRegistered = false;
+			log.debug("Grand Exchange tracking disabled.");
+		}
+	}
+
+	private void toggleColosseum(boolean enable)
+	{
+		if (enable && !isColosseumRegistered) {
+			eventBus.register(coloLogger);
+			eventBus.register(coloScanner);
+			coloScanner.updateConfigFlags(true);
+			isColosseumRegistered = true;
+			log.debug("Colosseum tracking enabled.");
+			toggleTimeline(config.logWaveTimeline());
+
+		} else if (!enable && isColosseumRegistered) {
+			toggleTimeline(false);
+
+			eventBus.unregister(coloLogger);
+			eventBus.unregister(coloScanner);
+			coloScanner.updateConfigFlags(false);
+			isColosseumRegistered = false;
+			log.debug("Colosseum tracking disabled.");
+		}
+	}
+
+	private void toggleTimeline(boolean enable)
+	{
+		boolean shouldEnable = enable && isColosseumRegistered;
+
+		if (shouldEnable && !isTimelineRegistered) {
+			eventBus.register(timelineLogger);
+			isTimelineRegistered = true;
+			log.debug("Colosseum Timeline tracking enabled.");
+		}
+		else if (!shouldEnable && isTimelineRegistered) {
+			eventBus.unregister(timelineLogger);
+			isTimelineRegistered = false;
+			log.debug("Colosseum Timeline tracking disabled.");
+		}
+
+		if (enable && !isColosseumRegistered) {
+			log.warn("Ignored request to enable Colosseum Timeline: Base Colosseum logging is currently disabled.");
+		}
+	}
+
+	private void toggleScreenshots(boolean enable)
+	{
+		if (enable && !isScreenshotRegistered) {
+			eventBus.register(screenshotLogger);
+			isScreenshotRegistered = true;
+			log.debug("Screenshot tracking enabled.");
+		} else if (!enable && isScreenshotRegistered) {
+			eventBus.unregister(screenshotLogger);
+			isScreenshotRegistered = false;
+			log.debug("Screenshot tracking disabled.");
+		}
 	}
 
 	@Subscribe
@@ -138,27 +263,27 @@ public class DataLoggerPlugin extends Plugin
 		if (event.getGameState() == GameState.LOGIN_SCREEN)
 		{
 			sessionInitialized = false;
-			lastAccountHash = -1;
 		}
 	}
 
 	@Subscribe
 	public void onGameTick(GameTick event)
 	{
-		if (client.getGameState() == GameState.LOGGED_IN && !sessionInitialized)
+		if (!sessionInitialized && client.getGameState() == GameState.LOGGED_IN)
 		{
 			long currentHash = client.getAccountHash();
 
 			if (currentHash != -1 && client.getLocalPlayer() != null && client.getLocalPlayer().getName() != null)
 			{
-				lastAccountHash = currentHash;
 				sessionInitialized = true;
 
 				String hashString = String.valueOf(currentHash);
 				String accountName = client.getLocalPlayer().getName();
 
 				log.debug("Session ready! Hash: {}, Name: {}. Broadcasting event.", hashString, accountName);
-				eventBus.post(new AccountHashResolved(hashString, accountName));
+				eventBus.post(new AccountHashResolved(hashString, currentHash, accountName));
+
+				fileIOService.updateAccountHashMapping(hashString, accountName);
 			}
 		}
 	}

@@ -50,7 +50,7 @@ import com.datalogger.models.colosseum.ManticoreAttackSequence;
 import com.datalogger.models.colosseum.SummaryUI;
 import com.datalogger.models.colosseum.enums.ColosseumModifier;
 import com.datalogger.models.colosseum.enums.TimestampFormat;
-import com.datalogger.models.common.ItemBundle;
+import com.datalogger.models.itemvault.ItemBundle;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.time.Instant;
@@ -103,8 +103,6 @@ public class ColosseumScanner
 	private final Map<Integer, ManticoreAttackSequence> manticoreSequences = new HashMap<>();
 	private final Map<Integer, String> manticoreSequenceStrings = new HashMap<>();
 
-	public int getManticoreIndexA() {return manticoreIndexA;}
-
 	public void setManticoreIndexA(int index) {
 		manticoreIndexA = index;
 	}
@@ -112,10 +110,6 @@ public class ColosseumScanner
 	public ManticoreAttackSequence getManticoreSequenceA()
 	{
 		return manticoreIndexA != null ? manticoreSequences.get(manticoreIndexA) : null;
-	}
-
-	public int getManticoreIndexB() {
-		return manticoreIndexB;
 	}
 
 	public void setManticoreIndexB(int index) {
@@ -139,7 +133,6 @@ public class ColosseumScanner
 	);
 
 	private Map<BooleanSupplier, Collection<Integer>> OPTIONAL_NPC_SUPPLIERS;
-
 	private final Set<Integer> trackedNpcIds = new HashSet<>();
 
 	@Inject
@@ -652,7 +645,9 @@ public class ColosseumScanner
 	public void updateConfigFlags(boolean startUp)
 	{
 		enabledSwapQuiverLoot = config.logQuiverAsSplinters();
+		log.info("enabledSwapQuiverLoot is set to {}", enabledSwapQuiverLoot);
 		timestampFormat = config.logTimestamp();
+		log.info("timestampFormat is set to {}", timestampFormat.name());
 
 		if (startUp)
 		{

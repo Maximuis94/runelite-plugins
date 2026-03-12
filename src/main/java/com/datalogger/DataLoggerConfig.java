@@ -31,8 +31,6 @@ import net.runelite.client.config.ConfigItem;
 import net.runelite.client.config.ConfigSection;
 
 
-
-
 @ConfigGroup(DataLoggerConfig.CONFIG_GROUP)
 public interface DataLoggerConfig extends Config {
 	String CONFIG_GROUP = "datalogger";
@@ -40,11 +38,11 @@ public interface DataLoggerConfig extends Config {
 	// --- Sections ---
 
 	@ConfigSection(
-		name = "Grand Exchange",
+		name = "Item loggers",
 		description = "Settings for logging Grand Exchange activity",
 		position = 0
 	)
-	String grandExchangeSection = "grandExchange";
+	String itemLoggerSection = "itemLogger";
 
 	@ConfigSection(
 		name = "Colosseum",
@@ -74,7 +72,7 @@ public interface DataLoggerConfig extends Config {
 		name = "Log Grand Exchange",
 		description = "If enabled, Grand Exchange offers are logged upon completion.",
 		position = 0,
-		section = grandExchangeSection
+		section = itemLoggerSection
 	)
 	default boolean logGrandExchange() { return true; }
 
@@ -83,7 +81,7 @@ public interface DataLoggerConfig extends Config {
 		name = "Log Grand Exchange (CSV)",
 		description = "If enabled, Grand Exchange offers are added to a CSV log upon completion.",
 		position = 1,
-		section = grandExchangeSection
+		section = itemLoggerSection
 	)
 	default boolean logGrandExchangeCSV() { return true; }
 
@@ -92,9 +90,45 @@ public interface DataLoggerConfig extends Config {
 		name = "Log Grand Exchange (JSON)",
 		description = "If enabled, a copy of the internal ledger JSON is created after updating it.",
 		position = 2,
-		section = grandExchangeSection
+		section = itemLoggerSection
 	)
 	default boolean logGrandExchangeJSON() { return true; }
+
+	@ConfigItem(
+		keyName = "logItemVault",
+		name = "Log Item vaults",
+		description = "If enabled, Item vaults (bank/seed vault) are parsed and saved when interacting with them.",
+		position = 3,
+		section = itemLoggerSection
+	)
+	default boolean logItemVault() { return true; }
+
+	@ConfigItem(
+		keyName = "logGrandExchangeCSV",
+		name = "Log Grand Exchange (CSV)",
+		description = "If enabled, a copy of the internal (aggregated) vaults are created as JSON files.",
+		position = 4,
+		section = itemLoggerSection
+	)
+	default boolean logItemVaultCSV() { return true; }
+
+	@ConfigItem(
+		keyName = "logItemVaultJSON",
+		name = "Log Item vault (JSON)",
+		description = "If enabled, a copy of the internal (aggregated) vaults are created as CSV files.",
+		position = 5,
+		section = itemLoggerSection
+	)
+	default boolean logItemVaultJSON() { return true; }
+
+	@ConfigItem(
+		keyName = "skipItemVaultAccountList",
+		name = "Exclude accounts",
+		description = "Accounts that should not be included by the Item Vault logger. Accounts should be separated using ','; e.g. ACCOUNT_NAME,OTHER_ACCOUNT_NAME",
+		position = 6,
+		section = itemLoggerSection
+	)
+	default String skipItemVaultAccountList() { return ""; }
 
 	// --- Colosseum Items ---
 
@@ -106,6 +140,7 @@ public interface DataLoggerConfig extends Config {
 		section = colosseumSection
 	)
 	default boolean logColosseum() { return true; }
+
 
 	@ConfigItem(
 		keyName = "logColosseumCSV",

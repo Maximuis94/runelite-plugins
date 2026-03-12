@@ -26,11 +26,13 @@ package com.datalogger.loggers;
 
 import com.datalogger.DataLoggerConfig;
 import com.datalogger.events.ColosseumAttemptEnded;
+import com.datalogger.events.ColosseumAttemptStarted;
 import com.datalogger.events.ColosseumWaveEnded;
 import com.datalogger.events.ColosseumWaveStarted;
 import com.datalogger.models.colosseum.ColosseumState;
 import com.datalogger.services.ColosseumScanner;
 import com.datalogger.services.FileIOService;
+import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import javax.inject.Inject;
@@ -44,7 +46,7 @@ import net.runelite.client.eventbus.Subscribe;
  * The timeline is composed of states that are generated every tick.
  * A state describes player- and NPC data, NPC data is restricted to a subset of NPCs, of which may be enabled via
  * plugin configurations.
- *
+ * The timeline logger is an extension of the colosseum logger and cannot function without it being active.
  */
 @Slf4j
 @Singleton
@@ -53,6 +55,9 @@ public class ColosseumTimelineLogger {
 	@Inject private FileIOService fileIOService;
 	@Inject private DataLoggerConfig config;
 
+	private File root;
+	private String account;
+	private String attemptId;
 	private boolean isRecording = false;
 	private int currentWave;
 	private int waveStartTick;
@@ -93,9 +98,19 @@ public class ColosseumTimelineLogger {
 	}
 
 	@Subscribe
+	public void onColosseumAttemptStarted(ColosseumAttemptStarted event)
+	{
+		root = new File(event.getRoot());
+		account = event.getAccountName();
+		attemptId = String.format("%s_%s", account, event.getStartTime());
+		log.info("Registered root={} in TimelineLogger", root);
+	}
+
+	@Subscribe
 	public void onColosseumAttemptEnded(ColosseumAttemptEnded event) {
 		if (config.logWaveTimeline()) {
-			fileIOService.mergeTimelineFiles(event.getAttemptId());
+			File outFile = new File(root, attemptId+"_timeline.json");
+			fileIOService.mergeTimelineFiles(outFile, event.getAttemptId());
 		}
 	}
 }

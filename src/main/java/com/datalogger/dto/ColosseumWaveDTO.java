@@ -26,7 +26,7 @@
 package com.datalogger.dto;
 
 import com.datalogger.models.colosseum.ManticoreAttackSequence;
-import com.datalogger.models.common.ItemBundle;
+import com.datalogger.models.itemvault.ItemBundle;
 import lombok.Builder;
 import lombok.Data;
 import java.util.List;

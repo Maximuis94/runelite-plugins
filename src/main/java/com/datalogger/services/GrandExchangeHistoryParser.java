@@ -26,8 +26,8 @@
 package com.datalogger.services;
 
 import com.datalogger.DataLoggerConfig;
-import static com.datalogger.constants.GrandExchange.InterfaceID.GE_GROUP_ID;
-import static com.datalogger.constants.GrandExchange.InterfaceID.GE_HISTORY_CHILD_ID;
+import static com.datalogger.constants.Item.InterfaceID.GE_GROUP_ID;
+import static com.datalogger.constants.Item.InterfaceID.GE_HISTORY_CHILD_ID;
 import com.datalogger.events.AccountHashResolved;
 import com.datalogger.models.grandexchange.GeLedgerEntry;
 import java.time.Instant;
@@ -68,7 +68,7 @@ public class GrandExchangeHistoryParser
 	@Inject
 	private ItemManager itemManager;
 
-	private String accountHash = null;
+	private long accountHash = -1;
 	private String accountName = null;
 
 	private boolean hasParsed = false;
@@ -82,7 +82,13 @@ public class GrandExchangeHistoryParser
 	@Subscribe
 	public void onAccountHashResolved(AccountHashResolved event)
 	{
-		accountHash = event.getAccountHash();
+		String hash = event.getAccountHashString().strip();
+		if (hash.matches("\\d+"))
+			accountHash = Long.parseLong(event.getAccountHashString());
+		else {
+			log.info("Failed to extract account hash value; it is not a digit...");
+			accountHash = -1;
+		}
 		accountName = event.getAccountName(); // Ready for your CSVs!
 		hasParsed = false;
 	}
@@ -103,7 +109,7 @@ public class GrandExchangeHistoryParser
 		GameState state = event.getGameState();
 		if (state == GameState.LOGIN_SCREEN) {
 			hasParsed = false;
-			accountHash = null;
+			accountHash = -1;
 			log.debug("Session ended. GE History Parser state cleared.");
 		}
 	}
@@ -113,7 +119,7 @@ public class GrandExchangeHistoryParser
 	 */
 	private boolean allowedToParseHistory()
 	{
-		if (!config.logGrandExchange() || accountHash == null || hasParsed) return false;
+		if (!config.logGrandExchange() || accountHash == -1 || hasParsed) return false;
 
 		if (System.currentTimeMillis() - lastParsed < COOLDOWN_MS) {
 			log.debug("Skipping GE history parse; history was parsed less than 5 minutes ago.");
@@ -161,6 +167,7 @@ public class GrandExchangeHistoryParser
 			boolean isBuy = typeText.equalsIgnoreCase("Bought:");
 
 			int itemId = itemWidget.getItemId();
+			int itemQuantity = itemWidget.getItemQuantity();
 			ItemComposition item = itemManager.getItemComposition(itemId);
 			String itemName = item.getName();
 
@@ -173,7 +180,7 @@ public class GrandExchangeHistoryParser
 					.itemName(itemName)
 					.isBuy(isBuy)
 					.price(historyEntry.getPriceEach())
-					.quantity(historyEntry.getQuantity())
+					.quantity(itemQuantity)
 					.value(historyEntry.getNetCoins())
 					.tax(historyEntry.getTax())
 					.accountName(accountName)
@@ -194,11 +201,12 @@ public class GrandExchangeHistoryParser
 		if (!parsedEntries.isEmpty()) {
 			Collections.reverse(parsedEntries);
 
-			List<GeLedgerEntry> savedEntries = fileIOService.loadInternalGeLedger(accountHash);
+			String hash = String.valueOf(accountHash);
+			List<GeLedgerEntry> savedEntries = fileIOService.loadInternalGeLedger(hash);
 
 			List<GeLedgerEntry> mergedEntries = reconciler.weaveLedgers(savedEntries, parsedEntries);
 
-			fileIOService.saveInternalGeLedger(accountName, accountHash, mergedEntries);
+			fileIOService.saveInternalGeLedger(accountName, hash, mergedEntries);
 
 			log.info("Successfully parsed and saved GE History.");
 		}

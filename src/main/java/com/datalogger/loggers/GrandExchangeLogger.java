@@ -24,9 +24,9 @@
  */
 package com.datalogger.loggers;
 
-import static com.datalogger.constants.GrandExchange.Values.MAX_ITEM_TAX;
-import static com.datalogger.constants.GrandExchange.Values.MAX_TAXED_PRICE;
-import static com.datalogger.constants.GrandExchange.Values.TAX_MULTIPLIER;
+import static com.datalogger.constants.Item.Values.MAX_ITEM_TAX;
+import static com.datalogger.constants.Item.Values.MAX_TAXED_PRICE;
+import static com.datalogger.constants.Item.Values.TAX_MULTIPLIER;
 import com.datalogger.framework.AbstractLogger;
 import com.datalogger.framework.LogType;
 import com.datalogger.models.grandexchange.ActiveGeOffer;
@@ -138,6 +138,7 @@ public class GrandExchangeLogger extends AbstractLogger
 		}
 
 		String accountHash = getAccountHashString();
+		long accountHashLong = getAccountHashLong();
 		Properties state = utils.getAccountState(accountHash);
 
 		String createdTs = getOrSetCreatedTimestamp(slot, offer, state, accountHash);
@@ -146,7 +147,7 @@ public class GrandExchangeLogger extends AbstractLogger
 
 		if (isFinalState(offer.getState()) && offer.getSpent() > 0) {
 			if (!fingerprint.equals(lastLoggedFp)) {
-				logFinalTrade(slot, offer, createdTs, accountHash);
+				logFinalTrade(slot, offer, createdTs, accountHashLong);
 
 				state.setProperty("last_fp_" + slot, fingerprint);
 				utils.saveAccountState(accountHash, state);
@@ -238,7 +239,7 @@ public class GrandExchangeLogger extends AbstractLogger
 	/**
 	 * Submits a completed trade to the internal ledger and adds it to the CSV file
 	 */
-	private void logFinalTrade(int slot, GrandExchangeOffer offer, String createdTs, String accountHash)
+	private void logFinalTrade(int slot, GrandExchangeOffer offer, String createdTs, long accountHash)
 	{
 		String currentAccountName = getAccountName();
 		int quantity = offer.getQuantitySold();
@@ -287,10 +288,10 @@ public class GrandExchangeLogger extends AbstractLogger
 			.originalOfferPrice(offer.getPrice())
 			.build();
 
-
-		List<GeLedgerEntry> internalLedger = utils.loadInternalGeLedger(accountHash);
+		String hashString = getAccountHashString();
+		List<GeLedgerEntry> internalLedger = utils.loadInternalGeLedger(hashString);
 		internalLedger.add(ledgerEntry);
-		utils.saveInternalGeLedger(currentAccountName, accountHash, internalLedger);
+		utils.saveInternalGeLedger(currentAccountName, hashString, internalLedger);
 
 		if (config.logGrandExchangeCSV())
 		{
@@ -329,7 +330,7 @@ public class GrandExchangeLogger extends AbstractLogger
 			String.valueOf(entry.getValue()),
 			String.valueOf(entry.getTax()),
 			entry.getAccountName() != null ? entry.getAccountName() : "",
-			entry.getAccountHash() != null ? entry.getAccountHash() : "",
+			String.valueOf(entry.getAccountHash()),
 			String.valueOf(entry.getGeSlot()),
 			String.valueOf(entry.isHistoryEntry()),
 			String.valueOf(entry.isCancelled())

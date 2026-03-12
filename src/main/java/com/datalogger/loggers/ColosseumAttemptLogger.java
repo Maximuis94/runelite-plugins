@@ -44,6 +44,7 @@ import static com.datalogger.constants.Colosseum.Script.POPULATE_INTERMISSION_UI
 import static com.datalogger.constants.Colosseum.Script.POPULATE_REWARDS_CHEST_UI_SCRIPT_ID;
 import static com.datalogger.constants.Colosseum.Varbit.COLOSSEUM_SELECTED_MODIFIER_VARBIT;
 import com.datalogger.events.ColosseumAttemptEnded;
+import com.datalogger.events.ColosseumAttemptStarted;
 import com.datalogger.events.ColosseumWaveEnded;
 import com.datalogger.events.ColosseumWaveStarted;
 import com.datalogger.framework.AbstractLogger;
@@ -53,12 +54,16 @@ import com.datalogger.models.colosseum.ColosseumWave;
 import com.datalogger.models.colosseum.IntermissionUI;
 import com.datalogger.models.colosseum.enums.ColosseumModifier;
 import com.datalogger.models.colosseum.enums.WaveStatus;
-import com.datalogger.models.common.ItemBundle;
+import com.datalogger.models.itemvault.ItemBundle;
 import com.datalogger.services.ColosseumScanner;
 import com.datalogger.services.FileIOService;
 import com.google.common.primitives.Ints;
+import java.io.File;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import javax.inject.Inject;
@@ -90,6 +95,9 @@ public class ColosseumAttemptLogger extends AbstractLogger
 
 	private String entryTag;
 	private String entryAccount;
+	private String attemptId;
+	private String startTime;
+	private File attemptRoot;
 
 	private boolean activeTrial;
 	private boolean activeWave;
@@ -416,13 +424,21 @@ public class ColosseumAttemptLogger extends AbstractLogger
 		attemptStartTick = client.getTickCount();
 		setCurrentWave(1);
 		activeWave = false;
-		currentAttempt = new ColosseumAttempt(attemptStartTick);
+		startTime = Instant.ofEpochMilli(System.currentTimeMillis())
+			.atZone(ZoneId.systemDefault())
+			.format(DateTimeFormatter.ofPattern("yyMMdd_HHmmss"));
+
+		attemptId = String.format("%s_%s", getAccountName(), startTime);
+		currentAttempt = new ColosseumAttempt(attemptStartTick, getAccountName());
+		attemptRoot = new File(FileIOService.COLOSSEUM_ROOT_DIR, attemptId);
+		attemptRoot.mkdirs();
 		finalStatus = null;
 		activeTrial = true;
 		waitingForIntermission = true;
 		inColosseum = true;
 		parsedTransitionUI = null;
 		parsedCurrentWaveIntermission = false;
+		eventBus.post(new ColosseumAttemptStarted(currentAttempt.getStartTime(), getAccountName(), currentAttempt.getRootDirectory().getAbsolutePath()));
 
 		entryTag = config.colosseumTag();
 		try
@@ -449,7 +465,7 @@ public class ColosseumAttemptLogger extends AbstractLogger
 		fileIOService.logColosseumAttempt(currentAttempt);
 
 		if (enabledCsvLogging)
-			fileIOService.writeColosseumCSVLog(entryAccount, currentAttempt.getStartTime(), writeCsvLog());
+			fileIOService.writeColosseumCSVLog(currentAttempt, writeCsvLog());
 		currentAttempt = null;
 	}
 

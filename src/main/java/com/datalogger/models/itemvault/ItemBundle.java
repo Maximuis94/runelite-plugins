@@ -23,7 +23,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.datalogger.models.common;
+package com.datalogger.models.itemvault;
 
 import lombok.Value;
 import net.runelite.api.ItemComposition;

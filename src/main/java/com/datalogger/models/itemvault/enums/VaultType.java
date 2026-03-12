@@ -1,0 +1,108 @@
+/*
+ * Copyright (c) 2026, maximuis94 <https://github.com/maximuis94>
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright notice, this
+ *    list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ *    this list of conditions and the following disclaimer in the documentation
+ *    and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
+ * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+package com.datalogger.models.itemvault.enums;
+
+import static com.datalogger.constants.Item.InterfaceID.BANK_CHILD_ID;
+import static com.datalogger.constants.Item.InterfaceID.BANK_GROUP_ID;
+import static com.datalogger.constants.Item.InterfaceID.SEED_VAULT_CHILD_ID;
+import static com.datalogger.constants.Item.InterfaceID.SEED_VAULT_GROUP_ID;
+import static com.datalogger.services.FileIOService.INTERNAL_VAULT_DIR;
+import static com.datalogger.services.FileIOService.ITEM_VAULT_DIR;
+import java.io.File;
+import lombok.Getter;
+import net.runelite.api.events.WidgetLoaded;
+
+@Getter
+public enum VaultType {
+	BANK(BANK_GROUP_ID, BANK_CHILD_ID),
+	SEED_VAULT(SEED_VAULT_GROUP_ID, SEED_VAULT_CHILD_ID),
+	GRAND_EXCHANGE(-1, -1);
+
+	private final int groupId;
+	private final int childId;
+
+	VaultType(int groupId, int childId)
+	{
+		this.childId = childId;
+		this.groupId = groupId;
+	}
+
+	/**
+	 * The name of the VaultType, lowercased and with hyphens instead of underscores.
+	 */
+	public String fileNameString()
+	{
+		return this.name().toLowerCase().replace("_", "-");
+	}
+
+	/**
+	 * Return true if the given WidgetLoaded instance has a groupId that corresponds to this VaultType
+	 */
+	public boolean isVaultUI(WidgetLoaded wl)
+	{
+		return wl.getGroupId() == groupId;
+	}
+
+	/**
+	 * Return the VaultType that corresponds to the VaultType with the given groupId
+	 */
+	public static VaultType byGroupId(int groupId)
+	{
+		switch (groupId)
+		{
+			case BANK_GROUP_ID:
+				return VaultType.BANK;
+			case SEED_VAULT_GROUP_ID:
+				return VaultType.SEED_VAULT;
+			default:
+				return null;
+		}
+	}
+
+	/**
+	 * Return the internal json file associated with the given accountHash.
+	 */
+	public File getInternalFile(long accountHash)
+	{
+		return new File(INTERNAL_VAULT_DIR, fileNameString() + "_" + accountHash + ".json");
+	}
+
+	/**
+	 * Return the internal json file associated with the given accountHash.
+	 */
+	public File getExternalCSVFile(long accountHash)
+	{
+		return new File(ITEM_VAULT_DIR, fileNameString() + "_" + accountHash + ".csv");
+	}
+
+	/**
+	 * Return the internal json file associated with the given accountHash.
+	 */
+	public File getExternalJSONFile(long accountHash)
+	{
+		return new File(ITEM_VAULT_DIR, fileNameString() + "_" + accountHash + ".json");
+	}
+}

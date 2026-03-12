@@ -29,13 +29,13 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
 /**
- * Fired when the player logs in and both their unique account hash
- * and display name are successfully resolved.
+ * Fired when the player logs in and both their unique account hash and display name are successfully resolved.
  */
 @Getter
 @RequiredArgsConstructor
 public class AccountHashResolved
 {
-	private final String accountHash;
+	private final String accountHashString;
+	private final long accountHash;
 	private final String accountName;
 }

@@ -24,7 +24,7 @@
  */
 package com.datalogger.constants;
 
-import com.datalogger.models.common.ItemBundle;
+import com.datalogger.models.itemvault.ItemBundle;
 
 /**
  * Centralized constants related to Fortis Colosseum

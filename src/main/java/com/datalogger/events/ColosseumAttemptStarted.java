@@ -33,4 +33,6 @@ import lombok.Value;
 @Value
 public class ColosseumAttemptStarted {
 	String startTime;
+	String accountName;
+	String root;
 }

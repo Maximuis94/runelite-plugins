@@ -22,7 +22,6 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
 package com.datalogger.models.grandexchange;
 
 import lombok.AllArgsConstructor;
@@ -50,7 +49,7 @@ public class GeLedgerEntry {
 	private int tax;
 
 	private String accountName;
-	private String accountHash;
+	private long accountHash;
 
 	private int geSlot;
 	private boolean isHistoryEntry;
