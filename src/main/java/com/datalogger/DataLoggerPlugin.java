@@ -59,7 +59,7 @@ import net.runelite.client.util.ImageUtil;
 @Slf4j
 @PluginDescriptor(
 	name = "Data Logger",
-	description = "Logs game data for various activities, like Fortis Colosseum results or the Grand Exchange",
+	description = "Locally logs Fortis Colosseum trial data, item storage, and Grand Exchange offers as JSON/CSV files. Designed for multi-client usage.",
 	tags = {"logger", "data", "history", "screenshot", "tracker", "csv", "json", "ge", "grand exchange", "bank", "item", "fortis", "colosseum"}
 )
 public class DataLoggerPlugin extends Plugin
