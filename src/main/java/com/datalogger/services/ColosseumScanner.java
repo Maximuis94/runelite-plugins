@@ -578,11 +578,18 @@ public class ColosseumScanner
 		{
 			case UNIX:
 				state.timestampUnix(Instant.now().toEpochMilli());
+				break;
 			case HHMMSS_M:
 				state.timestampHmsm(HHMMSS_FORMATTER.format(Instant.now()));
+				break;
 			case BOTH:
-				state.timestampUnix(Instant.now().toEpochMilli());
-				state.timestampHmsm(HHMMSS_FORMATTER.format(Instant.now()));
+				Instant now = Instant.now();
+				state.timestampUnix(now.toEpochMilli());
+				state.timestampHmsm(HHMMSS_FORMATTER.format(now));
+				break;
+			case NONE:
+			default:
+				break;
 		}
 		return state.build();
 	}
