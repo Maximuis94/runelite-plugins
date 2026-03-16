@@ -55,4 +55,11 @@ public final class Item
 		public static final int MAX_TAXED_PRICE = MAX_TAX_PRICE - MAX_ITEM_TAX;
 
 	}
+
+	public static class Script
+	{
+		public static final int GE_OFFER_COLLECTION_SCRIPT_ID = 489;
+		public static final int GE_OFFER_SCRIPT_ID = 795;
+		public static final int BANK_UI_GE_COLLECT_SCRIPT_ID = 706;
+	}
 }

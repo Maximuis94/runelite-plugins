@@ -24,6 +24,11 @@
  */
 package com.datalogger.loggers;
 
+import com.datalogger.DataLoggerConfig;
+import static com.datalogger.constants.Item.InterfaceID.GE_GROUP_ID;
+import static com.datalogger.constants.Item.InterfaceID.GE_HISTORY_CHILD_ID;
+import static com.datalogger.constants.Item.Script.GE_OFFER_COLLECTION_SCRIPT_ID;
+import static com.datalogger.constants.Item.Script.GE_OFFER_SCRIPT_ID;
 import static com.datalogger.constants.Item.Values.MAX_ITEM_TAX;
 import static com.datalogger.constants.Item.Values.MAX_TAXED_PRICE;
 import static com.datalogger.constants.Item.Values.TAX_MULTIPLIER;
@@ -31,6 +36,7 @@ import com.datalogger.framework.AbstractLogger;
 import com.datalogger.framework.LogType;
 import com.datalogger.models.grandexchange.ActiveGeOffer;
 import com.datalogger.models.grandexchange.GeLedgerEntry;
+import com.datalogger.services.GrandExchangeHistoryParser;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
@@ -43,7 +49,12 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.GrandExchangeOffer;
 import net.runelite.api.GrandExchangeOfferState;
 import net.runelite.api.events.GrandExchangeOfferChanged;
+import net.runelite.api.events.ScriptPreFired;
+import net.runelite.api.events.WidgetLoaded;
+import net.runelite.api.widgets.Widget;
+import net.runelite.client.callback.ClientThread;
 import net.runelite.client.eventbus.Subscribe;
+import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.game.ItemManager;
 
 @Slf4j
@@ -51,10 +62,20 @@ import net.runelite.client.game.ItemManager;
 public class GrandExchangeLogger extends AbstractLogger
 {
 	@Inject private ItemManager itemManager;
+	@Inject private ClientThread clientThread;
+
+	@Inject private GrandExchangeHistoryParser historyParser;
 
 	private static final String CSV_HEADER = "ItemId,ItemName,OfferCreationTime,Timestamp,TradeType,Quantity,OfferQuantity,Price,OfferPrice,Value,Tax,AccountName,AccountHash,GeSlot,IsHistoryEntry,IsCancelled";
 
 	private ActiveGeOffer[] currentActiveOffers = new ActiveGeOffer[8];
+
+//	private List<GeLedgerEntry> internalLedger;
+
+	private final String[] lastLoggedFingerprints = new String[8];
+
+	private boolean loggerIsEnabled = false;
+	private boolean collectionScriptRunning = false;
 
 	@Override
 	public LogType getLogType() { return LogType.GRAND_EXCHANGE; }
@@ -65,16 +86,31 @@ public class GrandExchangeLogger extends AbstractLogger
 	@Override
 	public boolean isEnabled() { return config.logGrandExchange(); }
 
+	private Long lastParsedHistory = null;
+	private final int HISTORY_PARSE_COOLDOWN_MS = 120000;
+
 	/**
 	 * Triggered automatically by AbstractLogger when a valid session begins.
 	 */
 	@Override
 	public void setup()
 	{
-		String hash = getAccountHashString();
-		if (hash.equals("-1")) return;
+		loggerIsEnabled = config.logGrandExchange();
+		if (!loggerIsEnabled)
+			return;
 
-		List<ActiveGeOffer> savedState = utils.loadActiveGeOffers(hash);
+		String hash = getAccountHashString();
+		if (hash.equals("-1")) {
+			log.error("Unable to acquire valid account hash for grand exchange logger");
+			return;
+		}
+
+		Properties state = fileIOService.getAccountState(hash);
+		for (int i = 0; i < 8; i++) {
+			lastLoggedFingerprints[i] = state.getProperty("last_fp_" + i);
+		}
+
+		List<ActiveGeOffer> savedState = fileIOService.loadActiveGeOffers(hash);
 		currentActiveOffers = new ActiveGeOffer[8];
 		for (ActiveGeOffer offer : savedState) {
 			if (offer != null && offer.getSlot() >= 0 && offer.getSlot() < 8) {
@@ -82,6 +118,53 @@ public class GrandExchangeLogger extends AbstractLogger
 			}
 		}
 		initialScan();
+	}
+
+	private boolean isGrandExchangeSubmissionScript(int scriptId)
+	{
+		return scriptId == GE_OFFER_SCRIPT_ID || scriptId == GE_OFFER_COLLECTION_SCRIPT_ID;
+	}
+
+	/**
+	 * Submit all completed offers that have not been submitted yet.
+	 */
+	private void submitCompletedOffers(GrandExchangeOffer[] offers)
+	{
+		String hashString = getAccountHashString();
+		if (hashString.equals("-1"))
+		{
+			return;
+		}
+
+		for (int i = 0; i < offers.length; i++)
+		{
+			final int geSlot = i;
+			GrandExchangeOffer offer = offers[geSlot];
+
+			if (offer == null || !isFinalState(offer.getState())) {continue;}
+
+			log.debug("New completed trade detected in slot {}. Submitting...", geSlot);
+			if (handleOffer(geSlot, offer))
+				log.info("Successfully submitted completed trade detected in slot {}.", geSlot);
+			else
+				log.info("Did not submit trade in slot {}.", geSlot);
+		}
+	}
+
+	@Subscribe
+	public void onScriptPreFired(ScriptPreFired event)
+	{
+		if (!loggerIsEnabled || collectionScriptRunning || !isGrandExchangeSubmissionScript(event.getScriptId())) return;
+
+		collectionScriptRunning = true;
+		GrandExchangeOffer[] offers = client.getGrandExchangeOffers();
+		if (offers == null)
+		{
+			collectionScriptRunning = false;
+			return;
+		}
+		submitCompletedOffers(offers);
+		collectionScriptRunning = false;
 	}
 
 	@Subscribe
@@ -94,6 +177,44 @@ public class GrandExchangeLogger extends AbstractLogger
 
 		updateActiveOfferState(slot, offer, hash);
 		handleOffer(slot, offer);
+	}
+
+	@Subscribe
+	public void onWidgetLoaded(WidgetLoaded event)
+	{
+		if (!config.logGrandExchange()) return;
+
+		if (event.getGroupId() == GE_GROUP_ID)
+		{
+			if (canParseHistory())
+			{
+				historyUI();
+			}
+		}
+	}
+
+	@Subscribe
+	public void onConfigChanged(ConfigChanged event)
+	{
+		if (!event.getGroup().equals(DataLoggerConfig.CONFIG_GROUP)) return;
+
+		if (!loggerIsEnabled && config.logGrandExchange())
+		{
+			setup();
+		}
+
+		loggerIsEnabled = config.logGrandExchange();
+	}
+
+	private void historyUI()
+	{
+		Widget cw = client.getWidget(GE_GROUP_ID, GE_HISTORY_CHILD_ID);
+		if (cw != null && !cw.isHidden())
+		{
+			this.lastParsedHistory = Instant.now().toEpochMilli();
+			log.info("Attempting to parse GE history....");
+			clientThread.invokeLater(this.historyParser::parseGeHistory);
+		}
 	}
 
 	/**
@@ -126,34 +247,38 @@ public class GrandExchangeLogger extends AbstractLogger
 			.filter(Objects::nonNull)
 			.collect(Collectors.toList());
 
-		utils.saveActiveGeOffers(hash, listToSave);
+		fileIOService.saveActiveGeOffers(hash, listToSave);
 	}
 
-	public void handleOffer(int slot, GrandExchangeOffer offer) {
-		if (!isEnabled()) return;
+	public boolean handleOffer(int slot, GrandExchangeOffer offer) {
+		if (!isEnabled()) return false;
 
 		if (offer.getState() == GrandExchangeOfferState.EMPTY) {
 			clearSlotMemory(slot);
-			return;
+			return false;
 		}
 
 		String accountHash = getAccountHashString();
 		long accountHashLong = getAccountHashLong();
-		Properties state = utils.getAccountState(accountHash);
+		Properties state = fileIOService.getAccountState(accountHash);
 
 		String createdTs = getOrSetCreatedTimestamp(slot, offer, state, accountHash);
 		String fingerprint = generateFingerprint(offer);
-		String lastLoggedFp = state.getProperty("last_fp_" + slot);
+		String lastLoggedFp = lastLoggedFingerprints[slot];
+
 
 		if (isFinalState(offer.getState()) && offer.getSpent() > 0) {
 			if (!fingerprint.equals(lastLoggedFp)) {
+				lastLoggedFingerprints[slot] = fingerprint;
 				logFinalTrade(slot, offer, createdTs, accountHashLong);
 
 				state.setProperty("last_fp_" + slot, fingerprint);
-				utils.saveAccountState(accountHash, state);
+				fileIOService.saveAccountState(accountHash, state);
 				log.debug("Logged GE trade for slot {}. FP: {}", slot, fingerprint);
+				return true;
 			}
 		}
+		return false;
 	}
 
 	public void initialScan() {
@@ -161,7 +286,7 @@ public class GrandExchangeLogger extends AbstractLogger
 		if (offers == null) return;
 
 		String accountHash = getAccountHashString();
-		Properties state = utils.getAccountState(accountHash);
+		Properties state = fileIOService.getAccountState(accountHash);
 		boolean propertiesChanged = false;
 
 		for (int i = 0; i < offers.length; i++) {
@@ -191,7 +316,7 @@ public class GrandExchangeLogger extends AbstractLogger
 
 			if (isFinalState(offer.getState())) {
 				String fp = generateFingerprint(offer);
-				if (!fp.equals(state.getProperty("last_fp_" + i))) {
+				if (!fp.equals(lastLoggedFingerprints[i])) {
 					state.setProperty("last_fp_" + i, fp);
 					propertiesChanged = true;
 				}
@@ -199,14 +324,16 @@ public class GrandExchangeLogger extends AbstractLogger
 		}
 
 		if (propertiesChanged) {
-			utils.saveAccountState(accountHash, state);
+			fileIOService.saveAccountState(accountHash, state);
 		}
 
 		List<ActiveGeOffer> listToSave = Arrays.stream(currentActiveOffers)
 			.filter(Objects::nonNull)
 			.collect(Collectors.toList());
 
-		utils.saveActiveGeOffers(accountHash, listToSave);
+		fileIOService.saveActiveGeOffers(accountHash, listToSave);
+
+//		internalLedger = fileIOService.loadInternalGeLedger(accountHash);
 		log.debug("Initial GE scan complete. Live active offers saved to disk for {}", getAccountName());
 	}
 
@@ -219,21 +346,16 @@ public class GrandExchangeLogger extends AbstractLogger
 	 */
 	private int approximateTax(boolean isBuy, int quantity, int price)
 	{
-		int estimatedTaxPaid = 0;
-
 		if (!isBuy && price >= 49) {
-			int approxTaxPerItem;
-
 			if (price >= MAX_TAXED_PRICE) {
-				approxTaxPerItem = MAX_ITEM_TAX;
+				return MAX_ITEM_TAX;
 			} else {
 				long approxGrossPerItem = Math.round(price / TAX_MULTIPLIER);
-				approxTaxPerItem = (int) (approxGrossPerItem - price);
+				return (int) (approxGrossPerItem - price);
 			}
 
-			estimatedTaxPaid = approxTaxPerItem * quantity;
 		}
-		return estimatedTaxPaid;
+		return 0;
 	}
 
 	/**
@@ -251,10 +373,9 @@ public class GrandExchangeLogger extends AbstractLogger
 		}
 
 		int totalSpent = offer.getSpent();
-		int price = totalSpent / quantity;
+		int price = (int) Math.floor((double) totalSpent / quantity);
 		boolean isBuy = isBuy(offer.getState());
 		int estimatedTaxPaid = approximateTax(isBuy, quantity, price);
-
 
 		Instant creationInstant = null;
 		if (createdTs != null && !createdTs.isEmpty())
@@ -289,9 +410,9 @@ public class GrandExchangeLogger extends AbstractLogger
 			.build();
 
 		String hashString = getAccountHashString();
-		List<GeLedgerEntry> internalLedger = utils.loadInternalGeLedger(hashString);
+		List<GeLedgerEntry> internalLedger = fileIOService.loadInternalGeLedger(hashString);
 		internalLedger.add(ledgerEntry);
-		utils.saveInternalGeLedger(currentAccountName, hashString, internalLedger);
+		fileIOService.saveInternalGeLedger(currentAccountName, hashString, internalLedger);
 
 		if (config.logGrandExchangeCSV())
 		{
@@ -348,19 +469,19 @@ public class GrandExchangeLogger extends AbstractLogger
 			existing = Instant.now().toString();
 			state.setProperty(tsKey, existing);
 			state.setProperty(itemKey, String.valueOf(offer.getItemId()));
-			utils.saveAccountState(hash, state);
+			fileIOService.saveAccountState(hash, state);
 		}
 		return existing;
 	}
 
 	private void clearSlotMemory(int slot) {
 		String hash = getAccountHashString();
-		Properties state = utils.getAccountState(hash);
+		Properties state = fileIOService.getAccountState(hash);
 
 		if (state.containsKey("slot_created_" + slot)) {
 			state.remove("slot_created_" + slot);
 			state.remove("slot_item_" + slot);
-			utils.saveAccountState(hash, state);
+			fileIOService.saveAccountState(hash, state);
 		}
 	}
 
@@ -379,5 +500,22 @@ public class GrandExchangeLogger extends AbstractLogger
 		return state == GrandExchangeOfferState.BUYING ||
 			state == GrandExchangeOfferState.BOUGHT ||
 			state == GrandExchangeOfferState.CANCELLED_BUY;
+	}
+
+	/**
+	 * Updates relevant configurations into class variables
+	 */
+	private void updateConfigurations()
+	{
+		loggerIsEnabled = config.logGrandExchange();
+	}
+
+	/**
+	 * Return true if the GE history may be parsed again. Should be constrained to some degree to prevent
+	 * excessive/duplicate calls
+	 */
+	private boolean canParseHistory()
+	{
+		return lastParsedHistory == null || Instant.now().toEpochMilli() - lastParsedHistory > HISTORY_PARSE_COOLDOWN_MS;
 	}
 }

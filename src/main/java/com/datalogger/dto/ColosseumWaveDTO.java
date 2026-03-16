@@ -47,14 +47,13 @@ public class ColosseumWaveDTO {
 
 	private double timeTaken;
 	private int speedBonus;
-	private int speedBonusTime;
 	private int damageTaken;
 	private int damageBonus;
 	private int modifierGlory;
 	private int completionBonus;
 	private int waveGlory;
 	private int totalGlory;
-	private int totalTime;
+	private double totalTimeTaken;
 
 	private Integer serpentShamanSpawnX;
 	private Integer serpentShamanSpawnY;

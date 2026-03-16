@@ -116,6 +116,7 @@ public class ColosseumAttemptLogger extends AbstractLogger
 	private int attemptEndTick;
 	private int waveStartTick;
 	private int waveEndTick;
+	private double totalTimeTaken;
 
 	private ColosseumAttempt currentAttempt;
 	private WaveStatus finalStatus;
@@ -427,7 +428,7 @@ public class ColosseumAttemptLogger extends AbstractLogger
 		startTime = Instant.ofEpochMilli(System.currentTimeMillis())
 			.atZone(ZoneId.systemDefault())
 			.format(DateTimeFormatter.ofPattern("yyMMdd_HHmmss"));
-
+		totalTimeTaken = .0;
 		attemptId = String.format("%s_%s", getAccountName(), startTime);
 		currentAttempt = new ColosseumAttempt(attemptStartTick, getAccountName());
 		attemptRoot = new File(FileIOService.COLOSSEUM_ROOT_DIR, attemptId);
@@ -511,6 +512,7 @@ public class ColosseumAttemptLogger extends AbstractLogger
 		List<ItemBundle> loot = parsedTransitionUI != null && parsedTransitionUI.getPotentialLoot() != null ? parsedTransitionUI.getPotentialLoot() : new ArrayList<>();
 
 		double timeTaken = getWaveTimeTaken();
+		totalTimeTaken = totalTimeTaken + timeTaken;
 		ColosseumWave failedWave = ColosseumWave.builder()
 			.wave(currentWave)
 			.status(submitStatus)
@@ -529,6 +531,7 @@ public class ColosseumAttemptLogger extends AbstractLogger
 			.completionBonus(0)
 			.waveGlory(0)
 			.totalGlory(parsedTransitionUI != null ? parsedTransitionUI.getTotalGlory() : 0)
+			.totalTimeTaken(totalTimeTaken)
 			.serpentShamanSpawn(serpentShamanSpawn)
 			.javelinColossusSpawnA(javelinColossusSpawnA)
 			.javelinColossusSpawnB(javelinColossusSpawnB)
@@ -628,6 +631,7 @@ public class ColosseumAttemptLogger extends AbstractLogger
 			: new ArrayList<>();
 
 		double timeTaken = getWaveTimeTaken();
+		totalTimeTaken = totalTimeTaken + timeTaken;
 		return ColosseumWave.builder()
 			.wave(completedWave)
 			.status(WaveStatus.COMPLETED)
@@ -639,6 +643,7 @@ public class ColosseumAttemptLogger extends AbstractLogger
 			.startTick(waveStartTick)
 			.endTick(waveEndTick)
 			.timeTaken(timeTaken)
+			.totalTimeTaken(totalTimeTaken)
 			.speedBonus(curUI.getSpeedBonusGlory())
 			.damageTaken(curUI.getDamageTakenAmount())
 			.damageBonus(curUI.getDamageTakenGlory())
@@ -683,6 +688,7 @@ public class ColosseumAttemptLogger extends AbstractLogger
 			.startTick(endTick)
 			.endTick(endTick)
 			.timeTaken(0)
+			.totalTimeTaken(totalTimeTaken)
 			.speedBonus(0)
 			.damageTaken(0)
 			.damageBonus(0)

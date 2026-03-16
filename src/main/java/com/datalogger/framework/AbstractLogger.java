@@ -38,7 +38,7 @@ import net.runelite.client.eventbus.Subscribe;
 @Slf4j
 public abstract class AbstractLogger implements Loggable {
 	@Inject protected Client client;
-	@Inject protected FileIOService utils;
+	@Inject protected FileIOService fileIOService;
 	@Inject protected DataLoggerConfig config;
 
 	// Currently active account
@@ -76,8 +76,8 @@ public abstract class AbstractLogger implements Loggable {
 			return;
 		}
 
-		File logFile = utils.getTargetFile(getLogType(), accountName);
-		utils.atomicWrite(logFile, getCsvHeader(), csvRow);
+		File logFile = fileIOService.getTargetFile(getLogType(), accountName);
+		fileIOService.atomicWrite(logFile, getCsvHeader(), csvRow);
 	}
 
 	/**

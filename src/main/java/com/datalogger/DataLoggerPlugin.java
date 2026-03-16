@@ -85,6 +85,7 @@ public class DataLoggerPlugin extends Plugin
 
 	private NavigationButton navButton;
 	private boolean sessionInitialized = false;
+	private boolean startUpComplete = false;
 
 	// Registration State Trackers
 	private boolean isItemVaultRegistered = false;
@@ -126,6 +127,7 @@ public class DataLoggerPlugin extends Plugin
 			.build();
 
 		clientToolbar.addNavigation(navButton);
+		startUpComplete = true;
 	}
 
 	@Override
@@ -271,7 +273,7 @@ public class DataLoggerPlugin extends Plugin
 	@Subscribe
 	public void onGameTick(GameTick event)
 	{
-		if (!sessionInitialized && client.getGameState() == GameState.LOGGED_IN)
+		if (!sessionInitialized && startUpComplete && client.getGameState() == GameState.LOGGED_IN)
 		{
 			long currentHash = client.getAccountHash();
 

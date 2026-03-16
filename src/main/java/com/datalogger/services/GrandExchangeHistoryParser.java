@@ -39,12 +39,8 @@ import javax.inject.Singleton;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
-import net.runelite.api.GameState;
 import net.runelite.api.ItemComposition;
-import net.runelite.api.events.GameStateChanged;
-import net.runelite.api.events.WidgetLoaded;
 import net.runelite.api.widgets.Widget;
-import net.runelite.client.callback.ClientThread;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.util.Text;
@@ -53,20 +49,11 @@ import net.runelite.client.util.Text;
 @Singleton
 public class GrandExchangeHistoryParser
 {
-	@Inject
-	private Client client;
-	@Inject
-	private ClientThread clientThread;
-	@Inject
-	private FileIOService fileIOService;
-	@Inject
-	private DataLoggerConfig config;
-
-	@Inject
-	private GeHistoryReconciler reconciler;
-
-	@Inject
-	private ItemManager itemManager;
+	private final Client client;
+	private final FileIOService fileIOService;
+	private final DataLoggerConfig config;
+	private final GeHistoryReconciler reconciler;
+	private final ItemManager itemManager;
 
 	private long accountHash = -1;
 	private String accountName = null;
@@ -76,42 +63,25 @@ public class GrandExchangeHistoryParser
 	private static final int ELEMENTS_PER_ROW = 6;
 	private static final long COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes in milliseconds
 
+	@Inject
+	public GrandExchangeHistoryParser(Client client, FileIOService fileIOService, DataLoggerConfig config, ItemManager itemManager)
+	{
+		this.client = client;
+		this.fileIOService = fileIOService;
+		this.config = config;
+		this.reconciler = new GeHistoryReconciler();
+		this.itemManager = itemManager;
+	}
+
 	/**
 	 * Listens for our custom event and caches the account hash globally for this class.
 	 */
 	@Subscribe
 	public void onAccountSessionStarted(AccountSessionStarted event)
 	{
-		String hash = event.getAccountHashString().strip();
-		if (hash.matches("\\d+"))
-			accountHash = Long.parseLong(event.getAccountHashString());
-		else {
-			log.info("Failed to extract account hash value; it is not a digit...");
-			accountHash = -1;
-		}
-		accountName = event.getAccountName(); // Ready for your CSVs!
+		accountHash = event.getAccountHash();
+		accountName = event.getAccountName();
 		hasParsed = false;
-	}
-
-	@Subscribe
-	public void onWidgetLoaded(WidgetLoaded event)
-	{
-		if (!hasParsed && config.logGrandExchange() && event.getGroupId() == GE_GROUP_ID)
-		{
-			log.info("Attempting to parse GE history....");
-			clientThread.invokeLater(this::parseGeHistory);
-		}
-	}
-
-	// Reset accountHash and hasParsed when logging out
-	@Subscribe
-	public void onGameStateChanged(GameStateChanged event) {
-		GameState state = event.getGameState();
-		if (state == GameState.LOGIN_SCREEN) {
-			hasParsed = false;
-			accountHash = -1;
-			log.debug("Session ended. GE History Parser state cleared.");
-		}
 	}
 
 	/**
@@ -134,7 +104,11 @@ public class GrandExchangeHistoryParser
 	 * skip them if they are already logged.
 	 */
 	public void parseGeHistory() {
-		if (!allowedToParseHistory()) return;
+		if (!allowedToParseHistory())
+		{
+			log.info("Not parsing Grand Exchange history");
+			return;
+		}
 
 		Widget historyContainer = client.getWidget(GE_GROUP_ID, GE_HISTORY_CHILD_ID);
 
@@ -210,6 +184,8 @@ public class GrandExchangeHistoryParser
 
 			log.info("Successfully parsed and saved GE History.");
 		}
+		else
+			log.info("Did not enter any entry data from the Grand Exchange history");
 
 		lastParsed = System.currentTimeMillis();
 		hasParsed = true;

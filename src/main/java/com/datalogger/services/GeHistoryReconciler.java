@@ -29,40 +29,50 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 public class GeHistoryReconciler {
 
-	public List<GeLedgerEntry> weaveLedgers(List<GeLedgerEntry> masterLedger, List<GeLedgerEntry> scrapedHistory) {
+	public List<GeLedgerEntry> weaveLedgers(List<GeLedgerEntry> masterLedger, List<GeLedgerEntry> scrapedHistory)
+	{
 		List<GeLedgerEntry> updatedLedger = new ArrayList<>(masterLedger);
 		Set<Integer> consumedIndices = new HashSet<>();
 
-		int windowStart = Math.max(0, updatedLedger.size() - 200);
+		int x = scrapedHistory.size();
 
-		for (GeLedgerEntry scraped : scrapedHistory) {
+		int windowStart = Math.max(0, updatedLedger.size() - x);
+
+		for (GeLedgerEntry scraped : scrapedHistory)
+		{
 			boolean foundMatch = false;
 
-			for (int i = windowStart; i < updatedLedger.size(); i++) {
-				if (consumedIndices.contains(i)) {
+			for (int i = windowStart; i < updatedLedger.size(); i++)
+			{
+				if (consumedIndices.contains(i))
+				{
 					continue;
 				}
 
 				GeLedgerEntry existing = updatedLedger.get(i);
 
-				if (isExactMatch(existing, scraped)) {
+				if (isExactMatch(existing, scraped))
+				{
 					foundMatch = true;
 					consumedIndices.add(i);
 
-					if (!existing.isHistoryEntry()) {
+					if (!existing.isHistoryEntry())
+					{
 						existing.setTax(scraped.getTax());
-						existing.setPrice(scraped.getPrice());
-						existing.setValue(scraped.getValue());
 					}
 					break;
 				}
 			}
 
-			if (!foundMatch) {
-				updatedLedger.add(scraped);
+			if (!foundMatch)
+			{
+//				updatedLedger.add(scraped);
+				log.info("Did not find a matching entry for history entry {}", scraped);
 			}
 		}
 		return updatedLedger;
@@ -74,6 +84,6 @@ public class GeHistoryReconciler {
 	private boolean isExactMatch(GeLedgerEntry existing, GeLedgerEntry scraped) {
 		return existing.getItemId() == scraped.getItemId() &&
 			existing.isBuy() == scraped.isBuy() &&
-			existing.getPrice() == scraped.getPrice()+scraped.getTax();
+			existing.getValue() == scraped.getValue();
 	}
 }

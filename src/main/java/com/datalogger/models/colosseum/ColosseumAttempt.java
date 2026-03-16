@@ -52,6 +52,8 @@ public class ColosseumAttempt
 	@Setter
 	private WaveStatus finalStatus;
 
+	private double totalTimeTaken;
+
 	private final List<ColosseumWave> waves;
 
 
@@ -65,6 +67,7 @@ public class ColosseumAttempt
 		waves = new ArrayList<>();
 		finalStatus = WaveStatus.FAILED;
 		account = accountName;
+		totalTimeTaken = .0;
 	}
 
 	public ColosseumAttemptDTO toDTO() {
@@ -86,6 +89,7 @@ public class ColosseumAttempt
 		if (waves.isEmpty())
 		{
 			waves.add(wave);
+			totalTimeTaken = wave.getTotalTimeTaken();
 		}
 		else
 		{
@@ -93,6 +97,7 @@ public class ColosseumAttempt
 			if (lastLogged.getWave() != wave.getWave())
 			{
 				waves.add(wave);
+				totalTimeTaken = wave.getTotalTimeTaken();
 			}
 		}
 	}
