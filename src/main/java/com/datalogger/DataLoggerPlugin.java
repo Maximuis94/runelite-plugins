@@ -143,6 +143,7 @@ public class DataLoggerPlugin extends Plugin
 
 		eventBus.unregister(accountHashMapper);
 		eventBus.unregister(fileIOService);
+		eventBus.unregister(itemVaultLogger);
 
 		toggleItemVault(false);
 		toggleGrandExchange(false);
