@@ -48,8 +48,8 @@ import com.datalogger.models.colosseum.ColosseumState;
 import com.datalogger.models.colosseum.IntermissionUI;
 import com.datalogger.models.colosseum.ManticoreAttackSequence;
 import com.datalogger.models.colosseum.SummaryUI;
-import com.datalogger.models.colosseum.enums.ColosseumModifier;
-import com.datalogger.models.colosseum.enums.TimestampFormat;
+import com.datalogger.models.enums.ColosseumModifier;
+import com.datalogger.models.enums.TimestampFormat;
 import com.datalogger.models.itemvault.ItemBundle;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -191,7 +191,6 @@ public class ColosseumScanner
 	@Subscribe
 	public void onNpcChanged(NpcChanged event)
 	{
-		// Called when an NPC transforms (e.g., changes phases)
 		NPC npc = event.getNpc();
 		NPCComposition comp = npc.getComposition();
 		int npcId = (comp != null) ? comp.getId() : npc.getId();

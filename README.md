@@ -7,6 +7,10 @@ The plugin itself does not (yet) provide means to interact with/view data, it me
 ## File structure
 The logger plugin stores its exported data in subdirectories of the plugin root, the plugin itself also relies on internal data.
 
+<details>
+  <summary>data-logger file structure</summary>
+
+
 ### Internal
 One of the subdirectories, internal, is used by the plugin. These files are assumed to be used by the 
 plugin only, modifying them or interacting with them while the plugin is used may affect plugin performance.
@@ -16,6 +20,8 @@ Most of the data in other folders can be reproduced using the internally cached 
 All other directories are data dumps produced by the logger; locking the files (e.g. by opening a CSV file using excel) 
 may prevent the plugin from updating it, but should not interfere with the plugin in any other way. The sections below describe 
 what data is stored where.
+
+</details>
 
 ## Item-related data loggers
 These loggers have been written to accommodate using multiple clients simultaneously and minimize risk for I/O errors.
@@ -53,8 +59,12 @@ CSV files are separated per day, named as `grand-exchange_YYYY-MM-DD.csv`. To fa
 effectively separating files per account.
 
 Grand Exchange offers are designed to contain as much information as possible. This information is limited to offer metadata and its 
-parameters upon completion.
-Furthermore, I tried to design the exchange logger as robust as possible in order to minimize missing logged offers.
+values upon completion. To minimize the risk of missing out on offer submissions, completed offers that have not been collected are 
+submitted on certain occasions, like right before collecting the offer.
+In order to avoid duplicate submissions, a completed offer passed to the handler will not be submitted if the last registered
+offer for that slot is identical to the to-be submitted offer.
+Ongoing offers are also tracked to determine the creation timestamp. The creation timestamp is logged if it is available,
+if not it is set to the submission timestamp instead. 
 
 
 <details>
@@ -67,11 +77,8 @@ This Grand Exchange history entry data tends to be more accurate, as it literall
 The taxed value cannot be induced with absolute certainty for sale offers priced above 50gp using RuneLite Grand Exchange offers (i.e. whether one sells an item for 99 gp 
 or 100 gp results in a 1gp and 2gp tax, respectively. Both cases would in turn result in the person selling receiving 98 
 gp per item, which is the information provided by RuneLite). 
-I tried to resolve this discrepancy by updating existing offers with this grand exchange history information, provided an entry can be matched to a submission.
-In case no match can be made, the offer is not stored.
-
-Ongoing offers are also tracked to determine the creation timestamp and to prevent duplicate submissions. The creation timestamp 
-is logged if it is available.
+An attempt is made to resolve this discrepancy by updating existing offers with this grand exchange history entry, provided a match can be made with an existing submission.
+If no match can be made, the offer is not submitted.
 
 All files located in the grand-exchange directory are constructed using data from the internal ge-history directory. 
 These files can be reproduced manually by via the buttons in the sidebar menu. The amount of internally logged offers 
@@ -157,7 +164,7 @@ the json and csv file content. This data is added to merged data structures.
 ## Colosseum
 Data loggers related to tracking Colosseum progress.
 Generated files are bundled per attempt in a newly created directory, which is named as `<ACCOUNT_NAME>_<YYMMDD>_<HHMMSS>`,
-and created in ${user.home}/.runelite/data-logger/colosseum. All tracked data that is related to an attempt is stored in 
+and created in ${user.home}/.runelite/data-logger/colosseum/attempt. All tracked data that is related to an attempt is stored in 
 this folder.
 
 
@@ -172,8 +179,8 @@ Logger that keeps track of Colosseum data per wave. If enabled, the following da
 - Wave reward(s)
   - Dizana's quiver can also be stored as 4,000 Sunfire splinters
   - Hidden next wave loot can also be logged
-- Modifiers: choices and modifier chosen
-- Time taken: Wave completion time in seconds
+- Modifiers: choices for this wave, modifier chosen and cumulative modifier choices
+- Time taken: Wave completion time in seconds + cumulative time taken
 - Damage taken: Amount of damage directly taken from enemies (i.e. that counts towards damage bonus)
 - Speed/damage/modifier/completion glory earned
 - Wave glory: Glory earned during this wave
@@ -192,58 +199,57 @@ The data described above is always generated as JSON file, and may additionally 
   {
     "wave": 8,
     "status": "COMPLETED",
-    "accountName": "ACCOUNT",
+    "accountName": "ACCOUNT_NAME",
     "tag": "",
     "earnedLoot": [
-        {
-        "itemId": 28942,
-        "itemName": "Echo crystal",
-        "quantity": 3
-        }
+      {
+        "itemId": 9342,
+        "itemName": "Onyx bolts",
+        "quantity": 30
+      }
     ],
     "modifierChoices": [
-        "BLASPHEMY_III",
-        "MANTIMAYHEM_II",
-        "MYOPIA_I"
+      "BEES_I",
+      "TOTEMIC",
+      "SOLARFLARE_I"
     ],
-    "chosenModifier": "MANTIMAYHEM_II",
-    "startTick": 1430,
-    "endTick": 1728,
-    "timeTaken": 178.8,
-    "speedBonus": 1616,
-    "damageTaken": 0,
-    "damageBonus": 800,
-    "modifierGlory": 1300,
+    "chosenModifier": "TOTEMIC",
+    "activeModifiers": [
+      "BLASPHEMY_I",
+      "FRAILTY_I",
+      "FRAILTY_II",
+      "MYOPIA_I",
+      "MYOPIA_II",
+      "MYOPIA_III",
+      "FRAILTY_III",
+      "DYNAMIC_DUO"
+    ],
+    "timeTaken": 226.8,
+    "speedBonus": 976,
+    "damageTaken": 174,
+    "damageBonus": 0,
+    "modifierGlory": 1550,
     "completionBonus": 800,
-    "waveGlory": 4516,
-    "totalGlory": 23590,
-    "javelinColossusSpawnA": {
-        "x": 40,
-        "y": 35
-    },
-    "javelinColossusSpawnB": {
-        "x": 35,
-        "y": 31
-    },
-    "manticoreSpawnA": {
-        "x": 33,
-        "y": 42
-    },
-    "manticoreSequenceA": {
-    "orbs": [
-        "MAGIC",
-        "RANGE",
-        "MELEE"
-    ]
-    },
-    "shockwaveColossusSpawnA": {
-        "x": 44,
-        "y": 37
-    },
-    "minotaurReinforcementsSpawn": {
-        "x": 33,
-        "y": 48
-    }
+    "waveGlory": 3326,
+    "totalGlory": 22867,
+    "totalTimeTaken": 845.4,
+    "javelinColossusSpawnAX": 35,
+    "javelinColossusSpawnAY": 37,
+    "javelinColossusSpawnBX": 32,
+    "javelinColossusSpawnBY": 27,
+    "manticoreSpawnAX": 35,
+    "manticoreSpawnAY": 31,
+    "manticoreSequenceA": [
+      "MAGIC",
+      "RANGE",
+      "MELEE"
+    ],
+    "shockwaveColossusSpawnAX": 29,
+    "shockwaveColossusSpawnAY": 37,
+    "shockwaveColossusSpawnBX": 27,
+    "shockwaveColossusSpawnBY": 37,
+    "minotaurReinforcementsSpawnX": 32,
+    "minotaurReinforcementsSpawnY": 20
   }
 ]
 ```
@@ -334,6 +340,17 @@ _Example of state data_
 If enabled, a screenshot is created and stored in the directory created for that attempt when the interface between waves or the rewards chest interface pops up.
 ![img_1.png](images/example-wave-completion-screenshot.png)
 _An example of a screenshot taken after wave 12 is completed_
+
+</details>
+
+<details>
+  <summary>Supply tracking</summary>
+
+
+If enabled, supplies are also tracked during colosseum trials. A snapshot is created at the start of an attempt, and 
+the supplies at the end are subtracted from the initial snapshot and stored into a file.
+These supplies also include an estimate of Scythe of vitur / Tumeken's shadow attacks (to be expanded in the future)
+Supply logs are saved as `<ACCOUNT_NAME>_<YYMMDD>_<HHMMSS>_supply-log.<EXTENSION>`
 
 </details>
 

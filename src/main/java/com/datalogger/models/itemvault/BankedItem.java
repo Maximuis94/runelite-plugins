@@ -25,7 +25,7 @@
 
 package com.datalogger.models.itemvault;
 
-import com.datalogger.models.itemvault.enums.VaultType;
+import com.datalogger.models.enums.VaultType;
 import lombok.Value;
 
 @Value

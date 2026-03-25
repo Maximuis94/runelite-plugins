@@ -27,7 +27,7 @@ package com.datalogger.services;
 import com.datalogger.events.AccountSessionStarted;
 import com.datalogger.loggers.ItemVaultLogger;
 import com.datalogger.models.itemvault.BankedItem;
-import com.datalogger.models.itemvault.enums.VaultType;
+import com.datalogger.models.enums.VaultType;
 import java.util.ArrayList;
 import java.util.List;
 import javax.inject.Inject;

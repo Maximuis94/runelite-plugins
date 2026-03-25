@@ -26,6 +26,7 @@ package com.datalogger.loggers;
 
 import com.datalogger.DataLoggerConfig;
 import static com.datalogger.constants.Colosseum.Intermission.INTERMISSION_GROUP_ID;
+import static com.datalogger.constants.Colosseum.Message.BOSS_MESSAGE_PREFIX;
 import static com.datalogger.constants.Colosseum.Message.BOSS_WAVE_START_PREFIX;
 import static com.datalogger.constants.Colosseum.Message.DEATH_MESSAGE;
 import static com.datalogger.constants.Colosseum.Message.END_ATTEMPT_MESSAGE;
@@ -52,19 +53,20 @@ import com.datalogger.framework.LogType;
 import com.datalogger.models.colosseum.ColosseumAttempt;
 import com.datalogger.models.colosseum.ColosseumWave;
 import com.datalogger.models.colosseum.IntermissionUI;
-import com.datalogger.models.colosseum.enums.ColosseumModifier;
-import com.datalogger.models.colosseum.enums.WaveStatus;
+import com.datalogger.models.enums.ColosseumModifier;
+import com.datalogger.models.enums.WaveStatus;
 import com.datalogger.models.itemvault.ItemBundle;
 import com.datalogger.services.ColosseumScanner;
 import com.datalogger.services.FileIOService;
+import com.datalogger.services.SupplyTracker;
 import com.google.common.primitives.Ints;
-import java.io.File;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -73,6 +75,8 @@ import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
 import net.runelite.api.NPC;
+import net.runelite.api.Player;
+import net.runelite.api.Skill;
 import net.runelite.api.WorldView;
 import net.runelite.api.coords.WorldPoint;
 import net.runelite.api.events.ChatMessage;
@@ -95,22 +99,23 @@ public class ColosseumAttemptLogger extends AbstractLogger
 
 	private String entryTag;
 	private String entryAccount;
-	private String attemptId;
 	private String startTime;
-	private File attemptRoot;
 
 	private boolean activeTrial;
 	private boolean activeWave;
 	private boolean inColosseum;
-
-	private boolean enabledLogging;
-	private boolean enabledCsvLogging;
+	private boolean trackSupplies;
 
 	private boolean parsedCurrentWaveIntermission;
 	private int currentWave;
 	private int completedWave;
 //	private int selectedModifierIdx;
 	private ColosseumModifier selectedModifier;
+	private final List<String> activeModifiers = new ArrayList<>();
+
+	private int bossWavePhase;
+	private final int[] bossWavePhaseTickCounts = new int[7];
+	private static final List<Integer> BOSS_HP_AT_PHASE = List.of(1500, 1350, 1125, 750, 375, 150, 0);
 
 	private int attemptStartTick;
 	private int attemptEndTick;
@@ -124,8 +129,14 @@ public class ColosseumAttemptLogger extends AbstractLogger
 	private final ColosseumScanner scanner;
 	private final Client client;
 	private final FileIOService fileIOService;
-	private final DataLoggerConfig config;
 	private final EventBus eventBus;
+	private final SupplyTracker supplyTracker;
+
+	private final DataLoggerConfig config;
+
+	private boolean enabledLogging;
+	private boolean enabledCsvLogging;
+	private boolean autoMergeWaveFiles;
 
 	private boolean waitingForIntermission;
 
@@ -142,12 +153,13 @@ public class ColosseumAttemptLogger extends AbstractLogger
 	private WorldPoint minotaurReinforcementsSpawn;
 
 	@Inject
-	public ColosseumAttemptLogger(ColosseumScanner scanner, Client client, FileIOService fileIOService, DataLoggerConfig config, EventBus eventBus) {
+	public ColosseumAttemptLogger(ColosseumScanner scanner, Client client, FileIOService fileIOService, DataLoggerConfig config, EventBus eventBus, SupplyTracker supplyTracker) {
 		this.scanner = scanner;
 		this.client = client;
 		this.fileIOService = fileIOService;
 		this.config = config;
 		this.eventBus = eventBus;
+		this.supplyTracker = supplyTracker;
 
 		updateConfigFlags();
 	}
@@ -159,6 +171,8 @@ public class ColosseumAttemptLogger extends AbstractLogger
 	{
 		enabledLogging = config.logColosseum();
 		enabledCsvLogging = enabledLogging && config.logColosseumCSV();
+		autoMergeWaveFiles = config.autoMergeWaveLogs();
+		trackSupplies = config.trackSupplies();
 	}
 
 	@Subscribe
@@ -195,6 +209,16 @@ public class ColosseumAttemptLogger extends AbstractLogger
 			return;
 		}
 
+		if (currentWave == 12 && message.startsWith(BOSS_MESSAGE_PREFIX) && client.getBoostedSkillLevel(Skill.HITPOINTS)>0)
+		{
+			int tickCount = client.getTickCount();
+			bossWavePhaseTickCounts[bossWavePhase] = tickCount;
+			log.info("Registered tickCount = {} for Sol heredit phase {}", tickCount, bossWavePhase);
+			bossWavePhase++;
+			return;
+		}
+
+
 		if (message.startsWith(START_ATTEMPT_MESSAGE))
 		{
 			startAttempt();
@@ -207,7 +231,6 @@ public class ColosseumAttemptLogger extends AbstractLogger
 			setCurrentWave(Integer.parseInt(message.split(" ")[1]));
 			completedWave = currentWave;
 			log.info("Starting wave {} - setting waveStartTick to {}", currentWave, waveStartTick);
-			log.info("Modifier change tick is {}", waveStartTick-5);
 			startWave();
 			return;
 		}
@@ -260,6 +283,7 @@ public class ColosseumAttemptLogger extends AbstractLogger
 				{
 					int selectedModifierIdx = event.getValue()-1;
 					selectedModifier = modifierChoices.get(selectedModifierIdx);
+					activeModifiers.add(selectedModifier.name());
 					parsedTransitionUI.setSelectedModifier(selectedModifier);
 					log.info("[WAVE {}] Varbit {} was changed - new value is {}, set selectedModifier to {}", currentWave, COLOSSEUM_SELECTED_MODIFIER_VARBIT, selectedModifierIdx, selectedModifier);
 				}
@@ -325,9 +349,23 @@ public class ColosseumAttemptLogger extends AbstractLogger
 
 	@Subscribe
 	public void onGameTick(GameTick event) {
-		if (!enabledLogging || !inColosseum) return;
+		if (!enabledLogging || !inColosseum || !activeWave) return;
 
-		if (activeWave && !scanner.scannedManticoreSequences(currentWave)) {
+		if (supplyTracker.isTracking())
+		{
+			Player localPlayer = client.getLocalPlayer();
+			if (localPlayer != null && client.getBoostedSkillLevel(Skill.HITPOINTS) == 0)
+			{
+				log.info("Player died at wave {}. Stopping tracker before respawn.", currentWave);
+
+
+				supplyTracker.stopTracking(currentAttempt.getAttemptRoot(), currentAttempt.getSupplyFileName(),true, enabledCsvLogging);
+				activeWave = false;
+				return;
+			}
+		}
+
+		if (!scanner.scannedManticoreSequences(currentWave)) {
 			WorldView wv = client.getTopLevelWorldView();
 			if (wv != null) {
 				scanner.parseManticoreAttackSequences(wv.npcs());
@@ -424,21 +462,27 @@ public class ColosseumAttemptLogger extends AbstractLogger
 		log.info("Starting a new Colosseum attempt.");
 		attemptStartTick = client.getTickCount();
 		setCurrentWave(1);
+		activeModifiers.clear();
 		activeWave = false;
 		startTime = Instant.ofEpochMilli(System.currentTimeMillis())
 			.atZone(ZoneId.systemDefault())
 			.format(DateTimeFormatter.ofPattern("yyMMdd_HHmmss"));
 		totalTimeTaken = .0;
-		attemptId = String.format("%s_%s", getAccountName(), startTime);
 		currentAttempt = new ColosseumAttempt(attemptStartTick, getAccountName());
-		attemptRoot = new File(FileIOService.COLOSSEUM_ROOT_DIR, attemptId);
 		finalStatus = null;
 		activeTrial = true;
 		waitingForIntermission = true;
 		inColosseum = true;
 		parsedTransitionUI = null;
 		parsedCurrentWaveIntermission = false;
-		eventBus.post(new ColosseumAttemptStarted(currentAttempt.getStartTime(), getAccountName(), currentAttempt.getRootDirectory().getAbsolutePath()));
+
+		if (trackSupplies)
+			supplyTracker.startTracking();
+
+		bossWavePhase = 0;
+		Arrays.fill(bossWavePhaseTickCounts, -1);
+
+		eventBus.post(new ColosseumAttemptStarted(currentAttempt.getStartTime(), getAccountName(), currentAttempt.getAttemptRoot().getAbsolutePath()));
 
 		entryTag = config.colosseumTag();
 		try
@@ -464,9 +508,31 @@ public class ColosseumAttemptLogger extends AbstractLogger
 		currentAttempt.setFinalStatus(status);
 		fileIOService.logColosseumAttempt(currentAttempt);
 
+		if (currentWave == 12 && bossWavePhaseTickCounts[0] != -1 && bossWavePhaseTickCounts[1] != -1)
+		{
+			double totalTimeTaken = 0;
+			log.info("Time taken per boss phase");
+			for (int phase = 1; phase < bossWavePhaseTickCounts.length; phase++)
+			{
+				double phaseTimeTaken = BigDecimal.valueOf(.6*(bossWavePhaseTickCounts[phase]- bossWavePhaseTickCounts[phase-1])).setScale(1, RoundingMode.HALF_UP).doubleValue();
+				totalTimeTaken += phaseTimeTaken;
+				log.info("Phase {}: [{}-{}] HP {} seconds (total: {})", phase, BOSS_HP_AT_PHASE.get(phase-1), BOSS_HP_AT_PHASE.get(phase), phaseTimeTaken, totalTimeTaken);
+			}
+		}
+
 		if (enabledCsvLogging)
+		{
 			fileIOService.writeColosseumCSVLog(currentAttempt, writeCsvLog());
+		}
+		if (trackSupplies)
+			supplyTracker.stopTracking(currentAttempt.getAttemptRoot(), currentAttempt.getSupplyFileName(), true, enabledCsvLogging);
+
 		currentAttempt = null;
+
+		if (autoMergeWaveFiles)
+		{
+			fileIOService.mergeColosseumWaveLogs();
+		}
 	}
 
 	/**
@@ -512,7 +578,7 @@ public class ColosseumAttemptLogger extends AbstractLogger
 		List<ItemBundle> loot = parsedTransitionUI != null && parsedTransitionUI.getPotentialLoot() != null ? parsedTransitionUI.getPotentialLoot() : new ArrayList<>();
 
 		double timeTaken = getWaveTimeTaken();
-		totalTimeTaken = totalTimeTaken + timeTaken;
+		totalTimeTaken = BigDecimal.valueOf(totalTimeTaken+timeTaken).setScale(1, RoundingMode.HALF_UP).doubleValue();
 		ColosseumWave failedWave = ColosseumWave.builder()
 			.wave(currentWave)
 			.status(submitStatus)
@@ -521,6 +587,7 @@ public class ColosseumAttemptLogger extends AbstractLogger
 			.earnedLoot(loot)
 			.modifierChoices(parsedTransitionUI != null ? parsedTransitionUI.getModifierChoices() : new ArrayList<>())
 			.chosenModifier(selectedModifier)
+			.activeModifiers(String.join("|", activeModifiers))
 			.startTick(waveStartTick)
 			.endTick(waveEndTick)
 			.timeTaken(timeTaken)
@@ -631,7 +698,7 @@ public class ColosseumAttemptLogger extends AbstractLogger
 			: new ArrayList<>();
 
 		double timeTaken = getWaveTimeTaken();
-		totalTimeTaken = totalTimeTaken + timeTaken;
+		totalTimeTaken = BigDecimal.valueOf(totalTimeTaken+timeTaken).setScale(1, RoundingMode.HALF_UP).doubleValue();
 		return ColosseumWave.builder()
 			.wave(completedWave)
 			.status(WaveStatus.COMPLETED)
@@ -640,6 +707,7 @@ public class ColosseumAttemptLogger extends AbstractLogger
 			.earnedLoot(loot)
 			.modifierChoices(parsedTransitionUI.getModifierChoices())
 			.chosenModifier(parsedTransitionUI.getSelectedModifier())
+			.activeModifiers(String.join("|", activeModifiers))
 			.startTick(waveStartTick)
 			.endTick(waveEndTick)
 			.timeTaken(timeTaken)
@@ -685,6 +753,7 @@ public class ColosseumAttemptLogger extends AbstractLogger
 			.earnedLoot(loot)
 			.modifierChoices(parsedTransitionUI != null ? parsedTransitionUI.getModifierChoices() : new ArrayList<>())
 			.chosenModifier(null)
+			.activeModifiers(String.join("|", activeModifiers))
 			.startTick(endTick)
 			.endTick(endTick)
 			.timeTaken(0)
@@ -737,6 +806,9 @@ public class ColosseumAttemptLogger extends AbstractLogger
 		return BigDecimal.valueOf(.6 * (waveEndTick - waveStartTick)).setScale(1, RoundingMode.HALF_UP).doubleValue();
 	}
 
+	/**
+	 * Generate and return a String that is to be written into the CSV log
+	 */
 	public String writeCsvLog() {
 		if (currentAttempt == null || currentAttempt.getWaves() == null || currentAttempt.getWaves().isEmpty()) {
 			return "";

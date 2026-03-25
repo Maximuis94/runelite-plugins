@@ -23,22 +23,13 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.datalogger.models.colosseum.enums;
+package com.datalogger.models.enums;
 
-public enum TimestampFormat {
-	NONE("None"),
-	UNIX("UNIX"),
-	HHMMSS_M("hh:mm:ss.m"),
-	BOTH("Both");
-
-	private final String name;
-
-	TimestampFormat(String name) {
-		this.name = name;
-	}
-
-	@Override
-	public String toString() {
-		return name;
-	}
+public enum WaveStatus
+{
+	COMPLETED,
+	FAILED,
+	CLAIMED,
+	CANCELLED,
+	CONFIG_DISABLED
 }

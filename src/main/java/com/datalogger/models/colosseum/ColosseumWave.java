@@ -26,9 +26,11 @@ package com.datalogger.models.colosseum;
 
 import com.datalogger.dto.ColosseumWaveDTO;
 import com.datalogger.framework.DataRow;
-import com.datalogger.models.colosseum.enums.ColosseumModifier;
-import com.datalogger.models.colosseum.enums.WaveStatus;
+import com.datalogger.models.enums.ColosseumModifier;
+import com.datalogger.models.enums.WaveStatus;
 import com.datalogger.models.itemvault.ItemBundle;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 import java.util.stream.Collectors;
 import lombok.Builder;
@@ -53,6 +55,8 @@ public class ColosseumWave implements DataRow
 
 	@Singular
 	private List<ColosseumModifier> modifierChoices;
+
+	private String activeModifiers;
 
 	private ColosseumModifier chosenModifier;
 
@@ -103,8 +107,9 @@ public class ColosseumWave implements DataRow
 				.map(ColosseumModifier::name)
 				.collect(Collectors.toList()) : new java.util.ArrayList<>())
 			.chosenModifier(chosenModifier != null ? chosenModifier.name() : null)
+			.activeModifiers(activeModifiers != null ? activeModifiers : "")
 			.timeTaken(timeTaken)
-			.totalTimeTaken(totalTimeTaken)
+			.totalTimeTaken(BigDecimal.valueOf(totalTimeTaken).setScale(1, RoundingMode.HALF_UP).doubleValue())
 			.speedBonus(speedBonus)
 			.damageTaken(damageTaken)
 			.damageBonus(damageBonus)
@@ -146,7 +151,7 @@ public class ColosseumWave implements DataRow
 	}
 
 	public static String csvHeader() {
-		return "wave,status,accountName,tag,itemIds,itemNames,quantities,modifierChoice_I,modifierChoice_II,modifierChoice_III,chosenModifier,timeTaken,damageTaken,speedBonus,damageBonus,modifierGlory,completionBonus,waveGlory,totalGlory,totalTimeTaken,serpentShamanSpawnX,serpentShamanSpawnY,javelinColossusSpawnAX,javelinColossusSpawnAY,javelinColossusSpawnBX,javelinColossusSpawnBY,manticoreSpawnAX,manticoreSpawnAY,manticoreSequenceA,manticoreSpawnBX,manticoreSpawnBY,manticoreSequenceB,shockwaveColossusSpawnAX,shockwaveColossusSpawnAY,shockwaveColossusSpawnBX,shockwaveColossusSpawnBY,jaguarWarriorReinfSpawnX,jaguarWarriorReinfSpawnY,serpentShamanReinfSpawnX,serpentShamanReinfSpawnY,minotaurReinfSpawnX,minotaurReinfSpawnY";
+		return "wave,status,accountName,tag,itemIds,itemNames,quantities,modifierChoice_I,modifierChoice_II,modifierChoice_III,chosenModifier,activeModifiers,timeTaken,damageTaken,speedBonus,damageBonus,modifierGlory,completionBonus,waveGlory,totalGlory,totalTimeTaken,serpentShamanSpawnX,serpentShamanSpawnY,javelinColossusSpawnAX,javelinColossusSpawnAY,javelinColossusSpawnBX,javelinColossusSpawnBY,manticoreSpawnAX,manticoreSpawnAY,manticoreSequenceA,manticoreSpawnBX,manticoreSpawnBY,manticoreSequenceB,shockwaveColossusSpawnAX,shockwaveColossusSpawnAY,shockwaveColossusSpawnBX,shockwaveColossusSpawnBY,jaguarWarriorReinfSpawnX,jaguarWarriorReinfSpawnY,serpentShamanReinfSpawnX,serpentShamanReinfSpawnY,minotaurReinfSpawnX,minotaurReinfSpawnY";
 	}
 
 	public String toCsvRow() {
@@ -165,7 +170,7 @@ public class ColosseumWave implements DataRow
 		String mod1 = modifierChoices != null && !modifierChoices.isEmpty() && modifierChoices.get(0) != null ? modifierChoices.get(0).name() : "";
 		String mod2 = modifierChoices != null && modifierChoices.size() > 1 && modifierChoices.get(1) != null ? modifierChoices.get(1).name() : "";
 		String mod3 = modifierChoices != null && modifierChoices.size() > 2 && modifierChoices.get(2) != null ? modifierChoices.get(2).name() : "";
-
+		String activeModifiersString = String.join("|", activeModifiers);
 		return String.join(",",
 			String.valueOf(wave),
 			modStatus,
@@ -178,6 +183,7 @@ public class ColosseumWave implements DataRow
 			mod2,
 			mod3,
 			chosenMod,
+			activeModifiersString,
 			String.format("%.1f", timeTaken),
 			String.valueOf(damageTaken),
 			String.valueOf(speedBonus),

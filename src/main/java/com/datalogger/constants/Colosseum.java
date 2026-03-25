@@ -140,6 +140,7 @@ public final class Colosseum
 		public static final String WAVE_START_PREFIX = "Wave: ";
 		public static final String BOSS_WAVE_START_PREFIX = "Sol Heredit jumps down from his seat...";
 		public static final String END_ATTEMPT_MESSAGE = "Search the chest nearby to retrieve your earned rewards";
+		public static final String BOSS_MESSAGE_PREFIX = "Sol Heredit|";
 		public static final String BOSS_WAVE_P1_MESSAGE = "Sol Heredit|Let's start by testing your footwork.";
 		public static final String BOSS_WAVE_P2_MESSAGE = "Sol Heredit|Not bad. Let's try something else...";
 		public static final String BOSS_WAVE_P3_MESSAGE = "Sol Heredit|Impressive. Let's see how you handle this...";

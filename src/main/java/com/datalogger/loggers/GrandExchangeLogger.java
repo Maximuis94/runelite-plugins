@@ -126,45 +126,51 @@ public class GrandExchangeLogger extends AbstractLogger
 	}
 
 	/**
-	 * Submit all completed offers that have not been submitted yet.
+	 * Submit all active, completed offers that have not been submitted so far.
 	 */
-	private void submitCompletedOffers(GrandExchangeOffer[] offers)
+	private void submitCompletedOffers()
 	{
+
+		GrandExchangeOffer[] offers = client.getGrandExchangeOffers();
+		if (offers == null) return;
+
 		String hashString = getAccountHashString();
 		if (hashString.equals("-1"))
 		{
 			return;
 		}
 
-		for (int i = 0; i < offers.length; i++)
+		for (int geSlot = 0; geSlot < offers.length; geSlot++)
 		{
-			final int geSlot = i;
 			GrandExchangeOffer offer = offers[geSlot];
 
 			if (offer == null || !isFinalState(offer.getState())) {continue;}
 
-			log.debug("New completed trade detected in slot {}. Submitting...", geSlot);
+			log.debug("Attempting to submit completed trade in GE slot {}...", geSlot);
 			if (handleOffer(geSlot, offer))
-				log.info("Successfully submitted completed trade detected in slot {}.", geSlot);
-			else
-				log.info("Did not submit trade in slot {}.", geSlot);
+				log.info("Submitted completed offer from GE slot {}", geSlot);
 		}
+	}
+
+	/**
+	 * Handler for submitting active, completed offers right before collecting the items from the active exchange offers
+	 */
+	private void onCollectActiveGrandExchangeOffers()
+	{
+		collectionScriptRunning = true;
+		log.info("Offers are being collected - attempting to submit completed offers before they are cleared");
+		submitCompletedOffers();
+		collectionScriptRunning = false;
 	}
 
 	@Subscribe
 	public void onScriptPreFired(ScriptPreFired event)
 	{
-		if (!loggerIsEnabled || collectionScriptRunning || !isGrandExchangeSubmissionScript(event.getScriptId())) return;
+		if (!loggerIsEnabled) return;
 
-		collectionScriptRunning = true;
-		GrandExchangeOffer[] offers = client.getGrandExchangeOffers();
-		if (offers == null)
-		{
-			collectionScriptRunning = false;
-			return;
-		}
-		submitCompletedOffers(offers);
-		collectionScriptRunning = false;
+		if (!collectionScriptRunning && isGrandExchangeSubmissionScript(event.getScriptId()))
+			onCollectActiveGrandExchangeOffers();
+
 	}
 
 	@Subscribe
@@ -277,6 +283,8 @@ public class GrandExchangeLogger extends AbstractLogger
 				log.debug("Logged GE trade for slot {}. FP: {}", slot, fingerprint);
 				return true;
 			}
+			else
+				log.debug("Did not submit trade for slot {} - it is equal to the last submission for this slot", slot);
 		}
 		return false;
 	}
@@ -458,6 +466,10 @@ public class GrandExchangeLogger extends AbstractLogger
 		);
 	}
 
+	/**
+	 * Fetch and return the createdTimestamp registered to the given offer. If no registration is found, return the
+	 * current timestamp instead.
+	 */
 	private String getOrSetCreatedTimestamp(int slot, GrandExchangeOffer offer, Properties state, String hash) {
 		String tsKey = "slot_created_" + slot;
 		String itemKey = "slot_item_" + slot;

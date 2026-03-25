@@ -24,7 +24,8 @@
  */
 package com.datalogger;
 
-import com.datalogger.models.colosseum.enums.TimestampFormat;
+import com.datalogger.models.enums.ScreenshotFormat;
+import com.datalogger.models.enums.TimestampFormat;
 import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
@@ -40,28 +41,32 @@ public interface DataLoggerConfig extends Config {
 	@ConfigSection(
 		name = "Item loggers",
 		description = "Settings for logging Grand Exchange activity",
-		position = 0
+		position = 0,
+		closedByDefault = true
 	)
 	String ITEM_LOGGER_SECTION = "itemLogger";
 
 	@ConfigSection(
 		name = "Colosseum",
 		description = "Settings for Fortis Colosseum trial logging",
-		position = 1
+		position = 1,
+	closedByDefault = true
 	)
 	String COLOSSEUM_SECTION = "colosseum";
 
 	@ConfigSection(
 		name = "Colosseum timeline logger",
 		description = "Toggle to track player and NPC data during Colosseum waves",
-		position = 2
+		position = 2,
+		closedByDefault = true
 	)
 	String COLOSSEUM_TIMELINE_SECTION = "colosseumTimeline";
 
 	@ConfigSection(
 		name = "Screenshots",
 		description = "Settings for automatic screenshot capturing",
-		position = 3
+		position = 3,
+		closedByDefault = true
 	)
 	String SCREENSHOT_SECTION = "screenshot";
 
@@ -163,11 +168,29 @@ public interface DataLoggerConfig extends Config {
 	@ConfigItem(
 		keyName = "colosseumTag",
 		name = "Tag",
-		description = "A custom tag that will be assigned to logged entries (e.g. tag a specific setup)",
+		description = "A custom tag that will be assigned to logged entries (e.g. to distinguish between specific setups)",
 		position = 3,
 		section = COLOSSEUM_SECTION
 	)
 	default String colosseumTag() { return ""; }
+
+	@ConfigItem(
+		keyName = "autoMergeWaveLogs",
+		name = "Auto merge wave logs",
+		description = "Automatically merge all wave log files after an attempt is completed.",
+		position = 4,
+		section = COLOSSEUM_SECTION
+	)
+	default boolean autoMergeWaveLogs() { return false; }
+
+	@ConfigItem(
+		keyName = "trackSupplies",
+		name = "Track supply/ammo consumption",
+		description = "Track supplies and ammo consumed during a Colosseum attempt",
+		position = 5,
+		section = COLOSSEUM_SECTION
+	)
+	default boolean trackSupplies() { return true; }
 
 	// --- Colosseum NPC Optional Items ---
 
@@ -246,4 +269,14 @@ public interface DataLoggerConfig extends Config {
 		section = SCREENSHOT_SECTION
 	)
 	default boolean screenshotBetweenWaves() { return false; }
+	@ConfigItem(
+		keyName = "screenshotFormat",
+		name = "Screenshot format",
+		description = "Select the file format for screenshots. PNG is lossless quality, JPEG reduces file size.",
+		position = 1,
+		section = SCREENSHOT_SECTION
+	)
+	default ScreenshotFormat screenshotFormat() {
+		return ScreenshotFormat.PNG;
+	}
 }

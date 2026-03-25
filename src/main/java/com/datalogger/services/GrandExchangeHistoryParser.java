@@ -30,6 +30,7 @@ import static com.datalogger.constants.Item.InterfaceID.GE_GROUP_ID;
 import static com.datalogger.constants.Item.InterfaceID.GE_HISTORY_CHILD_ID;
 import com.datalogger.events.AccountSessionStarted;
 import com.datalogger.models.grandexchange.GeLedgerEntry;
+import com.datalogger.models.grandexchange.GrandExchangeHistoryEntry;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -57,6 +58,8 @@ public class GrandExchangeHistoryParser
 
 	private long accountHash = -1;
 	private String accountName = null;
+
+	private long parseTimeMillis;
 
 	private boolean hasParsed = false;
 	private long lastParsed = 0;
@@ -100,6 +103,52 @@ public class GrandExchangeHistoryParser
 	}
 
 	/**
+	 * Convert a row of the Grand Exchange History UI into a GrandExchangeHistoryEntry instance and return it.
+	 */
+	private GrandExchangeHistoryEntry parseRow(Widget[] children, int start)
+	{
+		Widget typeWidget = children[start + 2];
+		Widget itemWidget = children[start + 4];
+		Widget valueWidget = children[start + 5];
+
+		if (typeWidget == null || itemWidget == null || valueWidget == null) {
+			return null;
+		}
+
+		String typeText = Text.removeTags(typeWidget.getText()).trim();
+		boolean isBuy = typeText.equalsIgnoreCase("Bought:");
+
+		int itemId = itemWidget.getItemId();
+		int itemQuantity = itemWidget.getItemQuantity();
+		ItemComposition item = itemManager.getItemComposition(itemId);
+		String itemName = item.getMembersName();
+
+		try {
+			String rawValueText = valueWidget.getText();
+			ExtractedHistoryValue historyEntry = parseValueWidgetText(rawValueText);
+
+			GrandExchangeHistoryEntry entry = GrandExchangeHistoryEntry.builder()
+				.itemId(itemId)
+				.itemName(itemName)
+				.isBuy(isBuy)
+				.price(historyEntry.getPriceEach())
+				.quantity(itemQuantity)
+				.grossValue(historyEntry.getGrossCoins())
+				.netValue(historyEntry.getNetCoins())
+				.tax(historyEntry.getTax())
+				.accountName(accountName)
+				.accountHash(accountHash)
+				.parseTime(parseTimeMillis)
+				.build();
+			return entry;
+
+		} catch (IllegalStateException e) {
+			log.error("Failed to parse history entry (possible quantity=0). Raw text: {}", valueWidget.getText(), e);
+		}
+		return null;
+	}
+
+	/**
 	 * Parse the GE History UI and submit the parsed entries. Check encountered entries against existing entries and
 	 * skip them if they are already logged.
 	 */
@@ -123,6 +172,7 @@ public class GrandExchangeHistoryParser
 
 		List<GeLedgerEntry> parsedEntries = new ArrayList<>();
 		Instant currentParseTime = Instant.now();
+		parseTimeMillis = currentParseTime.toEpochMilli();
 
 		for (int i = 0; i < children.length; i += ELEMENTS_PER_ROW) {
 			if (i + (ELEMENTS_PER_ROW - 1) >= children.length) {

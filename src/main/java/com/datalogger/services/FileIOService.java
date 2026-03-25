@@ -27,15 +27,18 @@ package com.datalogger.services;
 import com.datalogger.DataLoggerConfig;
 import com.datalogger.dto.ColosseumAttemptDTO;
 import com.datalogger.dto.ColosseumStateDTO;
+import com.datalogger.dto.TrackedSuppliesDTO;
 import com.datalogger.events.ColosseumAttemptStarted;
 import com.datalogger.framework.LogType;
 import com.datalogger.models.colosseum.ColosseumAttempt;
 import com.datalogger.models.colosseum.ColosseumState;
 import com.datalogger.models.colosseum.ColosseumWave;
+import com.datalogger.models.enums.ScreenshotFormat;
 import com.datalogger.models.grandexchange.ActiveGeOffer;
 import com.datalogger.models.grandexchange.GeLedgerEntry;
 import com.datalogger.models.itemvault.BankedItem;
 import com.google.gson.Gson;
+import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonSerializationContext;
@@ -43,6 +46,7 @@ import com.google.gson.JsonSerializer;
 import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonWriter;
 import java.awt.image.BufferedImage;
+import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
@@ -76,6 +80,7 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.coords.WorldPoint;
 import net.runelite.client.RuneLite;
 import net.runelite.client.eventbus.Subscribe;
+import net.runelite.client.events.ConfigChanged;
 
 /**
  * Service that handles writing and reading operations of local files.
@@ -97,9 +102,11 @@ public class FileIOService
 	private final Queue<Future<?>> pendingWrites = new ConcurrentLinkedQueue<>();
 
 	private final DataLoggerConfig config;
+	private boolean logGrandExchangeJson;
 
 	private String account;
 	private String attemptRoot;
+	private File attemptRootFile;
 	private String startTime;
 
 	private final int MAX_BACKLOG_ROWS = 5000;
@@ -121,7 +128,39 @@ public class FileIOService
 		attemptRoot = event.getRoot();
 		account = event.getAccountName();
 		startTime = event.getStartTime();
+
+		attemptRootFile = new File(attemptRoot);
+
+		if (!attemptRootFile.exists())
+		{
+			boolean created = attemptRootFile.mkdirs();
+
+			if (created)
+			{
+				log.debug("Successfully created Colosseum attempt directory at: {}", attemptRoot);
+			}
+			else
+			{
+				log.warn("Failed to create Colosseum attempt directory at: {}. Logs/screenshots may fail to save.", attemptRoot);
+			}
+		}
+
 		log.info("Initialized Colosseum FileIOService vars with root={}, account={}, startTime={}", attemptRoot, account, startTime);
+	}
+
+	@Subscribe
+	public void onConfigChanged(ConfigChanged event)
+	{
+		if (!event.getGroup().equals(DataLoggerConfig.CONFIG_GROUP)) return;
+		updateConfigFlags();
+	}
+
+	/**
+	 * Parse relevant configurations and load the values into associated variables
+	 */
+	private void updateConfigFlags()
+	{
+		logGrandExchangeJson = config.logGrandExchangeJSON();
 	}
 
 	public static final File PLUGIN_ROOT = new File(RuneLite.RUNELITE_DIR, "data-logger");
@@ -132,16 +171,19 @@ public class FileIOService
 	public static final File GE_STATE_DIR = new File(INTERNAL_ROOT_DIR, "state");
 	public static final File INTERNAL_ACTIVE_OFFERS_DIR = new File(INTERNAL_ROOT_DIR, "active-offers");
 	public static final File GRAND_EXCHANGE_DIR = new File(PLUGIN_ROOT, "grand-exchange");
+	public static final File GRAND_EXCHANGE_ACTIVE_OFFERS_DIR = new File(GRAND_EXCHANGE_DIR, "active-offers");
 	public static final File ITEM_VAULT_DIR = new File(PLUGIN_ROOT, "item-vault");
 	public static final File COLOSSEUM_ROOT_DIR = new File(PLUGIN_ROOT, "colosseum");
+	public static final File COLOSSEUM_ATTEMPT_DIR = new File(COLOSSEUM_ROOT_DIR, "attempt");
 	public static final File COLOSSEUM_TIMELINE_DIR = new File(COLOSSEUM_ROOT_DIR, "timeline");
 	public static final File COLOSSEUM_LOG_DIR = new File(COLOSSEUM_ROOT_DIR, "log");
-	public static final File COLOSSEUM_CSV_DIR = new File(COLOSSEUM_ROOT_DIR, "csv");
 	public static final File COLOSSEUM_SCREENSHOT_DIR = new File(COLOSSEUM_ROOT_DIR, "screenshot");
 
 	public static final File ACCOUNT_HASH_MAPPINGS = new File(INTERNAL_ROOT_DIR, "account-hash-mappings.json");
-	public static final File AGGREGATED_ITEM_VAULT_JSON = new File(ITEM_VAULT_DIR, "aggregated-wealth-summary.json");
-	public static final File AGGREGATED_ITEM_VAULT_CSV = new File(ITEM_VAULT_DIR, "aggregated-wealth-summary.csv");
+	public static final File COLOSSEUM_WAVE_LOG_MERGED_JSON = new File(COLOSSEUM_ROOT_DIR, "colosseum-waves-merged.json");
+	public static final File COLOSSEUM_WAVE_LOG_MERGED_CSV = new File(COLOSSEUM_ROOT_DIR, "colosseum-waves-merged.csv");
+	public static final File MERGED_ITEM_VAULT_JSON = new File(ITEM_VAULT_DIR, "merged-vaults.json");
+	public static final File MERGED_ITEM_VAULT_CSV = new File(ITEM_VAULT_DIR, "merged-vaults.csv");
 
 
 	/**
@@ -391,18 +433,13 @@ public class FileIOService
 	 */
 	public void logColosseumAttempt(ColosseumAttempt attempt) {
 		Future<?> future = executor.submit(() -> {
-			// 1. Move disk I/O (directory checks) inside the async block
-			if (!COLOSSEUM_LOG_DIR.exists()) {
-				COLOSSEUM_LOG_DIR.mkdirs();
+			if (!attemptRootFile.exists()) {
+				attemptRootFile.mkdirs();
 			}
 
-			File targetFile = attemptWaveLogFile(attempt.getAccount(), attempt.getStartTime(), "json");
+			File targetFile = attempt.getWaveLogJsonFile();
 
-			// 2. Use the DTO to ensure your JSON output is formatted correctly
 			ColosseumAttemptDTO attemptDto = attempt.toDTO();
-
-			// Note: FileWriter is fine, but Files.newBufferedWriter is the modern standard
-			// for Java 11+ as it lets you explicitly set UTF-8 encoding.
 			try (FileWriter writer = new FileWriter(targetFile)) {
 				gson.toJson(attemptDto, writer);
 				log.info("Successfully saved Colosseum attempt to {}", targetFile.getAbsolutePath());
@@ -418,32 +455,34 @@ public class FileIOService
 	/**
 	 * Saves a screenshot to a specified sub-directory with a specific file name.
 	 * * @param screenshot   The image to save
-	 * @param directory The path relative to the root screenshots folder (e.g., "colosseum/231012_143000")
+	 * @param rootDir The path relative to the root screenshots folder (e.g., "colosseum/231012_143000")
 	 * @param fileName     The name of the file without the extension (e.g., "wave-01")
+	 * @param format The format of the image file
 	 */
-	public void saveScreenshot(BufferedImage screenshot, File directory, String fileName) {
-		Future<?> future = executor.submit(() -> {
-			try {
-				if (!directory.exists() && !directory.mkdirs()) {
-					log.error("Failed to create screenshot directory: {}", directory.getAbsolutePath());
-					return;
-				}
+	public void saveScreenshot(BufferedImage image, File rootDir, String fileName, ScreenshotFormat format) throws IOException {
+		if (!rootDir.exists() && !rootDir.mkdirs()) {
+			log.warn("Failed to create screenshot directories.");
+			return;
+		}
 
-				File file = new File(directory, fileName + ".png");
-				ImageIO.write(screenshot, "png", file);
+		File outputFile = new File(rootDir, fileName + "." + format.getExtension());
 
-				log.info("Saved screenshot to {}", file.getAbsolutePath());
-			} catch (IOException e) {
-				log.error("Failed to save screenshot", e);
-			}
-		});
-
-		pendingWrites.add(future);
+		if (format == ScreenshotFormat.JPEG) {
+			BufferedImage rgbImage = new BufferedImage(
+				image.getWidth(),
+				image.getHeight(),
+				BufferedImage.TYPE_INT_RGB
+			);
+			rgbImage.createGraphics().drawImage(image, 0, 0, null);
+			ImageIO.write(rgbImage, "jpg", outputFile);
+		} else {
+			ImageIO.write(image, "png", outputFile);
+		}
 	}
 
 	public void writeColosseumCSVLog(ColosseumAttempt attempt, String rows) {
 		String header = ColosseumWave.csvHeader();
-		File outFile = attemptWaveLogFile(attempt.getAccount(), attempt.getStartTime(), "csv");
+		File outFile = attempt.getWaveLogCsvFile();
 		Future<?> future = executor.submit(() -> {
 			try {
 				File parent = outFile.getParentFile();
@@ -548,7 +587,7 @@ public class FileIOService
 
 					log.debug("Successfully saved internal GE ledger for account hash: {}", accountHash);
 
-					if (config.logGrandExchangeJSON())
+					if (logGrandExchangeJson)
 					{
 						try
 						{
@@ -607,7 +646,8 @@ public class FileIOService
 	}
 
 	/**
-	 * Safely saves the active Grand Exchange offers (Wealth Tracker state) for a specific account.
+	 * Safely saves the active Grand Exchange offers (Wealth Tracker state) for a specific account,
+	 * and exports a JSON copy and a CSV file to the public grand exchange directory.
 	 */
 	public void saveActiveGeOffers(String accountHash, List<ActiveGeOffer> offers) {
 		if (accountHash == null || accountHash.isEmpty() || offers == null) {
@@ -624,20 +664,67 @@ public class FileIOService
 			File finalFile = new File(INTERNAL_ACTIVE_OFFERS_DIR, accountHash + ".json");
 			File tempFile = new File(INTERNAL_ACTIVE_OFFERS_DIR, accountHash + ".tmp");
 
+			// Define the public export files
+			File publicJsonFile = new File(ITEM_VAULT_DIR, "active-offers_" + accountHash + ".json");
+			File publicCsvFile = new File(ITEM_VAULT_DIR, "active-offers_" + accountHash + ".csv");
+
 			Object lock = accountLocks.computeIfAbsent(accountHash, k -> new Object());
 
 			synchronized (lock) {
 				try {
+					// 1. Write the internal JSON temp file
 					try (FileWriter writer = new FileWriter(tempFile)) {
 						gson.toJson(offers, writer);
 					}
 
+					// 2. Atomic swap to final internal file
 					Files.move(
 						tempFile.toPath(),
 						finalFile.toPath(),
 						StandardCopyOption.ATOMIC_MOVE,
 						StandardCopyOption.REPLACE_EXISTING
 					);
+
+					// 3. Handle Public Exports
+					if (!ITEM_VAULT_DIR.exists() && !ITEM_VAULT_DIR.mkdirs()) {
+						log.error("Failed to create public active GE offers directory: {}", ITEM_VAULT_DIR.getAbsolutePath());
+					} else {
+						// Export JSON copy
+						Files.copy(
+							finalFile.toPath(),
+							publicJsonFile.toPath(),
+							StandardCopyOption.REPLACE_EXISTING
+						);
+
+						// Export CSV
+						try (BufferedWriter bw = Files.newBufferedWriter(publicCsvFile.toPath(), StandardCharsets.UTF_8);
+							 PrintWriter out = new PrintWriter(bw)) {
+
+							// Write CSV headers based on the JSON structure
+							out.println("slot,itemId,itemName,isBuy,state,totalQuantity,quantitySold,offerPrice,spent");
+
+							for (ActiveGeOffer offer : offers) {
+								// Escape itemName to avoid breaking the CSV layout if an item has a comma in its name
+								String itemName = offer.getItemName() != null ? offer.getItemName() : "";
+								if (itemName.contains(",")) {
+									itemName = "\"" + itemName + "\"";
+								}
+
+								out.printf("%d,%d,%s,%b,%s,%d,%d,%d,%d%n",
+									offer.getSlot(),
+									offer.getItemId(),
+									itemName,
+									offer.isBuy(), // Or offer.getIsBuy() depending on your getters
+									offer.getState(), // Assuming this is an Enum or String
+									offer.getTotalQuantity(),
+									offer.getQuantitySold(),
+									offer.getOfferPrice(),
+									offer.getSpent()
+								);
+							}
+						}
+						log.debug("Successfully exported public active GE offers (JSON/CSV) for account hash: {}", accountHash);
+					}
 
 				} catch (Exception e) {
 					log.error("Failed to save active GE offers for account hash: {}", accountHash, e);
@@ -876,18 +963,268 @@ public class FileIOService
 		return mappings;
 	}
 
-	public File attemptTimelineFile()
+	/**
+	 * Merge CSV and JSON wave log files
+	 */
+	public void mergeColosseumWaveLogs()
 	{
-		return new File(attemptRoot, String.format("%s_%s_timeline.json", account, startTime));
+		mergeAllWaveLogsJson();
+		mergeAllWaveLogsCsv();
 	}
 
-	public File attemptWaveLogFile(String account, String startTime, String extension)
-	{
-		String attemptId = String.format("%s_%s", account, startTime);
-		return new File(new File(FileIOService.COLOSSEUM_ROOT_DIR, attemptId), String.format("%s_wave-log.%s", attemptId, extension.replace(".","")));	}
+	/**
+	 * Merges all Colosseum wave log json files into a single csv file
+	 */
+	private void mergeAllWaveLogsJson() {
+		Future<?> future = executor.submit(() -> {
+			if (!COLOSSEUM_ATTEMPT_DIR.exists() || !COLOSSEUM_ATTEMPT_DIR.isDirectory()) {
+				log.debug("Colosseum root directory does not exist. Skipping merge.");
+				return;
+			}
+			log.info("Attempting to merge all Colosseum wave json logs into {}", COLOSSEUM_WAVE_LOG_MERGED_JSON);
 
-	public File attemptWaveLogCsvFile()
+			File[] attemptDirs = COLOSSEUM_ATTEMPT_DIR.listFiles(File::isDirectory);
+			if (attemptDirs == null || attemptDirs.length == 0) {
+				return;
+			}
+
+			int nWaves = 0;
+			int nLogs = 0;
+			JsonArray mergedWaves = new JsonArray();
+
+			for (File dir : attemptDirs) {
+				String attemptId = dir.getName();
+
+				File logFile = new File(dir, attemptId + "_wave-log.json");
+
+				if (!logFile.exists() || !logFile.isFile()) {
+					continue;
+				}
+
+				try (Reader reader = new FileReader(logFile)) {
+					JsonObject attemptJson = gson.fromJson(reader, JsonObject.class);
+
+					if (attemptJson != null && attemptJson.has("waves") && attemptJson.has("timestamp")) {
+						long timestamp = attemptJson.get("timestamp").getAsLong();
+						String attemptResult = attemptJson.get("result").getAsString();
+						JsonArray waves = attemptJson.getAsJsonArray("waves");
+						boolean addedWave = false;
+						for (JsonElement waveElement : waves) {
+							if (waveElement.isJsonObject()) {
+								JsonObject waveObj = waveElement.getAsJsonObject();
+								waveObj.addProperty("attemptId", attemptId);
+								waveObj.addProperty("attemptTimestamp", timestamp);
+								waveObj.addProperty("attemptResult", attemptResult);
+
+								mergedWaves.add(waveObj);
+								nWaves++;
+								if (!addedWave) {
+									nLogs++;
+									addedWave = true;
+								}
+							}
+						}
+					}
+				} catch (Exception e) {
+					log.error("Failed to parse wave log for attempt: {}", attemptId, e);
+				}
+			}
+
+			File parentDir = COLOSSEUM_WAVE_LOG_MERGED_JSON.getParentFile();
+			if (parentDir != null && !parentDir.exists() && !parentDir.mkdirs()) {
+				log.error("Could not create directory for merged wave logs: {}", parentDir.getAbsolutePath());
+				return;
+			}
+
+			try (BufferedWriter writer = Files.newBufferedWriter(COLOSSEUM_WAVE_LOG_MERGED_JSON.toPath(), StandardCharsets.UTF_8)) {
+				gson.toJson(mergedWaves, writer);
+				log.info("Successfully merged data of {} waves from {} log files into {}", nWaves, nLogs, COLOSSEUM_WAVE_LOG_MERGED_JSON.getName());
+			} catch (IOException e) {
+				log.error("Failed to write merged Colosseum wave logs to {}", COLOSSEUM_WAVE_LOG_MERGED_JSON.getName(), e);
+			}
+		});
+		pendingWrites.add(future);
+	}
+
+	/**
+	 * Merges all Colosseum wave log csv files into a single csv file
+	 */
+	private void mergeAllWaveLogsCsv() {
+		Future<?> future = executor.submit(() -> {
+			if (!COLOSSEUM_ROOT_DIR.exists() || !COLOSSEUM_ROOT_DIR.isDirectory()) {
+				log.debug("Colosseum root directory does not exist. Skipping CSV merge.");
+				return;
+			}
+			log.info("Attempting to merge all Colosseum wave csv logs...");
+
+			File[] attemptDirs = COLOSSEUM_ATTEMPT_DIR.listFiles(File::isDirectory);
+			if (attemptDirs == null || attemptDirs.length == 0) {
+				return;
+			}
+
+			File parentDir = COLOSSEUM_WAVE_LOG_MERGED_CSV.getParentFile();
+			if (parentDir != null && !parentDir.exists()) {
+				log.error("Could not create directory for merged CSV wave logs: {}", parentDir.getAbsolutePath());
+				return;
+			}
+
+			final String[] CSV_HEADER = "wave,status,attemptResult,accountName,tag,itemIds,itemNames,quantities,modifierChoice_I,modifierChoice_II,modifierChoice_III,chosenModifier,activeModifiers,timeTaken,damageTaken,speedBonus,damageBonus,modifierGlory,completionBonus,waveGlory,totalGlory,totalTimeTaken,serpentShamanSpawnX,serpentShamanSpawnY,javelinColossusSpawnAX,javelinColossusSpawnAY,javelinColossusSpawnBX,javelinColossusSpawnBY,manticoreSpawnAX,manticoreSpawnAY,manticoreSequenceA,manticoreSpawnBX,manticoreSpawnBY,manticoreSequenceB,shockwaveColossusSpawnAX,shockwaveColossusSpawnAY,shockwaveColossusSpawnBX,shockwaveColossusSpawnBY,jaguarWarriorReinfSpawnX,jaguarWarriorReinfSpawnY,serpentShamanReinfSpawnX,serpentShamanReinfSpawnY,minotaurReinfSpawnX,minotaurReinfSpawnY".split(",");
+
+			int masterAttemptResultIndex = java.util.Arrays.asList(CSV_HEADER).indexOf("attemptResult");
+			int nLogs = 0;
+			int nWaves = 0;
+
+			try (BufferedWriter bw = Files.newBufferedWriter(COLOSSEUM_WAVE_LOG_MERGED_CSV.toPath(), StandardCharsets.UTF_8);
+				 PrintWriter out = new PrintWriter(bw)) {
+
+				out.print("attemptId,attemptTimestamp,");
+				out.println(String.join(",", CSV_HEADER));
+
+				for (File dir : attemptDirs) {
+					String attemptId = dir.getName();
+
+					int firstUnderscore = attemptId.indexOf('_');
+					String attemptTimestamp = firstUnderscore != -1 ? attemptId.substring(firstUnderscore + 1) : attemptId;
+
+					File csvFile = new File(dir, attemptId + "_wave-log.csv");
+
+					if (!csvFile.exists() || !csvFile.isFile()) {
+						continue;
+					}
+
+					try (BufferedReader reader = Files.newBufferedReader(csvFile.toPath(), StandardCharsets.UTF_8)) {
+						String headerLine = reader.readLine();
+						if (headerLine == null) continue;
+
+						String[] localHeader = headerLine.split(",", -1);
+						int[] headerMap = new int[localHeader.length];
+						int localStatusIndex = -1;
+
+						for (int i = 0; i < localHeader.length; i++) {
+							headerMap[i] = -1;
+
+							if (localHeader[i].trim().equalsIgnoreCase("status")) {
+								localStatusIndex = i;
+							}
+
+							for (int j = 0; j < CSV_HEADER.length; j++) {
+								if (localHeader[i].trim().equalsIgnoreCase(CSV_HEADER[j])) {
+									headerMap[i] = j;
+									break;
+								}
+							}
+						}
+
+						java.util.List<String> lines = new java.util.ArrayList<>();
+						String line;
+						while ((line = reader.readLine()) != null) {
+							if (line.trim().isEmpty()) continue;
+							lines.add(line);
+						}
+
+						if (lines.isEmpty()) continue;
+
+						nLogs++;
+						nWaves += lines.size();
+						String attemptResult = "";
+						if (localStatusIndex != -1) {
+							String[] finalRowValues = lines.get(lines.size() - 1).split(",", -1);
+							if (finalRowValues.length > localStatusIndex) {
+								attemptResult = finalRowValues[localStatusIndex];
+							}
+						}
+
+						for (String currentLine : lines) {
+							String[] localValues = currentLine.split(",", -1);
+							String[] alignedValues = new String[CSV_HEADER.length];
+
+							Arrays.fill(alignedValues, "");
+
+							for (int i = 0; i < localValues.length; i++) {
+								int masterIndex = headerMap[i];
+								if (masterIndex != -1) {
+									alignedValues[masterIndex] = localValues[i];
+								}
+							}
+
+							if (masterAttemptResultIndex != -1) {
+								alignedValues[masterAttemptResultIndex] = attemptResult;
+							}
+
+							out.print(attemptId);
+							out.print(',');
+							out.print(attemptTimestamp);
+							out.print(',');
+							out.println(String.join(",", alignedValues));
+						}
+					} catch (Exception e) {
+						log.error("Failed to parse CSV wave log for attempt: {}", attemptId, e);
+					}
+				}
+				log.info("Successfully merged all {} waves from {} Colosseum CSV wave logs into {}", nWaves, nLogs, COLOSSEUM_WAVE_LOG_MERGED_CSV.getName());
+			} catch (IOException e) {
+				log.error("Failed to write merged Colosseum CSV file", e);
+			}
+		});
+		pendingWrites.add(future);
+	}
+
+	/**
+	 * Serializes the TrackedSupplies object into a beautifully formatted JSON file.
+	 */
+	public void exportToJson(File file, TrackedSuppliesDTO supplies)
 	{
-		return new File(attemptRoot, String.format("%s_%s_wave-log.csv", account, startTime));
+		try (FileWriter writer = new FileWriter(file))
+		{
+			gson.toJson(supplies, writer);
+			log.info("Successfully exported supplies to JSON: {}", file.getAbsolutePath());
+		}
+		catch (IOException e)
+		{
+			log.error("Failed to write JSON export.", e);
+		}
+	}
+
+	/**
+	 * Flattens the TrackedSupplies object into a CSV format.
+	 * Format: Category, Identifier, Quantity
+	 */
+	public void exportToCsv(File file, TrackedSuppliesDTO supplies)
+	{
+		try (PrintWriter writer = new PrintWriter(new FileWriter(file)))
+		{
+			writer.println("Category,Identifier,Quantity");
+
+			if (supplies.getScytheAttacks() > 0)
+			{
+				writer.printf("Attack,Scythe,%d%n", supplies.getScytheAttacks());
+			}
+			if (supplies.getShadowAttacks() > 0)
+			{
+				writer.printf("Attack,Shadow,%d%n", supplies.getShadowAttacks());
+			}
+
+			if (supplies.getConsumedItems() != null)
+			{
+				for (Map.Entry<String, Integer> entry : supplies.getConsumedItems().entrySet())
+				{
+					writer.printf("Item,%s,%d%n", entry.getKey(), entry.getValue());
+				}
+			}
+
+			if (supplies.getConsumedDoses() != null)
+			{
+				for (Map.Entry<String, Integer> entry : supplies.getConsumedDoses().entrySet())
+				{
+					writer.printf("Dose,%s,%d%n", entry.getKey(), entry.getValue());
+				}
+			}
+
+			log.info("Successfully exported supplies to CSV: {}", file.getAbsolutePath());
+		}
+		catch (IOException e)
+		{
+			log.error("Failed to write CSV export.", e);
+		}
 	}
 }

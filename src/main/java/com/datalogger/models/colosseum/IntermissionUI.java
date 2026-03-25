@@ -25,7 +25,7 @@
 
 package com.datalogger.models.colosseum;
 
-import com.datalogger.models.colosseum.enums.ColosseumModifier;
+import com.datalogger.models.enums.ColosseumModifier;
 import com.datalogger.models.itemvault.ItemBundle;
 import java.util.List;
 import lombok.Builder;

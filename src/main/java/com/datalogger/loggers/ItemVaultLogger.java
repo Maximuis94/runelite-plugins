@@ -29,11 +29,11 @@ import com.datalogger.framework.AbstractLogger;
 import com.datalogger.framework.LogType;
 import com.datalogger.models.grandexchange.ActiveGeOffer;
 import com.datalogger.models.itemvault.BankedItem;
-import com.datalogger.models.itemvault.enums.VaultType;
+import com.datalogger.models.enums.VaultType;
 import com.datalogger.services.AccountHashMapper;
 import com.datalogger.services.FileIOService;
-import static com.datalogger.services.FileIOService.AGGREGATED_ITEM_VAULT_CSV;
-import static com.datalogger.services.FileIOService.AGGREGATED_ITEM_VAULT_JSON;
+import static com.datalogger.services.FileIOService.MERGED_ITEM_VAULT_CSV;
+import static com.datalogger.services.FileIOService.MERGED_ITEM_VAULT_JSON;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -293,8 +293,8 @@ public class ItemVaultLogger extends AbstractLogger
 			return;
 		}
 
-		fileIOService.saveJson(AGGREGATED_ITEM_VAULT_JSON, items);
-		fileIOService.writeVaultCsv(AGGREGATED_ITEM_VAULT_CSV, items, true);
+		fileIOService.saveJson(MERGED_ITEM_VAULT_JSON, items);
+		fileIOService.writeVaultCsv(MERGED_ITEM_VAULT_CSV, items, true);
 
 		log.info("Successfully exported aggregated wealth summary for {} unique items.", items.size());
 	}

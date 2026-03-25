@@ -35,6 +35,8 @@ import com.datalogger.services.ColosseumScanner;
 import com.datalogger.services.FileIOService;
 import com.datalogger.services.GrandExchangeHistoryParser;
 import com.datalogger.services.ItemVaultParser;
+import com.datalogger.services.SupplyTracker;
+import com.datalogger.services.WeaponTracker;
 import com.datalogger.ui.DataLoggerPanel;
 import com.google.inject.Provides;
 import java.awt.image.BufferedImage;
@@ -82,6 +84,8 @@ public class DataLoggerPlugin extends Plugin
 	@Inject private ColosseumScanner coloScanner;
 	@Inject private ColosseumTimelineLogger timelineLogger;
 	@Inject private ScreenshotLogger screenshotLogger;
+	@Inject private WeaponTracker weaponTracker;
+	@Inject private SupplyTracker supplyTracker;
 
 	private NavigationButton navButton;
 	private boolean sessionInitialized = false;
@@ -109,6 +113,8 @@ public class DataLoggerPlugin extends Plugin
 		accountHashMapper.loadMappings();
 		eventBus.register(fileIOService);
 		eventBus.register(itemVaultLogger);
+		eventBus.register(weaponTracker);
+		eventBus.register(supplyTracker);
 		itemVaultLogger.updateIgnoredAccountHashes();
 
 		toggleItemVault(config.logItemVault());
@@ -143,6 +149,9 @@ public class DataLoggerPlugin extends Plugin
 
 		eventBus.unregister(accountHashMapper);
 		eventBus.unregister(fileIOService);
+		eventBus.unregister(itemVaultLogger);
+		eventBus.unregister(weaponTracker);
+		eventBus.unregister(supplyTracker);
 
 		toggleItemVault(false);
 		toggleGrandExchange(false);
@@ -222,7 +231,6 @@ public class DataLoggerPlugin extends Plugin
 
 			eventBus.unregister(coloLogger);
 			eventBus.unregister(coloScanner);
-			coloScanner.updateConfigFlags(false);
 			isColosseumRegistered = false;
 			log.debug("Colosseum tracking disabled.");
 		}
@@ -253,6 +261,7 @@ public class DataLoggerPlugin extends Plugin
 		if (enable && !isScreenshotRegistered) {
 			eventBus.register(screenshotLogger);
 			isScreenshotRegistered = true;
+			screenshotLogger.updateConfigFlags();
 			log.debug("Screenshot tracking enabled.");
 		} else if (!enable && isScreenshotRegistered) {
 			eventBus.unregister(screenshotLogger);

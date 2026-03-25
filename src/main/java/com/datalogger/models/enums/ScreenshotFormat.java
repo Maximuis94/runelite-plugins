@@ -23,54 +23,17 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.datalogger.models.colosseum.enums;
+package com.datalogger.models.enums;
 
-public enum ColosseumModifier {
-	BEES_I,
-	BEES_II,
-	BEES_III,
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 
-	BLASPHEMY_I,
-	BLASPHEMY_II,
-	BLASPHEMY_III,
+@RequiredArgsConstructor
+@Getter
+public enum ScreenshotFormat
+{
+	PNG("png"),
+	JPEG("jpg");
 
-	DOOM_I,
-	DOOM_II,
-	DOOM_III,
-
-	DYNAMIC_DUO,
-
-	FRAILTY_I,
-	FRAILTY_II,
-	FRAILTY_III,
-
-	MANTIMAYHEM_I,
-	MANTIMAYHEM_II,
-	MANTIMAYHEM_III,
-
-	MYOPIA_I,
-	MYOPIA_II,
-	MYOPIA_III,
-
-	QUARTET,
-
-	RED_FLAG,
-
-	REENTRY_I,
-	REENTRY_II,
-	REENTRY_III,
-
-	RELENTLESS_I,
-	RELENTLESS_II,
-	RELENTLESS_III,
-
-	SOLARFLARE_I,
-	SOLARFLARE_II,
-	SOLARFLARE_III,
-
-	TOTEMIC,
-
-	VOLATILITY_I,
-	VOLATILITY_II,
-	VOLATILITY_III
+	private final String extension;
 }

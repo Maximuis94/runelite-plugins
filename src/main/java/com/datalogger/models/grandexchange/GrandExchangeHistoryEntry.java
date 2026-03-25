@@ -23,13 +23,39 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.datalogger.models.colosseum.enums;
+package com.datalogger.models.grandexchange;
 
-public enum WaveStatus
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import java.time.Instant;
+import lombok.NoArgsConstructor;
+
+/**
+ * An entry of the Grand Exchange History. Each time the GE History UI is opened, its contents are scanned and stored.
+ * Ideally, the resulting entries can be matched to previous offer submissions, allowing certain values to be specified
+ * with more accuracy. If this is the case, the associatedGeSlot and the associatedExactTimestamp will be assigned a
+ * value corresponding to the related submission.
+ */
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class GrandExchangeHistoryEntry
 {
-	COMPLETED,
-	FAILED,
-	CLAIMED,
-	CANCELLED,
-	CONFIG_DISABLED
+	private int itemId;
+	private String itemName;
+
+	private boolean isBuy;
+	private int quantity;
+	private int price;
+	private int grossValue;
+	private int netValue;
+	private int tax;
+
+	private String accountName;
+	private long parseTime;
+	private long accountHash;
+	private int associatedGeSlot;
+	private long associatedExactTimestamp;
 }

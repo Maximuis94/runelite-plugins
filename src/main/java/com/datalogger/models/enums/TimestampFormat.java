@@ -22,37 +22,23 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package com.datalogger.framework;
 
-import static com.datalogger.services.FileIOService.COLOSSEUM_ROOT_DIR;
-import static com.datalogger.services.FileIOService.GRAND_EXCHANGE_DIR;
-import static com.datalogger.services.FileIOService.ITEM_VAULT_DIR;
-import java.io.File;
-import lombok.Getter;
-import lombok.RequiredArgsConstructor;
+package com.datalogger.models.enums;
 
-@Getter
-@RequiredArgsConstructor
-public enum LogType
-{
-	GRAND_EXCHANGE("Grand Exchange", GRAND_EXCHANGE_DIR),
-	COLOSSEUM("Colosseum", COLOSSEUM_ROOT_DIR),
-	ITEM_VAULT("Item Vault", ITEM_VAULT_DIR);
+public enum TimestampFormat {
+	NONE("None"),
+	UNIX("UNIX"),
+	HHMMSS_M("hh:mm:ss.m"),
+	BOTH("Both");
 
 	private final String name;
-	private final String directoryName;
-	private final File logDirectory;
 
-	LogType(String logTypeName, File root)
-	{
-		name = logTypeName;
-		directoryName = logTypeName.toLowerCase().replace(" ", "-");
-		logDirectory = root;
+	TimestampFormat(String name) {
+		this.name = name;
 	}
 
 	@Override
-	public String toString()
-	{
+	public String toString() {
 		return name;
 	}
 }

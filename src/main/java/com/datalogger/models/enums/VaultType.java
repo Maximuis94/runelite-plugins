@@ -23,7 +23,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.datalogger.models.itemvault.enums;
+package com.datalogger.models.enums;
 
 import static com.datalogger.constants.Item.InterfaceID.BANK_CHILD_ID;
 import static com.datalogger.constants.Item.InterfaceID.BANK_GROUP_ID;

@@ -25,6 +25,8 @@
 
 package com.datalogger.constants;
 
+import static net.runelite.api.gameval.VarbitID.*;
+
 /**
  * Constants related to logging of Item / Grand Exchange offers
  */
@@ -35,6 +37,8 @@ public final class Item
 	 */
 	public static class InterfaceID
 	{
+		public static final int INVENTORY_CONTAINER_GROUP_ID = 149;
+		public static final int INVENTORY_CONTAINER_CHILD_ID = 0;
 		public static final int GE_GROUP_ID = 383;
 		public static final int GE_HISTORY_CHILD_ID = 3;
 		public static final int BANK_GROUP_ID = 12;
@@ -62,4 +66,15 @@ public final class Item
 		public static final int GE_OFFER_SCRIPT_ID = 795;
 		public static final int BANK_UI_GE_COLLECT_SCRIPT_ID = 706;
 	}
+
+	public static final int[] RUNE_POUCH_TYPE_VARBITS = {
+		RUNE_POUCH_TYPE_1, RUNE_POUCH_TYPE_2, RUNE_POUCH_TYPE_3, RUNE_POUCH_TYPE_4
+	};
+
+	public static final int[] RUNE_POUCH_AMOUNT_VARBITS = {
+		RUNE_POUCH_QUANTITY_1, RUNE_POUCH_QUANTITY_2, RUNE_POUCH_QUANTITY_3, RUNE_POUCH_QUANTITY_4
+	};
+
+	public static final int INVENTORY_CONTAINER_ID = 93;
+	public static final int EQUIPMENT_CONTAINER_ID = 94;
 }

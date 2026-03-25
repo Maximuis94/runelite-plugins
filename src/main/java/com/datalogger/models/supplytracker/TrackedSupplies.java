@@ -22,37 +22,49 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package com.datalogger.framework;
 
-import static com.datalogger.services.FileIOService.COLOSSEUM_ROOT_DIR;
-import static com.datalogger.services.FileIOService.GRAND_EXCHANGE_DIR;
-import static com.datalogger.services.FileIOService.ITEM_VAULT_DIR;
-import java.io.File;
-import lombok.Getter;
-import lombok.RequiredArgsConstructor;
+package com.datalogger.models.supplytracker;
 
-@Getter
-@RequiredArgsConstructor
-public enum LogType
+import com.datalogger.dto.TrackedSuppliesDTO;
+import com.datalogger.models.enums.ConsumableItemGroup;
+import java.util.HashMap;
+import java.util.Map;
+import lombok.Value;
+import net.runelite.client.game.ItemManager;
+
+@Value
+public class TrackedSupplies
 {
-	GRAND_EXCHANGE("Grand Exchange", GRAND_EXCHANGE_DIR),
-	COLOSSEUM("Colosseum", COLOSSEUM_ROOT_DIR),
-	ITEM_VAULT("Item Vault", ITEM_VAULT_DIR);
+	Map<Integer, Integer> consumedItems;
+	Map<ConsumableItemGroup, Integer> doses;
 
-	private final String name;
-	private final String directoryName;
-	private final File logDirectory;
+	int scytheAttacks;
+	int shadowAttacks;
 
-	LogType(String logTypeName, File root)
+	public TrackedSuppliesDTO toDto(ItemManager itemManager)
 	{
-		name = logTypeName;
-		directoryName = logTypeName.toLowerCase().replace(" ", "-");
-		logDirectory = root;
-	}
+		Map<String, Integer> namedItems = new HashMap<>();
+		if (consumedItems != null)
+		{
+			consumedItems.forEach((id, qty) -> {
+				String itemName = itemManager.getItemComposition(id).getName();
+				namedItems.put(itemName, qty);
+			});
+		}
 
-	@Override
-	public String toString()
-	{
-		return name;
+		Map<String, Integer> namedDoses = new HashMap<>();
+		if (doses != null)
+		{
+			doses.forEach((group, nDoses) -> {
+				namedDoses.put(group.getBaseItemName(), nDoses);
+			});
+		}
+
+		return TrackedSuppliesDTO.builder()
+			.consumedItems(namedItems)
+			.consumedDoses(namedDoses)
+			.scytheAttacks(scytheAttacks)
+			.shadowAttacks(shadowAttacks)
+			.build();
 	}
 }

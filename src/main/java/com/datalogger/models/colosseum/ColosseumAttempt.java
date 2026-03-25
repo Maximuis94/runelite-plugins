@@ -26,8 +26,8 @@
 package com.datalogger.models.colosseum;
 
 import com.datalogger.dto.ColosseumAttemptDTO;
-import com.datalogger.models.colosseum.enums.WaveStatus;
-import com.datalogger.services.FileIOService;
+import com.datalogger.models.enums.WaveStatus;
+import static com.datalogger.services.FileIOService.COLOSSEUM_ATTEMPT_DIR;
 import java.io.File;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -56,6 +56,16 @@ public class ColosseumAttempt
 
 	private final List<ColosseumWave> waves;
 
+	private final String attemptId;
+
+	private final File attemptRoot;
+
+	private final File waveLogJsonFile;
+
+	private final File waveLogCsvFile;
+
+	private final String supplyFileName;
+
 
 	public ColosseumAttempt(int startTick, String accountName)
 	{
@@ -68,6 +78,12 @@ public class ColosseumAttempt
 		finalStatus = WaveStatus.FAILED;
 		account = accountName;
 		totalTimeTaken = .0;
+
+		attemptId = String.format("%s_%s", account, startTime);
+		attemptRoot = new File(COLOSSEUM_ATTEMPT_DIR, attemptId);
+		waveLogJsonFile =  new File(attemptRoot, attemptId+"_wave-log.json");
+		waveLogCsvFile =  new File(attemptRoot, attemptId+"_wave-log.csv");
+		supplyFileName = attemptId + "_supply-log";
 	}
 
 	public ColosseumAttemptDTO toDTO() {
@@ -100,10 +116,5 @@ public class ColosseumAttempt
 				totalTimeTaken = wave.getTotalTimeTaken();
 			}
 		}
-	}
-
-	public File getRootDirectory()
-	{
-		return new File(FileIOService.COLOSSEUM_ROOT_DIR, String.format("%s_%s", account, startTime));
 	}
 }

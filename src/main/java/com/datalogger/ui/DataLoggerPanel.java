@@ -26,6 +26,8 @@ package com.datalogger.ui;
 
 import com.datalogger.framework.LogType;
 import com.datalogger.loggers.ItemVaultLogger;
+import com.datalogger.services.FileIOService;
+import com.datalogger.services.SupplyTracker;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Desktop;
@@ -39,18 +41,17 @@ import javax.swing.JButton;
 import javax.swing.JPanel;
 import javax.swing.border.EmptyBorder;
 import lombok.extern.slf4j.Slf4j;
+import net.runelite.client.callback.ClientThread;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.PluginPanel;
 
 @Slf4j
 public class DataLoggerPanel extends PluginPanel {
 	private final JPanel logContentDisplay = new JPanel();
-	private final ItemVaultLogger itemVaultLogger;
 	private final ScheduledExecutorService executor;
 
 	@Inject
-	public DataLoggerPanel(ItemVaultLogger itemVaultLogger, ScheduledExecutorService executor) {
-		this.itemVaultLogger = itemVaultLogger;
+	public DataLoggerPanel(ItemVaultLogger itemVaultLogger, ScheduledExecutorService executor, FileIOService fileIOService, SupplyTracker supplyTracker, ClientThread clientThread) {
 		this.executor = executor;
 
 		// Matches the standard RuneLite sidebar padding
@@ -66,7 +67,7 @@ public class DataLoggerPanel extends PluginPanel {
 
 		// --- BOTTOM BUTTONS SECTION ---
 		JPanel buttonContainer = new JPanel();
-		buttonContainer.setLayout(new GridLayout(5, 1, 0, 8));
+		buttonContainer.setLayout(new GridLayout(8, 1, 0, 8));
 		buttonContainer.setBorder(new EmptyBorder(10, 5, 0, 5));
 		buttonContainer.setBackground(ColorScheme.DARK_GRAY_COLOR);
 
@@ -84,7 +85,13 @@ public class DataLoggerPanel extends PluginPanel {
 			itemVaultLogger.exportAggregatedData();
 		});
 
+		JButton mergeColosseumWaveLog = createStyledButton("Merge colosseum wave logs");
+		mergeColosseumWaveLog.addActionListener(e -> {
+			fileIOService.mergeColosseumWaveLogs();
+		});
+
 		buttonContainer.add(exportVaultBtn);
+		buttonContainer.add(mergeColosseumWaveLog);
 		buttonContainer.add(openLogsBtn);
 		buttonContainer.add(openItemVaultBtn);
 		buttonContainer.add(openDataBtn);

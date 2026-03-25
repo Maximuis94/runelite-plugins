@@ -31,6 +31,7 @@ import static com.datalogger.constants.Colosseum.Message.WAVE_START_PREFIX;
 import static com.datalogger.constants.Colosseum.Script.POPULATE_INTERMISSION_UI_SCRIPT_ID;
 import static com.datalogger.constants.Colosseum.Script.POPULATE_REWARDS_CHEST_UI_SCRIPT_ID;
 import com.datalogger.events.ColosseumAttemptStarted;
+import com.datalogger.models.enums.ScreenshotFormat;
 import com.datalogger.services.FileIOService;
 import java.awt.image.BufferedImage;
 import java.io.File;
@@ -42,6 +43,7 @@ import net.runelite.api.ChatMessageType;
 import net.runelite.api.events.ChatMessage;
 import net.runelite.api.events.ScriptPostFired;
 import net.runelite.client.eventbus.Subscribe;
+import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.ui.DrawManager;
 import net.runelite.client.util.Text;
 
@@ -51,10 +53,13 @@ import net.runelite.client.util.Text;
 @Slf4j
 @Singleton
 public class ScreenshotLogger {
-	@Inject private DataLoggerConfig config;
 	@Inject private DrawManager drawManager;
 	@Inject private ScheduledExecutorService executor;
 	@Inject private FileIOService fileIOService;
+
+	@Inject private DataLoggerConfig config;
+	private ScreenshotFormat screenshotFormat;
+	private boolean screenshotBetweenColosseumWaves;
 
 	private boolean intermissionScreenshotPending = false;
 	private boolean rewardChestSpawned = false;
@@ -63,6 +68,21 @@ public class ScreenshotLogger {
 	private String colosseumAttemptId = null;
 
 	private File root;
+
+	@Subscribe
+	public void onConfigChanged(ConfigChanged event)
+	{
+		updateConfigFlags();
+	}
+
+	/**
+	 * Loads configuration values into class variables
+	 */
+	public void updateConfigFlags()
+	{
+		screenshotBetweenColosseumWaves = config.screenshotBetweenWaves();
+		screenshotFormat = config.screenshotFormat();
+	}
 
 	@Subscribe
 	public void onColosseumAttemptStarted(ColosseumAttemptStarted event) {
@@ -89,8 +109,20 @@ public class ScreenshotLogger {
 		String fileName = getScreenshotFileName(colosseumCurrentWave, rewardChestSpawned);
 
 		drawManager.requestNextFrameListener(image ->
-			fileIOService.saveScreenshot((BufferedImage) image, root, fileName)
-		);
+		{
+			BufferedImage bufferedImage = (BufferedImage) image;
+			executor.submit(() ->
+			{
+				try
+				{
+					fileIOService.saveScreenshot(bufferedImage, root, fileName, screenshotFormat);
+				}
+				catch (Exception e)
+				{
+					log.error("Failed to save screenshot", e);
+				}
+			});
+		});
 	}
 
 	/**
@@ -105,7 +137,7 @@ public class ScreenshotLogger {
 
 	@Subscribe
 	public void onChatMessage(ChatMessage event) {
-		if (!config.screenshotBetweenWaves() || ignoreChatMessageType(event.getType())) {
+		if (!screenshotBetweenColosseumWaves || ignoreChatMessageType(event.getType())) {
 			return;
 		}
 
