@@ -158,12 +158,12 @@ public interface DataLoggerConfig extends Config {
 
 	@ConfigItem(
 		keyName = "logQuiverAsSplinters",
-		name = "Log Dizana's quiver (uncharged) Sunfire splinters",
+		name = "Log quiver reward as splinters",
 		description = "If enabled, the Dizana's quiver (uncharged) reward is logged as 4,000 Sunfire splinters instead.",
 		position = 2,
 		section = COLOSSEUM_SECTION
 	)
-	default boolean logQuiverAsSplinters() { return true; }
+	default boolean logQuiverAsSplinters() { return false; }
 
 	@ConfigItem(
 		keyName = "colosseumTag",

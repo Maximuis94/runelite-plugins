@@ -349,8 +349,35 @@ _An example of a screenshot taken after wave 12 is completed_
 
 If enabled, supplies are also tracked during colosseum trials. A snapshot is created at the start of an attempt, and 
 the supplies at the end are subtracted from the initial snapshot and stored into a file.
-These supplies also include an estimate of Scythe of vitur / Tumeken's shadow attacks (to be expanded in the future)
-Supply logs are saved as `<ACCOUNT_NAME>_<YYMMDD>_<HHMMSS>_supply-log.<EXTENSION>`
+These supplies also include an estimate of Scythe of vitur / Tumeken's shadow attacks (to be expanded in the future). 
+Supply logs are saved as `<ACCOUNT_NAME>_<YYMMDD>_<HHMMSS>_supply-log.<EXTENSION>` in the directory created for the particular attempt.
+
+<details>
+
+<summary>Example supply log</summary>
+
+```json
+{
+  "consumedItems": {
+    "Death rune": 12,
+    "Blood rune": 107,
+    "Dragon arrow": 41,
+    "Aether rune": 31,
+    "Fire rune": 190
+  },
+  "consumedDoses": {
+    "Super restore": 16,
+    "Divine ranging potion": 4,
+    "Saradomin brew": 1,
+    "Divine super combat potion": 6,
+    "Sanfew serum": 10
+  },
+  "scytheAttacks": 145,
+  "shadowAttacks": 11
+}
+```
+
+</details>
 
 </details>
 
