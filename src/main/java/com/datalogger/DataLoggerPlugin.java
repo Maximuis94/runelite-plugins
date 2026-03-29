@@ -30,18 +30,21 @@ import com.datalogger.loggers.ColosseumTimelineLogger;
 import com.datalogger.loggers.GrandExchangeLogger;
 import com.datalogger.loggers.ItemVaultLogger;
 import com.datalogger.loggers.ScreenshotLogger;
+import com.datalogger.models.enums.ConsumableItemGroup;
+import com.datalogger.models.enums.ItemCharge;
 import com.datalogger.services.AccountHashMapper;
 import com.datalogger.services.ColosseumScanner;
+import com.datalogger.services.EquipmentTracker;
 import com.datalogger.services.FileIOService;
 import com.datalogger.services.GrandExchangeHistoryParser;
 import com.datalogger.services.ItemVaultParser;
 import com.datalogger.services.SupplyTracker;
-import com.datalogger.services.WeaponTracker;
 import com.datalogger.ui.DataLoggerPanel;
 import com.google.inject.Provides;
 import java.awt.image.BufferedImage;
 import javax.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
+import net.runelite.api.Actor;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
 import net.runelite.api.WorldType;
@@ -52,6 +55,7 @@ import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
+import net.runelite.client.game.ItemManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.ClientToolbar;
@@ -71,6 +75,7 @@ public class DataLoggerPlugin extends Plugin
 	@Inject private ClientToolbar clientToolbar;
 	@Inject private EventBus eventBus;
 	@Inject private DataLoggerConfig config;
+	@Inject private ItemManager itemManager;
 
 	@Inject private AccountHashMapper accountHashMapper;
 	@Inject private FileIOService fileIOService;
@@ -84,7 +89,7 @@ public class DataLoggerPlugin extends Plugin
 	@Inject private ColosseumScanner coloScanner;
 	@Inject private ColosseumTimelineLogger timelineLogger;
 	@Inject private ScreenshotLogger screenshotLogger;
-	@Inject private WeaponTracker weaponTracker;
+	@Inject private EquipmentTracker equipmentTracker;
 	@Inject private SupplyTracker supplyTracker;
 
 	private NavigationButton navButton;
@@ -108,12 +113,13 @@ public class DataLoggerPlugin extends Plugin
 	protected void startUp() throws Exception
 	{
 		log.info("Data Logger starting up...");
-
+		ItemCharge.setItemManager(itemManager);
+		ConsumableItemGroup.setItemManager(itemManager);
 		eventBus.register(accountHashMapper);
 		accountHashMapper.loadMappings();
 		eventBus.register(fileIOService);
 		eventBus.register(itemVaultLogger);
-		eventBus.register(weaponTracker);
+		eventBus.register(equipmentTracker);
 		eventBus.register(supplyTracker);
 		itemVaultLogger.updateIgnoredAccountHashes();
 
@@ -123,7 +129,6 @@ public class DataLoggerPlugin extends Plugin
 		toggleTimeline(config.logWaveTimeline());
 		toggleScreenshots(config.screenshotBetweenWaves());
 
-		// 3. Setup UI
 		final BufferedImage icon = ImageUtil.loadImageResource(getClass(), "icon.png");
 		navButton = NavigationButton.builder()
 			.tooltip("Data Logger Viewer")
@@ -144,13 +149,15 @@ public class DataLoggerPlugin extends Plugin
 		if (fileIOService != null) {
 			fileIOService.flushAll();
 		}
+		ItemCharge.setItemManager(null);
+		ConsumableItemGroup.setItemManager(null);
 
 		clientToolbar.removeNavigation(navButton);
 
 		eventBus.unregister(accountHashMapper);
 		eventBus.unregister(fileIOService);
 		eventBus.unregister(itemVaultLogger);
-		eventBus.unregister(weaponTracker);
+		eventBus.unregister(equipmentTracker);
 		eventBus.unregister(supplyTracker);
 
 		toggleItemVault(false);
@@ -273,9 +280,12 @@ public class DataLoggerPlugin extends Plugin
 	@Subscribe
 	public void onGameStateChanged(GameStateChanged event)
 	{
-		if (event.getGameState() == GameState.LOGIN_SCREEN)
+		GameState gameState = event.getGameState();
+		if (gameState == GameState.LOGIN_SCREEN || gameState == GameState.HOPPING)
 		{
+			log.info("Player has logged out or is hopping. Resetting account parameters.");
 			sessionInitialized = false;
+			eventBus.post(new AccountSessionStarted("", -1, null, false));
 		}
 	}
 
@@ -285,8 +295,8 @@ public class DataLoggerPlugin extends Plugin
 		if (!sessionInitialized && startUpComplete && client.getGameState() == GameState.LOGGED_IN)
 		{
 			long currentHash = client.getAccountHash();
-
-			if (currentHash != -1 && client.getLocalPlayer() != null && client.getLocalPlayer().getName() != null)
+			Actor player = client.getLocalPlayer();
+			if (currentHash != -1 && player != null && player.getName() != null)
 			{
 				sessionInitialized = true;
 
@@ -294,10 +304,8 @@ public class DataLoggerPlugin extends Plugin
 				String accountName = client.getLocalPlayer().getName();
 				boolean isMembers = client.getWorldType().contains(WorldType.MEMBERS);
 
-				log.debug("Session ready! Hash: {}, Name: {}. Broadcasting event.", hashString, accountName);
+				log.debug("Loaded new session data. accountHash={} accountName={} isMembers={}", hashString, accountName, isMembers);
 				eventBus.post(new AccountSessionStarted(hashString, currentHash, accountName, isMembers));
-
-				fileIOService.updateAccountHashMapping(hashString, accountName);
 			}
 		}
 	}

@@ -27,9 +27,9 @@ package com.datalogger.dto;
 
 import com.datalogger.models.colosseum.ManticoreAttackSequence;
 import com.datalogger.models.itemvault.ItemBundle;
+import java.util.List;
 import lombok.Builder;
 import lombok.Data;
-import java.util.List;
 
 @Data
 @Builder
@@ -40,7 +40,7 @@ public class ColosseumWaveDTO {
 	private String accountName;
 	private String tag;
 
-	private List<ItemBundle> earnedLoot;
+	private ItemBundle earnedLoot;
 
 	private List<String> modifierChoices;
 	private String chosenModifier;

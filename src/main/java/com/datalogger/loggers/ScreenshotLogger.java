@@ -31,6 +31,8 @@ import static com.datalogger.constants.Colosseum.Message.WAVE_START_PREFIX;
 import static com.datalogger.constants.Colosseum.Script.POPULATE_INTERMISSION_UI_SCRIPT_ID;
 import static com.datalogger.constants.Colosseum.Script.POPULATE_REWARDS_CHEST_UI_SCRIPT_ID;
 import com.datalogger.events.ColosseumAttemptStarted;
+import com.datalogger.events.PlayerDied;
+import com.datalogger.framework.LogType;
 import com.datalogger.models.enums.ScreenshotFormat;
 import com.datalogger.services.FileIOService;
 import java.awt.image.BufferedImage;
@@ -61,13 +63,15 @@ public class ScreenshotLogger {
 	private ScreenshotFormat screenshotFormat;
 	private boolean screenshotBetweenColosseumWaves;
 
+	private boolean awaitingColosseumReset = false;
+	private boolean isActiveAttempt = false;
 	private boolean intermissionScreenshotPending = false;
 	private boolean rewardChestSpawned = false;
 	private int colosseumCurrentWave = 0;
 
 	private String colosseumAttemptId = null;
 
-	private File root;
+	private File colosseumRoot;
 
 	@Subscribe
 	public void onConfigChanged(ConfigChanged event)
@@ -86,27 +90,39 @@ public class ScreenshotLogger {
 
 	@Subscribe
 	public void onColosseumAttemptStarted(ColosseumAttemptStarted event) {
+		isActiveAttempt = true;
 		colosseumAttemptId = event.getStartTime();
 		colosseumCurrentWave = 1;
 		intermissionScreenshotPending = true;
 		rewardChestSpawned = false;
-		root = new File(event.getRoot());
+		colosseumRoot = new File(event.getRoot());
 		log.debug("Screenshot logger synced with attempt ID: {}", colosseumAttemptId);
+	}
+
+	public void resetColosseum() {
+		log.debug("Screenshotlogger ended colosseum attempt with id {}", colosseumAttemptId);
+		isActiveAttempt = false;
+		colosseumAttemptId = null;
+		colosseumCurrentWave = 0;
+		intermissionScreenshotPending = false;
+		rewardChestSpawned = false;
+		colosseumRoot = null;
+		awaitingColosseumReset = false;
 	}
 
 	/**
 	 * Return the File for the screenshot for a specific wave / whether it is a reward
 	 */
-	private String getScreenshotFileName(int waveNumber, boolean isReward)
+	private String getScreenshotFileName(int waveNumber, String affix)
 	{
-		return String.format("wave-%02d%s", waveNumber, isReward ? "-reward" : "");
+		return String.format("wave-%02d%s", waveNumber, affix);
 	}
 
 	/**
 	 * Create a screenshot and save it in the given fileName in the given subDirectory
 	 */
 	private void captureAndSaveScreenshot() {
-		String fileName = getScreenshotFileName(colosseumCurrentWave, rewardChestSpawned);
+		String fileName = getScreenshotFileName(colosseumCurrentWave, rewardChestSpawned ? "-reward" : "");
 
 		drawManager.requestNextFrameListener(image ->
 		{
@@ -115,7 +131,10 @@ public class ScreenshotLogger {
 			{
 				try
 				{
-					fileIOService.saveScreenshot(bufferedImage, root, fileName, screenshotFormat);
+					fileIOService.saveScreenshot(bufferedImage, colosseumRoot, fileName, screenshotFormat);
+
+					if (awaitingColosseumReset)
+						resetColosseum();
 				}
 				catch (Exception e)
 				{
@@ -137,13 +156,13 @@ public class ScreenshotLogger {
 
 	@Subscribe
 	public void onChatMessage(ChatMessage event) {
-		if (!screenshotBetweenColosseumWaves || ignoreChatMessageType(event.getType())) {
+		if (ignoreChatMessageType(event.getType())) {
 			return;
 		}
 
 		String message = Text.removeTags(event.getMessage());
 
-		if (!intermissionScreenshotPending)
+		if (screenshotBetweenColosseumWaves && !intermissionScreenshotPending)
 			updateColosseumFlags(message);
 	}
 
@@ -158,11 +177,46 @@ public class ScreenshotLogger {
 
 	@Subscribe
 	public void onScriptPostFired(ScriptPostFired event) {
-		if (intermissionScreenshotPending && isPostColosseumWaveUI(event.getScriptId()))
+		if (screenshotBetweenColosseumWaves && intermissionScreenshotPending && isPostColosseumWaveUI(event.getScriptId()))
 		{
 			takeColosseumScreenshot(event.getScriptId());
 		}
 	}
+
+	/**
+	 * Screenshot taken in the event of a colosseum death
+	 */
+	private void screenshotColosseumDeath()
+	{
+		String fileName = getScreenshotFileName(colosseumCurrentWave, "-death");
+		drawManager.requestNextFrameListener(image ->
+		{
+			BufferedImage bufferedImage = (BufferedImage) image;
+			executor.submit(() ->
+			{
+				try
+				{
+					fileIOService.saveScreenshot(bufferedImage, colosseumRoot, fileName, screenshotFormat);
+					resetColosseum();
+				}
+				catch (Exception e)
+				{
+					log.error("Failed to save screenshot", e);
+				}
+			});
+		});
+	}
+
+	@Subscribe
+	public void onPlayerDied(PlayerDied event)
+	{
+		if (screenshotBetweenColosseumWaves && event.getLogType() == LogType.COLOSSEUM)
+		{
+			screenshotColosseumDeath();
+		}
+	}
+
+
 
 	/**
 	 * Set the colosseumScreenshotPending variable to true if a new wave has started, in case of specific chat messages
@@ -192,12 +246,9 @@ public class ScreenshotLogger {
 	 */
 	private void takeColosseumScreenshot(int scriptId)
 	{
+		awaitingColosseumReset = scriptId == POPULATE_REWARDS_CHEST_UI_SCRIPT_ID;
 		captureAndSaveScreenshot();
 		intermissionScreenshotPending = false;
 		rewardChestSpawned = false;
-
-		if (scriptId == POPULATE_REWARDS_CHEST_UI_SCRIPT_ID) {
-			colosseumAttemptId = null;
-		}
 	}
 }

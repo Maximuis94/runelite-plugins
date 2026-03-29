@@ -25,9 +25,12 @@
 package com.datalogger.services;
 
 import com.datalogger.DataLoggerConfig;
+import com.datalogger.constants.PluginConstants;
+import static com.datalogger.constants.PluginConstants.INTERNAL_COLOSSEUM_ATTEMPT_HISTORY;
 import com.datalogger.dto.ColosseumAttemptDTO;
 import com.datalogger.dto.ColosseumStateDTO;
 import com.datalogger.dto.TrackedSuppliesDTO;
+import com.datalogger.events.AccountSessionStarted;
 import com.datalogger.events.ColosseumAttemptStarted;
 import com.datalogger.framework.LogType;
 import com.datalogger.models.colosseum.ColosseumAttempt;
@@ -37,6 +40,7 @@ import com.datalogger.models.enums.ScreenshotFormat;
 import com.datalogger.models.grandexchange.ActiveGeOffer;
 import com.datalogger.models.grandexchange.GeLedgerEntry;
 import com.datalogger.models.itemvault.BankedItem;
+import com.datalogger.models.supplytracker.ValuedItemStack;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -76,9 +80,9 @@ import java.util.stream.Collectors;
 import javax.imageio.ImageIO;
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.coords.WorldPoint;
-import net.runelite.client.RuneLite;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
 
@@ -89,6 +93,13 @@ import net.runelite.client.events.ConfigChanged;
 @Singleton
 public class FileIOService
 {
+	public static final File ACCOUNT_HASH_MAPPINGS = new File(PluginConstants.INTERNAL_ROOT_DIR, "account-hash-mappings.properties");
+	public static final File INTERNAL_ACTIVE_OFFERS_DIR = new File(PluginConstants.INTERNAL_ROOT_DIR, "active-offers");
+	public static final File GE_STATE_DIR = new File(PluginConstants.INTERNAL_ROOT_DIR, "state");
+	public static final File INTERNAL_TEMP_DIR = new File(PluginConstants.INTERNAL_ROOT_DIR, "temp");
+	public static final File INTERNAL_GE_DIR = new File(PluginConstants.INTERNAL_ROOT_DIR, "ge-history");
+	public static final File COLOSSEUM_WAVE_LOG_MERGED_CSV = new File(PluginConstants.COLOSSEUM_ROOT_DIR, "colosseum-waves-merged.csv");
+	public static final File COLOSSEUM_WAVE_LOG_MERGED_JSON = new File(PluginConstants.COLOSSEUM_ROOT_DIR, "colosseum-waves-merged.json");
 	private final Gson gson;
 
 	private final ScheduledExecutorService executor;
@@ -104,7 +115,14 @@ public class FileIOService
 	private final DataLoggerConfig config;
 	private boolean logGrandExchangeJson;
 
-	private String account;
+	private String accountName = "";
+	private String accountHashString = "";
+
+	@Getter
+	private boolean hasValidAccountInfo = false;
+	@Getter
+	private boolean hasExpiredAccountInfo = false;
+
 	private String attemptRoot;
 	private File attemptRootFile;
 	private String startTime;
@@ -126,7 +144,6 @@ public class FileIOService
 	public void onColosseumAttemptStarted(ColosseumAttemptStarted event)
 	{
 		attemptRoot = event.getRoot();
-		account = event.getAccountName();
 		startTime = event.getStartTime();
 
 		attemptRootFile = new File(attemptRoot);
@@ -145,7 +162,7 @@ public class FileIOService
 			}
 		}
 
-		log.info("Initialized Colosseum FileIOService vars with root={}, account={}, startTime={}", attemptRoot, account, startTime);
+		log.info("Initialized Colosseum FileIOService vars with root={}, account={}, startTime={}", attemptRoot, accountName, startTime);
 	}
 
 	@Subscribe
@@ -155,6 +172,38 @@ public class FileIOService
 		updateConfigFlags();
 	}
 
+	@Subscribe
+	public void onAccountSessionStarted(AccountSessionStarted event)
+	{
+		updateAccountInfo(event.getAccountName(), event.getAccountHashString());
+	}
+
+	private boolean isValidAccountString(String accountString)
+	{
+		return accountString != null && !accountString.isEmpty();
+	}
+
+	/**
+	 * Update account info with the given accountName and accountHash Strings. If either one is not valid, indicate this
+	 * via the hasValidAccountInfo flag, but keep the previous name and/or hash cached.
+	 */
+	private void updateAccountInfo(String accountName, String accountHashString)
+	{
+		boolean isValidName = isValidAccountString(accountName);
+		boolean isValidHash = isValidAccountString(accountHashString);
+		if (isValidName && isValidHash)
+		{
+			this.accountName = accountName;
+			this.accountHashString = accountHashString;
+			hasValidAccountInfo = true;
+		}
+		else if (hasValidAccountInfo)
+		{
+			log.info("AccountHash info has expired and does not match the currently active session.");
+			hasExpiredAccountInfo = true;
+		}
+	}
+
 	/**
 	 * Parse relevant configurations and load the values into associated variables
 	 */
@@ -162,28 +211,6 @@ public class FileIOService
 	{
 		logGrandExchangeJson = config.logGrandExchangeJSON();
 	}
-
-	public static final File PLUGIN_ROOT = new File(RuneLite.RUNELITE_DIR, "data-logger");
-	public static final File INTERNAL_ROOT_DIR = new File(PLUGIN_ROOT, "internal");
-	public static final File INTERNAL_GE_DIR = new File(INTERNAL_ROOT_DIR, "ge-history");
-	public static final File INTERNAL_VAULT_DIR = new File(INTERNAL_ROOT_DIR, "item-vault");
-	public static final File INTERNAL_TEMP_DIR = new File(INTERNAL_ROOT_DIR, "temp");
-	public static final File GE_STATE_DIR = new File(INTERNAL_ROOT_DIR, "state");
-	public static final File INTERNAL_ACTIVE_OFFERS_DIR = new File(INTERNAL_ROOT_DIR, "active-offers");
-	public static final File GRAND_EXCHANGE_DIR = new File(PLUGIN_ROOT, "grand-exchange");
-	public static final File GRAND_EXCHANGE_ACTIVE_OFFERS_DIR = new File(GRAND_EXCHANGE_DIR, "active-offers");
-	public static final File ITEM_VAULT_DIR = new File(PLUGIN_ROOT, "item-vault");
-	public static final File COLOSSEUM_ROOT_DIR = new File(PLUGIN_ROOT, "colosseum");
-	public static final File COLOSSEUM_ATTEMPT_DIR = new File(COLOSSEUM_ROOT_DIR, "attempt");
-	public static final File COLOSSEUM_TIMELINE_DIR = new File(COLOSSEUM_ROOT_DIR, "timeline");
-	public static final File COLOSSEUM_LOG_DIR = new File(COLOSSEUM_ROOT_DIR, "log");
-	public static final File COLOSSEUM_SCREENSHOT_DIR = new File(COLOSSEUM_ROOT_DIR, "screenshot");
-
-	public static final File ACCOUNT_HASH_MAPPINGS = new File(INTERNAL_ROOT_DIR, "account-hash-mappings.json");
-	public static final File COLOSSEUM_WAVE_LOG_MERGED_JSON = new File(COLOSSEUM_ROOT_DIR, "colosseum-waves-merged.json");
-	public static final File COLOSSEUM_WAVE_LOG_MERGED_CSV = new File(COLOSSEUM_ROOT_DIR, "colosseum-waves-merged.csv");
-	public static final File MERGED_ITEM_VAULT_JSON = new File(ITEM_VAULT_DIR, "merged-vaults.json");
-	public static final File MERGED_ITEM_VAULT_CSV = new File(ITEM_VAULT_DIR, "merged-vaults.csv");
 
 
 	/**
@@ -235,12 +262,11 @@ public class FileIOService
 	/**
 	 * Returns a File reference based on the input provided and the plugin configurations
 	 * @param type The data that is to be logged
-	 * @param account The account that the data relates to
 	 * @return File reference based on inputs provided and strategy selected
 	 */
-	public File getTargetFile(LogType type, String account) {
+	public File getTargetFile(LogType type) {
 		String date = java.time.LocalDate.now().toString();
-		File accountDir = new File(type.getLogDirectory(), account.toLowerCase());
+		File accountDir = new File(type.getLogDirectory(), accountName.toLowerCase());
 
 		return new File(accountDir, type.getDirectoryName() + "_" + date + ".csv");
 	}
@@ -248,21 +274,20 @@ public class FileIOService
 	/**
 	 * Ensures the state directory exists and returns the file path for an account's state
 	 */
-	private File getStateFile(String accountHash) {
+	private File getStateFile() {
 		if (!GE_STATE_DIR.exists()) {
 			GE_STATE_DIR.mkdirs();
 		}
-		return new File(GE_STATE_DIR, "state_" + accountHash + ".properties");
+		return new File(GE_STATE_DIR, "state_" + accountHashString + ".properties");
 	}
 
 	/**
 	 * Parse the properties file associated with the given account hash
-	 * @param accountHash The account hash that indicates which file is to be parsed
 	 * @return The contents of the parsed properties file
 	 */
-	public Properties getAccountState(String accountHash) {
+	public Properties getAccountState() {
 		Properties props = new Properties();
-		File file = getStateFile(accountHash);
+		File file = getStateFile();
 
 		if (file.exists()) {
 			try (FileInputStream in = new FileInputStream(file)) {
@@ -276,12 +301,11 @@ public class FileIOService
 
 	/**
 	 * Export properties associated with accountHash to its corresponding file
-	 * @param accountHash Account hash String
 	 * @param props Properties that are to be saved.
 	 */
-	public void saveAccountState(String accountHash, Properties props) {
+	public void saveAccountState(Properties props) {
 		Future<?> future = executor.submit(() -> {
-			File file = getStateFile(accountHash); // Note: getStateFile has a .mkdirs() in it, so it's good this is async now!
+			File file = getStateFile(); // Note: getStateFile has a .mkdirs() in it, so it's good this is async now!
 			try (FileOutputStream out = new FileOutputStream(file)) {
 				props.store(out, "Account-specific ongoing Grand Exchange offers");
 			} catch (IOException e) {
@@ -429,27 +453,46 @@ public class FileIOService
 	}
 
 	/**
-	 * Logs the given attempt
+	 * Logs the given ColosseumAttemptDto in the internal history and the given attemptLogJsonFile
 	 */
-	public void logColosseumAttempt(ColosseumAttempt attempt) {
-		Future<?> future = executor.submit(() -> {
-			if (!attemptRootFile.exists()) {
-				attemptRootFile.mkdirs();
+	public void logColosseumAttempt(ColosseumAttemptDTO attemptDto, File attemptLogJsonFile) {
+		Future<?> futureInternal = executor.submit(() -> {
+			File parentDir = INTERNAL_COLOSSEUM_ATTEMPT_HISTORY.getParentFile();
+
+			if (parentDir != null && !parentDir.exists()) {
+				parentDir.mkdirs();
 			}
 
-			File targetFile = attempt.getWaveLogJsonFile();
+			Gson flatGson = new Gson();
+			String jsonLine = flatGson.toJson(attemptDto);
 
-			ColosseumAttemptDTO attemptDto = attempt.toDTO();
-			try (FileWriter writer = new FileWriter(targetFile)) {
+			try (FileWriter fw = new FileWriter(INTERNAL_COLOSSEUM_ATTEMPT_HISTORY, true);
+				 BufferedWriter bw = new BufferedWriter(fw);
+				 PrintWriter out = new PrintWriter(bw)) {
+
+				out.println(jsonLine);
+				log.info("Successfully appended attempt to internal history.");
+
+			} catch (IOException e) {
+				log.error("Failed to append to internal Colosseum history!", e);
+			}
+		});
+		pendingWrites.add(futureInternal);
+
+		Future<?> futureExternal = executor.submit(() -> {
+			File parentDir = attemptLogJsonFile.getParentFile();
+			if (parentDir != null && !parentDir.exists()) {
+				parentDir.mkdirs();
+			}
+
+			try (FileWriter writer = new FileWriter(attemptLogJsonFile)) {
 				gson.toJson(attemptDto, writer);
-				log.info("Successfully saved Colosseum attempt to {}", targetFile.getAbsolutePath());
-				log.info("Attempt waves: {} finalStatus: {}", attempt.getWaves().size(), attempt.getFinalStatus());
+				log.info("Successfully saved Colosseum attempt to {}", attemptLogJsonFile.getAbsolutePath());
 			} catch (IOException e) {
 				log.error("Failed to save Colosseum attempt log!", e);
 			}
 		});
-
-		pendingWrites.add(future);
+		pendingWrites.add(futureExternal);
 	}
 
 	/**
@@ -460,6 +503,7 @@ public class FileIOService
 	 * @param format The format of the image file
 	 */
 	public void saveScreenshot(BufferedImage image, File rootDir, String fileName, ScreenshotFormat format) throws IOException {
+		log.info("Attempting to save screenshot at directory {} with fileName {}", rootDir, fileName);
 		if (!rootDir.exists() && !rootDir.mkdirs()) {
 			log.warn("Failed to create screenshot directories.");
 			return;
@@ -552,11 +596,10 @@ public class FileIOService
 	 * Safely saves the internal Grand Exchange ledger for a specific account.
 	 * Offloads to a background thread and uses an atomic file swap to prevent data corruption.
 	 *
-	 * @param accountHash The unique hash of the logged-in account
 	 * @param ledger The full merged list of ledger entries to save
 	 */
-	public void saveInternalGeLedger(String accountName, String accountHash, List<GeLedgerEntry> ledger) {
-		if (accountName == null || accountHash == null || accountHash.isEmpty() || ledger == null) {
+	public void saveInternalGeLedger(List<GeLedgerEntry> ledger) {
+		if (!hasValidAccountInfo || ledger == null) {
 			return;
 		}
 
@@ -566,11 +609,11 @@ public class FileIOService
 				return;
 			}
 
-			File finalFile = new File(INTERNAL_GE_DIR, accountHash + ".json");
-			File tempFile = new File(INTERNAL_GE_DIR, accountHash + ".tmp");
-			File copyTo = new File(GRAND_EXCHANGE_DIR, accountName + "/grand-exchange.json");
+			File finalFile = new File(INTERNAL_GE_DIR, accountHashString + ".json");
+			File tempFile = new File(INTERNAL_GE_DIR, accountHashString + ".tmp");
+			File copyTo = new File(PluginConstants.GRAND_EXCHANGE_DIR, accountName + "/grand-exchange.json");
 
-			Object lock = accountLocks.computeIfAbsent(accountHash, k -> new Object());
+			Object lock = accountLocks.computeIfAbsent(accountHashString, k -> new Object());
 
 			synchronized (lock) {
 				try {
@@ -585,7 +628,7 @@ public class FileIOService
 						StandardCopyOption.REPLACE_EXISTING
 					);
 
-					log.debug("Successfully saved internal GE ledger for account hash: {}", accountHash);
+					log.debug("Successfully saved internal GE ledger for account hash: {}", accountHashString);
 
 					if (logGrandExchangeJson)
 					{
@@ -609,7 +652,7 @@ public class FileIOService
 					}
 
 				} catch (Exception e) {
-					log.error("Failed to save internal GE ledger for account hash: {}", accountHash, e);
+					log.error("Failed to save internal GE ledger for account hash: {}", accountHashString, e);
 					if (tempFile.exists()) {
 						tempFile.delete();
 					}
@@ -646,11 +689,26 @@ public class FileIOService
 	}
 
 	/**
+	 * Load and return active GE offers for the currently active account
+	 */
+	public List<ActiveGeOffer> loadActiveGeOffers()
+	{
+		if(!hasValidAccountInfo)
+		{
+			log.error("Unable to load active GE offers for current accountHash as it is null or empty...");
+			return new ArrayList<>();
+		}
+
+		log.info("Loading active GE offers for account {} with hash {}...", accountName, accountHashString);
+		return loadActiveGeOffers(accountHashString);
+	}
+
+	/**
 	 * Safely saves the active Grand Exchange offers (Wealth Tracker state) for a specific account,
 	 * and exports a JSON copy and a CSV file to the public grand exchange directory.
 	 */
 	public void saveActiveGeOffers(String accountHash, List<ActiveGeOffer> offers) {
-		if (accountHash == null || accountHash.isEmpty() || offers == null) {
+		if (!hasValidAccountInfo || offers == null) {
 			log.debug("Unable to save active GE offers for account hash: {}", accountHash);
 			return;
 		}
@@ -665,8 +723,8 @@ public class FileIOService
 			File tempFile = new File(INTERNAL_ACTIVE_OFFERS_DIR, accountHash + ".tmp");
 
 			// Define the public export files
-			File publicJsonFile = new File(ITEM_VAULT_DIR, "active-offers_" + accountHash + ".json");
-			File publicCsvFile = new File(ITEM_VAULT_DIR, "active-offers_" + accountHash + ".csv");
+			File publicJsonFile = new File(PluginConstants.ITEM_VAULT_DIR, "active-offers_" + accountHash + ".json");
+			File publicCsvFile = new File(PluginConstants.ITEM_VAULT_DIR, "active-offers_" + accountHash + ".csv");
 
 			Object lock = accountLocks.computeIfAbsent(accountHash, k -> new Object());
 
@@ -686,8 +744,8 @@ public class FileIOService
 					);
 
 					// 3. Handle Public Exports
-					if (!ITEM_VAULT_DIR.exists() && !ITEM_VAULT_DIR.mkdirs()) {
-						log.error("Failed to create public active GE offers directory: {}", ITEM_VAULT_DIR.getAbsolutePath());
+					if (!PluginConstants.ITEM_VAULT_DIR.exists() && !PluginConstants.ITEM_VAULT_DIR.mkdirs()) {
+						log.error("Failed to create public active GE offers directory: {}", PluginConstants.ITEM_VAULT_DIR.getAbsolutePath());
 					} else {
 						// Export JSON copy
 						Files.copy(
@@ -737,6 +795,12 @@ public class FileIOService
 		pendingWrites.add(future);
 	}
 
+	public void saveActiveGeOffers(List<ActiveGeOffer> offers)
+	{
+		log.info("Saving active GE offers for account {}", accountName);
+		saveActiveGeOffers(accountHashString, offers);
+	}
+
 	/**
 	 * Final attempt to write all rows that previously failed to write.
 	 */
@@ -778,45 +842,6 @@ public class FileIOService
 					file.getName(), backlog.size());
 			}
 		}
-	}
-
-	/**
-	 * Update a cached accountHash-accountName mapping JSON file with the given accountHash and accountName
-	 */
-	public void updateAccountHashMapping(String accountHash, String accountName) {
-		if (accountHash == null || accountHash.isEmpty() || accountName == null || accountName.isEmpty()) {
-			return;
-		}
-
-		Future<?> future = executor.submit(() -> {
-			File parentDir = ACCOUNT_HASH_MAPPINGS.getParentFile();
-			if (parentDir != null && !parentDir.exists()) {
-				parentDir.mkdirs();
-			}
-
-			synchronized (mappingsLock) {
-				Properties properties = new Properties();
-
-				if (ACCOUNT_HASH_MAPPINGS.exists()) {
-					try (FileInputStream in = new FileInputStream(ACCOUNT_HASH_MAPPINGS)) {
-						properties.load(in);
-					} catch (Exception e) {
-						log.error("Failed to read existing account hash mappings", e);
-					}
-				}
-
-				properties.setProperty(accountHash, accountName);
-
-				try (FileOutputStream out = new FileOutputStream(ACCOUNT_HASH_MAPPINGS)) {
-					properties.store(out, "Account Hash to Account Name Mappings");
-					log.debug("Successfully updated account hash mapping for: {}", accountName);
-				} catch (Exception e) {
-					log.error("Failed to write updated account hash mappings", e);
-				}
-			}
-		});
-
-		pendingWrites.add(future);
 	}
 
 	/**
@@ -868,7 +893,7 @@ public class FileIOService
 	 * Returns a Map where the key is the filename and the value is the array of raw items.
 	 */
 	public Map<String, BankedItem[]> readAllVaultFilesRaw() {
-		File directory = INTERNAL_VAULT_DIR;
+		File directory = PluginConstants.INTERNAL_VAULT_DIR;
 		if (!directory.exists() || !directory.isDirectory()) {
 			return new HashMap<>(); // Return empty map if directory doesn't exist
 		}
@@ -945,13 +970,14 @@ public class FileIOService
 				Properties properties = new Properties();
 				properties.load(in);
 
-				for (String key : properties.stringPropertyNames())
+				for (String accountHash : properties.stringPropertyNames())
 				{
 					try {
-						long hash = Long.parseLong(key);
-						mappings.put(hash, properties.getProperty(key));
+						long hash = Long.parseLong(accountHash);
+						String name = properties.getProperty(accountHash);
+						mappings.put(hash, name);
 					} catch (NumberFormatException e) {
-						log.warn("Found invalid account hash in mappings file: {}", key);
+						log.warn("Found invalid account hash in mappings file: {}", accountHash);
 					}
 				}
 			}
@@ -977,13 +1003,13 @@ public class FileIOService
 	 */
 	private void mergeAllWaveLogsJson() {
 		Future<?> future = executor.submit(() -> {
-			if (!COLOSSEUM_ATTEMPT_DIR.exists() || !COLOSSEUM_ATTEMPT_DIR.isDirectory()) {
+			if (!PluginConstants.COLOSSEUM_ATTEMPT_DIR.exists() || !PluginConstants.COLOSSEUM_ATTEMPT_DIR.isDirectory()) {
 				log.debug("Colosseum root directory does not exist. Skipping merge.");
 				return;
 			}
 			log.info("Attempting to merge all Colosseum wave json logs into {}", COLOSSEUM_WAVE_LOG_MERGED_JSON);
 
-			File[] attemptDirs = COLOSSEUM_ATTEMPT_DIR.listFiles(File::isDirectory);
+			File[] attemptDirs = PluginConstants.COLOSSEUM_ATTEMPT_DIR.listFiles(File::isDirectory);
 			if (attemptDirs == null || attemptDirs.length == 0) {
 				return;
 			}
@@ -1051,13 +1077,13 @@ public class FileIOService
 	 */
 	private void mergeAllWaveLogsCsv() {
 		Future<?> future = executor.submit(() -> {
-			if (!COLOSSEUM_ROOT_DIR.exists() || !COLOSSEUM_ROOT_DIR.isDirectory()) {
+			if (!PluginConstants.COLOSSEUM_ROOT_DIR.exists() || !PluginConstants.COLOSSEUM_ROOT_DIR.isDirectory()) {
 				log.debug("Colosseum root directory does not exist. Skipping CSV merge.");
 				return;
 			}
 			log.info("Attempting to merge all Colosseum wave csv logs...");
 
-			File[] attemptDirs = COLOSSEUM_ATTEMPT_DIR.listFiles(File::isDirectory);
+			File[] attemptDirs = PluginConstants.COLOSSEUM_ATTEMPT_DIR.listFiles(File::isDirectory);
 			if (attemptDirs == null || attemptDirs.length == 0) {
 				return;
 			}
@@ -1193,32 +1219,37 @@ public class FileIOService
 	{
 		try (PrintWriter writer = new PrintWriter(new FileWriter(file)))
 		{
-			writer.println("Category,Identifier,Quantity");
-
-			if (supplies.getScytheAttacks() > 0)
-			{
-				writer.printf("Attack,Scythe,%d%n", supplies.getScytheAttacks());
-			}
-			if (supplies.getShadowAttacks() > 0)
-			{
-				writer.printf("Attack,Shadow,%d%n", supplies.getShadowAttacks());
-			}
+			int totalGp = 0;
+			writer.println("Category,Identifier,Quantity,Value (GP)");
 
 			if (supplies.getConsumedItems() != null)
 			{
-				for (Map.Entry<String, Integer> entry : supplies.getConsumedItems().entrySet())
+				for (Map.Entry<String, ValuedItemStack> entry : supplies.getConsumedItems().entrySet())
 				{
-					writer.printf("Item,%s,%d%n", entry.getKey(), entry.getValue());
+					writer.printf("Item,%s,%d,%d%n", entry.getKey(), entry.getValue().getCount(), entry.getValue().getTotalValueInGp());
+					totalGp += entry.getValue().getTotalValueInGp();
+				}
+			}
+
+			if (supplies.getConsumedCharges() != null)
+			{
+				for (Map.Entry<String, ValuedItemStack> entry : supplies.getConsumedCharges().entrySet())
+				{
+					writer.printf("Charge,%s,%d,%d%n", entry.getKey(), entry.getValue().getCount(), entry.getValue().getTotalValueInGp());
+					totalGp += entry.getValue().getTotalValueInGp();
 				}
 			}
 
 			if (supplies.getConsumedDoses() != null)
 			{
-				for (Map.Entry<String, Integer> entry : supplies.getConsumedDoses().entrySet())
+				for (Map.Entry<String, ValuedItemStack> entry : supplies.getConsumedDoses().entrySet())
 				{
-					writer.printf("Dose,%s,%d%n", entry.getKey(), entry.getValue());
+					writer.printf("Dose,%s,%d,%d%n", entry.getKey(), entry.getValue().getCount(), entry.getValue().getTotalValueInGp());
+					totalGp += entry.getValue().getTotalValueInGp();
 				}
 			}
+
+			writer.printf("Total,,,%d%n", totalGp);
 
 			log.info("Successfully exported supplies to CSV: {}", file.getAbsolutePath());
 		}

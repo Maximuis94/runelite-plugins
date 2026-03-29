@@ -25,6 +25,7 @@
 package com.datalogger.loggers;
 
 import com.datalogger.DataLoggerConfig;
+import static com.datalogger.constants.PluginConstants.ITEM_VAULT_DIR;
 import com.datalogger.framework.AbstractLogger;
 import com.datalogger.framework.LogType;
 import com.datalogger.models.grandexchange.ActiveGeOffer;
@@ -32,8 +33,6 @@ import com.datalogger.models.itemvault.BankedItem;
 import com.datalogger.models.enums.VaultType;
 import com.datalogger.services.AccountHashMapper;
 import com.datalogger.services.FileIOService;
-import static com.datalogger.services.FileIOService.MERGED_ITEM_VAULT_CSV;
-import static com.datalogger.services.FileIOService.MERGED_ITEM_VAULT_JSON;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -54,6 +53,9 @@ import net.runelite.client.events.ConfigChanged;
 @Singleton
 public class ItemVaultLogger extends AbstractLogger
 {
+	public static final File MERGED_ITEM_VAULT_JSON = new File(ITEM_VAULT_DIR, "merged-vaults.json");
+	public static final File MERGED_ITEM_VAULT_CSV = new File(ITEM_VAULT_DIR, "merged-vaults.csv");
+
 	private final FileIOService fileIOService;
 	private final DataLoggerConfig config;
 	private final AccountHashMapper accountHashMapper;
@@ -275,7 +277,7 @@ public class ItemVaultLogger extends AbstractLogger
 			if (config.logItemVaultCSV())
 			{
 				File csvFile = vaultType.getExternalCSVFile(accountHash);
-				fileIOService.writeVaultCsv(csvFile, items, false);;
+				fileIOService.writeVaultCsv(csvFile, items, false);
 			}
 		});
 	}

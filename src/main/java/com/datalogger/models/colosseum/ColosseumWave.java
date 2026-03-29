@@ -51,7 +51,7 @@ public class ColosseumWave implements DataRow
 	private String accountName;
 	private String tag;
 
-	private List<ItemBundle> earnedLoot;
+	private ItemBundle earnedLoot;
 
 	@Singular
 	private List<ColosseumModifier> modifierChoices;
@@ -100,9 +100,7 @@ public class ColosseumWave implements DataRow
 			.status(status != null ? status.name() : "UNKNOWN")
 			.accountName(accountName)
 			.tag(tag)
-
-			.earnedLoot(earnedLoot != null ? earnedLoot : new java.util.ArrayList<>())
-
+			.earnedLoot(earnedLoot)
 			.modifierChoices(modifierChoices != null ? modifierChoices.stream()
 				.map(ColosseumModifier::name)
 				.collect(Collectors.toList()) : new java.util.ArrayList<>())
@@ -151,18 +149,15 @@ public class ColosseumWave implements DataRow
 	}
 
 	public static String csvHeader() {
-		return "wave,status,accountName,tag,itemIds,itemNames,quantities,modifierChoice_I,modifierChoice_II,modifierChoice_III,chosenModifier,activeModifiers,timeTaken,damageTaken,speedBonus,damageBonus,modifierGlory,completionBonus,waveGlory,totalGlory,totalTimeTaken,serpentShamanSpawnX,serpentShamanSpawnY,javelinColossusSpawnAX,javelinColossusSpawnAY,javelinColossusSpawnBX,javelinColossusSpawnBY,manticoreSpawnAX,manticoreSpawnAY,manticoreSequenceA,manticoreSpawnBX,manticoreSpawnBY,manticoreSequenceB,shockwaveColossusSpawnAX,shockwaveColossusSpawnAY,shockwaveColossusSpawnBX,shockwaveColossusSpawnBY,jaguarWarriorReinfSpawnX,jaguarWarriorReinfSpawnY,serpentShamanReinfSpawnX,serpentShamanReinfSpawnY,minotaurReinfSpawnX,minotaurReinfSpawnY";
+		return "wave,status,accountName,tag,itemId,itemName,quantity,modifierChoice_I,modifierChoice_II,modifierChoice_III,chosenModifier,activeModifiers,timeTaken,damageTaken,speedBonus,damageBonus,modifierGlory,completionBonus,waveGlory,totalGlory,totalTimeTaken,serpentShamanSpawnX,serpentShamanSpawnY,javelinColossusSpawnAX,javelinColossusSpawnAY,javelinColossusSpawnBX,javelinColossusSpawnBY,manticoreSpawnAX,manticoreSpawnAY,manticoreSequenceA,manticoreSpawnBX,manticoreSpawnBY,manticoreSequenceB,shockwaveColossusSpawnAX,shockwaveColossusSpawnAY,shockwaveColossusSpawnBX,shockwaveColossusSpawnBY,jaguarWarriorReinfSpawnX,jaguarWarriorReinfSpawnY,serpentShamanReinfSpawnX,serpentShamanReinfSpawnY,minotaurReinfSpawnX,minotaurReinfSpawnY";
 	}
 
 	public String toCsvRow() {
-		String itemIds = earnedLoot == null || earnedLoot.isEmpty() ? "-1" :
-			earnedLoot.stream().map(i -> String.valueOf(i.getItemId())).collect(Collectors.joining("|"));
+		String itemId = earnedLoot == null ? "-1" : String.valueOf(earnedLoot.getItemId());
 
-		String itemNames = earnedLoot == null || earnedLoot.isEmpty() ? "" :
-			earnedLoot.stream().map(ItemBundle::getItemName).collect(Collectors.joining("|"));
+		String itemName = earnedLoot == null ? "" : earnedLoot.getItemName();
 
-		String quantities = earnedLoot == null || earnedLoot.isEmpty() ? "0" :
-			earnedLoot.stream().map(i -> String.valueOf(i.getQuantity())).collect(Collectors.joining("|"));
+		String quantity = earnedLoot == null  ? "0" : String.valueOf(earnedLoot.getQuantity());
 
 		String modStatus = status != null ? status.name() : "UNKNOWN";
 		String chosenMod = chosenModifier != null ? chosenModifier.name() : "";
@@ -176,9 +171,9 @@ public class ColosseumWave implements DataRow
 			modStatus,
 			accountName,
 			tag,
-			itemIds,
-			itemNames,
-			quantities,
+			itemId,
+			itemName,
+			quantity,
 			mod1,
 			mod2,
 			mod3,

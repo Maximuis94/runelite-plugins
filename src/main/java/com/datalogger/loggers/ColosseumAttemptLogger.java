@@ -44,10 +44,12 @@ import static com.datalogger.constants.Colosseum.Region.COLOSSEUM_REGION_ID;
 import static com.datalogger.constants.Colosseum.Script.POPULATE_INTERMISSION_UI_SCRIPT_ID;
 import static com.datalogger.constants.Colosseum.Script.POPULATE_REWARDS_CHEST_UI_SCRIPT_ID;
 import static com.datalogger.constants.Colosseum.Varbit.COLOSSEUM_SELECTED_MODIFIER_VARBIT;
+import com.datalogger.dto.ColosseumAttemptDTO;
 import com.datalogger.events.ColosseumAttemptEnded;
 import com.datalogger.events.ColosseumAttemptStarted;
 import com.datalogger.events.ColosseumWaveEnded;
 import com.datalogger.events.ColosseumWaveStarted;
+import com.datalogger.events.PlayerDied;
 import com.datalogger.framework.AbstractLogger;
 import com.datalogger.framework.LogType;
 import com.datalogger.models.colosseum.ColosseumAttempt;
@@ -56,10 +58,13 @@ import com.datalogger.models.colosseum.IntermissionUI;
 import com.datalogger.models.enums.ColosseumModifier;
 import com.datalogger.models.enums.WaveStatus;
 import com.datalogger.models.itemvault.ItemBundle;
+import com.datalogger.models.supplytracker.TrackedSupplies;
+import com.datalogger.models.supplytracker.ValuedItemStack;
 import com.datalogger.services.ColosseumScanner;
 import com.datalogger.services.FileIOService;
 import com.datalogger.services.SupplyTracker;
 import com.google.common.primitives.Ints;
+import java.io.File;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
@@ -67,18 +72,21 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
+import net.runelite.api.ItemComposition;
 import net.runelite.api.NPC;
-import net.runelite.api.Player;
 import net.runelite.api.Skill;
 import net.runelite.api.WorldView;
 import net.runelite.api.coords.WorldPoint;
+import net.runelite.api.events.ActorDeath;
 import net.runelite.api.events.ChatMessage;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
@@ -89,6 +97,7 @@ import net.runelite.api.widgets.Widget;
 import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
+import net.runelite.client.game.ItemManager;
 import net.runelite.client.util.Text;
 
 @Slf4j
@@ -105,6 +114,7 @@ public class ColosseumAttemptLogger extends AbstractLogger
 	private boolean activeWave;
 	private boolean inColosseum;
 	private boolean trackSupplies;
+	private boolean enabledSwapQuiverLoot;
 
 	private boolean parsedCurrentWaveIntermission;
 	private int currentWave;
@@ -131,6 +141,7 @@ public class ColosseumAttemptLogger extends AbstractLogger
 	private final FileIOService fileIOService;
 	private final EventBus eventBus;
 	private final SupplyTracker supplyTracker;
+	private final ItemManager itemManager;
 
 	private final DataLoggerConfig config;
 
@@ -153,13 +164,14 @@ public class ColosseumAttemptLogger extends AbstractLogger
 	private WorldPoint minotaurReinforcementsSpawn;
 
 	@Inject
-	public ColosseumAttemptLogger(ColosseumScanner scanner, Client client, FileIOService fileIOService, DataLoggerConfig config, EventBus eventBus, SupplyTracker supplyTracker) {
+	public ColosseumAttemptLogger(ColosseumScanner scanner, Client client, FileIOService fileIOService, DataLoggerConfig config, EventBus eventBus, SupplyTracker supplyTracker, ItemManager itemManager) {
 		this.scanner = scanner;
 		this.client = client;
 		this.fileIOService = fileIOService;
 		this.config = config;
 		this.eventBus = eventBus;
 		this.supplyTracker = supplyTracker;
+		this.itemManager = itemManager;
 
 		updateConfigFlags();
 	}
@@ -173,6 +185,7 @@ public class ColosseumAttemptLogger extends AbstractLogger
 		enabledCsvLogging = enabledLogging && config.logColosseumCSV();
 		autoMergeWaveFiles = config.autoMergeWaveLogs();
 		trackSupplies = config.trackSupplies();
+		enabledSwapQuiverLoot = config.logQuiverAsSplinters();
 	}
 
 	@Subscribe
@@ -348,22 +361,21 @@ public class ColosseumAttemptLogger extends AbstractLogger
 	}
 
 	@Subscribe
+	public void onActorDeath(ActorDeath event)
+	{
+		if (supplyTracker.isTracking() && event.getActor() == client.getLocalPlayer())
+		{
+			eventBus.post(new PlayerDied(client.getTickCount(), LogType.COLOSSEUM));
+			log.info("Player died at wave {}. Stopping tracker before respawn.", currentWave);
+
+			supplyTracker.stopTracking(currentAttempt.getAttemptRoot(), currentAttempt.getSupplyFileName(),true, enabledCsvLogging);
+			activeWave = false;
+		}
+	}
+
+	@Subscribe
 	public void onGameTick(GameTick event) {
 		if (!enabledLogging || !inColosseum || !activeWave) return;
-
-		if (supplyTracker.isTracking())
-		{
-			Player localPlayer = client.getLocalPlayer();
-			if (localPlayer != null && client.getBoostedSkillLevel(Skill.HITPOINTS) == 0)
-			{
-				log.info("Player died at wave {}. Stopping tracker before respawn.", currentWave);
-
-
-				supplyTracker.stopTracking(currentAttempt.getAttemptRoot(), currentAttempt.getSupplyFileName(),true, enabledCsvLogging);
-				activeWave = false;
-				return;
-			}
-		}
 
 		if (!scanner.scannedManticoreSequences(currentWave)) {
 			WorldView wv = client.getTopLevelWorldView();
@@ -424,7 +436,6 @@ public class ColosseumAttemptLogger extends AbstractLogger
 		}
 	}
 
-
 	@Subscribe
 	public void onGameStateChanged(GameStateChanged event) {
 		if (!enabledLogging) return;
@@ -434,6 +445,7 @@ public class ColosseumAttemptLogger extends AbstractLogger
 		if (state == GameState.LOGIN_SCREEN || state == GameState.HOPPING) {
 			if (inColosseum && currentAttempt != null) {
 				log.info("Player logged out or disconnected in the Colosseum. Run failed.");
+				finalStatus = WaveStatus.LOGGED_OUT;
 				failWave();
 				inColosseum = false;
 			}
@@ -477,12 +489,16 @@ public class ColosseumAttemptLogger extends AbstractLogger
 		parsedCurrentWaveIntermission = false;
 
 		if (trackSupplies)
+		{
 			supplyTracker.startTracking();
+			supplyTracker.setTag(currentAttempt.getAttemptId());
+		}
 
 		bossWavePhase = 0;
 		Arrays.fill(bossWavePhaseTickCounts, -1);
 
 		eventBus.post(new ColosseumAttemptStarted(currentAttempt.getStartTime(), getAccountName(), currentAttempt.getAttemptRoot().getAbsolutePath()));
+		log.info("Starting a new ColosseumAttempt for account {} - Data will be saved in {}", getAccountName(), currentAttempt.getAttemptRoot().getAbsolutePath());
 
 		entryTag = config.colosseumTag();
 		try
@@ -496,6 +512,38 @@ public class ColosseumAttemptLogger extends AbstractLogger
 	}
 
 	/**
+	 * Preprocess the rewards attributes of the ongoing attempt and set them in the ColosseumAttempt instance.
+	 */
+	private void preprocessAttemptRewards()
+	{
+		int[] totalValue = {0};
+
+		Map<Integer, Integer> rewards = currentAttempt.getRewards();
+		Map<String, ValuedItemStack> namedRewards = new HashMap<>();
+		if (rewards != null) {
+			rewards.keySet().forEach(itemId -> {
+				ItemComposition comp = itemManager.getItemComposition(itemId);
+				int price = itemManager.getItemPrice(itemId);
+				int qty = rewards.getOrDefault(itemId, 0);
+				int value = price * qty;
+
+				totalValue[0] += value;
+				namedRewards.put(comp.getName(), new ValuedItemStack(qty, value));
+			});
+		}
+		currentAttempt.setNamedRewards(namedRewards, totalValue[0]);
+	}
+
+	/**
+	 * Update properties needed to generate the dto, then generate+return the ColosseumAttemptDto
+	 */
+	private ColosseumAttemptDTO generateColosseumAttemptDto()
+	{
+		preprocessAttemptRewards();
+		return currentAttempt.toDTO();
+	}
+
+	/**
 	 * Wrap up the ongoing attempt by merging the timeline of states, logging the current attempt and writing the CSV log,
 	 * depending on user-defined configurations.
 	 */
@@ -506,7 +554,13 @@ public class ColosseumAttemptLogger extends AbstractLogger
 		log.info("[Wave {}] ColosseumAttemptEnded posted | startTick={} endTick={} duration={}s", currentWave, attemptStartTick, attemptEndTick, attemptDuration);
 		eventBus.post(new ColosseumAttemptEnded(currentAttempt.getStartTime()));
 		currentAttempt.setFinalStatus(status);
-		fileIOService.logColosseumAttempt(currentAttempt);
+
+		TrackedSupplies supplies = supplyTracker.getConsumedItems();
+		currentAttempt.setConsumedSupplies(supplies);
+
+		File attemptJsonFile = currentAttempt.getWaveLogJsonFile();
+		ColosseumAttemptDTO dto = generateColosseumAttemptDto();
+		fileIOService.logColosseumAttempt(dto, attemptJsonFile);
 
 		if (currentWave == 12 && bossWavePhaseTickCounts[0] != -1 && bossWavePhaseTickCounts[1] != -1)
 		{
@@ -548,7 +602,7 @@ public class ColosseumAttemptLogger extends AbstractLogger
 			log.debug("Completing ColosseumWave for wave {}", currentWave);
 			ColosseumWave completedWave = completeWave(newUI);
 			log.debug("{}", completedWave.toDTO());
-			currentAttempt.submitWave(completedWave);
+			currentAttempt.submitWave(completedWave, enabledSwapQuiverLoot);
 			selectedModifier = null;
 		}
 		parsedTransitionUI = newUI;
@@ -560,7 +614,7 @@ public class ColosseumAttemptLogger extends AbstractLogger
 	 * Ongoing wave has failed; update it accordingly and submit it. Subsequently, end the ongoing attempt.
 	 */
 	private void failWave() {
-		if (currentAttempt == null || finalStatus != null && finalStatus != WaveStatus.CONFIG_DISABLED) return;
+		if (currentAttempt == null || finalStatus != null && finalStatus != WaveStatus.CONFIG_DISABLED && finalStatus != WaveStatus.LOGGED_OUT) return;
 		activeWave = false;
 		endWave();
 		final WaveStatus submitStatus;
@@ -575,7 +629,7 @@ public class ColosseumAttemptLogger extends AbstractLogger
 			submitStatus = finalStatus;
 		}
 
-		List<ItemBundle> loot = parsedTransitionUI != null && parsedTransitionUI.getPotentialLoot() != null ? parsedTransitionUI.getPotentialLoot() : new ArrayList<>();
+		ItemBundle loot = parsedTransitionUI != null ? parsedTransitionUI.getPotentialLoot() : null;
 
 		double timeTaken = getWaveTimeTaken();
 		totalTimeTaken = BigDecimal.valueOf(totalTimeTaken+timeTaken).setScale(1, RoundingMode.HALF_UP).doubleValue();
@@ -615,7 +669,7 @@ public class ColosseumAttemptLogger extends AbstractLogger
 
 		log.debug(failedWave.toString());
 
-		currentAttempt.submitWave(failedWave);
+		currentAttempt.submitWave(failedWave, enabledSwapQuiverLoot);
 		endAttempt(submitStatus);
 	}
 
@@ -693,9 +747,7 @@ public class ColosseumAttemptLogger extends AbstractLogger
 		int endTick = client.getTickCount();
 		log.info("Completed wave {} at tick {}", completedWave, endTick);
 
-		List<ItemBundle> loot = parsedTransitionUI != null && parsedTransitionUI.getPotentialLoot() != null
-			? parsedTransitionUI.getPotentialLoot()
-			: new ArrayList<>();
+		ItemBundle loot = parsedTransitionUI != null && parsedTransitionUI.getPotentialLoot() != null ? parsedTransitionUI.getPotentialLoot() : null;
 
 		double timeTaken = getWaveTimeTaken();
 		totalTimeTaken = BigDecimal.valueOf(totalTimeTaken+timeTaken).setScale(1, RoundingMode.HALF_UP).doubleValue();
@@ -742,9 +794,7 @@ public class ColosseumAttemptLogger extends AbstractLogger
 	{
 		int endTick = client.getTickCount();
 		log.info("Cancelled wave {} at tick {}", currentWave, endTick);
-		List<ItemBundle> loot = parsedTransitionUI != null && parsedTransitionUI.getPotentialLoot() != null
-			? parsedTransitionUI.getPotentialLoot()
-			: new ArrayList<>();
+		ItemBundle loot = parsedTransitionUI != null ? parsedTransitionUI.getPotentialLoot() : null;
 		return ColosseumWave.builder()
 			.wave(completedWave+1)
 			.status(WaveStatus.CANCELLED)

@@ -76,7 +76,7 @@ public abstract class AbstractLogger implements Loggable {
 			return;
 		}
 
-		File logFile = fileIOService.getTargetFile(getLogType(), accountName);
+		File logFile = fileIOService.getTargetFile(getLogType());
 		fileIOService.atomicWrite(logFile, getCsvHeader(), csvRow);
 	}
 

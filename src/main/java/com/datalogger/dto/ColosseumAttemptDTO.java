@@ -25,7 +25,9 @@
 
 package com.datalogger.dto;
 
+import com.datalogger.models.supplytracker.ValuedItemStack;
 import java.util.List;
+import java.util.Map;
 import lombok.Builder;
 import lombok.Data;
 
@@ -35,6 +37,10 @@ public class ColosseumAttemptDTO {
 	private long attemptId;
 	private long timestamp;
 	private String result;
+	private int rewardsValue;
+	private Map<String, ValuedItemStack> rewards;
+	private int consumedSupplyValue;
+	private TrackedSuppliesDTO consumedSupplies;
 	private int totalGlory;
 	private List<ColosseumWaveDTO> waves;
 }

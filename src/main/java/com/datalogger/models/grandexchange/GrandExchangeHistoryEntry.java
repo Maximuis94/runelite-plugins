@@ -28,7 +28,6 @@ package com.datalogger.models.grandexchange;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
-import java.time.Instant;
 import lombok.NoArgsConstructor;
 
 /**

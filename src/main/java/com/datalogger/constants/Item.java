@@ -28,7 +28,7 @@ package com.datalogger.constants;
 import static net.runelite.api.gameval.VarbitID.*;
 
 /**
- * Constants related to logging of Item / Grand Exchange offers
+ * Constants related to logging of Items / Grand Exchange offers
  */
 public final class Item
 {

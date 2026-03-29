@@ -25,15 +25,22 @@
 
 package com.datalogger.models.colosseum;
 
+import static com.datalogger.constants.Colosseum.Item.DIZANAS_QUIVER_REWARD;
+import static com.datalogger.constants.Colosseum.Item.DIZANAS_QUIVER_SWAPPED_REWARD;
+import static com.datalogger.constants.PluginConstants.COLOSSEUM_ATTEMPT_DIR;
 import com.datalogger.dto.ColosseumAttemptDTO;
 import com.datalogger.models.enums.WaveStatus;
-import static com.datalogger.services.FileIOService.COLOSSEUM_ATTEMPT_DIR;
+import com.datalogger.models.itemvault.ItemBundle;
+import com.datalogger.models.supplytracker.TrackedSupplies;
+import com.datalogger.models.supplytracker.ValuedItemStack;
 import java.io.File;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import lombok.Getter;
 import lombok.Setter;
@@ -51,6 +58,16 @@ public class ColosseumAttempt
 
 	@Setter
 	private WaveStatus finalStatus;
+
+	private int consumedSupplyValue;
+
+	private TrackedSupplies consumedSupplies;
+
+	private int totalRewardsValue;
+
+	private final Map<Integer, Integer> rewards = new HashMap<>();
+
+	private Map<String, ValuedItemStack> namedRewards = null;
 
 	private double totalTimeTaken;
 
@@ -84,6 +101,50 @@ public class ColosseumAttempt
 		waveLogJsonFile =  new File(attemptRoot, attemptId+"_wave-log.json");
 		waveLogCsvFile =  new File(attemptRoot, attemptId+"_wave-log.csv");
 		supplyFileName = attemptId + "_supply-log";
+		consumedSupplyValue = 0;
+	}
+
+	/**
+	 * Define the namedRewards and the summed rewards attributes that are to be used in the DTO
+	 */
+	public void setNamedRewards(Map<String, ValuedItemStack> namedRewards, int totalValue)
+	{
+		this.namedRewards = namedRewards;
+		this.totalRewardsValue = totalValue;
+	}
+
+	/**
+	 * Set the consumedSupplies and the consumedSupplyValue attributes
+	 */
+	public void setConsumedSupplies(TrackedSupplies supplies)
+	{
+		consumedSupplyValue = supplies.getTotalValue();
+		consumedSupplies = supplies;
+	}
+
+	/**
+	 * Add the given wave to the list of waves, provided it has not been submitted yet.
+	 * Additionally, add its loot to the Attempt rewards stack.
+	 */
+	public void submitWave(ColosseumWave wave, boolean swapQuiver)
+	{
+		if (waves.isEmpty() || waves.get(waves.size() - 1).getWave() != wave.getWave())
+		{
+			waves.add(wave);
+			totalTimeTaken = wave.getTotalTimeTaken();
+
+			if (wave.getStatus() == WaveStatus.COMPLETED)
+			{
+				ItemBundle bundle = wave.getEarnedLoot();
+				rewards.merge(bundle.getItemId(), bundle.getQuantity(), Integer::sum);
+
+				if (wave.getWave() == 12)
+				{
+					ItemBundle guaranteedReward = swapQuiver ? DIZANAS_QUIVER_SWAPPED_REWARD : DIZANAS_QUIVER_REWARD;
+					rewards.merge(guaranteedReward.getItemId(), guaranteedReward.getQuantity(), Integer::sum);
+				}
+			}
+		}
 	}
 
 	public ColosseumAttemptDTO toDTO() {
@@ -91,30 +152,14 @@ public class ColosseumAttempt
 			.attemptId(id)
 			.timestamp(id)
 			.result(finalStatus != null ? finalStatus.name() : "UNKNOWN")
+			.rewardsValue(totalRewardsValue)
+			.rewards(namedRewards)
+			.consumedSupplyValue(consumedSupplyValue)
+			.consumedSupplies(consumedSupplies != null ? consumedSupplies.toDto(null) : null)
 			.totalGlory(waves.isEmpty() ? 0 : waves.get(waves.size() - 1).getTotalGlory())
 			.waves(waves.stream()
 				.map(ColosseumWave::toDTO)
 				.collect(Collectors.toList()))
 			.build();
-	}
-
-	/**
-	 * Add the given wave to the list of waves, provided it has not been submitted yet.
-	 */
-	public void submitWave(ColosseumWave wave) {
-		if (waves.isEmpty())
-		{
-			waves.add(wave);
-			totalTimeTaken = wave.getTotalTimeTaken();
-		}
-		else
-		{
-			ColosseumWave lastLogged = waves.get(waves.size() - 1);
-			if (lastLogged.getWave() != wave.getWave())
-			{
-				waves.add(wave);
-				totalTimeTaken = wave.getTotalTimeTaken();
-			}
-		}
 	}
 }

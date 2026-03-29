@@ -99,18 +99,12 @@ public class GrandExchangeLogger extends AbstractLogger
 		if (!loggerIsEnabled)
 			return;
 
-		String hash = getAccountHashString();
-		if (hash.equals("-1")) {
-			log.error("Unable to acquire valid account hash for grand exchange logger");
-			return;
-		}
-
-		Properties state = fileIOService.getAccountState(hash);
+		Properties state = fileIOService.getAccountState();
 		for (int i = 0; i < 8; i++) {
 			lastLoggedFingerprints[i] = state.getProperty("last_fp_" + i);
 		}
 
-		List<ActiveGeOffer> savedState = fileIOService.loadActiveGeOffers(hash);
+		List<ActiveGeOffer> savedState = fileIOService.loadActiveGeOffers();
 		currentActiveOffers = new ActiveGeOffer[8];
 		for (ActiveGeOffer offer : savedState) {
 			if (offer != null && offer.getSlot() >= 0 && offer.getSlot() < 8) {
@@ -181,7 +175,7 @@ public class GrandExchangeLogger extends AbstractLogger
 		int slot = event.getSlot();
 		GrandExchangeOffer offer = event.getOffer();
 
-		updateActiveOfferState(slot, offer, hash);
+		updateActiveOfferState(slot, offer);
 		handleOffer(slot, offer);
 	}
 
@@ -226,7 +220,7 @@ public class GrandExchangeLogger extends AbstractLogger
 	/**
 	 * Maintains the 8-slot array of active GE offers and saves to disk on change.
 	 */
-	private void updateActiveOfferState(int slot, GrandExchangeOffer offer, String hash) {
+	private void updateActiveOfferState(int slot, GrandExchangeOffer offer) {
 		if (offer.getState() == GrandExchangeOfferState.EMPTY) {
 			currentActiveOffers[slot] = null;
 		} else {
@@ -253,7 +247,7 @@ public class GrandExchangeLogger extends AbstractLogger
 			.filter(Objects::nonNull)
 			.collect(Collectors.toList());
 
-		fileIOService.saveActiveGeOffers(hash, listToSave);
+		fileIOService.saveActiveGeOffers(listToSave);
 	}
 
 	public boolean handleOffer(int slot, GrandExchangeOffer offer) {
@@ -264,11 +258,10 @@ public class GrandExchangeLogger extends AbstractLogger
 			return false;
 		}
 
-		String accountHash = getAccountHashString();
 		long accountHashLong = getAccountHashLong();
-		Properties state = fileIOService.getAccountState(accountHash);
+		Properties state = fileIOService.getAccountState();
 
-		String createdTs = getOrSetCreatedTimestamp(slot, offer, state, accountHash);
+		String createdTs = getOrSetCreatedTimestamp(slot, offer, state);
 		String fingerprint = generateFingerprint(offer);
 		String lastLoggedFp = lastLoggedFingerprints[slot];
 
@@ -279,7 +272,7 @@ public class GrandExchangeLogger extends AbstractLogger
 				logFinalTrade(slot, offer, createdTs, accountHashLong);
 
 				state.setProperty("last_fp_" + slot, fingerprint);
-				fileIOService.saveAccountState(accountHash, state);
+				fileIOService.saveAccountState(state);
 				log.debug("Logged GE trade for slot {}. FP: {}", slot, fingerprint);
 				return true;
 			}
@@ -293,8 +286,7 @@ public class GrandExchangeLogger extends AbstractLogger
 		GrandExchangeOffer[] offers = client.getGrandExchangeOffers();
 		if (offers == null) return;
 
-		String accountHash = getAccountHashString();
-		Properties state = fileIOService.getAccountState(accountHash);
+		Properties state = fileIOService.getAccountState();
 		boolean propertiesChanged = false;
 
 		for (int i = 0; i < offers.length; i++) {
@@ -320,7 +312,7 @@ public class GrandExchangeLogger extends AbstractLogger
 					.build();
 			}
 
-			getOrSetCreatedTimestamp(i, offer, state, accountHash);
+			getOrSetCreatedTimestamp(i, offer, state);
 
 			if (isFinalState(offer.getState())) {
 				String fp = generateFingerprint(offer);
@@ -332,14 +324,14 @@ public class GrandExchangeLogger extends AbstractLogger
 		}
 
 		if (propertiesChanged) {
-			fileIOService.saveAccountState(accountHash, state);
+			fileIOService.saveAccountState(state);
 		}
 
 		List<ActiveGeOffer> listToSave = Arrays.stream(currentActiveOffers)
 			.filter(Objects::nonNull)
 			.collect(Collectors.toList());
 
-		fileIOService.saveActiveGeOffers(accountHash, listToSave);
+		fileIOService.saveActiveGeOffers(listToSave);
 
 //		internalLedger = fileIOService.loadInternalGeLedger(accountHash);
 		log.debug("Initial GE scan complete. Live active offers saved to disk for {}", getAccountName());
@@ -420,7 +412,7 @@ public class GrandExchangeLogger extends AbstractLogger
 		String hashString = getAccountHashString();
 		List<GeLedgerEntry> internalLedger = fileIOService.loadInternalGeLedger(hashString);
 		internalLedger.add(ledgerEntry);
-		fileIOService.saveInternalGeLedger(currentAccountName, hashString, internalLedger);
+		fileIOService.saveInternalGeLedger(internalLedger);
 
 		if (config.logGrandExchangeCSV())
 		{
@@ -470,7 +462,7 @@ public class GrandExchangeLogger extends AbstractLogger
 	 * Fetch and return the createdTimestamp registered to the given offer. If no registration is found, return the
 	 * current timestamp instead.
 	 */
-	private String getOrSetCreatedTimestamp(int slot, GrandExchangeOffer offer, Properties state, String hash) {
+	private String getOrSetCreatedTimestamp(int slot, GrandExchangeOffer offer, Properties state) {
 		String tsKey = "slot_created_" + slot;
 		String itemKey = "slot_item_" + slot;
 
@@ -481,19 +473,19 @@ public class GrandExchangeLogger extends AbstractLogger
 			existing = Instant.now().toString();
 			state.setProperty(tsKey, existing);
 			state.setProperty(itemKey, String.valueOf(offer.getItemId()));
-			fileIOService.saveAccountState(hash, state);
+			fileIOService.saveAccountState(state);
 		}
 		return existing;
 	}
 
 	private void clearSlotMemory(int slot) {
 		String hash = getAccountHashString();
-		Properties state = fileIOService.getAccountState(hash);
+		Properties state = fileIOService.getAccountState();
 
 		if (state.containsKey("slot_created_" + slot)) {
 			state.remove("slot_created_" + slot);
 			state.remove("slot_item_" + slot);
-			fileIOService.saveAccountState(hash, state);
+			fileIOService.saveAccountState(state);
 		}
 	}
 

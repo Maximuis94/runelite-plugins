@@ -32,7 +32,6 @@ import static com.datalogger.constants.Colosseum.Intermission.INTERMISSION_MODIF
 import static com.datalogger.constants.Colosseum.Intermission.INTERMISSION_NEXT_LOOT_CONTAINER;
 import static com.datalogger.constants.Colosseum.Intermission.INTERMISSION_RESULT_CONTAINER;
 import static com.datalogger.constants.Colosseum.Item.DIZANAS_QUIVER_UNCHARGED_ID;
-import static com.datalogger.constants.Colosseum.Item.SWAPPED_DIZANAS_QUIVER_ITEM_BUNDLE;
 import static com.datalogger.constants.Colosseum.ManticoreAttack.MAGIC_ORB_ID;
 import static com.datalogger.constants.Colosseum.ManticoreAttack.MELEE_ORB_ID;
 import static com.datalogger.constants.Colosseum.ManticoreAttack.RANGED_ORB_ID;
@@ -41,7 +40,6 @@ import static com.datalogger.constants.Colosseum.NPC_ALIAS.BOSS_WAVE_BEAM_CRYSTA
 import static com.datalogger.constants.Colosseum.NPC_ALIAS.SOLARFLARE_NPC_NAME;
 import static com.datalogger.constants.Colosseum.RewardsChest.REWARDS_CHEST_GROUP_ID;
 import static com.datalogger.constants.Colosseum.RewardsChest.REWARDS_CHEST_MODIFIER_LIST_CONTAINER_ID;
-import static com.datalogger.constants.Colosseum.RewardsChest.REWARDS_CHEST_REWARDS_TAB_CHILD_ID;
 import static com.datalogger.constants.Colosseum.RewardsChest.REWARDS_CHEST_SUMMARY_TAB_CHILD_ID;
 import com.datalogger.models.colosseum.ColosseumNPC;
 import com.datalogger.models.colosseum.ColosseumState;
@@ -398,7 +396,7 @@ public class ColosseumScanner
 		List<ColosseumModifier> activeModifiers = parseActiveModifiers(modContainer);
 
 		Widget lootContainer = client.getWidget(INTERMISSION_GROUP_ID, INTERMISSION_NEXT_LOOT_CONTAINER);
-		List<ItemBundle> nextLoot = parseNextLoot(lootContainer);
+		ItemBundle nextLoot = parseNextLoot(lootContainer);
 
 		SummaryUI summary = parseSummaryUI(client.getWidget(INTERMISSION_GROUP_ID, INTERMISSION_RESULT_CONTAINER));
 
@@ -437,25 +435,11 @@ public class ColosseumScanner
 	}
 
 	/**
-	 * Extract relevant data from the rewards chest UI and return them
+	 * Extract relevant data from the rewards chest UI and return them.
 	 */
 	private IntermissionUI scanRewardsChestUI(int currentWave)
 	{
 		log.debug("Scanning rewards chest UI for wave {}", currentWave);
-		Widget lootContainer = client.getWidget(REWARDS_CHEST_GROUP_ID, REWARDS_CHEST_REWARDS_TAB_CHILD_ID);
-		List<ItemBundle> allLoot = parseNextLoot(lootContainer);
-		if (!allLoot.isEmpty())
-		{
-			log.debug("Scanned {} items from rewards chest:", allLoot.size());
-			int i = 0;
-			for (ItemBundle loot : allLoot)
-			{
-				i++;
-				log.debug("[{}] item_id={} item_name={} quantity={}", i, loot.getItemId(), loot.getItemName(), loot.getQuantity());
-			}
-		}
-		else
-			log.error("Failed to scan nextLoot");
 
 		Widget stats = client.getWidget(REWARDS_CHEST_GROUP_ID, REWARDS_CHEST_SUMMARY_TAB_CHILD_ID);
 		SummaryUI ui = parseSummaryUI(stats);
@@ -465,7 +449,7 @@ public class ColosseumScanner
 
 		return IntermissionUI.builder()
 			.activeModifiers(activeModifiers)
-			.potentialLoot(allLoot)
+			.potentialLoot(null) // potential loot is not drawn from the rewards chest UI
 			.damageTakenGlory(ui == null ? 0 : ui.getDamageTakenGlory())
 			.speedBonusGlory(ui == null ? 0 : ui.getSpeedBonusGlory())
 			.speedBonusTimeSeconds(ui == null ? -1 : ui.getSpeedBonusTimeSeconds())
@@ -659,9 +643,8 @@ public class ColosseumScanner
 	/**
 	 * Iterate over lootContainer elements, attempt to extract a quantity of items from each element and return the extracted data as a List.
 	 */
-	private List<ItemBundle> parseNextLoot(Widget lootContainer)
+	private ItemBundle parseNextLoot(Widget lootContainer)
 	{
-		List<ItemBundle> nextLoot = new ArrayList<>();
 		if (lootContainer != null && lootContainer.getChild(0) != null)
 		{
 			for (Widget child : lootContainer.getDynamicChildren())
@@ -670,13 +653,11 @@ public class ColosseumScanner
 				int quantity = child.getItemQuantity();
 				ItemBundle nextItem = ItemBundle.fromComp(itemManager.getItemComposition(id), quantity);
 
-				if (enabledSwapQuiverLoot && nextItem.getItemId() == DIZANAS_QUIVER_UNCHARGED_ID)
-					nextLoot.add(SWAPPED_DIZANAS_QUIVER_ITEM_BUNDLE);
-				else
-					nextLoot.add(nextItem);
+				if (nextItem.getItemId() != DIZANAS_QUIVER_UNCHARGED_ID)
+					return nextItem;
 			}
 		}
-		return nextLoot;
+		return null;
 	}
 
 	/**

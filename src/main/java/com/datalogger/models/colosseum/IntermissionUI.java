@@ -35,7 +35,7 @@ import lombok.Data;
 @Builder
 public class IntermissionUI
 {
-	private final List<ItemBundle> potentialLoot;
+	private final ItemBundle potentialLoot;
 	private final List<ColosseumModifier> modifierChoices;
 
 	private final int waveBonusGlory;

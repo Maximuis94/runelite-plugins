@@ -56,16 +56,24 @@ public interface DataLoggerConfig extends Config {
 
 	@ConfigSection(
 		name = "Colosseum timeline logger",
-		description = "Toggle to track player and NPC data during Colosseum waves",
+		description = "Settings related to Fortis Colosseum trial timeline logging",
 		position = 2,
 		closedByDefault = true
 	)
 	String COLOSSEUM_TIMELINE_SECTION = "colosseumTimeline";
 
 	@ConfigSection(
+		name = "Supply logger",
+		description = "Settings related to supply loggers",
+		position = 3,
+		closedByDefault = true
+	)
+	String SUPPLY_SECTION = "supplyLogger";
+
+	@ConfigSection(
 		name = "Screenshots",
 		description = "Settings for automatic screenshot capturing",
-		position = 3,
+		position = 4,
 		closedByDefault = true
 	)
 	String SCREENSHOT_SECTION = "screenshot";
@@ -259,6 +267,17 @@ public interface DataLoggerConfig extends Config {
 	)
 	default boolean logBeamCrystal() { return false; }
 
+	// --- SupplyLogger Items ---
+
+	@ConfigItem(
+		keyName = "disableSoundEffectMute",
+		name = "Disable sound effect mute",
+		description = "Forces the sound effects volume to the lowest value possible rather than muting it. Unmuted sound effects benefit weapon charge tracking accuracy.",
+		position = 0,
+		section = SUPPLY_SECTION
+	)
+	default boolean disableSoundEffectMute() { return false; }
+
 	// --- Screenshot Items ---
 
 	@ConfigItem(
@@ -269,6 +288,7 @@ public interface DataLoggerConfig extends Config {
 		section = SCREENSHOT_SECTION
 	)
 	default boolean screenshotBetweenWaves() { return false; }
+
 	@ConfigItem(
 		keyName = "screenshotFormat",
 		name = "Screenshot format",

@@ -35,6 +35,9 @@ import javax.inject.Singleton;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.client.eventbus.Subscribe;
 
+/**
+ * Service class that manages accountHash/accountName info
+ */
 @Slf4j
 @Singleton
 public class AccountHashMapper

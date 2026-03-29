@@ -28,12 +28,12 @@ import static com.datalogger.constants.Colosseum.ManticoreAttack.MAGIC_ORB_ID;
 import static com.datalogger.constants.Colosseum.ManticoreAttack.MELEE_ORB_ID;
 import static com.datalogger.constants.Colosseum.ManticoreAttack.NO_ORB_ID;
 import static com.datalogger.constants.Colosseum.ManticoreAttack.RANGED_ORB_ID;
-import lombok.Getter;
-import net.runelite.api.ActorSpotAnim;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
+import lombok.Getter;
+import net.runelite.api.ActorSpotAnim;
 
 /**
  * Class that encodes a Manticores' attack sequence

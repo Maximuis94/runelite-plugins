@@ -24,9 +24,9 @@
  */
 package com.datalogger.framework;
 
-import static com.datalogger.services.FileIOService.COLOSSEUM_ROOT_DIR;
-import static com.datalogger.services.FileIOService.GRAND_EXCHANGE_DIR;
-import static com.datalogger.services.FileIOService.ITEM_VAULT_DIR;
+import static com.datalogger.constants.PluginConstants.COLOSSEUM_ROOT_DIR;
+import static com.datalogger.constants.PluginConstants.GRAND_EXCHANGE_DIR;
+import static com.datalogger.constants.PluginConstants.ITEM_VAULT_DIR;
 import java.io.File;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;

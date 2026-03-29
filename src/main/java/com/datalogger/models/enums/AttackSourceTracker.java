@@ -23,38 +23,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.datalogger.models.supplytracker;
+package com.datalogger.models.enums;
 
-import com.datalogger.dto.TrackedSuppliesDTO;
-import com.datalogger.models.enums.ConsumableItemGroup;
-import com.datalogger.models.enums.ItemCharge;
-import java.util.Map;
-import lombok.Value;
-
-@Value
-public class TrackedSupplies
+public enum AttackSourceTracker
 {
-	Map<Integer, Integer> consumedItems;
-	Map<ConsumableItemGroup, Integer> consumedDoses;
-	Map<ItemCharge, Integer> consumedCharges;
-
-	Map<String, ValuedItemStack> namedItems;
-	Map<String, ValuedItemStack> namedDoses;
-	Map<String, ValuedItemStack> namedCharges;
-	int totalValue;
-
-	public TrackedSuppliesDTO toDto(String tag)
-	{
-
-		TrackedSuppliesDTO.TrackedSuppliesDTOBuilder builder = TrackedSuppliesDTO.builder()
-			.consumedItems(namedItems)
-			.consumedDoses(namedDoses)
-			.consumedCharges(namedCharges)
-			.totalValue(totalValue);
-
-		if (tag != null && !tag.isEmpty())
-			builder.id(tag);
-
-		return builder.build();
-	}
+	XP_DROP,
+	PROJECTILE,
+	ANIMATION,
+	SOUND
 }

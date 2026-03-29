@@ -230,7 +230,7 @@ public class GrandExchangeHistoryParser
 
 			List<GeLedgerEntry> mergedEntries = reconciler.weaveLedgers(savedEntries, parsedEntries);
 
-			fileIOService.saveInternalGeLedger(accountName, hash, mergedEntries);
+			fileIOService.saveInternalGeLedger(mergedEntries);
 
 			log.info("Successfully parsed and saved GE History.");
 		}

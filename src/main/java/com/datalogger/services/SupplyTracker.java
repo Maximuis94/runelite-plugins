@@ -25,45 +25,49 @@
 
 package com.datalogger.services;
 
+import com.datalogger.DataLoggerConfig;
+import static com.datalogger.constants.Item.EQUIPMENT_CONTAINER_ID;
+import static com.datalogger.constants.Item.INVENTORY_CONTAINER_ID;
 import static com.datalogger.constants.Item.RUNE_POUCH_AMOUNT_VARBITS;
 import static com.datalogger.constants.Item.RUNE_POUCH_TYPE_VARBITS;
+import static com.datalogger.constants.PluginConstants.UNMUTE_COOLDOWN_SECONDS;
 import com.datalogger.dto.TrackedSuppliesDTO;
 import com.datalogger.models.enums.ConsumableItemGroup;
+import com.datalogger.models.enums.ItemCharge;
+import com.datalogger.models.enums.TrackedEquipment;
+import com.datalogger.models.supplytracker.SupplySnapshot;
 import com.datalogger.models.supplytracker.TrackedSupplies;
+import com.datalogger.models.supplytracker.ValuedItemStack;
 import java.io.File;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import lombok.Getter;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
-import net.runelite.api.Actor;
+import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
 import net.runelite.api.EnumComposition;
 import net.runelite.api.EnumID;
 import net.runelite.api.Item;
 import net.runelite.api.ItemComposition;
 import net.runelite.api.ItemContainer;
-import net.runelite.api.events.AnimationChanged;
+import net.runelite.api.Preferences;
 import net.runelite.api.events.VarbitChanged;
-import static net.runelite.api.gameval.AnimationID.SCYTHE_OF_VITUR_ATTACK;
-import static net.runelite.api.gameval.AnimationID.TOA_SOT_CAST_A;
-import static net.runelite.api.gameval.AnimationID.TOA_SOT_CAST_B;
 import static net.runelite.api.gameval.ItemID.BH_RUNE_POUCH;
+import static net.runelite.api.gameval.ItemID.BLOOD_AMULET;
 import static net.runelite.api.gameval.ItemID.DIVINE_RUNE_POUCH;
 import static net.runelite.api.gameval.ItemID.DIZANAS_QUIVER_BROKEN;
 import static net.runelite.api.gameval.ItemID.DIZANAS_QUIVER_INFINITE_BROKEN;
-import static net.runelite.api.gameval.ItemID.SCYTHE_OF_VITUR;
 import static net.runelite.api.gameval.ItemID.SKILLCAPE_MAX_DIZANAS_BROKEN;
-import static net.runelite.api.gameval.ItemID.TUMEKENS_SHADOW;
 import static net.runelite.api.gameval.VarPlayerID.DIZANAS_QUIVER_TEMP_AMMO;
 import static net.runelite.api.gameval.VarPlayerID.DIZANAS_QUIVER_TEMP_AMMO_AMOUNT;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.game.ItemVariationMapping;
-
-;
 
 @Slf4j
 @Singleton
@@ -73,27 +77,24 @@ public class SupplyTracker
 
 	private final ItemManager itemManager;
 
-	private final WeaponTracker weaponTracker;
+	private final EquipmentTracker equipmentTracker;
 
 	private final FileIOService fileIOService;
 
-	// 93 is the raw ID for the player's main 28-slot inventory.
-	private static final int INVENTORY_CONTAINER_ID = 93;
-	private static final int EQUIPMENT_CONTAINER_ID = 94;
+	private final DataLoggerConfig config;
+
+	@Setter
+	private String tag = null;
+
+	private Instant nextUnmuteTimestamp = null;
+	private boolean hasUnmutedAudio = false;
+	private boolean hasWeaponWithCharges = false;
 
 	@Getter
 	private boolean isTracking = false;
+	private SupplySnapshot initialSupplies;
 	private Map<Integer, Integer> inventory;
 	private Map<ConsumableItemGroup, Integer> doses;
-
-	private boolean trackAttackAnims;
-	private int nextAttackTick;
-
-	private boolean hasScythe;
-	private int scytheAttacks;
-
-	private boolean hasShadow;
-	private int shadowAttacks;
 
 	private boolean hasRunePouch;
 	private boolean hasQuiver;
@@ -104,12 +105,13 @@ public class SupplyTracker
 	private final int RUNE_POUCH_SLOTS = RUNE_POUCH_TYPE_VARBITS.length;
 
 	@Inject
-	public SupplyTracker(Client client, ItemManager itemManager, WeaponTracker weaponTracker, FileIOService fileIOService)
+	public SupplyTracker(Client client, ItemManager itemManager, EquipmentTracker equipmentTracker, FileIOService fileIOService, DataLoggerConfig config)
 	{
 		this.client = client;
 		this.itemManager = itemManager;
-		this.weaponTracker = weaponTracker;
+		this.equipmentTracker = equipmentTracker;
 		this.fileIOService = fileIOService;
+		this.config = config;
 	}
 
 	@Subscribe
@@ -127,45 +129,6 @@ public class SupplyTracker
 			quiverItemQuantity = newQuantity;
 			log.info("Updated quiver arrow quantity to {}", quiverItemQuantity);
 		}
-	}
-
-	/**
-	 * Update tracked attack counters, given animId and tickCount, if they are associated with a tracked weapon.
-	 */
-	private void updateAttackCounters(int animId, int tickCount)
-	{
-		switch (weaponTracker.getBaseWeaponId())
-		{
-			case SCYTHE_OF_VITUR:
-				if (animId == SCYTHE_OF_VITUR_ATTACK)
-				{
-					nextAttackTick = tickCount + 2;
-					scytheAttacks++;
-
-					log.info("Scythe attacks increased to {}", scytheAttacks);
-					break;
-				}
-			case TUMEKENS_SHADOW:
-				if (animId == TOA_SOT_CAST_A || animId == TOA_SOT_CAST_B)
-				{
-					nextAttackTick = tickCount + 2;
-					shadowAttacks++;
-					log.info("Shadow attacks increased to {}", shadowAttacks);
-					break;
-				}
-		}
-	}
-
-	@Subscribe
-	public void onAnimationChanged(AnimationChanged event)
-	{
-		if (!isTracking || !trackAttackAnims || event.getActor() != client.getLocalPlayer()) return;
-
-		int tickCount = client.getTickCount();
-		if (tickCount < nextAttackTick) return;
-
-		Actor player = event.getActor();
-		updateAttackCounters(player.getAnimation(), tickCount);
 	}
 
 	/**
@@ -295,26 +258,21 @@ public class SupplyTracker
 	}
 
 	/**
-	 * Update the corresponding flags of the given itemId.
+	 * Update the corresponding flags of the given base itemId.
 	 */
-	private void updateItemFlag(int itemId)
+	private void updateItemFlag(int baseItemId)
 	{
-		if (itemId == TUMEKENS_SHADOW)
+		if (!hasWeaponWithCharges && TrackedEquipment.getByBaseId(baseItemId) != null && baseItemId != BLOOD_AMULET)
 		{
-			hasShadow = true;
-			log.info("Enabled tracking of Tumeken's shadow attacks");
+			hasWeaponWithCharges = true;
+			log.info("Detected a weapon that consumes charges");
 		}
-		else if (itemId == SCYTHE_OF_VITUR)
-		{
-			hasScythe = true;
-			log.info("Enabled tracking of Scythe of vitur attacks");
-		}
-		else if (itemId == BH_RUNE_POUCH || itemId == DIVINE_RUNE_POUCH)
+		else if (baseItemId == BH_RUNE_POUCH || baseItemId == DIVINE_RUNE_POUCH)
 		{
 			hasRunePouch = true;
 			log.info("Enabled tracking of Rune pouch contents");
 		}
-		else if (itemId == DIZANAS_QUIVER_INFINITE_BROKEN   || itemId == SKILLCAPE_MAX_DIZANAS_BROKEN || itemId == DIZANAS_QUIVER_BROKEN)
+		else if (baseItemId == DIZANAS_QUIVER_INFINITE_BROKEN   || baseItemId == SKILLCAPE_MAX_DIZANAS_BROKEN || baseItemId == DIZANAS_QUIVER_BROKEN)
 		{
 			hasQuiver = true;
 			initializeQuiver();
@@ -323,8 +281,7 @@ public class SupplyTracker
 
 	private void updateTrackAttackAnims()
 	{
-		hasScythe = false;
-		hasShadow = false;
+		hasWeaponWithCharges = false;
 		hasRunePouch = false;
 		hasQuiver = false;
 
@@ -333,18 +290,14 @@ public class SupplyTracker
 			updateItemFlag(ItemVariationMapping.map(itemId));
 		}
 
-		updateItemFlag(weaponTracker.getBaseWeaponId());
-
-		trackAttackAnims =
-			hasScythe ||
-				hasShadow;
+		updateItemFlag(equipmentTracker.getBaseWeaponId());
 	}
 
 	/**
-	 * Parse the inventory and various other containers and cache the counted values.
-	 * @param updateFlags set to true if various flags require to be updated, e.g. when starting the tracking.
+	 * Parse the inventory and various other containers and cache the counted values. The snapshot produced is used as
+	 * initial state of the Inventory.
 	 */
-	private void parseItemContainers(boolean updateFlags)
+	private void parseInitialItemContainers()
 	{
 		inventory = parseInventory();
 
@@ -352,7 +305,32 @@ public class SupplyTracker
 
 		inventory = mergeMaps(inventory, parseEquipment());
 
-		if (updateFlags) updateTrackAttackAnims();
+		updateTrackAttackAnims();
+
+		if (hasRunePouch)
+		{
+			inventory = mergeMaps(inventory, parseRunePouch());
+		}
+
+		if (hasQuiver)
+		{
+			inventory.merge(quiverItemId, quiverItemQuantity, Integer::sum);
+		}
+
+		initialSupplies = new SupplySnapshot(inventory, doses);
+	}
+
+
+	/**
+	 * Parse and return the current contents of the inventory and its containers as a SupplySnapshot
+	 */
+	private SupplySnapshot getInventorySnapshot()
+	{
+		Map<Integer, Integer> inventory = parseInventory();
+
+		Map<ConsumableItemGroup, Integer> doses = extractDoses(inventory);
+
+		inventory = mergeMaps(inventory, parseEquipment());
 
 		if (hasRunePouch)
 		{
@@ -364,7 +342,10 @@ public class SupplyTracker
 			log.info("Adding quiver contents {}x {} into inventory", quiverItemQuantity, quiverItemComposition.getName());
 			inventory.merge(quiverItemId, quiverItemQuantity, Integer::sum);
 		}
+
+		return new SupplySnapshot(inventory, doses);
 	}
+
 
 	/**
 	 * Merge map1 into map2 and return the combined map.
@@ -379,15 +360,16 @@ public class SupplyTracker
 	}
 
 	/**
-	 * Start tracking supplies. Reset all counters and values and set isTracking to true
+	 * (Re)start tracking supplies by resetting all counters/values and by setting isTracking to true.
 	 */
 	public void startTracking()
 	{
+		tag = null;
 		isTracking = true;
-		scytheAttacks = 0;
-		shadowAttacks = 0;
-		parseItemContainers(true);
+		parseInitialItemContainers();
+		equipmentTracker.resetAttackCount();
 		log.info("Starting tracking of supplies");
+		validateTrackingAudio();
 	}
 
 	/**
@@ -398,61 +380,133 @@ public class SupplyTracker
 	{
 		isTracking = false;
 		TrackedSupplies supplies = getConsumedItems();
-		TrackedSuppliesDTO suppliesDTO = supplies.toDto(itemManager);
+		if (supplies != null)
+		{
+			TrackedSuppliesDTO suppliesDTO = supplies.toDto(tag);
+			if (writeJson) fileIOService.exportToJson(new File(directory, fileName+".json"), suppliesDTO);
+			if (writeCsv) fileIOService.exportToCsv(new File(directory, fileName+".csv"), suppliesDTO);
+		}
+		else
+		{
 
-		if (writeJson) fileIOService.exportToJson(new File(directory, fileName+".json"), suppliesDTO);
-		if (writeCsv) fileIOService.exportToCsv(new File(directory, fileName+".csv"), suppliesDTO);
+			log.debug("Supplies is null...");
+		}
+
+		restoreMutedSoundEffects();
 	}
 
-//	public void stopTrackingDebug()
-//	{
-//		parseRegisteredProjectiles();
-//
-//		TrackedSupplies supplies = getConsumedItems();
-//		TrackedSuppliesDTO suppliesDTO = supplies.toDto(itemManager);
-//		fileIOService.exportToJson(new File(FileIOService.PLUGIN_ROOT, "supply-test.json"), suppliesDTO);
-//		fileIOService.exportToCsv(new File(FileIOService.PLUGIN_ROOT, "supply-test.csv"), suppliesDTO);
-//	}
 
 	/**
-	 * Compare the initial state with the current state and return the difference as a set of consumed items
+	 * Compare the initial state with the current state and return the difference as a TrackedSupplies instance that
+	 * describes all consumed supplies and item charges.
 	 */
 	public TrackedSupplies getConsumedItems()
 	{
-		Map<Integer, Integer> initialInventory = new HashMap<>(inventory);
-		Map<ConsumableItemGroup, Integer> initialDoses = new HashMap<>(doses);
-		parseItemContainers(false);
-		Map<Integer, Integer> currentInventory = new HashMap<>(inventory);
-		Map<ConsumableItemGroup, Integer> currentDoses = new HashMap<>(doses);
-		inventory = new HashMap<>(initialInventory);
-		doses = new HashMap<>(initialDoses);
+		log.info("Fetching consumed items...");
+		SupplySnapshot snapshot = getInventorySnapshot();
 
 		Map<ConsumableItemGroup, Integer> consumedDoses = new HashMap<>();
 		Map<Integer, Integer> consumedItems = new HashMap<>();
-		initialInventory.forEach((item, startQty) -> {
-			int endQty = currentInventory.getOrDefault(item, 0);
+		Map<String, ValuedItemStack> namedItems = new HashMap<>();
+		int[] totalValue = {0};
+
+		inventory.forEach((item, startQty) -> {
+			int endQty = snapshot.getInventory().getOrDefault(item, 0);
 			int diff = startQty - endQty;
 
 			if (diff > 0)
 			{
 				ItemComposition itemComposition = itemManager.getItemComposition(item);
-				log.info("Consumed: {} x{}", itemComposition.getName(), diff);
+				log.info("Consumed item: {} x{}", itemComposition.getName(), diff);
 				consumedItems.put(item, diff);
+				int price = itemManager.getItemPrice(item);
+				int value = diff * (price > 0 ? price : itemComposition.getHaPrice());
+				totalValue[0] += value;
+				namedItems.put(itemComposition.getName(), new ValuedItemStack(diff, value));
 			}
 		});
-		initialDoses.forEach((itemGroup, startQty) -> {
-			int endQty = currentDoses.getOrDefault(itemGroup, 0);
+
+		Map<String, ValuedItemStack> namedDoses = new HashMap<>();
+		doses.forEach((itemGroup, startQty) -> {
+			int endQty = snapshot.getDoses().getOrDefault(itemGroup, 0);
 			int diff = startQty - endQty;
 
 			if (diff > 0)
 			{
-				log.info("Consumed: {} x{}", itemGroup.getBaseItemName(), diff);
+				log.info("Consumed dose: {} x{}", itemGroup.getBaseItemName(), diff);
 				consumedDoses.put(itemGroup, diff);
+				int value = itemGroup.getDoseValue() * diff;
+				totalValue[0] += value;
+				namedDoses.put(itemGroup.getBaseItemName(), new ValuedItemStack(diff, value));
 			}
 		});
 
-		return new TrackedSupplies(consumedItems, consumedDoses, scytheAttacks, shadowAttacks);
+		Map<String, ValuedItemStack> namedCharges = new HashMap<>();
+		Map<ItemCharge, Integer> consumedCharges = equipmentTracker.getTrackedCharges();
+		if (consumedCharges != null)
+		{
+			consumedCharges.forEach((charge, qty) -> {
+				int value = charge.getChargeValue() * qty;
+
+				totalValue[0] += value; // Accumulate total
+				namedCharges.put(charge.getFormattedName(), new ValuedItemStack(qty, value));
+			});
+		}
+
+		return new TrackedSupplies(consumedItems, consumedDoses, consumedCharges, namedItems, namedDoses, namedCharges, totalValue[0]);
 	}
 
+	/**
+	 * Check if sound effects are muted. Set it to lowest value possible and inform the user, or just inform the user,
+	 * depending on plugin configurations.
+	 * Only act if there actually is a weapon with charges.
+	 * Minimize method calls to avoid harassing the user. Additionally, restrict game messages sent based on previous
+	 * warning timestamp.
+	 */
+	private void validateTrackingAudio()
+	{
+		Preferences prefs = client.getPreferences();
+		if (prefs == null || !hasWeaponWithCharges) return;
 
+		Instant curTimestamp = Instant.now();
+		if (nextUnmuteTimestamp != null && curTimestamp.isBefore(nextUnmuteTimestamp)) return;
+
+
+		if (prefs.getSoundEffectVolume() == 0)
+		{
+			nextUnmuteTimestamp = curTimestamp.plusSeconds(UNMUTE_COOLDOWN_SECONDS);
+			if (config.disableSoundEffectMute())
+			{
+				prefs.setSoundEffectVolume(1);
+				hasUnmutedAudio = true;
+				client.addChatMessage(ChatMessageType.GAMEMESSAGE, "",
+					"<col=ef1020>Data logger: Sound was muted and unmuted by the data logger plugin it to the lowest value possible for more accurate weapon charge tracking.</col>", null);
+			}
+			else
+			{
+				client.addChatMessage(ChatMessageType.GAMEMESSAGE, "",
+					"<col=ef1020>Data logger: [WARNING] Sound Effects are muted! Weapon charges can be tracked much more accurately if sound effects are not completely muted.</col>", null);
+			}
+		}
+	}
+
+	/**
+	 * Mute audio if it was muted prior to automatically unmuting it, but only if the volume is at 1.
+	 */
+	private void restoreMutedSoundEffects()
+	{
+		if (hasUnmutedAudio)
+		{
+			Preferences prefs = client.getPreferences();
+			if (prefs == null) return;
+
+			if (prefs.getSoundEffectVolume() == 1)
+			{
+				prefs.setSoundEffectVolume(0);
+			}
+			hasUnmutedAudio = false;
+			log.info("Muted the audio after unmuting it before initiating the tracking of supplies.");
+		}
+
+	}
 }

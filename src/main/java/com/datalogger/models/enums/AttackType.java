@@ -23,38 +23,34 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.datalogger.models.supplytracker;
+package com.datalogger.models.enums;
 
-import com.datalogger.dto.TrackedSuppliesDTO;
-import com.datalogger.models.enums.ConsumableItemGroup;
-import com.datalogger.models.enums.ItemCharge;
-import java.util.Map;
-import lombok.Value;
+import lombok.Getter;
 
-@Value
-public class TrackedSupplies
+@Getter
+public enum AttackType
 {
-	Map<Integer, Integer> consumedItems;
-	Map<ConsumableItemGroup, Integer> consumedDoses;
-	Map<ItemCharge, Integer> consumedCharges;
+	MELEE_STAB(CombatType.MELEE),
+	MELEE_SLASH(CombatType.MELEE),
+	MELEE_CRUSH(CombatType.MELEE),
 
-	Map<String, ValuedItemStack> namedItems;
-	Map<String, ValuedItemStack> namedDoses;
-	Map<String, ValuedItemStack> namedCharges;
-	int totalValue;
+	RANGED_TYPELESS(CombatType.RANGED),
+	RANGED_LIGHT(CombatType.RANGED),
+	RANGED_NORMAL(CombatType.RANGED),
+	RANGED_HEAVY(CombatType.RANGED),
 
-	public TrackedSuppliesDTO toDto(String tag)
+	MAGIC_TYPELESS(CombatType.MAGIC),
+	MAGIC_AIR(CombatType.MAGIC),
+	MAGIC_WATER(CombatType.MAGIC),
+	MAGIC_EARTH(CombatType.MAGIC),
+	MAGIC_FIRE(CombatType.MAGIC),
+
+	TYPELESS(CombatType.TYPELESS);
+
+	private final CombatType combatType;
+
+	AttackType(CombatType combatType)
 	{
-
-		TrackedSuppliesDTO.TrackedSuppliesDTOBuilder builder = TrackedSuppliesDTO.builder()
-			.consumedItems(namedItems)
-			.consumedDoses(namedDoses)
-			.consumedCharges(namedCharges)
-			.totalValue(totalValue);
-
-		if (tag != null && !tag.isEmpty())
-			builder.id(tag);
-
-		return builder.build();
+		this.combatType = combatType;
 	}
 }

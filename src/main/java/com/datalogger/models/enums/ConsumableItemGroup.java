@@ -25,9 +25,13 @@
 
 package com.datalogger.models.enums;
 
+import static com.datalogger.constants.PluginConstants.ITEM_VALUE_UPDATE_FREQUENCY_SECONDS;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 import lombok.Getter;
+import net.runelite.api.ItemComposition;
+import net.runelite.client.game.ItemManager;
 
 public enum ConsumableItemGroup
 {
@@ -122,6 +126,11 @@ public enum ConsumableItemGroup
 	@Getter
 	private final String baseItemName;
 	private final int[] itemIds;
+	private final int referenceItemId;
+	private final int maxDoses;
+
+	private Integer doseValue = null;
+	private Instant cacheUpdateTime = null;
 
 	private static final Map<Integer, ConsumableItemGroup> ITEM_TO_GROUP = new HashMap<>();
 	private static final Map<Integer, Integer> POST_CONSUMPTION_ID = new HashMap<>();
@@ -149,10 +158,23 @@ public enum ConsumableItemGroup
 		}
 	}
 
+	private static ItemManager itemManager = null;
+
+	/**
+	 * Sets the ItemManager for the ItemCharge enum.
+	 */
+	public static void setItemManager(ItemManager itemManager)
+	{
+		ConsumableItemGroup.itemManager = itemManager;
+	}
+
 	ConsumableItemGroup(String baseItemName, int... itemIds)
 	{
 		this.baseItemName = baseItemName;
 		this.itemIds = itemIds;
+
+		referenceItemId = itemIds[0];
+		maxDoses = itemIds.length;
 	}
 
 	/**
@@ -189,5 +211,30 @@ public enum ConsumableItemGroup
 
 		int nDoses = ITEM_TO_DOSES.get(itemId) * quantity;
 		return Map.of(group, nDoses);
+	}
+
+	/**
+	 * Compute the value per dose, cache it and return it. Or return the cached value, if it is still viable.
+	 */
+	public int getDoseValue()
+	{
+		if (itemManager == null) return 0;
+
+		Instant curTime = Instant.now();
+		if (cacheUpdateTime != null && curTime.isBefore(cacheUpdateTime))
+		{
+			return doseValue;
+		}
+
+		int price = itemManager.getItemPrice(referenceItemId);
+		if (price > 0)
+			doseValue = price / maxDoses;
+		else {
+			ItemComposition composition = itemManager.getItemComposition(referenceItemId);
+			int haValue = composition.getHaPrice();
+			doseValue = haValue / maxDoses;
+		}
+		cacheUpdateTime = curTime.plusSeconds(ITEM_VALUE_UPDATE_FREQUENCY_SECONDS);
+		return doseValue;
 	}
 }

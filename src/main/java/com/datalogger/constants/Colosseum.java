@@ -117,7 +117,8 @@ public final class Colosseum
 		public static final int SUNFIRE_SPLINTERS_ID = 28924;
 		public static final int DIZANAS_QUIVER_UNCHARGED_ID = 28947;
 
-		public static final ItemBundle SWAPPED_DIZANAS_QUIVER_ITEM_BUNDLE = new ItemBundle(SUNFIRE_SPLINTERS_ID, "Sunfire splinters", 4000);
+		public static final ItemBundle DIZANAS_QUIVER_REWARD = new ItemBundle(DIZANAS_QUIVER_UNCHARGED_ID, "Dizana's quiver (uncharged)", 1);
+		public static final ItemBundle DIZANAS_QUIVER_SWAPPED_REWARD = new ItemBundle(SUNFIRE_SPLINTERS_ID, "Sunfire splinters", 4000);
 	}
 
 	/**

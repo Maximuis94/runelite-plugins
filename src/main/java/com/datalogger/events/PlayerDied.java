@@ -23,38 +23,16 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.datalogger.models.supplytracker;
-
-import com.datalogger.dto.TrackedSuppliesDTO;
-import com.datalogger.models.enums.ConsumableItemGroup;
-import com.datalogger.models.enums.ItemCharge;
-import java.util.Map;
+package com.datalogger.events;
+import com.datalogger.framework.LogType;
 import lombok.Value;
 
+/**
+ * Event that is broadcast as soon as the player is dead (i.e. death animation starts playing)
+ */
 @Value
-public class TrackedSupplies
+public class PlayerDied
 {
-	Map<Integer, Integer> consumedItems;
-	Map<ConsumableItemGroup, Integer> consumedDoses;
-	Map<ItemCharge, Integer> consumedCharges;
-
-	Map<String, ValuedItemStack> namedItems;
-	Map<String, ValuedItemStack> namedDoses;
-	Map<String, ValuedItemStack> namedCharges;
-	int totalValue;
-
-	public TrackedSuppliesDTO toDto(String tag)
-	{
-
-		TrackedSuppliesDTO.TrackedSuppliesDTOBuilder builder = TrackedSuppliesDTO.builder()
-			.consumedItems(namedItems)
-			.consumedDoses(namedDoses)
-			.consumedCharges(namedCharges)
-			.totalValue(totalValue);
-
-		if (tag != null && !tag.isEmpty())
-			builder.id(tag);
-
-		return builder.build();
-	}
+	int tickCount;
+	LogType logType;
 }

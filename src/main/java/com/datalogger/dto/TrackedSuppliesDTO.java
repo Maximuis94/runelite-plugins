@@ -25,17 +25,18 @@
 
 package com.datalogger.dto;
 
-import java.util.Map;
+import com.datalogger.models.supplytracker.ValuedItemStack;
 import lombok.Builder;
 import lombok.Value;
+import java.util.Map;
 
 @Value
 @Builder
 public class TrackedSuppliesDTO
 {
-	Map<String, Integer> consumedItems;
-	Map<String, Integer> consumedDoses;
-
-	int scytheAttacks;
-	int shadowAttacks;
+	String id;
+	int totalValue;
+	Map<String, ValuedItemStack> consumedItems;
+	Map<String, ValuedItemStack> consumedDoses;
+	Map<String, ValuedItemStack> consumedCharges;
 }
