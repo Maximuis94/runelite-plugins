@@ -1,19 +1,20 @@
 # Data Logger
-Data logger that will store various types of data locally.  
-Logged data is stored in directories located in the plugin root directory located at ${user.home}/.runelite/data-logger
+Data logger that will store completed Grand exchange offers, Bank/seed vault contents and Colosseum trials locally.  
+Logged data is stored in directories located in the plugin root directory located at ${user.home}/.runelite/data-logger</br>
+Additionally, Colosseum trials may also be submitted to Discord channels by configuring a webhook URL.
 
 The plugin itself does not (yet) provide means to interact with/view data, it merely logs.
 
 ## File structure
-The logger plugin stores its exported data in subdirectories of the plugin root, the plugin itself also relies on internal data.
 
 <details>
-  <summary>data-logger file structure</summary>
+  <summary>Click to expand</summary>
 
+The logger plugin stores its exported data in subdirectories of the plugin root, the plugin itself also relies on internal data.
 
 ### Internal
 One of the subdirectories, internal, is used by the plugin. These files are assumed to be used by the 
-plugin only, modifying them or interacting with them while the plugin is used may affect plugin performance.
+plugin only, modifying them or interacting with them while the plugin is used may negatively affect plugin performance.
 Most of the data in other folders can be reproduced using the internally cached data. 
 
 ### Other directories
@@ -27,8 +28,11 @@ what data is stored where.
 These loggers have been written to accommodate using multiple clients simultaneously and minimize risk for I/O errors.
 Furthermore, they are designed to keep track of items across multiple accounts.
 
+### Grand Exchange logger
+
 <details>
-  <summary>Grand Exchange logger</summary>
+
+  <summary>Click to expand</summary>
 
 If enabled, completed Grand Exchange offers are logged upon finalizing (more specifically; as soon as the progress bar turns green or red, indicating completion or cancellation, respectively).
 
@@ -69,6 +73,7 @@ if not it is set to the submission timestamp instead.
 
 <details>
     <summary>Grand Exchange History</summary>
+
 The Grand Exchange logger is also designed to retroactively update Grand Exchange offers that have already been
 submitted, this mechanism is triggered by opening the Grand Exchange history interface. 
 
@@ -90,15 +95,14 @@ indefinitely.
 ### Sidebar buttons
 
 <details>
-
     <summary>Write CSV files</summary>
 
 Write all internal data to CSV files, grouped per day. Existing files will be overwritten.
 </details>
 
 <details>
-
     <summary>Write json file</summary>
+
 Copies the internal JSON file to the grand-exchange directory. Existing file will be overwritten.
 
 </details>
@@ -106,10 +110,10 @@ Copies the internal JSON file to the grand-exchange directory. Existing file wil
 
 </details>
 
-
+### Item vault loggers
 <details>
+    <summary>Click to expand</summary>
 
-    <summary>Item vault loggers</summary>
 If enabled, the contents of item vaults (e.g. banks/seed vault) and ongoing grand exchange offers are logged per account and also merged into a single, separate file.
 Specific accounts may be excluded from aggregated lists via plugin configurations.
 Partially completed offers are added to item vault data as;
@@ -125,10 +129,9 @@ The combined list is a single file that combines all vault data of all accounts 
 
 As of now, the combined list merges banked item data, active ge offer data (the unfinished bit, to be precise) and seed vault data across all accounts.
 
-
 <details>
-
     <summary>Example item vault data</summary>
+
 
 The following data is logged as an item vault entry;
 
@@ -158,7 +161,6 @@ the json and csv file content. This data is added to merged data structures.
 
 </details>
 
-
 </details>
 
 ## Colosseum
@@ -167,93 +169,245 @@ Generated files are bundled per attempt in a newly created directory, which is n
 and created in ${user.home}/.runelite/data-logger/colosseum/attempt. All tracked data that is related to an attempt is stored in 
 this folder.
 
-
+### Colosseum wave logger
 <details>
-    <summary>Colosseum wave logger</summary>
+    <summary>Click to expand</summary>
 
-Logger that keeps track of Colosseum data per wave. If enabled, the following datapoints are logged;
-- Wave number
-- Wave status [COMPLETED/FAILED/CANCELLED/CONFIG_DISABLED]
-- Account name
-- Tag: User-defined tag that can be set in config menu
-- Wave reward(s)
-  - Dizana's quiver can also be stored as 4,000 Sunfire splinters
-  - Hidden next wave loot can also be logged
-- Modifiers: choices for this wave, modifier chosen and cumulative modifier choices
-- Time taken: Wave completion time in seconds + cumulative time taken
-- Damage taken: Amount of damage directly taken from enemies (i.e. that counts towards damage bonus)
-- Speed/damage/modifier/completion glory earned
-- Wave glory: Glory earned during this wave
-- Total glory: Total glory earned so far
-- Mob spawn locations: X and Y coordinates for each mob, except for Sol and Fremenniks
-- Manticore sequence: Orb sequences of manticores encountered during the wave (bottom-top)
+Overall Run Summary
 
-The data described above is always generated as JSON file, and may additionally also be generated as CSV file.
+At the root level, the log captures the final metrics and economics of the entire attempt:
+
+    Attempt ID & Timestamp: Unique identifier (Account + Date/Time) and exact Unix timestamp.
+
+    Account Name & Final Result: The player's name and the outcome of the run (COMPLETED, FAILED, or CANCELLED).
+
+    Total Run Metrics: Final cumulative time taken (in seconds) and total Glory earned.
+
+    Final Modifiers: A complete list of all modifiers active at the end of the run.
+
+    Rewards Breakdown: 
+        Total Grand Exchange value of all earned loot.
+
+        Itemized breakdown of all rewards, including item name, quantity, and individual GE value.
+
+    Supply Cost Breakdown: 
+        Total Grand Exchange value of all supplies consumed during the attempt.
+
+        Items/Runes: Tracked by quantity and GE value (e.g., Blood runes, Dragon arrows).
+
+        Potions: Tracked by individual doses consumed and their fractional GE value (e.g., Super restores, Saradomin brews).
+
+        Weapon Charges: Tracked by charges consumed and their GE value equivalent (e.g., Scythe of Vitur, Tumeken's Shadow, Venator bow).
+
+Wave-by-Wave Data (waves array)
+
+For granular analysis, every individual wave logs the following data points:
+
+    Wave Number & Status: The current wave and its specific completion status.
+
+    Tag: A custom, user-defined tag that can be set in the config menu.
+
+    Wave Reward: The specific loot earned for completing this wave (Item ID, Name, and Quantity). Note: This only includes the random roll, not the Quiver reward.
+
+    Modifiers: 
+
+        The 3 modifier choices offered at the start of the wave.
+
+        The specific modifier chosen.
+
+        The cumulative modifiers active during this specific wave.
+
+    Time Metrics: Wave completion time in seconds, alongside the cumulative time taken so far.
+
+    Glory & Performance Metrics: * Damage taken: Amount of damage directly taken from enemies (i.e., damage that negatively impacts the damage bonus).
+
+        Glory breakdown: Speed bonus, Damage bonus, Modifier glory, and Completion bonus.
+
+        Totals: Total glory earned this wave, and cumulative glory earned so far.
+
+    Mob Spawns & Mechanics:
+
+        Spawn Locations: Exact X and Y coordinates for initial mob spawns (e.g., Javelin/Shockwave Colossi) and mid-wave reinforcements (e.g., Minotaurs, Serpent Shamans). Note: Excludes Sol Heredit and Fremennik warbands.
+
+        Manticore Sequences: The specific attack orb sequences (Magic/Range/Melee) of manticores encountered during the wave, tracked individually if multiple spawn.
+
+The data described above may be generated as JSON file and as CSV file. The latter will produce multiple CSV files.
 
 
 <details>
     <summary>Colosseum json log entry</summary>
 
 ```JSON
-[
-  {
-    "wave": 8,
-    "status": "COMPLETED",
-    "accountName": "ACCOUNT_NAME",
-    "tag": "",
-    "earnedLoot": [
-      {
-        "itemId": 9342,
-        "itemName": "Onyx bolts",
-        "quantity": 30
+{
+  "attemptId": "ACCOUNT_NAME_yymmdd_hhmmss",
+  "timestamp": 1777777777777,
+  "account": "ACCOUNT_NAME",
+  "result": "COMPLETED",
+  "rewardsValue": 3667620,
+  "rewards": {
+    "Death rune": {
+      "count": 150,
+      "totalValueInGp": 28050
+    },
+    "Sunfire splinters": {
+      "count": 4080,
+      "totalValueInGp": 1297440
+    },
+    "Dragon arrowtips": {
+      "count": 250,
+      "totalValueInGp": 793750
+    },
+    "Onyx bolts": {
+      "count": 80,
+      "totalValueInGp": 660080
+    },
+    "Snapdragon seed": {
+      "count": 2,
+      "totalValueInGp": 102668
+    },
+    "Rune warhammer": {
+      "count": 5,
+      "totalValueInGp": 124430
+    },
+    "Rune chainbody": {
+      "count": 2,
+      "totalValueInGp": 58882
+    },
+    "Dragon bolts (unf)": {
+      "count": 200,
+      "totalValueInGp": 507200
+    },
+    "Earth orb": {
+      "count": 80,
+      "totalValueInGp": 95120
+    }
+  },
+  "consumedSupplyValue": 432111,
+  "consumedSupplies": {
+    "totalValue": 432111,
+    "consumedItems": {
+      "Death rune": {
+        "count": 16,
+        "totalValueInGp": 2992
+      },
+      "Blood rune": {
+        "count": 106,
+        "totalValueInGp": 28726
+      },
+      "Dragon arrow": {
+        "count": 39,
+        "totalValueInGp": 120783
+      },
+      "Aether rune": {
+        "count": 34,
+        "totalValueInGp": 26180
+      },
+      "Fire rune": {
+        "count": 180,
+        "totalValueInGp": 900
       }
-    ],
-    "modifierChoices": [
-      "BEES_I",
-      "TOTEMIC",
-      "SOLARFLARE_I"
-    ],
-    "chosenModifier": "TOTEMIC",
-    "activeModifiers": [
-      "BLASPHEMY_I",
-      "FRAILTY_I",
-      "FRAILTY_II",
-      "MYOPIA_I",
-      "MYOPIA_II",
-      "MYOPIA_III",
-      "FRAILTY_III",
-      "DYNAMIC_DUO"
-    ],
-    "timeTaken": 226.8,
-    "speedBonus": 976,
-    "damageTaken": 174,
-    "damageBonus": 0,
-    "modifierGlory": 1550,
-    "completionBonus": 800,
-    "waveGlory": 3326,
-    "totalGlory": 22867,
-    "totalTimeTaken": 845.4,
-    "javelinColossusSpawnAX": 35,
-    "javelinColossusSpawnAY": 37,
-    "javelinColossusSpawnBX": 32,
-    "javelinColossusSpawnBY": 27,
-    "manticoreSpawnAX": 35,
-    "manticoreSpawnAY": 31,
-    "manticoreSequenceA": [
-      "MAGIC",
-      "RANGE",
-      "MELEE"
-    ],
-    "shockwaveColossusSpawnAX": 29,
-    "shockwaveColossusSpawnAY": 37,
-    "shockwaveColossusSpawnBX": 27,
-    "shockwaveColossusSpawnBY": 37,
-    "minotaurReinforcementsSpawnX": 32,
-    "minotaurReinforcementsSpawnY": 20
-  }
-]
+    },
+    "consumedDoses": {
+      "Super restore": {
+        "count": 16,
+        "totalValueInGp": 42496
+      },
+      "Divine ranging potion": {
+        "count": 4,
+        "totalValueInGp": 6768
+      },
+      "Saradomin brew": {
+        "count": 4,
+        "totalValueInGp": 8220
+      },
+      "Divine super combat potion": {
+        "count": 6,
+        "totalValueInGp": 29244
+      },
+      "Sanfew serum": {
+        "count": 12,
+        "totalValueInGp": 64464
+      }
+    },
+    "consumedCharges": {
+      "Scythe of vitur": {
+        "count": 131,
+        "totalValueInGp": 84757
+      },
+      "Venator bow": {
+        "count": 15,
+        "totalValueInGp": 285
+      },
+      "Tumekens shadow": {
+        "count": 12,
+        "totalValueInGp": 16296
+      }
+    }
+  },
+  "totalGlory": 47675,
+  "totalTime": 1308.0,
+  "activeModifiers": [
+    "BLASPHEMY_III",
+    "FRAILTY_II",
+    "DOOM_II",
+    "MANTIMAYHEM_III",
+    "MYOPIA_I",
+    "VOLATILITY_I"
+  ],
+  "waves": [
+    {
+      "wave": 11,
+      "status": "COMPLETED",
+      "accountName": "ACCOUNT_NAME",
+      "tag": "",
+      "earnedLoot": {
+        "itemId": 1347,
+        "itemName": "Rune warhammer",
+        "quantity": 5
+      },
+      "modifierChoices": [
+        "DOOM_III",
+        "FRAILTY_III",
+        "MYOPIA_I"
+      ],
+      "chosenModifier": "MYOPIA_I",
+      "activeModifiers": "BLASPHEMY_III|FRAILTY_II|DOOM_II|MANTIMAYHEM_III|MYOPIA_I",
+      "timeTaken": 153.0,
+      "speedBonus": 2695,
+      "damageTaken": 0,
+      "damageBonus": 1100,
+      "modifierGlory": 1750,
+      "completionBonus": 1100,
+      "waveGlory": 6645,
+      "totalGlory": 40349,
+      "totalTimeTaken": 1172.4,
+      "javelinColossusSpawnAX": 40,
+      "javelinColossusSpawnAY": 35,
+      "manticoreSpawnAX": 33,
+      "manticoreSpawnAY": 42,
+      "manticoreSequenceA": [
+        "MAGIC",
+        "RANGE",
+        "MELEE"
+      ],
+      "manticoreSpawnBX": 32,
+      "manticoreSpawnBY": 27,
+      "manticoreSequenceB": [
+        "MAGIC",
+        "MELEE",
+        "RANGE"
+      ],
+      "shockwaveColossusSpawnAX": 35,
+      "shockwaveColossusSpawnAY": 31,
+      "serpentShamanReinforcementsSpawnX": 31,
+      "serpentShamanReinforcementsSpawnY": 48,
+      "minotaurReinforcementsSpawnX": 32,
+      "minotaurReinforcementsSpawnY": 48
+    }
+  ]
+}
 ```
-_An example entry in the Colosseum JSON log_
+_An example entry in the Colosseum JSON log. The waves list only shows wave 11 as an example._
 
 </details>
 
@@ -262,8 +416,10 @@ _An example entry in the Colosseum JSON log_
 _Example of a partial CSV row of the Colosseum wave logger_
 </details>
 
+
+### Colosseum timeline logger
 <details>
-    <summary>Colosseum Timeline logger</summary>
+    <summary>Click to expand</summary>
 
 If enabled, during every tick of each wave a game state is parsed and added to a timeline.
 A state is composed of the following values;
@@ -272,17 +428,18 @@ A state is composed of the following values;
 - Tick number, relative to wave start, starting at 0
 - Player X and Y coordinates
 - Player HP and Prayer
-- NPC list. For each relevant NPC, the following data is stored;
+- NPC list. For each relevant NPC*, the following data is stored;
   - NpcId
   - Name
   - X and Y coordinate
   - HP and Max HP
   - (Manticores only) Orb sequence
 
-    Fremenniks, Solarflares, Healing totems, Bee Swarms and Beam crystals are optional and can be disabled via configurations.
-    Relevant NPCs are NPCs one has to defeat to complete the wave.
+    Fremenniks, Solarflares, Healing totems, Bee Swarms and Beam crystals are optional and can be disabled via configurations.</br>
+    \* Relevant NPCs are NPCs one has to defeat to complete the wave. Fremenniks are excluded by default, but may be enabled.
+
 <details>
-    <summary>Colosseum timeline entry</summary>
+    <summary>Example timeline entry</summary>
 
 ```json
 [
@@ -333,8 +490,11 @@ _Example of state data_
 
 </details>
 
+
+### Colosseum screenshots
+
 <details>
-  <summary>Colosseum wave completion screenshots</summary>
+  <summary>Click to expand</summary>
 
 
 If enabled, a screenshot is created and stored in the directory created for that attempt when the interface between waves or the rewards chest interface pops up.
@@ -343,13 +503,15 @@ _An example of a screenshot taken after wave 12 is completed_
 
 </details>
 
+### Supply tracking
+
 <details>
-  <summary>Supply tracking</summary>
+  <summary>Click to expand</summary>
 
 
 If enabled, supplies are also tracked during colosseum trials. A snapshot is created at the start of an attempt, and 
 the supplies at the end are subtracted from the initial snapshot and stored into a file.
-These supplies also include an estimate of Scythe of vitur / Tumeken's shadow attacks (to be expanded in the future). 
+These supplies also include an estimate of certain item charges, like Scythe of vitur or Venator bow charges. </br>Additionally, all supplies are valued according to current market prices, this value is added to each supply count.  
 Supply logs are saved as `<ACCOUNT_NAME>_<YYMMDD>_<HHMMSS>_supply-log.<EXTENSION>` in the directory created for the particular attempt.
 
 <details>
@@ -358,22 +520,70 @@ Supply logs are saved as `<ACCOUNT_NAME>_<YYMMDD>_<HHMMSS>_supply-log.<EXTENSION
 
 ```json
 {
+  "id": "...",
+  "totalValue": 422856,
   "consumedItems": {
-    "Death rune": 12,
-    "Blood rune": 107,
-    "Dragon arrow": 41,
-    "Aether rune": 31,
-    "Fire rune": 190
+    "Death rune": {
+      "count": 11,
+      "totalValueInGp": 2002
+    },
+    "Blood rune": {
+      "count": 72,
+      "totalValueInGp": 19440
+    },
+    "Dragon arrow": {
+      "count": 42,
+      "totalValueInGp": 133182
+    },
+    "Aether rune": {
+      "count": 23,
+      "totalValueInGp": 17595
+    },
+    "Fire rune": {
+      "count": 132,
+      "totalValueInGp": 660
+    },
+    "Black chinchompa": {
+      "count": 7,
+      "totalValueInGp": 19271
+    }
   },
   "consumedDoses": {
-    "Super restore": 16,
-    "Divine ranging potion": 4,
-    "Saradomin brew": 1,
-    "Divine super combat potion": 6,
-    "Sanfew serum": 10
+    "Super restore": {
+      "count": 16,
+      "totalValueInGp": 42192
+    },
+    "Divine ranging potion": {
+      "count": 5,
+      "totalValueInGp": 8320
+    },
+    "Saradomin brew": {
+      "count": 3,
+      "totalValueInGp": 6165
+    },
+    "Divine super combat potion": {
+      "count": 6,
+      "totalValueInGp": 29328
+    },
+    "Sanfew serum": {
+      "count": 10,
+      "totalValueInGp": 54880
+    }
   },
-  "scytheAttacks": 145,
-  "shadowAttacks": 11
+  "consumedCharges": {
+    "Scythe of vitur": {
+      "count": 115,
+      "totalValueInGp": 74290
+    },
+    "Venator bow": {
+      "count": 37,
+      "totalValueInGp": 703
+    },
+    "Tumekens shadow": {
+      "count": 11,
+      "totalValueInGp": 14828
+    }
+  }
 }
 ```
 
@@ -381,3 +591,158 @@ Supply logs are saved as `<ACCOUNT_NAME>_<YYMMDD>_<HHMMSS>_supply-log.<EXTENSION
 
 </details>
 
+### Discord webhook
+<details> 
+    <summary>Click to expand</summary>
+
+
+Trials can also be broadcast to a Discord server by configuring a webhook url in the plugin configurations.
+Upon ending a trial, the results will be formatted and sent with a payload to the url. The results can be formatted in various ways; by using a pre-defined template or by using a custom template.</br>
+Additionally, one can also opt to attach an image to the message sent. 
+
+<details>
+    <summary>Pre-defined broadcasting templates</summary>
+
+The plugin has two built-in templates for broadcasting colosseum trials; concise and detailed. The former shows a brief 
+summary, whereas the latter adds wave-specific information for all waves to that summary. The desired template can be selected via the dropdown menu in the plugin settings.
+
+It is possible to omit certain properties by toggling the respective checkbox in the Discord pre-defined template section.
+
+![img.png](images/example-detailed-discord-colosseum-trial.png)</br>
+*An example Discord message broadcast following an unfortunately failed trial with an image attached to it using the detailed template*
+
+
+![img.png](images/example-concise-discord-colosseum-trial.png)</br>
+*An example Discord message broadcast following the same unfortunately failed trial using the concise template*
+
+
+
+</details>
+
+
+<details>
+    <summary>Custom broadcasting templates</summary>
+
+The Data Logger allows one to fully customize how your trials are formatted look by selecting the CUSTOM format option in the plugin settings. You can use special keywords in the "Custom Webhook Template" text box to inject your trial data exactly how you want it.
+
+Lines starting with # are treated as comments and will not be sent to Discord. A small example is provided as default value, which can also be restored by resetting the config to its default value.
+
+You can completely customize the Discord webhook messages sent by the Data Logger plugin by using a custom template. The plugin will parse your template and replace the keywords below with the actual data from your Colosseum attempt.
+
+It is also possible to test a defined template using the "Test with Uploaded Log" button in the side panel, which generates a discord message using the wave-log passed. 
+
+Note: Any line in your template starting with # will be ignored, allowing you to leave comments or notes in your configuration.
+
+Furthermore, `MOD(S)` and `MODIFIER(S)` tend to be interchangeable; the former produces a shortened version of the modifier name, whereas the latter produces the full name.
+
+
+##### Global Attempt Keywords
+
+These keywords represent the overall stats of the entire Colosseum run.
+Keyword	Description	Example Output</br>
+`<PLAYER>`	The in-game name of the account.	ACCOUNT_NAME</br>
+`<RESULT>`	The final outcome of the attempt.	COMPLETED, FAILED, CLAIMED</br>
+`<WAVES>`	The total number of waves completed.	12</br>
+`<TIME>`	The total time of the run, formatted as MM:SS.S	24:00.6</br>
+`<SECONDS>`	The total time of the run in seconds.	1788.0</br>
+`<GLORY>`	The total glory accumulated (comma formatted).	40,981</br>
+`<VALUE>`	The total GE value of the earned rewards (comma formatted).	3,817,566</br>
+`<COST>`	The total GE value of the supplies consumed (comma formatted).	475,723</br>
+`<MODIFIERS>`	A comma-separated list of all active modifiers at the end of the run (full names).	BLASPHEMY_III MYOPIA_II</br>
+`<MODS>`	A comma-separated list of all active modifiers at the end of the run (shortened aliases).	BL3 MY2</br>
+
+
+##### Wave-specific keywords
+
+You can pull data from a specific wave by using the syntax `<WaveNumber:PROPERTY>`.
+For example, to get the loot from wave 12, you would use <12:LOOT>. If a wave was not reached, it will output N/A.</br>
+
+Loot & Rewards
+
+    <#:LOOT> - The quantity and name of the item earned (e.g., 80x Sunfire splinters)
+
+    <#:LOOTNAME> - Only the name of the item earned (e.g., Sunfire splinters)
+
+    <#:LOOTAMOUNT> - Only the quantity of the item earned (e.g., 80)
+
+    <#:GLORY> - The glory earned during this wave.
+
+    <#:TOTALGLORY> - The cumulative glory accumulated up to and including this wave.
+
+Modifiers
+
+    <#:MODIFIER> or <#:CHOSENMODIFIER> - The full name of the modifier chosen for this wave.
+
+    <#:MOD> or <#:CHOSENMOD> - The shortened alias of the modifier chosen for this wave.
+
+    <#:MODIFIERCHOICES> - The 3 modifiers offered during this wave (full names).
+
+    <#:MODCHOICES> - The 3 modifiers offered during this wave (shortened aliases).
+
+    <#:SELECTEDMODIFIERCHOICES> - The 3 modifiers offered, highlighting the chosen modifier with square brackets (full names).
+
+    <#:SELECTEDMODCHOICES> - The 3 modifiers offered, highlighting the chosen modifier with square brackets (shortened aliases).
+
+Combat & Stats
+
+    <#:TIME> - The time it took to complete the wave, formatted as MM:SS.
+
+    <#:SECONDS> - The time it took to complete the wave in seconds (e.g., 132.6).
+
+    <#:DAMAGETAKEN> - The amount of damage taken from NPCs during this wave (only damage that counts towards the damage bonus)
+
+    <#:STATUS> - The completion status of the wave (e.g., COMPLETED, FAILED).
+
+
+</details>
+
+<details>
+
+<summary>Example custom template</summary>
+
+This is an example of a template string, followed by an image of the message sent to the discord channel that uses the template. For more accepted keywords, see `Custom broadcasting templates` 
+```
+**Wave 1**
+**Time:** <1:TIME> | **Glory:** <1:GLORY> 	  
+
+**Wave 2**
+**Time:** <2:TIME> | **Glory:** <2:GLORY>
+
+**Wave 3**
+**Time:** <3:TIME> | **Glory:** <3:GLORY>
+
+**Wave 4**
+**Time:** <4:TIME> | **Glory:** <4:GLORY>
+
+**Wave 5**
+**Time:** <5:TIME> | **Glory:** <5:GLORY>
+
+**Wave 6**
+**Time:** <6:TIME> | **Glory:** <6:GLORY>
+
+**Wave 7**
+**Time:** <7:TIME> | **Glory:** <7:GLORY>
+
+**Wave 8**
+**Time:** <8:TIME> | **Glory:** <8:GLORY>
+
+**Wave 9**
+**Time:** <9:TIME> | **Glory:** <9:GLORY>
+
+**Wave 10**
+**Time:** <10:TIME> | **Glory:** <10:GLORY>
+
+**Wave 11**
+**Time:** <11:TIME> | **Glory:** <11:GLORY>
+
+**Wave 12**
+**Time:** <12:TIME> | **Glory:** <12:GLORY>
+```
+
+![img.png](images/example-custom-discord-colosseum-trial.png)</br>
+*An example Discord message broadcast following the same unfortunately failed trial using the custom template above*
+
+
+</details>
+
+</details>

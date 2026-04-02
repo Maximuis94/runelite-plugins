@@ -31,7 +31,6 @@ import static com.datalogger.constants.Item.InterfaceID.GE_HISTORY_CHILD_ID;
 import com.datalogger.events.AccountSessionStarted;
 import com.datalogger.models.grandexchange.GeLedgerEntry;
 import com.datalogger.models.grandexchange.GrandExchangeHistoryEntry;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -171,8 +170,7 @@ public class GrandExchangeHistoryParser
 		}
 
 		List<GeLedgerEntry> parsedEntries = new ArrayList<>();
-		Instant currentParseTime = Instant.now();
-		parseTimeMillis = currentParseTime.toEpochMilli();
+		long parseTimeMillis = System.currentTimeMillis();
 
 		for (int i = 0; i < children.length; i += ELEMENTS_PER_ROW) {
 			if (i + (ELEMENTS_PER_ROW - 1) >= children.length) {
@@ -212,7 +210,7 @@ public class GrandExchangeHistoryParser
 					.geSlot(-1)
 					.isHistoryEntry(true)
 					.isCancelled(false)
-					.parseTime(currentParseTime)
+					.parseTime(parseTimeMillis)
 					.build();
 
 				parsedEntries.add(entry);

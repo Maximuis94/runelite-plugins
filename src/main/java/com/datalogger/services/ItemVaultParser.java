@@ -63,7 +63,7 @@ public class ItemVaultParser
 	private BankedItem parseSlotFree(VaultType vaultType, Widget slot)
 	{
 		return new BankedItem(
-			vaultType.name(),
+			vaultType,
 			accountHash,
 			accountName,
 			slot.getItemId(),
@@ -75,7 +75,7 @@ public class ItemVaultParser
 	private BankedItem parseSlotMembers(VaultType vaultType, Widget slot)
 	{
 		return new BankedItem(
-			vaultType.name(),
+			vaultType,
 			accountHash,
 			accountName,
 			slot.getItemId(),

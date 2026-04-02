@@ -88,7 +88,7 @@ public abstract class AbstractLogger implements Loggable {
 	public void onAccountSessionStarted(AccountSessionStarted event) {
 		accountName = event.getAccountName();
 		accountHashString = event.getAccountHashString();
-		accountHashLong = Long.parseLong(accountHashString);
+		accountHashLong = Long.parseLong(accountHashString == null ? "-1" : accountHashString);
 
 		log.debug("[{}] Session initialized for {} ({})", getLogType(), accountName, accountHashString);
 

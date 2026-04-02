@@ -26,11 +26,12 @@ package com.datalogger.loggers;
 
 import com.datalogger.DataLoggerConfig;
 import static com.datalogger.constants.PluginConstants.ITEM_VAULT_DIR;
+import com.datalogger.events.DataLoggerConfigChanged;
 import com.datalogger.framework.AbstractLogger;
 import com.datalogger.framework.LogType;
+import com.datalogger.models.enums.VaultType;
 import com.datalogger.models.grandexchange.ActiveGeOffer;
 import com.datalogger.models.itemvault.BankedItem;
-import com.datalogger.models.enums.VaultType;
 import com.datalogger.services.AccountHashMapper;
 import com.datalogger.services.FileIOService;
 import java.io.File;
@@ -47,7 +48,6 @@ import javax.inject.Singleton;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.GrandExchangeOfferState;
 import net.runelite.client.eventbus.Subscribe;
-import net.runelite.client.events.ConfigChanged;
 
 @Slf4j
 @Singleton
@@ -80,10 +80,8 @@ public class ItemVaultLogger extends AbstractLogger
 
 
 	@Subscribe
-	public void onConfigChanged(ConfigChanged event)
+	public void onDataLoggerConfigChanged(DataLoggerConfigChanged event)
 	{
-		if (!event.getGroup().equals(DataLoggerConfig.CONFIG_GROUP)) return;
-
 		updateIgnoredAccountHashes();
 	}
 
@@ -137,7 +135,7 @@ public class ItemVaultLogger extends AbstractLogger
 				for (BankedItem item : vaultEntry.getValue())
 				{
 					allItems.add(new BankedItem(
-						type.name(),
+						type,
 						currentAccountHash,
 						item.getAccountName(),
 						item.getItemId(),
@@ -215,7 +213,7 @@ public class ItemVaultLogger extends AbstractLogger
 					List<BankedItem> enrichedItems = new ArrayList<>();
 					for (BankedItem item : parsedItems) {
 						enrichedItems.add(new BankedItem(
-							vaultType.name(),
+							vaultType,
 							accountHash,
 							accountName,
 							item.getItemId(),
@@ -356,18 +354,18 @@ public class ItemVaultLogger extends AbstractLogger
 		if (offer.isBuy())
 		{
 			return new BankedItem(
-				VaultType.GRAND_EXCHANGE.name(),
+				VaultType.GRAND_EXCHANGE,
 				accountHash,
 				accountName,
 				COINS_ITEM_ID,
 				"Coins",
-				remainingQuantity * offer.getOfferPrice()
+				(long) remainingQuantity * offer.getOfferPrice()
 			);
 		}
 		else
 		{
 			return new BankedItem(
-				VaultType.GRAND_EXCHANGE.name(),
+				VaultType.GRAND_EXCHANGE,
 				accountHash,
 				accountName,
 				offer.getItemId(),
@@ -414,12 +412,12 @@ public class ItemVaultLogger extends AbstractLogger
 				geOffer.getItemId(),
 				geOffer,
 				(existing, incoming) -> new BankedItem(
-					VaultType.GRAND_EXCHANGE.name(),
+					VaultType.GRAND_EXCHANGE,
 					accountHash,
 					accountName,
 					existing.getItemId(),
 					existing.getItemName(),
-					(long) (existing.getQuantity() + incoming.getQuantity())
+					existing.getQuantity() + incoming.getQuantity()
 				)
 				);
 		}

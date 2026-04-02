@@ -26,21 +26,37 @@
 package com.datalogger.dto;
 
 import com.datalogger.models.supplytracker.ValuedItemStack;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import lombok.Builder;
 import lombok.Data;
+import lombok.NonNull;
 
 @Data
 @Builder
 public class ColosseumAttemptDTO {
-	private long attemptId;
+	@NonNull
+	private String attemptId;
 	private long timestamp;
+	@NonNull
+	private String account;
+	@NonNull
 	private String result;
 	private int rewardsValue;
-	private Map<String, ValuedItemStack> rewards;
+
+	@Builder.Default
+	private Map<String, ValuedItemStack> rewards = new HashMap<>();
+
 	private int consumedSupplyValue;
 	private TrackedSuppliesDTO consumedSupplies;
 	private int totalGlory;
-	private List<ColosseumWaveDTO> waves;
+	private double totalTime;
+
+	@Builder.Default
+	private List<String> activeModifiers = new ArrayList<>();
+
+	@Builder.Default
+	private List<ColosseumWaveDTO> waves = new ArrayList<>();
 }

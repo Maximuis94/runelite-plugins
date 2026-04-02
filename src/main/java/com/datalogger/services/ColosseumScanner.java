@@ -26,6 +26,7 @@
 package com.datalogger.services;
 
 import com.datalogger.DataLoggerConfig;
+import static com.datalogger.constants.Colosseum.COLOSSEUM_TIMELINE_HMS_FORMATTER;
 import static com.datalogger.constants.Colosseum.Intermission.INTERMISSION_GROUP_ID;
 import static com.datalogger.constants.Colosseum.Intermission.INTERMISSION_MODIFIER_CHOICES;
 import static com.datalogger.constants.Colosseum.Intermission.INTERMISSION_MODIFIER_LIST_CONTAINER;
@@ -35,12 +36,14 @@ import static com.datalogger.constants.Colosseum.Item.DIZANAS_QUIVER_UNCHARGED_I
 import static com.datalogger.constants.Colosseum.ManticoreAttack.MAGIC_ORB_ID;
 import static com.datalogger.constants.Colosseum.ManticoreAttack.MELEE_ORB_ID;
 import static com.datalogger.constants.Colosseum.ManticoreAttack.RANGED_ORB_ID;
+import static com.datalogger.constants.Colosseum.Message.NO_MODIFIERS_MESSAGE;
 import static com.datalogger.constants.Colosseum.NPC.*;
 import static com.datalogger.constants.Colosseum.NPC_ALIAS.BOSS_WAVE_BEAM_CRYSTAL_NPC_NAME;
 import static com.datalogger.constants.Colosseum.NPC_ALIAS.SOLARFLARE_NPC_NAME;
 import static com.datalogger.constants.Colosseum.RewardsChest.REWARDS_CHEST_GROUP_ID;
 import static com.datalogger.constants.Colosseum.RewardsChest.REWARDS_CHEST_MODIFIER_LIST_CONTAINER_ID;
 import static com.datalogger.constants.Colosseum.RewardsChest.REWARDS_CHEST_SUMMARY_TAB_CHILD_ID;
+import com.datalogger.events.DataLoggerConfigChanged;
 import com.datalogger.models.colosseum.ColosseumNPC;
 import com.datalogger.models.colosseum.ColosseumState;
 import com.datalogger.models.colosseum.IntermissionUI;
@@ -52,8 +55,6 @@ import com.datalogger.models.itemvault.ItemBundle;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.time.Instant;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -80,7 +81,6 @@ import net.runelite.api.events.NpcDespawned;
 import net.runelite.api.events.NpcSpawned;
 import net.runelite.api.widgets.Widget;
 import net.runelite.client.eventbus.Subscribe;
-import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.util.Text;
 
@@ -98,7 +98,6 @@ public class ColosseumScanner
 	private TimestampFormat timestampFormat;
 
 	private final Set<NPC> activeTrackedNpcs = new HashSet<>();
-	private final Map<Integer, String> npcNameCache = new HashMap<>();
 
 	private boolean scannedManticores;
 	private Integer manticoreIndexA = null;
@@ -106,6 +105,8 @@ public class ColosseumScanner
 
 	private final Map<Integer, ManticoreAttackSequence> manticoreSequences = new HashMap<>();
 	private final Map<Integer, String> manticoreSequenceStrings = new HashMap<>();
+
+	private static final java.util.regex.Pattern NUMBER_PATTERN = java.util.regex.Pattern.compile("[^0-9-]");
 
 	public void setManticoreIndexA(int index) {
 		manticoreIndexA = index;
@@ -149,12 +150,8 @@ public class ColosseumScanner
 	}
 
 	@Subscribe
-	public void onConfigChanged(ConfigChanged event)
+	public void onDataLoggerConfigChanged(DataLoggerConfigChanged event)
 	{
-		if (!event.getGroup().equals(DataLoggerConfig.CONFIG_GROUP)) {
-			return;
-		}
-
 		updateConfigFlags(false);
 	}
 
@@ -171,10 +168,6 @@ public class ColosseumScanner
 
 			// Cache the cleaned name immediately
 			String name = (comp != null) ? comp.getName() : npc.getName();
-			if (name != null)
-			{
-				npcNameCache.put(npc.getIndex(), Text.removeTags(name));
-			}
 		}
 	}
 
@@ -183,7 +176,6 @@ public class ColosseumScanner
 	{
 		NPC npc = event.getNpc();
 		activeTrackedNpcs.remove(npc);
-		npcNameCache.remove(npc.getIndex());
 	}
 
 	@Subscribe
@@ -194,19 +186,9 @@ public class ColosseumScanner
 		int npcId = (comp != null) ? comp.getId() : npc.getId();
 
 		if (trackedNpcIds.contains(npcId))
-		{
 			activeTrackedNpcs.add(npc);
-			String name = (comp != null) ? comp.getName() : npc.getName();
-			if (name != null)
-			{
-				npcNameCache.put(npc.getIndex(), Text.removeTags(name));
-			}
-		}
 		else
-		{
 			activeTrackedNpcs.remove(npc);
-			npcNameCache.remove(npc.getIndex());
-		}
 	}
 
 	/**
@@ -287,97 +269,6 @@ public class ColosseumScanner
 	}
 
 	/**
-	 * Match a ColosseumModifier instance to the given String and return it
-	 */
-	private ColosseumModifier matchModifier(String text)
-	{
-		switch (text)
-		{
-			case "Bees!":
-				return ColosseumModifier.BEES_I;
-			case "Bees! (II)":
-				return ColosseumModifier.BEES_II;
-			case "Bees! (III)":
-				return ColosseumModifier.BEES_III;
-
-			case "Blasphemy":
-				return ColosseumModifier.BLASPHEMY_I;
-			case "Blasphemy (II)":
-				return ColosseumModifier.BLASPHEMY_II;
-			case "Blasphemy (III)":
-				return ColosseumModifier.BLASPHEMY_III;
-
-			case "Doom":
-				return ColosseumModifier.DOOM_I;
-			case "Doom (II)":
-				return ColosseumModifier.DOOM_II;
-			case "Doom (III)":
-				return ColosseumModifier.DOOM_III;
-
-			case "Frailty":
-				return ColosseumModifier.FRAILTY_I;
-			case "Frailty (II)":
-				return ColosseumModifier.FRAILTY_II;
-			case "Frailty (III)":
-				return ColosseumModifier.FRAILTY_III;
-
-			case "Mantimayhem":
-				return ColosseumModifier.MANTIMAYHEM_I;
-			case "Mantimayhem (II)":
-				return ColosseumModifier.MANTIMAYHEM_II;
-			case "Mantimayhem (III)":
-				return ColosseumModifier.MANTIMAYHEM_III;
-
-			case "Myopia":
-				return ColosseumModifier.MYOPIA_I;
-			case "Myopia (II)":
-				return ColosseumModifier.MYOPIA_II;
-			case "Myopia (III)":
-				return ColosseumModifier.MYOPIA_III;
-
-			case "Reentry":
-				return ColosseumModifier.REENTRY_I;
-			case "Reentry (II)":
-				return ColosseumModifier.REENTRY_II;
-			case "Reentry (III)":
-				return ColosseumModifier.REENTRY_III;
-
-			case "Relentless":
-				return ColosseumModifier.RELENTLESS_I;
-			case "Relentless (II)":
-				return ColosseumModifier.RELENTLESS_II;
-			case "Relentless (III)":
-				return ColosseumModifier.RELENTLESS_III;
-
-			case "Solarflare":
-				return ColosseumModifier.SOLARFLARE_I;
-			case "Solarflare (II)":
-				return ColosseumModifier.SOLARFLARE_II;
-			case "Solarflare (III)":
-				return ColosseumModifier.SOLARFLARE_III;
-
-			case "Volatility":
-				return ColosseumModifier.VOLATILITY_I;
-			case "Volatility (II)":
-				return ColosseumModifier.VOLATILITY_II;
-			case "Volatility (III)":
-				return ColosseumModifier.VOLATILITY_III;
-
-			case "Dynamic Duo":
-				return ColosseumModifier.DYNAMIC_DUO;
-			case "Quartet":
-				return ColosseumModifier.QUARTET;
-			case "Red Flag":
-				return ColosseumModifier.RED_FLAG;
-			case "Totemic":
-				return ColosseumModifier.TOTEMIC;
-
-			default:
-				throw new UnsupportedOperationException("Unknown modifier: " + text);
-		}
-	}
-
-	/**
 	 * Handler for scanning rewards chest UI / wave intermission UI
 	 */
 	public IntermissionUI scanUI(boolean rewardsChestUI, int currentWave)
@@ -406,15 +297,15 @@ public class ColosseumScanner
 			Widget container = client.getWidget(INTERMISSION_GROUP_ID, childId);
 			if (container != null)
 			{
-				String rawText = Text.removeTags(container.getName());
-				ColosseumModifier mod = matchModifier(rawText);
+				String uiLabel = Text.removeTags(container.getName());
+				ColosseumModifier mod = ColosseumModifier.fromUiLabel(uiLabel);
 				if (mod != null)
 				{
 					modifierChoices.add(mod);
-					log.debug("Parsed Modifier choice: {}", rawText);
+					log.debug("Parsed Modifier choice: {}", mod);
 				}
 				else
-					log.error("Parsed unknown modifier choice: {}", rawText);
+					log.error("Unable to extract Modifier from label {}", uiLabel);
 			}
 		}
 
@@ -517,9 +408,7 @@ public class ColosseumScanner
 		return builder.build();
 	}
 
-	private static final DateTimeFormatter HHMMSS_FORMATTER = DateTimeFormatter
-		.ofPattern("HH:mm:ss.S")
-		.withZone(ZoneId.systemDefault());
+
 
 
 	/**
@@ -539,13 +428,10 @@ public class ColosseumScanner
 				continue;
 
 			NPCComposition composition = npc.getComposition();
-			int npcId = composition == null ? npc.getId() : composition.getId();
-
-			if (trackedNpcIds.contains(npcId)) {
-				ColosseumNPC colosseumNpc = generateNpc(npc, composition);
-				detectedNpcs.add(colosseumNpc);
-			}
+			ColosseumNPC colosseumNpc = generateNpc(npc, composition);
+			detectedNpcs.add(colosseumNpc);
 		}
+
 		int playerHp = client.getBoostedSkillLevel(Skill.HITPOINTS);
 		int playerPrayer = client.getBoostedSkillLevel(Skill.PRAYER);
 
@@ -560,15 +446,15 @@ public class ColosseumScanner
 		switch (timestampFormat)
 		{
 			case UNIX:
-				state.timestampUnix(Instant.now().toEpochMilli());
+				state.timestampUnix(System.currentTimeMillis());
 				break;
 			case HHMMSS_M:
-				state.timestampHmsm(HHMMSS_FORMATTER.format(Instant.now()));
+				state.timestampHmsm(COLOSSEUM_TIMELINE_HMS_FORMATTER.format(Instant.now()));
 				break;
 			case BOTH:
 				Instant now = Instant.now();
 				state.timestampUnix(now.toEpochMilli());
-				state.timestampHmsm(HHMMSS_FORMATTER.format(now));
+				state.timestampHmsm(COLOSSEUM_TIMELINE_HMS_FORMATTER.format(now));
 				break;
 			case NONE:
 			default:
@@ -627,9 +513,8 @@ public class ColosseumScanner
 		return (w != null) ? Text.removeTags(w.getText()) : "";
 	}
 
-	private static int parseNum(String s)
-	{
-		String val = s.replaceAll("[^0-9-]", "");
+	private static int parseNum(String s) {
+		String val = NUMBER_PATTERN.matcher(s).replaceAll("");
 		return val.isEmpty() ? 0 : Integer.parseInt(val);
 	}
 
@@ -670,10 +555,11 @@ public class ColosseumScanner
 		{
 			for (Widget child : modifierContainer.getDynamicChildren())
 			{
+				if (child.getText() == null) continue;
 				String txt = Text.removeTags(child.getText()).trim();
-				if (!txt.isEmpty() && !txt.equals("You have no modifiers yet."))
+				if (!txt.isEmpty() && !txt.equals(NO_MODIFIERS_MESSAGE))
 				{
-					ColosseumModifier mod = matchModifier(txt);
+					ColosseumModifier mod = ColosseumModifier.fromUiLabel(txt);
 					if (mod != null) parsedModifiers.add(mod);
 				}
 			}
@@ -716,5 +602,16 @@ public class ColosseumScanner
 				trackedNpcIds.addAll(entry.getValue());
 			}
 		}
+	}
+
+	/**
+	 * Shutdown cleanup method
+	 */
+	public void clearState()
+	{
+		activeTrackedNpcs.clear();
+		resetManticoreSequences();
+		scannedManticores = false;
+		log.debug("Colosseum scanner state cleared.");
 	}
 }

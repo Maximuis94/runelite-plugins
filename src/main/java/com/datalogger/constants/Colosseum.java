@@ -25,6 +25,8 @@
 package com.datalogger.constants;
 
 import com.datalogger.models.itemvault.ItemBundle;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 
 /**
  * Centralized constants related to Fortis Colosseum
@@ -135,6 +137,7 @@ public final class Colosseum
 	 */
 	public static class Message
 	{
+		public static final String NO_MODIFIERS_MESSAGE = "You have no modifiers yet.";
 		public static final String START_ATTEMPT_MESSAGE = "Minimus|Let me know when you want to begin.";
 		public static final String DEATH_MESSAGE = "Oh dear, you are dead!";
 		public static final String WAVE_1_HEADER = "Fortis Colosseum";
@@ -159,4 +162,7 @@ public final class Colosseum
 		public static final int POPULATE_INTERMISSION_UI_SCRIPT_ID = 4931;
 		public static final int POPULATE_REWARDS_CHEST_UI_SCRIPT_ID = 4929;
 	}
+
+	public static final DateTimeFormatter COLOSSEUM_TRIAL_TIMESTAMP_FORMATTER = DateTimeFormatter.ofPattern("yyMMdd_HHmmss").withZone(ZoneId.systemDefault());
+	public static final DateTimeFormatter COLOSSEUM_TIMELINE_HMS_FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss.S").withZone(ZoneId.systemDefault());
 }

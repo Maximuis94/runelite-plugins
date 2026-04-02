@@ -32,6 +32,8 @@ import com.datalogger.dto.ColosseumStateDTO;
 import com.datalogger.dto.TrackedSuppliesDTO;
 import com.datalogger.events.AccountSessionStarted;
 import com.datalogger.events.ColosseumAttemptStarted;
+import com.datalogger.events.DataLoggerConfigChanged;
+import com.datalogger.events.ScreenshotFileCreated;
 import com.datalogger.framework.LogType;
 import com.datalogger.models.colosseum.ColosseumAttempt;
 import com.datalogger.models.colosseum.ColosseumState;
@@ -64,6 +66,7 @@ import java.lang.reflect.Type;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -83,8 +86,8 @@ import javax.inject.Singleton;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.coords.WorldPoint;
+import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
-import net.runelite.client.events.ConfigChanged;
 
 /**
  * Service that handles writing and reading operations of local files.
@@ -113,7 +116,9 @@ public class FileIOService
 	private final Queue<Future<?>> pendingWrites = new ConcurrentLinkedQueue<>();
 
 	private final DataLoggerConfig config;
+	private final EventBus eventBus;
 	private boolean logGrandExchangeJson;
+	private boolean broadcastScreenshotEvent;
 
 	private String accountName = "";
 	private String accountHashString = "";
@@ -128,16 +133,32 @@ public class FileIOService
 	private String startTime;
 
 	private final int MAX_BACKLOG_ROWS = 5000;
+	private final int MAX_FLUSH_TIME_MS = 3000;
 
 	@Inject
-	private FileIOService(Gson gson, ScheduledExecutorService executor, DataLoggerConfig config) {
+	private FileIOService(Gson gson, ScheduledExecutorService executor, DataLoggerConfig config, EventBus eventBus) {
 		this.executor = executor;
 		this.gson = gson.newBuilder()
 			.registerTypeAdapter(WorldPoint.class, new WorldPointSerializer())
-			.setPrettyPrinting()
 			.disableHtmlEscaping()
 			.create();
 		this.config = config;
+		this.eventBus = eventBus;
+	}
+
+	/**
+	 * Helper method to safely create directories and report exactly why they failed.
+	 */
+	private boolean ensureDirectoryExists(File dir) {
+		if (dir != null && !dir.exists()) {
+			try {
+				java.nio.file.Files.createDirectories(dir.toPath());
+			} catch (IOException e) {
+				log.error("Failed to create directory: {}", dir.getAbsolutePath(), e);
+				return false;
+			}
+		}
+		return true;
 	}
 
 	@Subscribe
@@ -148,27 +169,21 @@ public class FileIOService
 
 		attemptRootFile = new File(attemptRoot);
 
-		if (!attemptRootFile.exists())
+		if (ensureDirectoryExists(attemptRootFile))
 		{
-			boolean created = attemptRootFile.mkdirs();
-
-			if (created)
-			{
-				log.debug("Successfully created Colosseum attempt directory at: {}", attemptRoot);
-			}
-			else
-			{
-				log.warn("Failed to create Colosseum attempt directory at: {}. Logs/screenshots may fail to save.", attemptRoot);
-			}
+			log.debug("Successfully verified Colosseum attempt directory at: {}", attemptRoot);
+		}
+		else
+		{
+			log.warn("Failed to create Colosseum attempt directory at: {}. Logs/screenshots may fail to save.", attemptRoot);
 		}
 
 		log.info("Initialized Colosseum FileIOService vars with root={}, account={}, startTime={}", attemptRoot, accountName, startTime);
 	}
 
 	@Subscribe
-	public void onConfigChanged(ConfigChanged event)
+	public void onDataLoggerConfigChanged(DataLoggerConfigChanged event)
 	{
-		if (!event.getGroup().equals(DataLoggerConfig.CONFIG_GROUP)) return;
 		updateConfigFlags();
 	}
 
@@ -210,6 +225,7 @@ public class FileIOService
 	private void updateConfigFlags()
 	{
 		logGrandExchangeJson = config.logGrandExchangeJSON();
+		broadcastScreenshotEvent = config.broadcastScreenshot();
 	}
 
 
@@ -228,8 +244,7 @@ public class FileIOService
 
 			try {
 				File parentDir = file.getParentFile();
-				if (parentDir != null && !parentDir.exists() && !parentDir.mkdirs()) {
-					log.error("Failed to create log directory: {}", parentDir.getAbsolutePath());
+				if (!ensureDirectoryExists(parentDir)) {
 					return;
 				}
 
@@ -246,6 +261,10 @@ public class FileIOService
 					String queuedRow;
 					while ((queuedRow = backlog.poll()) != null) {
 						out.println(queuedRow);
+					}
+
+					if (backlog.isEmpty()) {
+						failedWrites.remove(file);
 					}
 
 					log.debug("Successfully wrote to {}. Remaining backlog: {}", file.getName(), backlog.size());
@@ -275,9 +294,7 @@ public class FileIOService
 	 * Ensures the state directory exists and returns the file path for an account's state
 	 */
 	private File getStateFile() {
-		if (!GE_STATE_DIR.exists()) {
-			GE_STATE_DIR.mkdirs();
-		}
+		ensureDirectoryExists(GE_STATE_DIR);
 		return new File(GE_STATE_DIR, "state_" + accountHashString + ".properties");
 	}
 
@@ -305,7 +322,7 @@ public class FileIOService
 	 */
 	public void saveAccountState(Properties props) {
 		Future<?> future = executor.submit(() -> {
-			File file = getStateFile(); // Note: getStateFile has a .mkdirs() in it, so it's good this is async now!
+			File file = getStateFile();
 			try (FileOutputStream out = new FileOutputStream(file)) {
 				props.store(out, "Account-specific ongoing Grand Exchange offers");
 			} catch (IOException e) {
@@ -322,8 +339,7 @@ public class FileIOService
 	public void saveJson(File file, Object data) {
 		Future<?> future = executor.submit(() -> {
 			File directory = file.getParentFile();
-			if (!directory.exists() && !directory.mkdirs()) {
-				log.error("Could not create directory: {}", directory.getAbsolutePath());
+			if (!ensureDirectoryExists(directory)) {
 				return;
 			}
 
@@ -331,7 +347,6 @@ public class FileIOService
 			String cleanName = filename.endsWith(".json") ? filename : filename + ".json";
 			File finalFile = new File(directory, cleanName);
 
-			// StandardCharsets.UTF_8 recommended for clean JSON encoding
 			try (BufferedWriter writer = Files.newBufferedWriter(finalFile.toPath(), StandardCharsets.UTF_8)) {
 				gson.toJson(data, writer);
 				log.debug("Successfully integrated data to {}", finalFile.getName());
@@ -356,13 +371,11 @@ public class FileIOService
 	 */
 	public void saveWaveStates(String attemptId, int waveId, List<ColosseumState> liveStates) {
 		Future<?> future = executor.submit(() -> {
-			// 1. Move the DTO mapping inside the async block to save Client Thread CPU cycles
 			List<ColosseumStateDTO> dtos = liveStates.stream()
 				.map(ColosseumState::toDTO)
 				.collect(Collectors.toList());
 
-			if (!INTERNAL_TEMP_DIR.exists() && !INTERNAL_TEMP_DIR.mkdirs()) {
-				log.error("Could not create directory: {}", INTERNAL_TEMP_DIR.getAbsolutePath());
+			if (!ensureDirectoryExists(INTERNAL_TEMP_DIR)) {
 				return;
 			}
 
@@ -406,10 +419,7 @@ public class FileIOService
 			List<File> toDelete = new ArrayList<>();
 
 			try {
-				File parentDir = outFile.getParentFile();
-				if (parentDir != null && !parentDir.exists()) {
-					parentDir.mkdirs();
-				}
+				ensureDirectoryExists(outFile.getParentFile());
 
 				try (JsonWriter writer = new JsonWriter(new FileWriter(outFile))) {
 					writer.setIndent("  ");
@@ -436,7 +446,6 @@ public class FileIOService
 
 				log.info("Successfully merged timeline for attempt {} at {}", attemptId, outFile.getAbsolutePath());
 
-				// Clean up temporary files
 				for (File f : toDelete) {
 					if (f.delete()) {
 						log.debug("Deleted temp file '{}'", f.getName());
@@ -452,16 +461,9 @@ public class FileIOService
 		pendingWrites.add(future);
 	}
 
-	/**
-	 * Logs the given ColosseumAttemptDto in the internal history and the given attemptLogJsonFile
-	 */
 	public void logColosseumAttempt(ColosseumAttemptDTO attemptDto, File attemptLogJsonFile) {
 		Future<?> futureInternal = executor.submit(() -> {
-			File parentDir = INTERNAL_COLOSSEUM_ATTEMPT_HISTORY.getParentFile();
-
-			if (parentDir != null && !parentDir.exists()) {
-				parentDir.mkdirs();
-			}
+			ensureDirectoryExists(INTERNAL_COLOSSEUM_ATTEMPT_HISTORY.getParentFile());
 
 			Gson flatGson = new Gson();
 			String jsonLine = flatGson.toJson(attemptDto);
@@ -480,10 +482,7 @@ public class FileIOService
 		pendingWrites.add(futureInternal);
 
 		Future<?> futureExternal = executor.submit(() -> {
-			File parentDir = attemptLogJsonFile.getParentFile();
-			if (parentDir != null && !parentDir.exists()) {
-				parentDir.mkdirs();
-			}
+			ensureDirectoryExists(attemptLogJsonFile.getParentFile());
 
 			try (FileWriter writer = new FileWriter(attemptLogJsonFile)) {
 				gson.toJson(attemptDto, writer);
@@ -502,10 +501,10 @@ public class FileIOService
 	 * @param fileName     The name of the file without the extension (e.g., "wave-01")
 	 * @param format The format of the image file
 	 */
-	public void saveScreenshot(BufferedImage image, File rootDir, String fileName, ScreenshotFormat format) throws IOException {
+	public void saveScreenshot(BufferedImage image, File rootDir, String fileName, ScreenshotFormat format, boolean shouldBroadcast) throws IOException {
 		log.info("Attempting to save screenshot at directory {} with fileName {}", rootDir, fileName);
-		if (!rootDir.exists() && !rootDir.mkdirs()) {
-			log.warn("Failed to create screenshot directories.");
+
+		if (!ensureDirectoryExists(rootDir)) {
 			return;
 		}
 
@@ -522,6 +521,10 @@ public class FileIOService
 		} else {
 			ImageIO.write(image, "png", outputFile);
 		}
+		String absolutePath = outputFile.getAbsolutePath();
+		log.info("Posting ScreenshotFileCreated event for {} shouldBroadcast={}", absolutePath, shouldBroadcast);
+		eventBus.post(new ScreenshotFileCreated(absolutePath));
+
 	}
 
 	public void writeColosseumCSVLog(ColosseumAttempt attempt, String rows) {
@@ -529,10 +532,8 @@ public class FileIOService
 		File outFile = attempt.getWaveLogCsvFile();
 		Future<?> future = executor.submit(() -> {
 			try {
-				File parent = outFile.getParentFile();
-				if (parent != null && !parent.exists()) {
-					parent.mkdirs();
-				}
+				ensureDirectoryExists(outFile.getParentFile());
+
 				String content = header + "\n" + rows.trim() + "\n";
 
 				java.nio.file.Files.write(
@@ -559,21 +560,12 @@ public class FileIOService
 		}
 	}
 
-	/**
-	 * Safely loads the internal Grand Exchange ledger for a specific account.
-	 * Uses String interning to prevent reading while the file is actively being saved.
-	 *
-	 * @param accountHash The unique hash of the logged-in account
-	 * @return A list of ledger entries, or an empty list if no file exists
-	 */
 	public List<GeLedgerEntry> loadInternalGeLedger(String accountHash) {
 		if (accountHash == null || accountHash.isEmpty()) {
 			return new ArrayList<>();
 		}
 
 		File file = new File(INTERNAL_GE_DIR, accountHash + ".json");
-
-		// Safely retrieve or create a lock specific to this account hash
 		Object lock = accountLocks.computeIfAbsent(accountHash, k -> new Object());
 
 		synchronized (lock) {
@@ -582,7 +574,6 @@ public class FileIOService
 			}
 
 			try (Reader reader = new FileReader(file)) {
-				// Read directly into an array to avoid Gson TypeToken generic erasure
 				GeLedgerEntry[] arr = gson.fromJson(reader, GeLedgerEntry[].class);
 				return arr != null ? new ArrayList<>(Arrays.asList(arr)) : new ArrayList<>();
 			} catch (Exception e) {
@@ -604,8 +595,7 @@ public class FileIOService
 		}
 
 		Future<?> future = executor.submit(() -> {
-			if (!INTERNAL_GE_DIR.exists() && !INTERNAL_GE_DIR.mkdirs()) {
-				log.error("Failed to create internal GE ledger directory: {}", INTERNAL_GE_DIR.getAbsolutePath());
+			if (!ensureDirectoryExists(INTERNAL_GE_DIR)) {
 				return;
 			}
 
@@ -634,11 +624,7 @@ public class FileIOService
 					{
 						try
 						{
-							File copyToParent = copyTo.getParentFile();
-							if (copyToParent != null && !copyToParent.exists())
-							{
-								copyToParent.mkdirs();
-							}
+							ensureDirectoryExists(copyTo.getParentFile());
 							Files.copy(
 								finalFile.toPath(),
 								copyTo.toPath(),
@@ -688,9 +674,6 @@ public class FileIOService
 		}
 	}
 
-	/**
-	 * Load and return active GE offers for the currently active account
-	 */
 	public List<ActiveGeOffer> loadActiveGeOffers()
 	{
 		if(!hasValidAccountInfo)
@@ -714,15 +697,13 @@ public class FileIOService
 		}
 
 		Future<?> future = executor.submit(() -> {
-			if (!INTERNAL_ACTIVE_OFFERS_DIR.exists() && !INTERNAL_ACTIVE_OFFERS_DIR.mkdirs()) {
-				log.error("Failed to create internal active GE offers directory: {}", INTERNAL_ACTIVE_OFFERS_DIR.getAbsolutePath());
+			if (!ensureDirectoryExists(INTERNAL_ACTIVE_OFFERS_DIR)) {
 				return;
 			}
 
 			File finalFile = new File(INTERNAL_ACTIVE_OFFERS_DIR, accountHash + ".json");
 			File tempFile = new File(INTERNAL_ACTIVE_OFFERS_DIR, accountHash + ".tmp");
 
-			// Define the public export files
 			File publicJsonFile = new File(PluginConstants.ITEM_VAULT_DIR, "active-offers_" + accountHash + ".json");
 			File publicCsvFile = new File(PluginConstants.ITEM_VAULT_DIR, "active-offers_" + accountHash + ".csv");
 
@@ -730,12 +711,10 @@ public class FileIOService
 
 			synchronized (lock) {
 				try {
-					// 1. Write the internal JSON temp file
 					try (FileWriter writer = new FileWriter(tempFile)) {
 						gson.toJson(offers, writer);
 					}
 
-					// 2. Atomic swap to final internal file
 					Files.move(
 						tempFile.toPath(),
 						finalFile.toPath(),
@@ -743,26 +722,21 @@ public class FileIOService
 						StandardCopyOption.REPLACE_EXISTING
 					);
 
-					// 3. Handle Public Exports
-					if (!PluginConstants.ITEM_VAULT_DIR.exists() && !PluginConstants.ITEM_VAULT_DIR.mkdirs()) {
+					if (!ensureDirectoryExists(PluginConstants.ITEM_VAULT_DIR)) {
 						log.error("Failed to create public active GE offers directory: {}", PluginConstants.ITEM_VAULT_DIR.getAbsolutePath());
 					} else {
-						// Export JSON copy
 						Files.copy(
 							finalFile.toPath(),
 							publicJsonFile.toPath(),
 							StandardCopyOption.REPLACE_EXISTING
 						);
 
-						// Export CSV
 						try (BufferedWriter bw = Files.newBufferedWriter(publicCsvFile.toPath(), StandardCharsets.UTF_8);
 							 PrintWriter out = new PrintWriter(bw)) {
 
-							// Write CSV headers based on the JSON structure
 							out.println("slot,itemId,itemName,isBuy,state,totalQuantity,quantitySold,offerPrice,spent");
 
 							for (ActiveGeOffer offer : offers) {
-								// Escape itemName to avoid breaking the CSV layout if an item has a comma in its name
 								String itemName = offer.getItemName() != null ? offer.getItemName() : "";
 								if (itemName.contains(",")) {
 									itemName = "\"" + itemName + "\"";
@@ -772,8 +746,8 @@ public class FileIOService
 									offer.getSlot(),
 									offer.getItemId(),
 									itemName,
-									offer.isBuy(), // Or offer.getIsBuy() depending on your getters
-									offer.getState(), // Assuming this is an Enum or String
+									offer.isBuy(),
+									offer.getState(),
 									offer.getTotalQuantity(),
 									offer.getQuantitySold(),
 									offer.getOfferPrice(),
@@ -807,11 +781,20 @@ public class FileIOService
 	public void flushAll() {
 		log.info("Waiting for pending background file writes to complete...");
 
+		Instant timeLimit = Instant.now().plusMillis(MAX_FLUSH_TIME_MS);
+
 		Future<?> future;
 		while ((future = pendingWrites.poll()) != null) {
 			try {
 				if (!future.isDone() && !future.isCancelled()) {
-					future.get(2, TimeUnit.SECONDS);
+					long millisLeft = java.time.Duration.between(Instant.now(), timeLimit).toMillis();
+
+					if (millisLeft <= 0) {
+						log.warn("Global flush timeout reached. Cancelling remaining pending writes.");
+						future.cancel(true);
+						break;
+					}
+					future.get(millisLeft, TimeUnit.MILLISECONDS);
 				}
 			} catch (Exception e) {
 				log.warn("A pending file write timed out or was interrupted during shutdown.", e);
@@ -819,6 +802,11 @@ public class FileIOService
 		}
 
 		for (Map.Entry<File, Queue<String>> entry : failedWrites.entrySet()) {
+			if (Instant.now().isAfter(timeLimit)) {
+				log.warn("Global flush timeout reached before backlog could be fully flushed.");
+				break;
+			}
+
 			File file = entry.getKey();
 			Queue<String> backlog = entry.getValue();
 
@@ -834,6 +822,11 @@ public class FileIOService
 				while ((queuedRow = backlog.poll()) != null) {
 					out.println(queuedRow);
 				}
+
+				if (backlog.isEmpty()) {
+					failedWrites.remove(file);
+				}
+
 				log.info("Successfully flushed remaining backlog for {}", file.getName());
 
 			} catch (IOException e) {
@@ -851,9 +844,7 @@ public class FileIOService
 		Future<?> future = executor.submit(() -> {
 			File parentDir = csvFile.getParentFile();
 
-			// Fix: Actually create the parent directories if they don't exist!
-			if (parentDir != null && !parentDir.exists() && !parentDir.mkdirs()) {
-				log.error("Failed to create directory for vault CSV: {}", parentDir.getAbsolutePath());
+			if (!ensureDirectoryExists(parentDir)) {
 				return;
 			}
 
@@ -895,7 +886,7 @@ public class FileIOService
 	public Map<String, BankedItem[]> readAllVaultFilesRaw() {
 		File directory = PluginConstants.INTERNAL_VAULT_DIR;
 		if (!directory.exists() || !directory.isDirectory()) {
-			return new HashMap<>(); // Return empty map if directory doesn't exist
+			return new HashMap<>();
 		}
 
 		File[] vaultFiles = directory.listFiles((dir, name) -> name.endsWith(".json"));
@@ -924,14 +915,12 @@ public class FileIOService
 	{
 		Future<?> future = executor.submit(() -> {
 			File mappingFile = ACCOUNT_HASH_MAPPINGS;
-			File parentDir = mappingFile.getParentFile();
 
-			if (parentDir != null && !parentDir.exists() && !parentDir.mkdirs()) {
-				log.error("Failed to create directory for account hash mappings.");
+			if (!ensureDirectoryExists(mappingFile.getParentFile())) {
 				return;
 			}
 
-			synchronized (mappingFile.getAbsolutePath().intern()) {
+			synchronized (mappingsLock) {
 				Properties properties = new Properties();
 
 				if (mappingFile.exists()) {
@@ -1014,57 +1003,60 @@ public class FileIOService
 				return;
 			}
 
-			int nWaves = 0;
-			int nLogs = 0;
-			JsonArray mergedWaves = new JsonArray();
-
-			for (File dir : attemptDirs) {
-				String attemptId = dir.getName();
-
-				File logFile = new File(dir, attemptId + "_wave-log.json");
-
-				if (!logFile.exists() || !logFile.isFile()) {
-					continue;
-				}
-
-				try (Reader reader = new FileReader(logFile)) {
-					JsonObject attemptJson = gson.fromJson(reader, JsonObject.class);
-
-					if (attemptJson != null && attemptJson.has("waves") && attemptJson.has("timestamp")) {
-						long timestamp = attemptJson.get("timestamp").getAsLong();
-						String attemptResult = attemptJson.get("result").getAsString();
-						JsonArray waves = attemptJson.getAsJsonArray("waves");
-						boolean addedWave = false;
-						for (JsonElement waveElement : waves) {
-							if (waveElement.isJsonObject()) {
-								JsonObject waveObj = waveElement.getAsJsonObject();
-								waveObj.addProperty("attemptId", attemptId);
-								waveObj.addProperty("attemptTimestamp", timestamp);
-								waveObj.addProperty("attemptResult", attemptResult);
-
-								mergedWaves.add(waveObj);
-								nWaves++;
-								if (!addedWave) {
-									nLogs++;
-									addedWave = true;
-								}
-							}
-						}
-					}
-				} catch (Exception e) {
-					log.error("Failed to parse wave log for attempt: {}", attemptId, e);
-				}
-			}
-
-			File parentDir = COLOSSEUM_WAVE_LOG_MERGED_JSON.getParentFile();
-			if (parentDir != null && !parentDir.exists() && !parentDir.mkdirs()) {
-				log.error("Could not create directory for merged wave logs: {}", parentDir.getAbsolutePath());
+			if (!ensureDirectoryExists(COLOSSEUM_WAVE_LOG_MERGED_JSON.getParentFile())) {
 				return;
 			}
 
-			try (BufferedWriter writer = Files.newBufferedWriter(COLOSSEUM_WAVE_LOG_MERGED_JSON.toPath(), StandardCharsets.UTF_8)) {
-				gson.toJson(mergedWaves, writer);
+			int nWaves = 0;
+			int nLogs = 0;
+
+			try (BufferedWriter bw = Files.newBufferedWriter(COLOSSEUM_WAVE_LOG_MERGED_JSON.toPath(), StandardCharsets.UTF_8);
+				 JsonWriter writer = new JsonWriter(bw)) {
+
+				writer.setIndent("  ");
+				writer.beginArray();
+
+				for (File dir : attemptDirs) {
+					String attemptId = dir.getName();
+					File logFile = new File(dir, attemptId + "_wave-log.json");
+
+					if (!logFile.exists() || !logFile.isFile()) {
+						continue;
+					}
+
+					try (Reader reader = new FileReader(logFile)) {
+						JsonObject attemptJson = gson.fromJson(reader, JsonObject.class);
+
+						if (attemptJson != null && attemptJson.has("waves") && attemptJson.has("timestamp")) {
+							long timestamp = attemptJson.get("timestamp").getAsLong();
+							String attemptResult = attemptJson.get("result").getAsString();
+							JsonArray waves = attemptJson.getAsJsonArray("waves");
+							boolean addedWave = false;
+							for (JsonElement waveElement : waves) {
+								if (waveElement.isJsonObject()) {
+									JsonObject waveObj = waveElement.getAsJsonObject();
+									waveObj.addProperty("attemptId", attemptId);
+									waveObj.addProperty("attemptTimestamp", timestamp);
+									waveObj.addProperty("attemptResult", attemptResult);
+
+									gson.toJson(waveObj, writer);
+
+									nWaves++;
+									if (!addedWave) {
+										nLogs++;
+										addedWave = true;
+									}
+								}
+							}
+						}
+					} catch (Exception e) {
+						log.error("Failed to parse wave log for attempt: {}", attemptId, e);
+					}
+				}
+
+				writer.endArray();
 				log.info("Successfully merged data of {} waves from {} log files into {}", nWaves, nLogs, COLOSSEUM_WAVE_LOG_MERGED_JSON.getName());
+
 			} catch (IOException e) {
 				log.error("Failed to write merged Colosseum wave logs to {}", COLOSSEUM_WAVE_LOG_MERGED_JSON.getName(), e);
 			}
@@ -1088,9 +1080,7 @@ public class FileIOService
 				return;
 			}
 
-			File parentDir = COLOSSEUM_WAVE_LOG_MERGED_CSV.getParentFile();
-			if (parentDir != null && !parentDir.exists()) {
-				log.error("Could not create directory for merged CSV wave logs: {}", parentDir.getAbsolutePath());
+			if (!ensureDirectoryExists(COLOSSEUM_WAVE_LOG_MERGED_CSV.getParentFile())) {
 				return;
 			}
 

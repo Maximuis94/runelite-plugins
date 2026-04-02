@@ -35,6 +35,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 import lombok.Builder;
 import lombok.Data;
+import lombok.NonNull;
 import lombok.Singular;
 import net.runelite.api.coords.WorldPoint;
 
@@ -46,12 +47,15 @@ import net.runelite.api.coords.WorldPoint;
 public class ColosseumWave implements DataRow
 {
 	private int wave;
+
+	@NonNull
 	private WaveStatus status;
 
 	private String accountName;
 	private String tag;
 
 	private ItemBundle earnedLoot;
+	private int lootValue;
 
 	@Singular
 	private List<ColosseumModifier> modifierChoices;
@@ -93,14 +97,14 @@ public class ColosseumWave implements DataRow
 	private WorldPoint serpentShamanReinforcementsSpawn;
 	private WorldPoint minotaurReinforcementsSpawn;
 
-
 	public ColosseumWaveDTO toDTO() {
 		return ColosseumWaveDTO.builder()
 			.wave(wave)
-			.status(status != null ? status.name() : "UNKNOWN")
+			.status(status.name())
 			.accountName(accountName)
 			.tag(tag)
 			.earnedLoot(earnedLoot)
+			.lootValue(lootValue)
 			.modifierChoices(modifierChoices != null ? modifierChoices.stream()
 				.map(ColosseumModifier::name)
 				.collect(Collectors.toList()) : new java.util.ArrayList<>())
@@ -159,7 +163,7 @@ public class ColosseumWave implements DataRow
 
 		String quantity = earnedLoot == null  ? "0" : String.valueOf(earnedLoot.getQuantity());
 
-		String modStatus = status != null ? status.name() : "UNKNOWN";
+		String modStatus = status.name();
 		String chosenMod = chosenModifier != null ? chosenModifier.name() : "";
 
 		String mod1 = modifierChoices != null && !modifierChoices.isEmpty() && modifierChoices.get(0) != null ? modifierChoices.get(0).name() : "";

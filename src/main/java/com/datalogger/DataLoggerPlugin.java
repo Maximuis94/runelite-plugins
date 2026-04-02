@@ -24,6 +24,9 @@
  */
 package com.datalogger;
 
+import static com.datalogger.constants.PluginConstants.CONFIG_GROUP;
+import com.datalogger.events.DataLoggerConfigChanged;
+import com.datalogger.webhook.ColosseumDiscordBroadcaster;
 import com.datalogger.events.AccountSessionStarted;
 import com.datalogger.loggers.ColosseumAttemptLogger;
 import com.datalogger.loggers.ColosseumTimelineLogger;
@@ -34,6 +37,7 @@ import com.datalogger.models.enums.ConsumableItemGroup;
 import com.datalogger.models.enums.ItemCharge;
 import com.datalogger.services.AccountHashMapper;
 import com.datalogger.services.ColosseumScanner;
+import com.datalogger.services.DiscordWebhookService;
 import com.datalogger.services.EquipmentTracker;
 import com.datalogger.services.FileIOService;
 import com.datalogger.services.GrandExchangeHistoryParser;
@@ -65,8 +69,8 @@ import net.runelite.client.util.ImageUtil;
 @Slf4j
 @PluginDescriptor(
 	name = "Data Logger",
-	description = "Locally logs Fortis Colosseum trial data, item storage, and Grand Exchange offers as JSON/CSV files. Designed for multi-client usage.",
-	tags = {"logger", "data", "history", "screenshot", "tracker", "csv", "json", "ge", "grand exchange", "bank", "item", "fortis", "colosseum"}
+	description = "Locally logs Fortis Colosseum trial data (+Discord webhook), storages, and GE offers as JSON/CSV files. Designed for multi-client usage.",
+	tags = {"logger", "data", "history", "screenshot", "tracker", "csv", "json", "ge", "grand exchange", "bank", "item", "fortis", "colosseum", "timeline", "discord", "local", "webhook"}
 )
 public class DataLoggerPlugin extends Plugin
 {
@@ -88,15 +92,16 @@ public class DataLoggerPlugin extends Plugin
 	@Inject private ColosseumAttemptLogger coloLogger;
 	@Inject private ColosseumScanner coloScanner;
 	@Inject private ColosseumTimelineLogger timelineLogger;
+	@Inject private ColosseumDiscordBroadcaster colosseumDiscordBroadcaster;
 	@Inject private ScreenshotLogger screenshotLogger;
 	@Inject private EquipmentTracker equipmentTracker;
 	@Inject private SupplyTracker supplyTracker;
+	@Inject private DiscordWebhookService discordWebhookService;
 
 	private NavigationButton navButton;
 	private boolean sessionInitialized = false;
 	private boolean startUpComplete = false;
 
-	// Registration State Trackers
 	private boolean isItemVaultRegistered = false;
 	private boolean isGeRegistered = false;
 	private boolean isColosseumRegistered = false;
@@ -121,6 +126,8 @@ public class DataLoggerPlugin extends Plugin
 		eventBus.register(itemVaultLogger);
 		eventBus.register(equipmentTracker);
 		eventBus.register(supplyTracker);
+		eventBus.register(discordWebhookService);
+
 		itemVaultLogger.updateIgnoredAccountHashes();
 
 		toggleItemVault(config.logItemVault());
@@ -159,6 +166,7 @@ public class DataLoggerPlugin extends Plugin
 		eventBus.unregister(itemVaultLogger);
 		eventBus.unregister(equipmentTracker);
 		eventBus.unregister(supplyTracker);
+		eventBus.unregister(discordWebhookService);
 
 		toggleItemVault(false);
 		toggleGrandExchange(false);
@@ -167,14 +175,15 @@ public class DataLoggerPlugin extends Plugin
 		toggleScreenshots(false);
 	}
 
+	/**
+	 * Broadcast a plugin-specific ConfigChanged rather than a global ConfigChanged
+	 */
 	@Subscribe
 	public void onConfigChanged(ConfigChanged event)
 	{
-		if (!event.getGroup().equals(DataLoggerConfig.CONFIG_GROUP))
-		{
-			return;
-		}
+		if (!event.getGroup().equals(CONFIG_GROUP)) return;
 
+		eventBus.post(new DataLoggerConfigChanged(event.getKey(), event.getOldValue(), event.getNewValue(), event));
 		switch (event.getKey())
 		{
 			case "logItemVault":
@@ -228,16 +237,22 @@ public class DataLoggerPlugin extends Plugin
 		if (enable && !isColosseumRegistered) {
 			eventBus.register(coloLogger);
 			eventBus.register(coloScanner);
+			eventBus.register(colosseumDiscordBroadcaster);
+
 			coloScanner.updateConfigFlags(true);
+			colosseumDiscordBroadcaster.updateConfigFlags();
 			isColosseumRegistered = true;
 			log.debug("Colosseum tracking enabled.");
 			toggleTimeline(config.logWaveTimeline());
 
 		} else if (!enable && isColosseumRegistered) {
 			toggleTimeline(false);
+			coloScanner.clearState();
 
 			eventBus.unregister(coloLogger);
 			eventBus.unregister(coloScanner);
+			eventBus.unregister(colosseumDiscordBroadcaster);
+
 			isColosseumRegistered = false;
 			log.debug("Colosseum tracking disabled.");
 		}
@@ -286,6 +301,7 @@ public class DataLoggerPlugin extends Plugin
 			log.info("Player has logged out or is hopping. Resetting account parameters.");
 			sessionInitialized = false;
 			eventBus.post(new AccountSessionStarted("", -1, null, false));
+			coloScanner.clearState();
 		}
 	}
 
@@ -295,8 +311,10 @@ public class DataLoggerPlugin extends Plugin
 		if (!sessionInitialized && startUpComplete && client.getGameState() == GameState.LOGGED_IN)
 		{
 			long currentHash = client.getAccountHash();
+			if (currentHash == -1) return;
+
 			Actor player = client.getLocalPlayer();
-			if (currentHash != -1 && player != null && player.getName() != null)
+			if (player != null && player.getName() != null)
 			{
 				sessionInitialized = true;
 

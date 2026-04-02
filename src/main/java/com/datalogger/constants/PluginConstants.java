@@ -33,6 +33,8 @@ import net.runelite.client.RuneLite;
  */
 public final class PluginConstants
 {
+	public static final String CONFIG_GROUP = "datalogger";
+
 	public static final File PLUGIN_ROOT = new File(RuneLite.RUNELITE_DIR, "data-logger");
 	public static final File COLOSSEUM_ROOT_DIR = new File(PLUGIN_ROOT, "colosseum");
 	public static final File COLOSSEUM_SCREENSHOT_DIR = new File(COLOSSEUM_ROOT_DIR, "screenshot");
@@ -55,4 +57,5 @@ public final class PluginConstants
 	 */
 	public static final int ITEM_VALUE_UPDATE_FREQUENCY_SECONDS = 600;
 	public static final int UNMUTE_COOLDOWN_SECONDS = 600;
+	public static final int WEBHOOK_TEST_COOLDOWN_SECONDS_SUCCESS = 5;
 }

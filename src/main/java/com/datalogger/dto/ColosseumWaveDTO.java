@@ -41,6 +41,7 @@ public class ColosseumWaveDTO {
 	private String tag;
 
 	private ItemBundle earnedLoot;
+	private int lootValue;
 
 	private List<String> modifierChoices;
 	private String chosenModifier;

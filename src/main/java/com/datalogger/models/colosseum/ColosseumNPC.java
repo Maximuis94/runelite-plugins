@@ -42,13 +42,4 @@ public class ColosseumNPC {
 	int hp;
 	int maxHp;
 	String orbSequence;
-
-	/**
-	 * Converts this snapshot into a CSV-friendly string.
-	 * Format: npcId|name|x|y|hp
-	 */
-	public String toLogString() {
-		return String.format("%d|%s|%d|%d|%d",
-			npcId, name, x, y, hp);
-	}
 }

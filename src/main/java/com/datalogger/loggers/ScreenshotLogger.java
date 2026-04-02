@@ -31,6 +31,7 @@ import static com.datalogger.constants.Colosseum.Message.WAVE_START_PREFIX;
 import static com.datalogger.constants.Colosseum.Script.POPULATE_INTERMISSION_UI_SCRIPT_ID;
 import static com.datalogger.constants.Colosseum.Script.POPULATE_REWARDS_CHEST_UI_SCRIPT_ID;
 import com.datalogger.events.ColosseumAttemptStarted;
+import com.datalogger.events.DataLoggerConfigChanged;
 import com.datalogger.events.PlayerDied;
 import com.datalogger.framework.LogType;
 import com.datalogger.models.enums.ScreenshotFormat;
@@ -44,8 +45,8 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.ChatMessageType;
 import net.runelite.api.events.ChatMessage;
 import net.runelite.api.events.ScriptPostFired;
+import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
-import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.ui.DrawManager;
 import net.runelite.client.util.Text;
 
@@ -58,10 +59,12 @@ public class ScreenshotLogger {
 	@Inject private DrawManager drawManager;
 	@Inject private ScheduledExecutorService executor;
 	@Inject private FileIOService fileIOService;
+	@Inject private EventBus eventBus;
 
 	@Inject private DataLoggerConfig config;
 	private ScreenshotFormat screenshotFormat;
 	private boolean screenshotBetweenColosseumWaves;
+	private boolean enabledBroadcastScreenshot;
 
 	private boolean awaitingColosseumReset = false;
 	private boolean isActiveAttempt = false;
@@ -74,7 +77,7 @@ public class ScreenshotLogger {
 	private File colosseumRoot;
 
 	@Subscribe
-	public void onConfigChanged(ConfigChanged event)
+	public void onDataLoggerConfigChanged(DataLoggerConfigChanged event)
 	{
 		updateConfigFlags();
 	}
@@ -84,6 +87,7 @@ public class ScreenshotLogger {
 	 */
 	public void updateConfigFlags()
 	{
+		enabledBroadcastScreenshot = config.broadcastScreenshot();
 		screenshotBetweenColosseumWaves = config.screenshotBetweenWaves();
 		screenshotFormat = config.screenshotFormat();
 	}
@@ -131,7 +135,8 @@ public class ScreenshotLogger {
 			{
 				try
 				{
-					fileIOService.saveScreenshot(bufferedImage, colosseumRoot, fileName, screenshotFormat);
+
+					fileIOService.saveScreenshot(bufferedImage, colosseumRoot, fileName, screenshotFormat, colosseumCurrentWave == 12 || rewardChestSpawned);
 
 					if (awaitingColosseumReset)
 						resetColosseum();
@@ -162,7 +167,7 @@ public class ScreenshotLogger {
 
 		String message = Text.removeTags(event.getMessage());
 
-		if (screenshotBetweenColosseumWaves && !intermissionScreenshotPending)
+		if ((enabledBroadcastScreenshot || screenshotBetweenColosseumWaves) && !intermissionScreenshotPending)
 			updateColosseumFlags(message);
 	}
 
@@ -177,7 +182,7 @@ public class ScreenshotLogger {
 
 	@Subscribe
 	public void onScriptPostFired(ScriptPostFired event) {
-		if (screenshotBetweenColosseumWaves && intermissionScreenshotPending && isPostColosseumWaveUI(event.getScriptId()))
+		if ((enabledBroadcastScreenshot || screenshotBetweenColosseumWaves) && intermissionScreenshotPending && isPostColosseumWaveUI(event.getScriptId()))
 		{
 			takeColosseumScreenshot(event.getScriptId());
 		}
@@ -196,7 +201,8 @@ public class ScreenshotLogger {
 			{
 				try
 				{
-					fileIOService.saveScreenshot(bufferedImage, colosseumRoot, fileName, screenshotFormat);
+					fileIOService.saveScreenshot(bufferedImage, colosseumRoot, fileName, screenshotFormat, true);
+
 					resetColosseum();
 				}
 				catch (Exception e)
@@ -210,13 +216,11 @@ public class ScreenshotLogger {
 	@Subscribe
 	public void onPlayerDied(PlayerDied event)
 	{
-		if (screenshotBetweenColosseumWaves && event.getLogType() == LogType.COLOSSEUM)
+		if ((enabledBroadcastScreenshot || screenshotBetweenColosseumWaves) && event.getLogType() == LogType.COLOSSEUM)
 		{
 			screenshotColosseumDeath();
 		}
 	}
-
-
 
 	/**
 	 * Set the colosseumScreenshotPending variable to true if a new wave has started, in case of specific chat messages
@@ -237,9 +241,6 @@ public class ScreenshotLogger {
 		}
 	}
 
-
-
-
 	/**
 	 * Take a screenshot in case the intermission or rewards chest UI has appeared and subsequently update flags
 	 * @param scriptId The scriptId of the script that populates the UI
@@ -247,7 +248,8 @@ public class ScreenshotLogger {
 	private void takeColosseumScreenshot(int scriptId)
 	{
 		awaitingColosseumReset = scriptId == POPULATE_REWARDS_CHEST_UI_SCRIPT_ID;
-		captureAndSaveScreenshot();
+		if (screenshotBetweenColosseumWaves || enabledBroadcastScreenshot && awaitingColosseumReset)
+			captureAndSaveScreenshot();
 		intermissionScreenshotPending = false;
 		rewardChestSpawned = false;
 	}

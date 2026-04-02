@@ -24,7 +24,6 @@
  */
 package com.datalogger.loggers;
 
-import com.datalogger.DataLoggerConfig;
 import static com.datalogger.constants.Item.InterfaceID.GE_GROUP_ID;
 import static com.datalogger.constants.Item.InterfaceID.GE_HISTORY_CHILD_ID;
 import static com.datalogger.constants.Item.Script.GE_OFFER_COLLECTION_SCRIPT_ID;
@@ -32,6 +31,7 @@ import static com.datalogger.constants.Item.Script.GE_OFFER_SCRIPT_ID;
 import static com.datalogger.constants.Item.Values.MAX_ITEM_TAX;
 import static com.datalogger.constants.Item.Values.MAX_TAXED_PRICE;
 import static com.datalogger.constants.Item.Values.TAX_MULTIPLIER;
+import com.datalogger.events.DataLoggerConfigChanged;
 import com.datalogger.framework.AbstractLogger;
 import com.datalogger.framework.LogType;
 import com.datalogger.models.grandexchange.ActiveGeOffer;
@@ -54,7 +54,6 @@ import net.runelite.api.events.WidgetLoaded;
 import net.runelite.api.widgets.Widget;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.eventbus.Subscribe;
-import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.game.ItemManager;
 
 @Slf4j
@@ -194,10 +193,8 @@ public class GrandExchangeLogger extends AbstractLogger
 	}
 
 	@Subscribe
-	public void onConfigChanged(ConfigChanged event)
+	public void onDataLoggerConfigChanged(DataLoggerConfigChanged event)
 	{
-		if (!event.getGroup().equals(DataLoggerConfig.CONFIG_GROUP)) return;
-
 		if (!loggerIsEnabled && config.logGrandExchange())
 		{
 			setup();
@@ -344,7 +341,7 @@ public class GrandExchangeLogger extends AbstractLogger
 	/**
 	 * Approximate the tax paid using the offer data that is available. Note that this is not a perfect estimate.
 	 */
-	private int approximateTax(boolean isBuy, int quantity, int price)
+	private int approximateTax(boolean isBuy, int price)
 	{
 		if (!isBuy && price >= 49) {
 			if (price >= MAX_TAXED_PRICE) {
@@ -375,22 +372,10 @@ public class GrandExchangeLogger extends AbstractLogger
 		int totalSpent = offer.getSpent();
 		int price = (int) Math.floor((double) totalSpent / quantity);
 		boolean isBuy = isBuy(offer.getState());
-		int estimatedTaxPaid = approximateTax(isBuy, quantity, price);
+		int estimatedTaxPaid = approximateTax(isBuy, price);
 
-		Instant creationInstant = null;
-		if (createdTs != null && !createdTs.isEmpty())
-		{
-			try
-			{
-				creationInstant = Instant.parse(createdTs);
-			}
-			catch (Exception e)
-			{
-				log.debug("Could not parse createdTs: {}", createdTs);
-			}
-		}
 
-		GeLedgerEntry ledgerEntry = GeLedgerEntry.builder()
+		GeLedgerEntry.GeLedgerEntryBuilder builder = GeLedgerEntry.builder()
 			.itemId(offer.getItemId())
 			.itemName(itemManager.getItemComposition(offer.getItemId()).getName())
 			.isBuy(isBuy)
@@ -403,14 +388,25 @@ public class GrandExchangeLogger extends AbstractLogger
 			.geSlot(slot)
 			.isHistoryEntry(false)
 			.isCancelled(isCancelledState(offer.getState()))
-			.offerCreationTime(creationInstant)
-			.exactTimestamp(Instant.now())
+			.exactTimestamp(System.currentTimeMillis())
 			.originalOfferQuantity(offer.getTotalQuantity())
-			.originalOfferPrice(offer.getPrice())
-			.build();
+			.originalOfferPrice(offer.getPrice());
 
-		String hashString = getAccountHashString();
-		List<GeLedgerEntry> internalLedger = fileIOService.loadInternalGeLedger(hashString);
+		Instant creationInstant = null;
+		if (createdTs != null && !createdTs.isEmpty())
+		{
+			try
+			{
+				builder.offerCreationTime(Instant.parse(createdTs).toEpochMilli());
+			}
+			catch (Exception e)
+			{
+				log.debug("Could not parse createdTs: {}", createdTs);
+			}
+		}
+
+		GeLedgerEntry ledgerEntry = builder.build();
+		List<GeLedgerEntry> internalLedger = fileIOService.loadInternalGeLedger(getAccountHashString());
 		internalLedger.add(ledgerEntry);
 		fileIOService.saveInternalGeLedger(internalLedger);
 
@@ -431,10 +427,16 @@ public class GrandExchangeLogger extends AbstractLogger
 			safeItemName = "\"" + safeItemName + "\"";
 		}
 
-		String creationTimeStr = entry.getOfferCreationTime() != null ? entry.getOfferCreationTime().toString() : "";
+		String creationTimeStr = "";
+		if (entry.getOfferCreationTime() > 0) {
+			creationTimeStr = Instant.ofEpochMilli(entry.getOfferCreationTime()).toString();
+		}
 
-		Instant mainTime = entry.getExactTimestamp() != null ? entry.getExactTimestamp() : entry.getParseTime();
-		String timeStr = mainTime != null ? mainTime.toString() : "";
+		long mainTimeMillis = entry.getExactTimestamp() > 0 ? entry.getExactTimestamp() : entry.getParseTime();
+		String timeStr = "";
+		if (mainTimeMillis > 0) {
+			timeStr = Instant.ofEpochMilli(mainTimeMillis).toString();
+		}
 
 		String tradeType = entry.isBuy() ? "BUY" : "SELL";
 

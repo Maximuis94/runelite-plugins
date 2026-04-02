@@ -25,20 +25,20 @@
 
 package com.datalogger.models.colosseum;
 
-import static com.datalogger.constants.Colosseum.Item.DIZANAS_QUIVER_REWARD;
-import static com.datalogger.constants.Colosseum.Item.DIZANAS_QUIVER_SWAPPED_REWARD;
+import static com.datalogger.constants.Colosseum.COLOSSEUM_TRIAL_TIMESTAMP_FORMATTER;
 import static com.datalogger.constants.PluginConstants.COLOSSEUM_ATTEMPT_DIR;
 import com.datalogger.dto.ColosseumAttemptDTO;
+import com.datalogger.models.enums.ColosseumModifier;
 import com.datalogger.models.enums.WaveStatus;
-import com.datalogger.models.itemvault.ItemBundle;
 import com.datalogger.models.supplytracker.TrackedSupplies;
 import com.datalogger.models.supplytracker.ValuedItemStack;
 import java.io.File;
 import java.time.Instant;
 import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -59,6 +59,8 @@ public class ColosseumAttempt
 	@Setter
 	private WaveStatus finalStatus;
 
+	private final Map<Integer, ColosseumModifier> activeModifiers = new LinkedHashMap<>();
+
 	private int consumedSupplyValue;
 
 	private TrackedSupplies consumedSupplies;
@@ -69,6 +71,7 @@ public class ColosseumAttempt
 
 	private Map<String, ValuedItemStack> namedRewards = null;
 
+	@Setter
 	private double totalTimeTaken;
 
 	private final List<ColosseumWave> waves;
@@ -86,14 +89,15 @@ public class ColosseumAttempt
 
 	public ColosseumAttempt(int startTick, String accountName)
 	{
-		id = System.currentTimeMillis();
+		long now = System.currentTimeMillis();
+		id = now - (now % 1000L);
 		this.startTick = startTick;
 		startTime = Instant.ofEpochMilli(id)
 			.atZone(ZoneId.systemDefault())
-			.format(DateTimeFormatter.ofPattern("yyMMdd_HHmmss"));
+			.format(COLOSSEUM_TRIAL_TIMESTAMP_FORMATTER);
 		waves = new ArrayList<>();
 		finalStatus = WaveStatus.FAILED;
-		account = accountName;
+		account = accountName == null ? "N/A" : accountName;
 		totalTimeTaken = .0;
 
 		attemptId = String.format("%s_%s", account, startTime);
@@ -123,40 +127,30 @@ public class ColosseumAttempt
 	}
 
 	/**
-	 * Add the given wave to the list of waves, provided it has not been submitted yet.
-	 * Additionally, add its loot to the Attempt rewards stack.
+	 * Convert the active modifiers to an ordered List of Strings
 	 */
-	public void submitWave(ColosseumWave wave, boolean swapQuiver)
+	private List<String> getActiveModifiersDTO()
 	{
-		if (waves.isEmpty() || waves.get(waves.size() - 1).getWave() != wave.getWave())
-		{
-			waves.add(wave);
-			totalTimeTaken = wave.getTotalTimeTaken();
+		Collection<ColosseumModifier> modifiers = activeModifiers.values();
 
-			if (wave.getStatus() == WaveStatus.COMPLETED)
-			{
-				ItemBundle bundle = wave.getEarnedLoot();
-				rewards.merge(bundle.getItemId(), bundle.getQuantity(), Integer::sum);
-
-				if (wave.getWave() == 12)
-				{
-					ItemBundle guaranteedReward = swapQuiver ? DIZANAS_QUIVER_SWAPPED_REWARD : DIZANAS_QUIVER_REWARD;
-					rewards.merge(guaranteedReward.getItemId(), guaranteedReward.getQuantity(), Integer::sum);
-				}
-			}
-		}
+		return modifiers.stream()
+			.map(ColosseumModifier::name)
+			.collect(Collectors.toList());
 	}
 
 	public ColosseumAttemptDTO toDTO() {
 		return ColosseumAttemptDTO.builder()
-			.attemptId(id)
+			.attemptId(attemptId)
 			.timestamp(id)
+			.account(account)
 			.result(finalStatus != null ? finalStatus.name() : "UNKNOWN")
 			.rewardsValue(totalRewardsValue)
 			.rewards(namedRewards)
 			.consumedSupplyValue(consumedSupplyValue)
 			.consumedSupplies(consumedSupplies != null ? consumedSupplies.toDto(null) : null)
 			.totalGlory(waves.isEmpty() ? 0 : waves.get(waves.size() - 1).getTotalGlory())
+			.totalTime(totalTimeTaken)
+			.activeModifiers(getActiveModifiersDTO())
 			.waves(waves.stream()
 				.map(ColosseumWave::toDTO)
 				.collect(Collectors.toList()))

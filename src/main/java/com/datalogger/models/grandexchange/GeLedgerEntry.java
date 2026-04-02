@@ -27,7 +27,6 @@ package com.datalogger.models.grandexchange;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
-import java.time.Instant;
 import lombok.NoArgsConstructor;
 
 /**
@@ -55,9 +54,9 @@ public class GeLedgerEntry {
 	private boolean isHistoryEntry;
 	private boolean isCancelled;
 
-	private Instant offerCreationTime;
-	private Instant exactTimestamp;
-	private Instant parseTime;
+	private long offerCreationTime;
+	private long exactTimestamp;
+	private long parseTime;
 
 	private int originalOfferQuantity;
 	private int originalOfferPrice;

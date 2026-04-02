@@ -24,17 +24,19 @@
  */
 package com.datalogger;
 
+import static com.datalogger.constants.PluginConstants.CONFIG_GROUP;
+import com.datalogger.models.enums.ColosseumWebhookFormatter;
 import com.datalogger.models.enums.ScreenshotFormat;
 import com.datalogger.models.enums.TimestampFormat;
 import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
 import net.runelite.client.config.ConfigSection;
+import net.runelite.client.config.Range;
 
 
-@ConfigGroup(DataLoggerConfig.CONFIG_GROUP)
+@ConfigGroup(CONFIG_GROUP)
 public interface DataLoggerConfig extends Config {
-	String CONFIG_GROUP = "datalogger";
 
 	// --- Sections ---
 
@@ -77,6 +79,30 @@ public interface DataLoggerConfig extends Config {
 		closedByDefault = true
 	)
 	String SCREENSHOT_SECTION = "screenshot";
+
+	@ConfigSection(
+		name = "Discord",
+		description = "Configurations related to Discord",
+		position = 5,
+		closedByDefault = true
+	)
+	String DISCORD_SECTION = "discord";
+
+	@ConfigSection(
+		name = "Discord pre-defined template",
+		description = "Configurations related to customizing pre-defined Discord template configurations",
+		position = 6,
+		closedByDefault = true
+	)
+	String PREDEFINED_TEMPLATE_DISCORD_SECTION = "predefinedTemplateDiscordSection";
+
+	@ConfigSection(
+		name = "Discord custom template",
+		description = "Configurations related to customizable Discord template configurations",
+		position = 7,
+		closedByDefault = true
+	)
+	String CUSTOM_TEMPLATE_DISCORD_SECTION = "customTemplateDiscordSection";
 
 	// --- Grand Exchange Items ---
 
@@ -298,5 +324,187 @@ public interface DataLoggerConfig extends Config {
 	)
 	default ScreenshotFormat screenshotFormat() {
 		return ScreenshotFormat.PNG;
+	}
+
+	// --- Discord ---
+
+
+	@ConfigItem(
+		keyName = "enableDiscordBroadcasting",
+		name = "Enable Discord broadcasting",
+		description = "Uncheck to manually disable Discord broadcasting without altering other configurations.",
+		position = 0,
+		section = DISCORD_SECTION
+	)
+	default boolean enableWebhookBroadcasting() { return true; }
+
+	@ConfigItem(
+		keyName = "colosseumWebhookFormat",
+		name = "Webhook Format",
+		description = "Select the format to apply for broadcasting Colosseum trials",
+		position = 1,
+		section = DISCORD_SECTION
+	)
+	default ColosseumWebhookFormatter colosseumWebhookFormat()
+	{
+		return ColosseumWebhookFormatter.DETAILED;
+	}
+
+	@ConfigItem(
+		keyName = "colosseumDiscordWebhookUrl",
+		name = "Colosseum webhook URL",
+		description = "The Discord Webhook URL used to broadcast completed Colosseum runs.",
+		position = 2,
+		section = DISCORD_SECTION
+	)
+	default String colosseumDiscordWebhookUrl()
+	{
+		return "";
+	}
+
+	@ConfigItem(
+		keyName = "broadcastCompletedTrials",
+		name = "Broadcast completed trials",
+		description = "Broadcast a completed trial after opening the chest rewards UI.",
+		position = 3,
+		section = DISCORD_SECTION
+	)
+	default boolean broadcastCompletedTrials() { return true; }
+
+	@ConfigItem(
+		keyName = "broadcastCancelledTrials",
+		name = "Broadcast cancelled trials",
+		description = "Broadcast a cancelled trial after opening the chest rewards UI",
+		position = 4,
+		section = DISCORD_SECTION
+	)
+	default boolean broadcastCancelledTrials() { return true; }
+
+	@ConfigItem(
+		keyName = "broadcastFailedTrials",
+		name = "Broadcast failed trials",
+		description = "Broadcast a failed trial after taking lethal damage",
+		position = 5,
+		section = DISCORD_SECTION
+	)
+	default boolean broadcastFailedTrials() { return true; }
+
+	@ConfigItem(
+		keyName = "broadcastScreenshot",
+		name = "Add screenshot",
+		description = "Attach a screenshot to the broadcast",
+		position = 6,
+		section = DISCORD_SECTION
+	)
+	default boolean broadcastScreenshot() { return false; }
+
+	@Range(min = 0)
+	@ConfigItem(
+		keyName = "broadcastRewardThreshold",
+		name = "Min. reward (k)",
+		description = "Reward value threshold (* 1000 gp) for broadcasting a finished trial",
+		position = 7,
+		section = DISCORD_SECTION
+	)
+	default int broadcastRewardThreshold()
+	{
+		return 0;
+	}
+
+	@Range(min=1, max=12)
+	@ConfigItem(
+		keyName = "broadcastWaveThreshold",
+		name = "Min. wave (1-12)",
+		description = "Only broadcast finished trials if they reached at least this wave",
+		position = 8,
+		section = DISCORD_SECTION
+	)
+	default int broadcastWaveThreshold() {
+		return 10;
+	}
+
+	@ConfigItem(
+		keyName = "broadcastStatus",
+		name = "Include status",
+		description = "Include status in pre-defined templates",
+		position = 0,
+		section = PREDEFINED_TEMPLATE_DISCORD_SECTION
+	)
+	default boolean includeStatus() { return true; }
+
+	@ConfigItem(
+		keyName = "broadcastTime",
+		name = "Include completion time",
+		description = "Include completion time in pre-defined templates",
+		position = 1,
+		section = PREDEFINED_TEMPLATE_DISCORD_SECTION
+	)
+	default boolean includeTime() { return true; }
+
+	@ConfigItem(
+		keyName = "broadcastReward",
+		name = "Include reward",
+		description = "Include the item reward in pre-defined templates",
+		position = 2,
+		section = PREDEFINED_TEMPLATE_DISCORD_SECTION
+	)
+	default boolean includeReward() { return true; }
+
+	@ConfigItem(
+		keyName = "broadcastModifiers",
+		name = "Include modifiers",
+		description = "Include active/chosen modifiers in pre-defined templates",
+		position = 3,
+		section = PREDEFINED_TEMPLATE_DISCORD_SECTION
+	)
+	default boolean includeModifiers() { return true; }
+
+	@ConfigItem(
+		keyName = "broadcastGlory",
+		name = "Include glory",
+		description = "Include earned glory in pre-defined templates",
+		position = 4,
+		section = PREDEFINED_TEMPLATE_DISCORD_SECTION
+	)
+	default boolean includeGlory() { return true; }
+
+	@ConfigItem(
+		keyName = "broadcastRewardValue",
+		name = "Include reward value",
+		description = "Include the total reward value (gp) in pre-defined templates",
+		position = 5,
+		section = PREDEFINED_TEMPLATE_DISCORD_SECTION
+	)
+	default boolean includeRewardValue() { return true; }
+
+	@ConfigItem(
+		keyName = "broadcastSupplyValue",
+		name = "Include supply value",
+		description = "Include the consumed supplies value (gp) in pre-defined templates",
+		position = 6,
+		section = PREDEFINED_TEMPLATE_DISCORD_SECTION
+	)
+	default boolean includeSupplyValue() { return true; }
+
+	@ConfigItem(
+		keyName = "colosseumCustomTemplate",
+		name = "Customizable template",
+		description = "Define a custom template to broadcast",
+		position = 0,
+		section = CUSTOM_TEMPLATE_DISCORD_SECTION
+	)
+	default String colosseumCustomTemplate()
+	{
+		return "# --- INSTRUCTIONS --- \n" +
+			"# Edit this text to format your Discord webhook.\n" +
+			"# Global: <PLAYER>, <RESULT>, <TOTAL_GLORY>, <TIME>\n" +
+			"# Wave-specific: <1:MOD>, <12:TIME>, <6:STATUS>\n" +
+			"# Use 'Test with uploaded log' button in side panel to preview template!\n" +
+			"# See Custom Template Keywords section at https://runelite.net/plugin-hub/show/data-logger for a complete list of keywords\n" +
+			"# --------------------\n" +
+			"**<PLAYER>** just finished a Colosseum run!\n" +
+			"**Result:** <RESULT>\n" +
+			"**Time:** <TIME>\n" +
+			"**Final Modifier:** <12:MOD>\n\n\n\n\n";
 	}
 }

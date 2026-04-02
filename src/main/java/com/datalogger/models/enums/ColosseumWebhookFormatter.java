@@ -25,43 +25,10 @@
 
 package com.datalogger.models.enums;
 
-import com.google.common.collect.ImmutableMap;
-import lombok.Getter;
-
-@Getter
-public enum WaveStatus
+/**
+ * Colosseum webhook format choices
+ */
+public enum ColosseumWebhookFormatter
 {
-	COMPLETED("✔"),
-	FAILED("❌"),
-	CLAIMED("🌮"),
-	CANCELLED("🌮"),
-	CONFIG_DISABLED("🛠️"),
-	LOGGED_OUT("🔌");
-
-	private final String emoji;
-
-	WaveStatus(String emoji)
-	{
-		this.emoji = emoji;
-	}
-
-	private static final ImmutableMap<String, WaveStatus> LOOKUP;
-	static
-	{
-		ImmutableMap.Builder<String, WaveStatus> builder = ImmutableMap.builder();
-		for (WaveStatus status : values())
-		{
-			builder.put(status.name().toUpperCase(), status);
-		}
-		LOOKUP = builder.build();
-	}
-
-	public static WaveStatus fromString(String statusStr)
-	{
-		if (statusStr == null || statusStr.trim().isEmpty())
-		{
-			return null;
-		}
-		return LOOKUP.get(statusStr.trim().toUpperCase());
-	}
+	DETAILED, CONCISE, CUSTOM
 }

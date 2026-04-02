@@ -23,45 +23,21 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.datalogger.models.enums;
+package com.datalogger.events;
 
-import com.google.common.collect.ImmutableMap;
+import lombok.AllArgsConstructor;
 import lombok.Getter;
+import net.runelite.client.events.ConfigChanged;
 
+/**
+ * Event that acts as gatekeeper for onConfigChanged events to ensure only data logger config changes are broadcast.
+ */
 @Getter
-public enum WaveStatus
+@AllArgsConstructor
+public class DataLoggerConfigChanged
 {
-	COMPLETED("✔"),
-	FAILED("❌"),
-	CLAIMED("🌮"),
-	CANCELLED("🌮"),
-	CONFIG_DISABLED("🛠️"),
-	LOGGED_OUT("🔌");
-
-	private final String emoji;
-
-	WaveStatus(String emoji)
-	{
-		this.emoji = emoji;
-	}
-
-	private static final ImmutableMap<String, WaveStatus> LOOKUP;
-	static
-	{
-		ImmutableMap.Builder<String, WaveStatus> builder = ImmutableMap.builder();
-		for (WaveStatus status : values())
-		{
-			builder.put(status.name().toUpperCase(), status);
-		}
-		LOOKUP = builder.build();
-	}
-
-	public static WaveStatus fromString(String statusStr)
-	{
-		if (statusStr == null || statusStr.trim().isEmpty())
-		{
-			return null;
-		}
-		return LOOKUP.get(statusStr.trim().toUpperCase());
-	}
+	private final String key;
+	private final String oldValue;
+	private final String newValue;
+	private final ConfigChanged originalEvent;
 }

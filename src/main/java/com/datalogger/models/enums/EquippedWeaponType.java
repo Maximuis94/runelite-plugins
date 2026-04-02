@@ -131,12 +131,9 @@ public enum EquippedWeaponType
        new Stance(WeaponStyle.MELEE_DEFENSIVE, AttackType.MELEE_CRUSH),   // Index 2: Focus
 
 	// Index 3: "Spell" (Standard Autocast)
-	// Note: We use the base AttackType.MAGIC here because the staff itself
-	// doesn't know if you are casting Fire Surge or Water Strike!
        new Stance(WeaponStyle.MAGIC_AUTOCAST, MAGIC_TYPELESS),
 
 	// Index 4: Defensive Autocast
-	// In modern OSRS, defensive autocast often sits at index 4 for standard staves
        new Stance(WeaponStyle.MAGIC_DEFENSIVE_AUTOCAST, MAGIC_TYPELESS)
     ),
 
@@ -199,7 +196,6 @@ public enum EquippedWeaponType
 		return null;
 	}
 
-	// --- Tiny helper class to hold both pieces of data ---
 	@Value
 	public static class Stance
 	{
