@@ -23,24 +23,20 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.datalogger.models.colosseum;
+package com.datalogger.events;
 
-import lombok.Builder;
+import com.datalogger.models.enums.CombatType;
 import lombok.Value;
+import net.runelite.api.Actor;
+import net.runelite.api.Hitsplat;
 
-/**
- * A ColosseumNPC as seen in a ColosseumState
- * orbSequence only applies to Manticores; it is either Unknown or a triplet of attack styles, from bottom to top.
- */
 @Value
-@Builder
-public class ColosseumNPC {
-	int npcIndex;
-	int npcId;
-	String name;
-	int x;
-	int y;
-	int hp;
-	int maxHp;
-	String orbSequence;
+public class OutgoingHitApplied
+{
+	Actor target;
+	Hitsplat hitsplat;
+	int damage;
+	int weaponBaseId;
+	CombatType combatType;
+	int tickCount;
 }

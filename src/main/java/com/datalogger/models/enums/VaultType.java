@@ -39,7 +39,8 @@ import net.runelite.api.events.WidgetLoaded;
 public enum VaultType {
 	BANK(BANK_GROUP_ID, BANK_CHILD_ID),
 	SEED_VAULT(SEED_VAULT_GROUP_ID, SEED_VAULT_CHILD_ID),
-	GRAND_EXCHANGE(-1, -1);
+	GRAND_EXCHANGE(-1, -1),
+	VYRE_WELL(-1, -1);
 
 	private final int groupId;
 	private final int childId;

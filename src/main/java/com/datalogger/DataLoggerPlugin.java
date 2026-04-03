@@ -26,6 +26,7 @@ package com.datalogger;
 
 import static com.datalogger.constants.PluginConstants.CONFIG_GROUP;
 import com.datalogger.events.DataLoggerConfigChanged;
+import com.datalogger.services.CombatTracker;
 import com.datalogger.webhook.ColosseumDiscordBroadcaster;
 import com.datalogger.events.AccountSessionStarted;
 import com.datalogger.loggers.ColosseumAttemptLogger;
@@ -97,6 +98,7 @@ public class DataLoggerPlugin extends Plugin
 	@Inject private EquipmentTracker equipmentTracker;
 	@Inject private SupplyTracker supplyTracker;
 	@Inject private DiscordWebhookService discordWebhookService;
+	@Inject private CombatTracker combatTracker;
 
 	private NavigationButton navButton;
 	private boolean sessionInitialized = false;
@@ -127,6 +129,7 @@ public class DataLoggerPlugin extends Plugin
 		eventBus.register(equipmentTracker);
 		eventBus.register(supplyTracker);
 		eventBus.register(discordWebhookService);
+		eventBus.register(combatTracker);
 
 		itemVaultLogger.updateIgnoredAccountHashes();
 
@@ -167,6 +170,7 @@ public class DataLoggerPlugin extends Plugin
 		eventBus.unregister(equipmentTracker);
 		eventBus.unregister(supplyTracker);
 		eventBus.unregister(discordWebhookService);
+		eventBus.unregister(combatTracker);
 
 		toggleItemVault(false);
 		toggleGrandExchange(false);

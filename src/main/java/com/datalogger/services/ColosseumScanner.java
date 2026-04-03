@@ -362,6 +362,7 @@ public class ColosseumScanner
 	 */
 	private ColosseumNPC generateNpc(NPC npc, NPCComposition npcComposition)
 	{
+		int npcIndex = npc.getIndex();
 		int id = (npcComposition != null) ? npcComposition.getId() : npc.getId();
 
 		final String name;
@@ -391,6 +392,7 @@ public class ColosseumScanner
 		npc.getHealthScale();
 
 		ColosseumNPC.ColosseumNPCBuilder builder = ColosseumNPC.builder()
+			.npcIndex(npcIndex)
 			.npcId(id)
 			.name(Text.removeTags(name))
 			.x(location.getRegionX())
@@ -398,7 +400,6 @@ public class ColosseumScanner
 			.hp(currentHp)
 			.maxHp(maxHp);
 		if (id == MANTICORE_NPC_ID) {
-			int npcIndex = npc.getIndex();
 			String sequence = manticoreSequences.containsKey(npcIndex)
 				? manticoreSequenceStrings.get(npcIndex)
 				: "Unknown";

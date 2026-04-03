@@ -26,16 +26,18 @@ package com.datalogger.services;
 
 import com.datalogger.events.AccountSessionStarted;
 import com.datalogger.loggers.ItemVaultLogger;
-import com.datalogger.models.itemvault.BankedItem;
 import com.datalogger.models.enums.VaultType;
+import com.datalogger.models.itemvault.BankedItem;
 import java.util.ArrayList;
 import java.util.List;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
+import net.runelite.api.events.VarbitChanged;
 import net.runelite.api.events.WidgetClosed;
 import net.runelite.api.events.WidgetLoaded;
+import static net.runelite.api.gameval.VarbitID.TOB_LOBBY_WELL_CONTENTS;
 import net.runelite.api.widgets.Widget;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.util.Text;
@@ -141,5 +143,15 @@ public class ItemVaultParser
 	@Subscribe
 	public void onWidgetClosed(WidgetClosed event) {
 		processWidget(event.getGroupId());
+	}
+
+	@Subscribe
+	public void onVarbitChanged(VarbitChanged event)
+	{
+		int varbitId = event.getVarbitId();
+		switch (varbitId)
+		{
+			case TOB_LOBBY_WELL_CONTENTS:
+		}
 	}
 }

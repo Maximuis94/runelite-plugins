@@ -23,24 +23,48 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.datalogger.models.colosseum;
+package com.datalogger.models.combat;
 
-import lombok.Builder;
-import lombok.Value;
+import lombok.Data;
+import java.util.ArrayList;
+import java.util.List;
 
-/**
- * A ColosseumNPC as seen in a ColosseumState
- * orbSequence only applies to Manticores; it is either Unknown or a triplet of attack styles, from bottom to top.
- */
-@Value
-@Builder
-public class ColosseumNPC {
-	int npcIndex;
-	int npcId;
-	String name;
-	int x;
-	int y;
-	int hp;
-	int maxHp;
-	String orbSequence;
+@Data
+public class TargetNpc
+{
+	private final int npcIndex;
+	private final int npcId;
+	private final String npcName;
+
+	private final List<PlayerAttack> attacks = new ArrayList<>();
+
+	public TargetNpc(int npcIndex, int npcId, String npcName)
+	{
+		this.npcIndex = npcIndex;
+		this.npcId = npcId;
+		this.npcName = npcName;
+	}
+
+	/**
+	 * Add an incoming PlayerAttack
+	 */
+	public void addPlayerAttack(PlayerAttack record) {
+		this.attacks.add(record);
+	}
+
+	public int getTotalDamage() {
+		return attacks.stream().mapToInt(PlayerAttack::getDamage).sum();
+	}
+
+	public int getSuccessfulHits() {
+		return (int) attacks.stream().filter(hit -> !hit.isMiss()).count();
+	}
+
+	public int getMissedHits() {
+		return (int) attacks.stream().filter(PlayerAttack::isMiss).count();
+	}
+
+	public int getMaxHit() {
+		return attacks.stream().mapToInt(PlayerAttack::getDamage).max().orElse(0);
+	}
 }

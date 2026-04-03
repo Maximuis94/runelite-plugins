@@ -23,24 +23,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.datalogger.models.colosseum;
+package com.datalogger.services;
 
-import lombok.Builder;
-import lombok.Value;
-
-/**
- * A ColosseumNPC as seen in a ColosseumState
- * orbSequence only applies to Manticores; it is either Unknown or a triplet of attack styles, from bottom to top.
- */
-@Value
-@Builder
-public class ColosseumNPC {
-	int npcIndex;
-	int npcId;
-	String name;
-	int x;
-	int y;
-	int hp;
-	int maxHp;
-	String orbSequence;
+public class OutgoingAttackTracker
+{
 }
