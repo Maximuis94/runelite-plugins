@@ -35,3 +35,10 @@ java {
 tasks.withType(JavaCompile) {
     options.encoding = 'UTF-8'
 }
+
+tasks.register('run', JavaExec) {
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.datalogger.DataLoggerPluginTest'
+    jvmArgs "-ea"
+    args "--developer-mode", "--debug"
+}
