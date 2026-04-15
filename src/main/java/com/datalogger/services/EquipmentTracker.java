@@ -159,7 +159,9 @@ public class EquipmentTracker
 		else attackSpeed = DEFAULT_ATTACK_SPEED;
 		canConsumeBloodFuryCharges = currentCombatType == CombatType.MELEE && hasBloodFury;
 
-		log.info("Updated combat parameters. weapon={} attackStyleIndex={} currentCombatType={} soundId={} equippedWeaponType={} attackSpeed={}", currentWeaponId, attackStyleIndex, currentCombatType.name(), attackStyleSoundId, equippedWeaponType, attackSpeed);
+		EquippedWeaponType weaponEnum = EquippedWeaponType.getByVarbitValue(equippedWeaponType);
+		String name = weaponEnum == null ? "Unknown" : weaponEnum.name();
+		log.info("Updated combat parameters. enum={} weapon={} baseId={} attackStyleIndex={} currentCombatType={} soundId={} equippedWeaponType={} attackSpeed={}", name, currentWeaponId, baseWeaponId, attackStyleIndex, currentCombatType.name(), attackStyleSoundId, equippedWeaponType, attackSpeed);
 	}
 
 	private void syncEquipment()

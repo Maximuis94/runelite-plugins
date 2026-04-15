@@ -23,38 +23,24 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.datalogger.models.itemvault;
+package com.datalogger.services.itemvault.container;
 
 import com.datalogger.models.enums.VaultType;
-import lombok.Value;
+import javax.inject.Singleton;
+import net.runelite.api.gameval.InventoryID;
 
-@Value
-public class BankedItem
+@Singleton
+public class SeedVaultParser extends AbstractContainerVaultParser
 {
-	long accountHash;
-	String accountName;
-	String vaultType;
-	int itemId;
-	String itemName;
-	long quantity;
-
-	public BankedItem(VaultType vaultType, long accountHash, String accountName, int itemId, String itemName, long quantity)
+	@Override
+	public VaultType getVaultType()
 	{
-		this.vaultType = vaultType.name();
-		this.accountHash = accountHash;
-		this.accountName = accountName;
-		this.itemId = itemId;
-		this.itemName = itemName;
-		this.quantity = quantity;
+		return VaultType.SEED_VAULT;
 	}
 
-	public BankedItem(String vaultType, long accountHash, String accountName, int itemId, String itemName, long quantity)
+	@Override
+	protected int getContainerId()
 	{
-		this.vaultType = vaultType;
-		this.accountHash = accountHash;
-		this.accountName = accountName;
-		this.itemId = itemId;
-		this.itemName = itemName;
-		this.quantity = quantity;
+		return InventoryID.SEED_VAULT;
 	}
 }

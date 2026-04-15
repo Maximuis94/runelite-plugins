@@ -75,6 +75,8 @@ public final class Item
 		RUNE_POUCH_QUANTITY_1, RUNE_POUCH_QUANTITY_2, RUNE_POUCH_QUANTITY_3, RUNE_POUCH_QUANTITY_4
 	};
 
+	public static int RUNE_POUCH_SLOTS = RUNE_POUCH_TYPE_VARBITS.length;
+
 	public static final int INVENTORY_CONTAINER_ID = 93;
 	public static final int EQUIPMENT_CONTAINER_ID = 94;
 }

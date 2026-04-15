@@ -27,6 +27,7 @@ package com.datalogger;
 import static com.datalogger.constants.PluginConstants.CONFIG_GROUP;
 import com.datalogger.events.DataLoggerConfigChanged;
 import com.datalogger.services.CombatTracker;
+import com.datalogger.services.itemvault.VaultManager;
 import com.datalogger.webhook.ColosseumDiscordBroadcaster;
 import com.datalogger.events.AccountSessionStarted;
 import com.datalogger.loggers.ColosseumAttemptLogger;
@@ -87,6 +88,7 @@ public class DataLoggerPlugin extends Plugin
 	@Inject private DataLoggerPanel panel;
 	@Inject private ItemVaultLogger itemVaultLogger;
 
+	@Inject private VaultManager vaultManager;
 	@Inject private ItemVaultParser itemVaultParser;
 	@Inject private GrandExchangeLogger geLogger;
 	@Inject private GrandExchangeHistoryParser grandExchangeHistoryParser;
@@ -208,14 +210,29 @@ public class DataLoggerPlugin extends Plugin
 		}
 	}
 
+//	private void toggleItemVault(boolean enable)
+//	{
+//		if (enable && !isItemVaultRegistered) {
+//			eventBus.register(itemVaultParser);
+//			isItemVaultRegistered = true;
+//			log.debug("Item Vault tracking enabled.");
+//		} else if (!enable && isItemVaultRegistered) {
+//			eventBus.unregister(itemVaultParser);
+//			isItemVaultRegistered = false;
+//			log.debug("Item Vault tracking disabled.");
+//		}
+//	}
+
 	private void toggleItemVault(boolean enable)
 	{
 		if (enable && !isItemVaultRegistered) {
-			eventBus.register(itemVaultParser);
+			// THE UPGRADE: The Manager handles all parser registrations and mid-session syncs!
+			vaultManager.startUp();
 			isItemVaultRegistered = true;
 			log.debug("Item Vault tracking enabled.");
 		} else if (!enable && isItemVaultRegistered) {
-			eventBus.unregister(itemVaultParser);
+			// THE UPGRADE: The Manager unregisters all its parsers cleanly!
+			vaultManager.shutDown();
 			isItemVaultRegistered = false;
 			log.debug("Item Vault tracking disabled.");
 		}

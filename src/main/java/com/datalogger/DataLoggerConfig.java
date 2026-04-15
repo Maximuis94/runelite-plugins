@@ -353,7 +353,7 @@ public interface DataLoggerConfig extends Config {
 	@ConfigItem(
 		keyName = "colosseumDiscordWebhookUrl",
 		name = "Colosseum webhook URL",
-		description = "The Discord Webhook URL used to broadcast completed Colosseum runs.",
+		description = "The Discord Webhook URL used to broadcast completed Colosseum runs. Separate multiple URLs with a ','.",
 		position = 2,
 		section = DISCORD_SECTION
 	)

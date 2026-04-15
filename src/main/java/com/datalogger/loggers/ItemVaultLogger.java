@@ -231,7 +231,6 @@ public class ItemVaultLogger extends AbstractLogger
 				}
 			}
 
-			// 3. Trigger GE Vault loads
 			for (long accountHash : vaultCache.keySet()) {
 				loadGeVaultIntoMemory(accountHash);
 			}
@@ -263,7 +262,7 @@ public class ItemVaultLogger extends AbstractLogger
 					return map;
 				}).collect(java.util.stream.Collectors.toList());
 
-			File internalJson = vaultType.getInternalFile(accountHash);
+			File internalJson = fileIOService.getInternalVaultFile(vaultType);
 			fileIOService.saveJson(internalJson, slimItems);
 
 			if (config.logItemVaultJSON())

@@ -25,36 +25,42 @@
 
 package com.datalogger.models.itemvault;
 
-import com.datalogger.models.enums.VaultType;
 import lombok.Value;
+import net.runelite.api.ItemComposition;
 
+/**
+ * Represents a quantity of a specific item
+ */
 @Value
-public class BankedItem
+public class ValuedItemBundle
 {
-	long accountHash;
-	String accountName;
-	String vaultType;
 	int itemId;
 	String itemName;
 	long quantity;
+	long value;
 
-	public BankedItem(VaultType vaultType, long accountHash, String accountName, int itemId, String itemName, long quantity)
-	{
-		this.vaultType = vaultType.name();
-		this.accountHash = accountHash;
-		this.accountName = accountName;
+	public ValuedItemBundle(int itemId, String itemName, int quantity, int price) {
 		this.itemId = itemId;
 		this.itemName = itemName;
 		this.quantity = quantity;
+		this.value = (long) price * quantity;
 	}
 
-	public BankedItem(String vaultType, long accountHash, String accountName, int itemId, String itemName, long quantity)
-	{
-		this.vaultType = vaultType;
-		this.accountHash = accountHash;
-		this.accountName = accountName;
+	public ValuedItemBundle(int itemId, String itemName, long quantity, int price) {
 		this.itemId = itemId;
 		this.itemName = itemName;
 		this.quantity = quantity;
+		this.value = (long) price * quantity;
+	}
+
+	/**
+	 * Constructs a new ItemBundle using the game's item composition blueprint.
+	 *
+	 * @param itemComp The ItemComposition fetched from the ItemManager.
+	 * @param quantity The amount of this item.
+	 */
+	public static ValuedItemBundle fromComp(ItemComposition itemComp, int quantity, int price)
+	{
+		return new ValuedItemBundle(itemComp.getId(), itemComp.getName(), quantity, price);
 	}
 }

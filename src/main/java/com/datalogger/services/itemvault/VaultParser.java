@@ -23,38 +23,42 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.datalogger.models.itemvault;
+package com.datalogger.services.itemvault;
 
 import com.datalogger.models.enums.VaultType;
-import lombok.Value;
+import com.datalogger.models.itemvault.BankedItem;
+import java.io.File;
+import java.util.List;
 
-@Value
-public class BankedItem
+/**
+ * Overarching VaultParser interface. Each VaultParser has its own VaultType, as well as a parseVault method that
+ * returns the current amount of refundable items, derived from the tracked amount of charges related to the subclass.
+ */
+public interface VaultParser
 {
-	long accountHash;
-	String accountName;
-	String vaultType;
-	int itemId;
-	String itemName;
-	long quantity;
+	/**
+	 * Identifies which vault this parser handles.
+	 */
+	VaultType getVaultType();
 
-	public BankedItem(VaultType vaultType, long accountHash, String accountName, int itemId, String itemName, long quantity)
-	{
-		this.vaultType = vaultType.name();
-		this.accountHash = accountHash;
-		this.accountName = accountName;
-		this.itemId = itemId;
-		this.itemName = itemName;
-		this.quantity = quantity;
-	}
+	/**
+	 * Convert the internally tracked amount of charges to one or more BankedItems. That is, one or more quantities of
+	 * items that the amount of charges represents.
+	 */
+	List<BankedItem> parseVault();
 
-	public BankedItem(String vaultType, long accountHash, String accountName, int itemId, String itemName, long quantity)
-	{
-		this.vaultType = vaultType;
-		this.accountHash = accountHash;
-		this.accountName = accountName;
-		this.itemId = itemId;
-		this.itemName = itemName;
-		this.quantity = quantity;
-	}
+	/**
+	 * Label used in merged files to distinguish item origins
+	 */
+	String getVaultLabel();
+
+	/**
+	 * Returns the prefix used in the internal output file name.
+	 */
+	String getFilePrefix();
+
+	/**
+	 * Parse the cache file produced by the VaultParser and converts its contents to a List of BankedItem instances.
+	 */
+	List<BankedItem> parseOfflineFile(long accountHash, File vaultFile);
 }

@@ -23,38 +23,63 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.datalogger.models.itemvault;
+package com.datalogger.services.itemvault.itemcharge;
 
-import com.datalogger.models.enums.VaultType;
-import lombok.Value;
+import com.datalogger.models.enums.ItemCharge;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import javax.inject.Singleton;
+import lombok.NonNull;
+import lombok.extern.slf4j.Slf4j;
+import net.runelite.api.EquipmentInventorySlot;
+import net.runelite.api.gameval.ItemID;
 
-@Value
-public class BankedItem
+@Slf4j
+@Singleton
+public class TumekensShadowParser extends AbstractItemChargeParser
 {
-	long accountHash;
-	String accountName;
-	String vaultType;
-	int itemId;
-	String itemName;
-	long quantity;
+	private static final Pattern CHARGE_PATTERN = Pattern.compile("^Tumeken's shadow has ([\\d,]+) c");
 
-	public BankedItem(VaultType vaultType, long accountHash, String accountName, int itemId, String itemName, long quantity)
+	//	private static final String FULLY_CHARGED_MESSAGE = "Your weapon is fully charged.";
+	private static final int MAX_CHARGES = 2500;
+
+	@Override
+	protected EquipmentInventorySlot getEquipmentSlot()
 	{
-		this.vaultType = vaultType.name();
-		this.accountHash = accountHash;
-		this.accountName = accountName;
-		this.itemId = itemId;
-		this.itemName = itemName;
-		this.quantity = quantity;
+		return EquipmentInventorySlot.WEAPON;
 	}
 
-	public BankedItem(String vaultType, long accountHash, String accountName, int itemId, String itemName, long quantity)
+	@Override
+	protected int getBaseItemId()
 	{
-		this.vaultType = vaultType;
-		this.accountHash = accountHash;
-		this.accountName = accountName;
-		this.itemId = itemId;
-		this.itemName = itemName;
-		this.quantity = quantity;
+		return ItemID.TUMEKENS_SHADOW;
 	}
+
+	@Override
+	protected Integer parseChargeCount(String message)
+	{
+		Matcher matcher = CHARGE_PATTERN.matcher(message);
+		if (matcher.find())
+		{
+			String cleanNumber = matcher.group(1).replace(",", "");
+			try
+			{
+				return Integer.parseInt(cleanNumber);
+			}
+			catch (NumberFormatException e)
+			{
+				log.warn("Failed to parse Tumeken's shadow charges from string: {}", cleanNumber);
+				return null;
+			}
+		}
+		return null;
+	}
+
+	@Override
+	protected @NonNull ItemCharge getItemChargeType()
+	{
+		return ItemCharge.TUMEKENS_SHADOW;
+	}
+
+
 }
