@@ -54,13 +54,22 @@ public final class PluginConstants {
 		private BankUI() {}
 
 		public static final int ITEMS_PER_ROW = 8;
-		public static final int ITEM_WIDTH = 36;
-		public static final int ITEM_HEIGHT = 32;
-		public static final int START_X = 39;
-		public static final int START_Y = 0;
+		public static final int ITEM_WIDTH = 38;
+		public static final int ITEM_HEIGHT = 34;
+		public static final int ITEM_START_X = 43;
+		public static final int ITEM_START_Y = 6;
 		public static final int MAX_ITEM_ID = 35000;
 
+		public static final int BTN_ORIGINAL_X = 420;
+		public static final int BTN_ORIGINAL_Y = 420;
+		public static final int BTN_ORIGINAL_WIDTH = 30;
+		public static final int BTN_ORIGINAL_HEIGHT = 30;
+
+		public static final int BANK_MARGIN_PADDING = 6;
+		public static final int SCROLL_BAR_WIDTH = 16;
+
 		public static final int ITEM_CONTAINER_ID = (InterfaceID.BANKMAIN << 16) | 12;
+		public static final int BOTTOM_BAR_CHILD_ID = 16;
 		public static final int SCROLLBAR_ID = (InterfaceID.BANKMAIN << 16) | 13;
 
 		public static final int BANK_TITLE_BAR_ID = (InterfaceID.BANKMAIN << 16) | 15;

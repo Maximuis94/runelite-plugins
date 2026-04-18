@@ -30,8 +30,8 @@ import static com.frequentlytradeditemstab.PluginConstants.BankUI.ITEMS_PER_ROW;
 import static com.frequentlytradeditemstab.PluginConstants.BankUI.ITEM_HEIGHT;
 import static com.frequentlytradeditemstab.PluginConstants.BankUI.ITEM_WIDTH;
 import static com.frequentlytradeditemstab.PluginConstants.BankUI.MAX_ITEM_ID;
-import static com.frequentlytradeditemstab.PluginConstants.BankUI.START_X;
-import static com.frequentlytradeditemstab.PluginConstants.BankUI.START_Y;
+import static com.frequentlytradeditemstab.PluginConstants.BankUI.ITEM_START_X;
+import static com.frequentlytradeditemstab.PluginConstants.BankUI.ITEM_START_Y;
 import java.util.Arrays;
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -41,6 +41,7 @@ import net.runelite.api.Client;
 import net.runelite.api.ScriptID;
 import net.runelite.api.events.ScriptPostFired;
 import net.runelite.api.widgets.Widget;
+import net.runelite.client.callback.ClientThread;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.game.ItemManager;
 
@@ -49,15 +50,17 @@ import net.runelite.client.game.ItemManager;
 public class FrequentlyTradedBankFilter {
 	private final Client client;
 	private final ItemManager itemManager;
+	private final ClientThread clientThread; // NEW: Added ClientThread
 
 	private final boolean[] isFrequentlyTraded = new boolean[MAX_ITEM_ID];
 
-
 	@Inject
-	public FrequentlyTradedBankFilter(Client client, ItemManager itemManager) {
+	public FrequentlyTradedBankFilter(Client client, ItemManager itemManager, ClientThread clientThread) {
 		this.client = client;
 		this.itemManager = itemManager;
+		this.clientThread = clientThread; // NEW: Initialize ClientThread
 	}
+
 	@Getter
 	private boolean isFilterActive = false;
 
@@ -107,8 +110,8 @@ public class FrequentlyTradedBankFilter {
 			int itemId = itemManager.canonicalize(child.getItemId());
 
 			if (itemId >= 0 && itemId < MAX_ITEM_ID && isFrequentlyTraded[itemId]) {
-				child.setOriginalX(START_X + (x * ITEM_WIDTH));
-				child.setOriginalY(START_Y + (y * ITEM_HEIGHT));
+				child.setOriginalX(ITEM_START_X + (x * ITEM_WIDTH));
+				child.setOriginalY(ITEM_START_Y + (y * ITEM_HEIGHT));
 				child.revalidate();
 
 				x++;
@@ -122,9 +125,11 @@ public class FrequentlyTradedBankFilter {
 		}
 
 		int totalRows = (x == 0) ? y : y + 1;
-		int newScrollHeight = START_Y + (totalRows * ITEM_HEIGHT);
+		int newScrollHeight = ITEM_START_Y + (totalRows * ITEM_HEIGHT);
 		itemContainer.setScrollHeight(Math.max(newScrollHeight, itemContainer.getHeight()));
 
-		client.runScript(ScriptID.UPDATE_SCROLLBAR, PluginConstants.BankUI.SCROLLBAR_ID, itemContainer.getId(), newScrollHeight);
+		clientThread.invokeLater(() -> {
+			client.runScript(ScriptID.UPDATE_SCROLLBAR, PluginConstants.BankUI.SCROLLBAR_ID, itemContainer.getId(), newScrollHeight);
+		});
 	}
 }
