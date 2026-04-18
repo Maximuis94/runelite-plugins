@@ -15,7 +15,7 @@ repositories {
 
 def runeLiteVersion = 'latest.release'
 // Make sure this points to your actual test class that launches the RuneLite client!
-def pluginMainClass = 'com.placeholderprices.PlaceholderPricesPluginTest'
+def pluginMainClass = 'com.frequentlytradeditemstab.FrequentlyTradedItemsTabPluginTest'
 
 dependencies {
     compileOnly group: 'net.runelite', name: 'client', version: runeLiteVersion
@@ -30,7 +30,7 @@ dependencies {
     testImplementation 'ch.qos.logback:logback-classic:1.2.11'
 }
 
-group = 'com.placeholderprices'
+group = 'com.frequentlytradeditemstab'
 version = '1.0'
 
 tasks.withType(JavaCompile).configureEach {

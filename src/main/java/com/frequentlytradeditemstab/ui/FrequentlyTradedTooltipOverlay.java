@@ -23,16 +23,15 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.placeholderprices;
+package com.frequentlytradeditemstab.ui;
 
-import java.awt.Color;
-import java.awt.Dimension;
-import java.awt.Graphics2D;
-import javax.inject.Inject;
+import com.frequentlytradeditemstab.FrequentlyTradedItemsTabConfig;
 import net.runelite.api.Client;
 import net.runelite.api.ItemComposition;
 import net.runelite.api.MenuEntry;
+import net.runelite.api.gameval.InterfaceID;
 import static net.runelite.api.gameval.InterfaceID.BANKMAIN;
+import net.runelite.api.gameval.InventoryID;
 import net.runelite.api.widgets.Widget;
 import net.runelite.api.widgets.WidgetUtil;
 import net.runelite.client.game.ItemManager;
@@ -43,45 +42,40 @@ import net.runelite.client.ui.overlay.tooltip.TooltipManager;
 import net.runelite.client.util.ColorUtil;
 import net.runelite.client.util.QuantityFormatter;
 
-public class PlaceholderPricesOverlay extends Overlay
-{
+import javax.inject.Inject;
+import java.awt.Color;
+import java.awt.Dimension;
+import java.awt.Graphics2D;
+
+public class FrequentlyTradedTooltipOverlay extends Overlay {
+
 	private final Client client;
 	private final TooltipManager tooltipManager;
 	private final ItemManager itemManager;
-	private final PlaceholderPricesPlugin plugin;
+	private final FrequentlyTradedItemsTabConfig config;
+	private final FrequentlyTradedBankFilter bankFilter;
 
-	private final int MAX_STRING_BUILDER_CAPACITY = 100;
-	private final Color itemNameColor = new Color(230, 140, 75);
+	private static final Color ITEM_NAME_COLOR = new Color(230, 140, 75);
 
 	@Inject
-	PlaceholderPricesOverlay(Client client, TooltipManager tooltipManager, ItemManager itemManager, PlaceholderPricesPlugin plugin)
-	{
+	public FrequentlyTradedTooltipOverlay(Client client, TooltipManager tooltipManager, ItemManager itemManager,
+										  FrequentlyTradedItemsTabConfig config, FrequentlyTradedBankFilter bankFilter) {
 		setPosition(OverlayPosition.DYNAMIC);
 		this.client = client;
 		this.tooltipManager = tooltipManager;
 		this.itemManager = itemManager;
-		this.plugin = plugin;
+		this.config = config;
+		this.bankFilter = bankFilter;
 	}
 
 	@Override
-	public Dimension render(Graphics2D graphics)
-	{
-		if (client.isMenuOpen())
-		{
-			return null;
-		}
-
-		boolean showGE = plugin.isShowGEPrice();
-		boolean showHA = plugin.isShowHAValue();
-
-		if (!showGE && !showHA)
-		{
+	public Dimension render(Graphics2D graphics) {
+		if (client.isMenuOpen() || !config.showPricesTooltip() || !bankFilter.isFilterActive()) {
 			return null;
 		}
 
 		MenuEntry[] menuEntries = client.getMenu().getMenuEntries();
-		if (menuEntries.length == 0)
-		{
+		if (menuEntries.length == 0) {
 			return null;
 		}
 
@@ -89,73 +83,47 @@ public class PlaceholderPricesOverlay extends Overlay
 		int widgetId = entry.getParam1();
 		int groupId = WidgetUtil.componentToInterface(widgetId);
 
-		if (groupId != BANKMAIN)
-		{
+		if (groupId != BANKMAIN) {
+			return null;
+		}
+
+		Widget container = client.getWidget(widgetId);
+		if (container == null) {
 			return null;
 		}
 
 		int index = entry.getParam0();
-		Widget container = client.getWidget(widgetId);
-		if (container == null)
-		{
-			return null;
-		}
-
 		Widget itemWidget = container.getChild(index);
 
-		if (itemWidget == null || itemWidget.getItemQuantity() > 0)
-		{
+		// We only care about unowned placeholders (quantity == 0)
+		if (itemWidget == null || itemWidget.getItemQuantity() > 0) {
 			return null;
 		}
 
 		int itemId = itemWidget.getItemId();
-		if (itemId <= 0)
-		{
+		if (itemId <= 0) {
 			return null;
 		}
 
 		ItemComposition itemDef = itemManager.getItemComposition(itemId);
 		int realItemId = itemId;
 
-		if (itemDef.getPlaceholderTemplateId() != -1)
-		{
+		// Resolve placeholder IDs to their canonical item IDs
+		if (itemDef.getPlaceholderTemplateId() != -1) {
 			realItemId = itemDef.getPlaceholderId();
-			if (showHA)
-			{
-				itemDef = itemManager.getItemComposition(realItemId);
-			}
 		}
 
-		StringBuilder tooltipStr = new StringBuilder(MAX_STRING_BUILDER_CAPACITY);
-
-		tooltipStr.append(ColorUtil.wrapWithColorTag(itemDef.getName(), itemNameColor));
-
-		boolean addedPrice = false;
-
-		if (showGE)
-		{
-			int gePrice = itemManager.getItemPrice(realItemId);
-			if (gePrice > 0)
-			{
-				tooltipStr.append("</br>GE: ").append(ColorUtil.wrapWithColorTag(QuantityFormatter.quantityToStackSize(gePrice) + " gp", Color.LIGHT_GRAY));
-				addedPrice = true;
-			}
+		// Fetch the actively traded GE Price
+		int gePrice = itemManager.getItemPrice(realItemId);
+		if (gePrice <= 0) {
+			return null;
 		}
 
-		if (showHA)
-		{
-			int haPrice = itemDef.getHaPrice();
-			if (haPrice > 0)
-			{
-				tooltipStr.append("</br>HA: ").append(ColorUtil.wrapWithColorTag(QuantityFormatter.quantityToStackSize(haPrice) + " gp", Color.LIGHT_GRAY));
-				addedPrice = true;
-			}
-		}
+		String tooltipStr = ColorUtil.wrapWithColorTag(itemDef.getName(), ITEM_NAME_COLOR) +
+			"</br>Actively traded price: " +
+			ColorUtil.wrapWithColorTag(QuantityFormatter.quantityToStackSize(gePrice) + " gp", Color.LIGHT_GRAY);
 
-		if (addedPrice)
-		{
-			tooltipManager.add(new Tooltip(tooltipStr.toString()));
-		}
+		tooltipManager.add(new Tooltip(tooltipStr));
 
 		return null;
 	}
