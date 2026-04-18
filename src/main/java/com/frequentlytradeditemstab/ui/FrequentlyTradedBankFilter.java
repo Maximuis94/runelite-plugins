@@ -58,7 +58,7 @@ public class FrequentlyTradedBankFilter {
 	public FrequentlyTradedBankFilter(Client client, ItemManager itemManager, ClientThread clientThread) {
 		this.client = client;
 		this.itemManager = itemManager;
-		this.clientThread = clientThread; // NEW: Initialize ClientThread
+		this.clientThread = clientThread;
 	}
 
 	@Getter
@@ -83,7 +83,7 @@ public class FrequentlyTradedBankFilter {
 
 	@Subscribe
 	public void onScriptPostFired(ScriptPostFired event) {
-		if (event.getScriptId() != ScriptID.BANKMAIN_BUILD) {
+		if (event.getScriptId() != ScriptID.BANKMAIN_FINISHBUILDING) {
 			return;
 		}
 

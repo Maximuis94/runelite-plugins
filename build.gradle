@@ -14,7 +14,6 @@ repositories {
 }
 
 def runeLiteVersion = 'latest.release'
-// Make sure this points to your actual test class that launches the RuneLite client!
 def pluginMainClass = 'com.frequentlytradeditemstab.FrequentlyTradedItemsTabPluginTest'
 
 dependencies {

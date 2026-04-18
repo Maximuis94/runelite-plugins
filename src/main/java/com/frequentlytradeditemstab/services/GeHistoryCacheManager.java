@@ -93,7 +93,6 @@ public class GeHistoryCacheManager {
 		if (accountHash == -1) return;
 
 		synchronized (historyByAccount) {
-			// Note: add your duplicate prevention logic here if necessary
 			historyByAccount.computeIfAbsent(accountHash, k -> new ArrayList<>()).addAll(newEntries);
 		}
 
@@ -108,7 +107,7 @@ public class GeHistoryCacheManager {
 				}
 				gson.toJson(copyToSave, writer);
 			} catch (Exception e) {
-				log.error("Failed to save GE history cache for account hash: " + accountHash, e);
+				log.error("Failed to save GE history cache for account hash: {}", accountHash, e);
 			}
 		});
 	}

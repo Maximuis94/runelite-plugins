@@ -28,6 +28,8 @@ package com.frequentlytradeditemstab.services;
 import com.frequentlytradeditemstab.FrequentlyTradedItemsTabConfig;
 import com.frequentlytradeditemstab.PluginConstants;
 import com.frequentlytradeditemstab.models.CachedGrandExchangeTrade;
+import com.frequentlytradeditemstab.models.GrandExchangeHistoryEntry;
+import lombok.extern.slf4j.Slf4j;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.game.ItemStats;
 import net.runelite.client.game.ItemVariationMapping;
@@ -38,6 +40,7 @@ import javax.inject.Singleton;
 import java.util.*;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Singleton
 public class TradeFrequencyAnalyzer {
 
@@ -50,7 +53,7 @@ public class TradeFrequencyAnalyzer {
 		this.itemManager = itemManager;
 	}
 
-	public Set<Integer> analyze(List<CachedGrandExchangeTrade> trades) {
+	public Set<Integer> analyzeTrades(List<CachedGrandExchangeTrade> trades) {
 		Map<Integer, Integer> tradeCounts = new HashMap<>();
 
 		for (CachedGrandExchangeTrade trade : trades) {
@@ -89,23 +92,69 @@ public class TradeFrequencyAnalyzer {
 		return expandedItems;
 	}
 
-	private void applyConfigOverrides(Set<Integer> expandedItems) {
-		List<String> includes = Text.fromCSV(config.includeItems());
-		for (String name : includes) {
-			if (name.isEmpty()) continue;
+	public Set<Integer> analyzeHistory(List<GrandExchangeHistoryEntry> entries) {
+		Map<Integer, Integer> tradeCounts = new HashMap<>();
 
-			itemManager.search(name).stream()
-				.filter(itemPrice -> itemPrice.getName().equalsIgnoreCase(name))
-				.forEach(itemPrice -> expandAndAddVariantGroup(expandedItems, itemPrice.getId()));
+		for (GrandExchangeHistoryEntry entry : entries) {
+			if (!entry.isBuy() && !config.includeSales()) continue;
+			if (entry.isBuy() && !config.includePurchases()) continue;
+
+			int quantityTraded = entry.getQuantity();
+			tradeCounts.put(entry.getItemId(), tradeCounts.getOrDefault(entry.getItemId(), 0) + quantityTraded);
 		}
 
-		List<String> excludes = Text.fromCSV(config.excludeItems());
-		for (String name : excludes) {
-			if (name.isEmpty()) continue;
+		Set<Integer> frequentItems = tradeCounts.entrySet().stream()
+			.filter(entry -> {
+				int itemId = entry.getKey();
+				int totalQuantity = entry.getValue();
 
-			itemManager.search(name).stream()
-				.filter(itemPrice -> itemPrice.getName().equalsIgnoreCase(name))
-				.forEach(itemPrice -> expandAndRemoveVariantGroup(expandedItems, itemPrice.getId()));
+				ItemStats stats = itemManager.getItemStats(itemId);
+
+				if (stats != null && stats.getGeLimit() > 0) {
+					double requiredAmount = stats.getGeLimit() * config.buyLimitThreshold();
+					return totalQuantity >= requiredAmount;
+				}
+
+				return totalQuantity >= PluginConstants.Analysis.DEFAULT_FREQUENCY_THRESHOLD;
+			})
+			.map(Map.Entry::getKey)
+			.collect(Collectors.toSet());
+
+		Set<Integer> expandedItems = new HashSet<>();
+		for (Integer itemId : frequentItems) {
+			expandAndAddVariantGroup(expandedItems, itemId);
+		}
+
+		applyConfigOverrides(expandedItems);
+
+		return expandedItems;
+	}
+
+	private void applyConfigOverrides(Set<Integer> expandedItems) {
+		// Handle Included Item IDs
+		List<String> includes = Text.fromCSV(config.includeItems());
+		for (String idString : includes) {
+			if (idString.trim().isEmpty()) continue;
+
+			try {
+				int itemId = Integer.parseInt(idString.trim());
+				expandAndAddVariantGroup(expandedItems, itemId);
+			} catch (NumberFormatException e) {
+				log.debug("Invalid item ID in include config: '{}'", idString);
+			}
+		}
+
+		// Handle Excluded Item IDs
+		List<String> excludes = Text.fromCSV(config.excludeItems());
+		for (String idString : excludes) {
+			if (idString.trim().isEmpty()) continue;
+
+			try {
+				int itemId = Integer.parseInt(idString.trim());
+				expandAndRemoveVariantGroup(expandedItems, itemId);
+			} catch (NumberFormatException e) {
+				log.debug("Invalid item ID in exclude config: '{}'", idString);
+			}
 		}
 	}
 

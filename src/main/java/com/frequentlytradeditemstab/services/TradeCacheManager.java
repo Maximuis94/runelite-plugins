@@ -76,12 +76,11 @@ public class TradeCacheManager {
 						try (FileReader reader = new FileReader(file)) {
 							List<CachedGrandExchangeTrade> loaded = gson.fromJson(reader, listType);
 							if (loaded != null && !loaded.isEmpty()) {
-								// Extract the account hash directly from the first loaded trade
 								long hash = loaded.get(0).getAccountHash();
 								loadedMap.put(hash, loaded);
 							}
 						} catch (Exception e) {
-							log.error("Failed to read trade cache file: " + file.getName(), e);
+							log.error("Failed to read trade cache file: {}", file.getName(), e);
 						}
 					}
 				}
@@ -114,7 +113,7 @@ public class TradeCacheManager {
 				}
 				gson.toJson(copyToSave, writer);
 			} catch (Exception e) {
-				log.error("Failed to save trade cache for account hash: " + hash, e);
+				log.error("Failed to save trade cache for account hash: {}", hash, e);
 			}
 		});
 	}

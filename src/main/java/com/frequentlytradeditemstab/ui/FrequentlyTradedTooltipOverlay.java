@@ -26,12 +26,14 @@
 package com.frequentlytradeditemstab.ui;
 
 import com.frequentlytradeditemstab.FrequentlyTradedItemsTabConfig;
+import java.awt.Color;
+import java.awt.Dimension;
+import java.awt.Graphics2D;
+import javax.inject.Inject;
 import net.runelite.api.Client;
 import net.runelite.api.ItemComposition;
 import net.runelite.api.MenuEntry;
-import net.runelite.api.gameval.InterfaceID;
 import static net.runelite.api.gameval.InterfaceID.BANKMAIN;
-import net.runelite.api.gameval.InventoryID;
 import net.runelite.api.widgets.Widget;
 import net.runelite.api.widgets.WidgetUtil;
 import net.runelite.client.game.ItemManager;
@@ -41,11 +43,6 @@ import net.runelite.client.ui.overlay.tooltip.Tooltip;
 import net.runelite.client.ui.overlay.tooltip.TooltipManager;
 import net.runelite.client.util.ColorUtil;
 import net.runelite.client.util.QuantityFormatter;
-
-import javax.inject.Inject;
-import java.awt.Color;
-import java.awt.Dimension;
-import java.awt.Graphics2D;
 
 public class FrequentlyTradedTooltipOverlay extends Overlay {
 
@@ -95,7 +92,6 @@ public class FrequentlyTradedTooltipOverlay extends Overlay {
 		int index = entry.getParam0();
 		Widget itemWidget = container.getChild(index);
 
-		// We only care about unowned placeholders (quantity == 0)
 		if (itemWidget == null || itemWidget.getItemQuantity() > 0) {
 			return null;
 		}
@@ -108,19 +104,17 @@ public class FrequentlyTradedTooltipOverlay extends Overlay {
 		ItemComposition itemDef = itemManager.getItemComposition(itemId);
 		int realItemId = itemId;
 
-		// Resolve placeholder IDs to their canonical item IDs
 		if (itemDef.getPlaceholderTemplateId() != -1) {
 			realItemId = itemDef.getPlaceholderId();
 		}
 
-		// Fetch the actively traded GE Price
 		int gePrice = itemManager.getItemPrice(realItemId);
 		if (gePrice <= 0) {
 			return null;
 		}
 
 		String tooltipStr = ColorUtil.wrapWithColorTag(itemDef.getName(), ITEM_NAME_COLOR) +
-			"</br>Actively traded price: " +
+			"</br>GE: " +
 			ColorUtil.wrapWithColorTag(QuantityFormatter.quantityToStackSize(gePrice) + " gp", Color.LIGHT_GRAY);
 
 		tooltipManager.add(new Tooltip(tooltipStr));

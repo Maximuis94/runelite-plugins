@@ -99,4 +99,17 @@ public interface FrequentlyTradedItemsTabConfig extends Config
 	{
 		return 1.0;
 	}
+
+	@ConfigItem(
+		keyName = "deactivateAtTabSwitch",
+		name = "Deactivate filter at tab switch",
+		description = "If set, the filter is deactivated when switching between bank tabs.",
+		position = 6
+	)
+	default boolean deactivateAtTabSwitch()
+	{
+		return false;
+	}
+
+
 }

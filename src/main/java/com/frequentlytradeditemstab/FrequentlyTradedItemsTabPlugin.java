@@ -26,12 +26,8 @@
 package com.frequentlytradeditemstab;
 
 import static com.frequentlytradeditemstab.PluginConstants.BankUI.BANK_MARGIN_PADDING;
-import static com.frequentlytradeditemstab.PluginConstants.BankUI.BOTTOM_BAR_CHILD_ID;
 import static com.frequentlytradeditemstab.PluginConstants.BankUI.BTN_ORIGINAL_HEIGHT;
 import static com.frequentlytradeditemstab.PluginConstants.BankUI.BTN_ORIGINAL_WIDTH;
-import static com.frequentlytradeditemstab.PluginConstants.BankUI.BTN_ORIGINAL_X;
-import static com.frequentlytradeditemstab.PluginConstants.BankUI.BTN_ORIGINAL_Y;
-import static com.frequentlytradeditemstab.PluginConstants.BankUI.SCROLL_BAR_WIDTH;
 import com.frequentlytradeditemstab.services.GeHistoryCacheManager;
 import com.frequentlytradeditemstab.services.GeHistoryRecorder;
 import com.frequentlytradeditemstab.services.GeTradeRecorder;
@@ -40,23 +36,16 @@ import com.frequentlytradeditemstab.services.TradeFrequencyAnalyzer;
 import com.frequentlytradeditemstab.ui.FrequentlyTradedBankFilter;
 import com.frequentlytradeditemstab.ui.FrequentlyTradedTooltipOverlay;
 import com.google.inject.Provides;
-import java.awt.image.BufferedImage;
 import javax.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
-import net.runelite.api.ItemID;
 import net.runelite.api.ScriptID;
-import static net.runelite.api.ScriptID.BANKMAIN_BUILD;
-import static net.runelite.api.ScriptID.BANKMAIN_FINISHBUILDING;
-import net.runelite.api.events.ClientTick;
 import net.runelite.api.events.GameStateChanged;
+import net.runelite.api.events.MenuOptionClicked;
 import net.runelite.api.events.ScriptPostFired;
-import net.runelite.api.events.WidgetLoaded;
 import net.runelite.api.gameval.InterfaceID;
-import net.runelite.api.gameval.InventoryID;
 import static net.runelite.api.gameval.ItemID.PLATINUM;
-import net.runelite.api.gameval.SpriteID;
 import net.runelite.api.widgets.JavaScriptCallback;
 import net.runelite.api.widgets.Widget;
 import net.runelite.api.widgets.WidgetType;
@@ -67,12 +56,7 @@ import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
-import net.runelite.client.ui.ClientToolbar;
 import net.runelite.client.ui.overlay.OverlayManager;
-import net.runelite.client.util.ImageUtil;
-import net.runelite.api.MenuAction;
-import net.runelite.api.MenuEntry;
-import net.runelite.api.events.MenuOptionClicked;
 
 @Slf4j
 @PluginDescriptor(name = PluginConstants.PLUGIN_NAME)
@@ -87,10 +71,10 @@ public class FrequentlyTradedItemsTabPlugin extends Plugin {
 	@Inject private TradeFrequencyAnalyzer analyzer;
 	@Inject private FrequentlyTradedBankFilter bankFilter;
 	@Inject private TradeCacheManager tradeCacheManager;
-	@Inject private GeHistoryCacheManager historyCacheManager;
+	@Inject private GeHistoryCacheManager geHistoryCacheManager;
 	@Inject private GeTradeRecorder tradeRecorder;
 	@Inject private GeHistoryRecorder historyRecorder;
-	@Inject private ClientToolbar clientToolbar;
+	@Inject private FrequentlyTradedItemsTabConfig config;
 	@Inject private Client client;
 
 	@Provides
@@ -125,13 +109,6 @@ public class FrequentlyTradedItemsTabPlugin extends Plugin {
 		}
 	}
 
-	//	@Subscribe
-//	public void onWidgetLoaded(WidgetLoaded event) {
-//		if (event.getGroupId() == InterfaceID.BANKMAIN) {
-//			clientThread.invokeLater(this::createBankToggleButton);
-//		}
-//	}
-//
 	@Subscribe
 	public void onScriptPostFired(ScriptPostFired event) {
 		int scriptId = event.getScriptId();
@@ -141,10 +118,13 @@ public class FrequentlyTradedItemsTabPlugin extends Plugin {
 	}
 
 	@Subscribe
-	public void onClientTick(ClientTick event) {
-		Widget bankContainer = client.getWidget(InterfaceID.BANKMAIN, 1);
-		if (bankContainer != null && !bankContainer.isHidden()) {
-			createBankToggleButton();
+	public void onMenuOptionClicked(MenuOptionClicked event) {
+		if (!bankFilter.isFilterActive() || !config.deactivateAtTabSwitch()) {
+			return;
+		}
+		String option = event.getMenuOption();
+		if (option != null && (option.equals("View tab") || option.equals("View all items"))) {
+			bankFilter.setFilterActive(false);
 		}
 	}
 
@@ -159,12 +139,19 @@ public class FrequentlyTradedItemsTabPlugin extends Plugin {
 		if (children != null) {
 			for (Widget child : children) {
 				if (child != null && child.getName() != null && child.getName().contains("Frequently Traded")) {
+
 					if (child.getOriginalX() != targetX || child.getOriginalY() != targetY || child.isHidden()) {
 						child.setOriginalX(targetX);
 						child.setOriginalY(targetY);
 						child.setHidden(false);
 						child.revalidate();
 					}
+
+					Widget[] inner = child.getDynamicChildren();
+					if (inner != null && inner.length > 0) {
+						inner[0].setTextColor(bankFilter.isFilterActive() ? 0x5A5245 : 0x383023);
+					}
+
 					return;
 				}
 			}
@@ -182,7 +169,6 @@ public class FrequentlyTradedItemsTabPlugin extends Plugin {
 		toggleBtn.setAction(0, "Toggle");
 		toggleBtn.setOnOpListener((JavaScriptCallback) ev -> toggleFilter());
 
-		// 3. Create the Background Rectangle
 		Widget bg = toggleBtn.createChild(-1, WidgetType.RECTANGLE);
 		bg.setOriginalX(0);
 		bg.setOriginalY(0);
@@ -192,7 +178,6 @@ public class FrequentlyTradedItemsTabPlugin extends Plugin {
 		bg.setTextColor(bankFilter.isFilterActive() ? 0x5A5245 : 0x383023);
 		bg.revalidate();
 
-		// 4. Create the Platinum Icon
 		Widget icon = toggleBtn.createChild(-1, WidgetType.GRAPHIC);
 		icon.setOriginalX(2);
 		icon.setOriginalY(2);
@@ -211,80 +196,29 @@ public class FrequentlyTradedItemsTabPlugin extends Plugin {
 		bankFilter.setFilterActive(newState);
 
 		clientThread.invokeLater(() -> {
-
-			// --- NEW: Visually update the button's background color ---
+			// 1. Update the button's background color visually
 			Widget rootContainer = client.getWidget(InterfaceID.BANKMAIN, 1);
 			if (rootContainer != null && rootContainer.getDynamicChildren() != null) {
 				for (Widget child : rootContainer.getDynamicChildren()) {
 					if (child != null && child.getName() != null && child.getName().contains("Frequently Traded")) {
 						Widget[] innerChildren = child.getDynamicChildren();
 						if (innerChildren != null && innerChildren.length > 0) {
-							Widget bg = innerChildren[0]; // The RECTANGLE is the first child we created
+							Widget bg = innerChildren[0];
 							bg.setTextColor(newState ? 0x5A5245 : 0x383023);
 						}
 						break;
 					}
 				}
 			}
-			// ----------------------------------------------------------
 
-			boolean changedTab = false;
-
-			// If turning the filter ON, force the bank to switch to the "All" tab and clear Bank Tags.
-			if (newState) {
-				Widget tabContainer = client.getWidget(InterfaceID.BANKMAIN, 11);
-
-				if (tabContainer != null && tabContainer.getDynamicChildren() != null) {
-					for (Widget tab : tabContainer.getDynamicChildren()) {
-
-						boolean isAllTab = tab.getName() != null && tab.getName().contains("View all items");
-						if (!isAllTab && tab.getActions() != null) {
-							for (String action : tab.getActions()) {
-								if (action != null && action.contains("View all items")) {
-									isAllTab = true;
-									break;
-								}
-							}
-						}
-
-						if (isAllTab) {
-							Object[] tabListener = tab.getOnOpListener();
-							if (tabListener != null) {
-
-								try {
-									MenuEntry[] oldEntries = client.getMenu().getMenuEntries();
-
-									MenuEntry fakeEntry = client.getMenu().createMenuEntry(-1)
-										.setOption("View all items")
-										.setTarget("")
-										.setType(MenuAction.CC_OP)
-										.setIdentifier(1)
-										.setParam0(tab.getIndex())
-										.setParam1(tab.getId());
-
-									eventBus.post(new MenuOptionClicked(fakeEntry));
-
-									client.getMenu().setMenuEntries(oldEntries);
-								} catch (Exception e) {
-									log.debug("Could not spoof event for Bank Tags", e);
-								}
-								client.runScript(tabListener);
-								changedTab = true;
-								break;
-							}
-						}
-					}
-				}
-			}
-
-			// If turning OFF, or if we couldn't find the 'All' tab, manually rebuild the bank
-			if (!changedTab) {
-				Widget bankContainer = client.getWidget(PluginConstants.BankUI.ITEM_CONTAINER_ID);
-				if (bankContainer != null) {
-					Object[] buildScriptArgs = bankContainer.getOnInvTransmitListener();
-					if (buildScriptArgs != null) {
-						client.runScript(buildScriptArgs);
-					}
+			// 2. Just trigger the native bank rebuild script.
+			// When it finishes, your BANKMAIN_FINISHBUILDING hook will fire,
+			// and your filter logic will take over the screen!
+			Widget bankContainer = client.getWidget(PluginConstants.BankUI.ITEM_CONTAINER_ID);
+			if (bankContainer != null) {
+				Object[] buildScriptArgs = bankContainer.getOnInvTransmitListener();
+				if (buildScriptArgs != null) {
+					client.runScript(buildScriptArgs);
 				}
 			}
 		});
@@ -303,16 +237,27 @@ public class FrequentlyTradedItemsTabPlugin extends Plugin {
 	 */
 	public void reloadFilterData() {
 		tradeCacheManager.loadTradesAsync()
-			.thenAccept(trades -> {
-				clientThread.invokeLater(() -> {
-					try {
-						var frequentItems = analyzer.analyze(trades);
-						bankFilter.updateFrequentItems(frequentItems);
-					} catch (Exception e) {
-						log.error("Error analyzing frequent items on client thread", e);
-					}
-				});
-			})
+			.thenAccept(trades -> clientThread.invokeLater(() -> {
+				try {
+					var frequentItems = analyzer.analyzeTrades(trades);
+					bankFilter.updateFrequentItems(frequentItems);
+				} catch (Exception e) {
+					log.error("Error analyzing frequent items on client thread", e);
+				}
+			}))
+			.exceptionally(ex -> {
+				log.error("Failed to load trades from cache", ex);
+				return null;
+			});
+		geHistoryCacheManager.loadHistoryAsync()
+			.thenAccept(entries -> clientThread.invokeLater(() -> {
+				try {
+					var frequentItems = analyzer.analyzeHistory(entries);
+					bankFilter.updateFrequentItems(frequentItems);
+				} catch (Exception e) {
+					log.error("Error analyzing frequent items on client thread", e);
+				}
+			}))
 			.exceptionally(ex -> {
 				log.error("Failed to load trades from cache", ex);
 				return null;

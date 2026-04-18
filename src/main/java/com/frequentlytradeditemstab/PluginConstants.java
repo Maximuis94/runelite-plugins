@@ -25,7 +25,6 @@
 package com.frequentlytradeditemstab;
 
 import java.io.File;
-import static net.runelite.api.gameval.InterfaceID.GE_HISTORY;
 import net.runelite.api.gameval.InterfaceID;
 import net.runelite.client.RuneLite;
 
@@ -34,10 +33,8 @@ import net.runelite.client.RuneLite;
  */
 public final class PluginConstants {
 
-	// Prevent instantiation
 	private PluginConstants() {}
 
-	// --- General Plugin Constants ---
 	public static final String PLUGIN_NAME = "Frequently Traded Items Tab";
 	public static final String CONFIG_GROUP = "frequentlytradeditemstab";
 	public static final String PLUGIN_DIR_NAME = "frequently-traded-items-tab";
@@ -54,34 +51,26 @@ public final class PluginConstants {
 		private BankUI() {}
 
 		public static final int ITEMS_PER_ROW = 8;
-		public static final int ITEM_WIDTH = 38;
-		public static final int ITEM_HEIGHT = 34;
+		public static final int ITEM_WIDTH = 49;
+		public static final int ITEM_HEIGHT = 36;
 		public static final int ITEM_START_X = 43;
 		public static final int ITEM_START_Y = 6;
 		public static final int MAX_ITEM_ID = 35000;
 
-		public static final int BTN_ORIGINAL_X = 420;
-		public static final int BTN_ORIGINAL_Y = 420;
+
 		public static final int BTN_ORIGINAL_WIDTH = 30;
 		public static final int BTN_ORIGINAL_HEIGHT = 30;
 
 		public static final int BANK_MARGIN_PADDING = 6;
-		public static final int SCROLL_BAR_WIDTH = 16;
 
 		public static final int ITEM_CONTAINER_ID = (InterfaceID.BANKMAIN << 16) | 12;
-		public static final int BOTTOM_BAR_CHILD_ID = 16;
 		public static final int SCROLLBAR_ID = (InterfaceID.BANKMAIN << 16) | 13;
-
-		public static final int BANK_TITLE_BAR_ID = (InterfaceID.BANKMAIN << 16) | 15;
-		public static final int FREQUENT_ITEMS_BUTTON_ID = 555;
 	}
 
 	public static final class GeHistory {
 		private GeHistory() {}
 
 		public static final int GE_HISTORY_CHILD_CONTAINER_ID = 3;
-
-		public static final int PACKED_CONTAINER_ID = (GE_HISTORY << 16) | GE_HISTORY_CHILD_CONTAINER_ID;
 
 		public static final int ELEMENTS_PER_ROW = 6;
 		public static final long PARSE_COOLDOWN_MS = 5 * 60 * 1000;
