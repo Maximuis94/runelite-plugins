@@ -25,6 +25,7 @@
 package com.datalogger;
 
 import static com.datalogger.constants.PluginConstants.CONFIG_GROUP;
+import com.datalogger.models.enums.BroadcastColosseumScreenshotOption;
 import com.datalogger.models.enums.ColosseumWebhookFormatter;
 import com.datalogger.models.enums.ScreenshotFormat;
 import com.datalogger.models.enums.TimestampFormat;
@@ -396,7 +397,7 @@ public interface DataLoggerConfig extends Config {
 		position = 6,
 		section = DISCORD_SECTION
 	)
-	default boolean broadcastScreenshot() { return false; }
+	default BroadcastColosseumScreenshotOption broadcastScreenshot() { return BroadcastColosseumScreenshotOption.NEVER; }
 
 	@Range(min = 0)
 	@ConfigItem(

@@ -34,6 +34,7 @@ import com.datalogger.events.ColosseumAttemptStarted;
 import com.datalogger.events.DataLoggerConfigChanged;
 import com.datalogger.events.PlayerDied;
 import com.datalogger.framework.LogType;
+import com.datalogger.models.enums.BroadcastColosseumScreenshotOption;
 import com.datalogger.models.enums.ScreenshotFormat;
 import com.datalogger.services.FileIOService;
 import java.awt.image.BufferedImage;
@@ -64,7 +65,10 @@ public class ScreenshotLogger {
 	@Inject private DataLoggerConfig config;
 	private ScreenshotFormat screenshotFormat;
 	private boolean screenshotBetweenColosseumWaves;
-	private boolean enabledBroadcastScreenshot;
+	private boolean screenshotColosseumRewardsUI;
+	private boolean screenshotColosseumSuccess;
+	private boolean screenshotColosseumClaim;
+	private boolean screenshotColosseumDeath;
 
 	private boolean awaitingColosseumReset = false;
 	private boolean isActiveAttempt = false;
@@ -87,8 +91,15 @@ public class ScreenshotLogger {
 	 */
 	public void updateConfigFlags()
 	{
-		enabledBroadcastScreenshot = config.broadcastScreenshot();
+		BroadcastColosseumScreenshotOption broadcastScreenshotConfig = config.broadcastScreenshot();
 		screenshotBetweenColosseumWaves = config.screenshotBetweenWaves();
+
+		screenshotColosseumSuccess = broadcastScreenshotConfig.isScreenshotOnSuccess();
+		screenshotColosseumClaim = broadcastScreenshotConfig.isScreenshotOnClaim();
+		screenshotColosseumRewardsUI = broadcastScreenshotConfig.isScreenshotOnRewardsUI();
+
+		screenshotColosseumDeath = broadcastScreenshotConfig.isScreenshotOnFailure();
+
 		screenshotFormat = config.screenshotFormat();
 	}
 
@@ -167,7 +178,7 @@ public class ScreenshotLogger {
 
 		String message = Text.removeTags(event.getMessage());
 
-		if ((enabledBroadcastScreenshot || screenshotBetweenColosseumWaves) && !intermissionScreenshotPending)
+		if ((screenshotColosseumRewardsUI || screenshotBetweenColosseumWaves) && !intermissionScreenshotPending)
 			updateColosseumFlags(message);
 	}
 
@@ -182,7 +193,7 @@ public class ScreenshotLogger {
 
 	@Subscribe
 	public void onScriptPostFired(ScriptPostFired event) {
-		if ((enabledBroadcastScreenshot || screenshotBetweenColosseumWaves) && intermissionScreenshotPending && isPostColosseumWaveUI(event.getScriptId()))
+		if ((screenshotColosseumRewardsUI || screenshotBetweenColosseumWaves) && intermissionScreenshotPending && isPostColosseumWaveUI(event.getScriptId()))
 		{
 			takeColosseumScreenshot(event.getScriptId());
 		}
@@ -216,7 +227,7 @@ public class ScreenshotLogger {
 	@Subscribe
 	public void onPlayerDied(PlayerDied event)
 	{
-		if ((enabledBroadcastScreenshot || screenshotBetweenColosseumWaves) && event.getLogType() == LogType.COLOSSEUM)
+		if ((screenshotColosseumDeath || screenshotBetweenColosseumWaves) && event.getLogType() == LogType.COLOSSEUM)
 		{
 			screenshotColosseumDeath();
 		}
@@ -248,7 +259,10 @@ public class ScreenshotLogger {
 	private void takeColosseumScreenshot(int scriptId)
 	{
 		awaitingColosseumReset = scriptId == POPULATE_REWARDS_CHEST_UI_SCRIPT_ID;
-		if (screenshotBetweenColosseumWaves || enabledBroadcastScreenshot && awaitingColosseumReset)
+		if (screenshotBetweenColosseumWaves ||
+			awaitingColosseumReset &&
+				(screenshotColosseumSuccess && colosseumCurrentWave == 12 ||
+				screenshotColosseumClaim && colosseumCurrentWave < 12))
 			captureAndSaveScreenshot();
 		intermissionScreenshotPending = false;
 		rewardChestSpawned = false;

@@ -38,6 +38,7 @@ import com.datalogger.framework.LogType;
 import com.datalogger.models.colosseum.ColosseumAttempt;
 import com.datalogger.models.colosseum.ColosseumState;
 import com.datalogger.models.colosseum.ColosseumWave;
+import com.datalogger.models.enums.BroadcastColosseumScreenshotOption;
 import com.datalogger.models.enums.ScreenshotFormat;
 import com.datalogger.models.grandexchange.ActiveGeOffer;
 import com.datalogger.models.grandexchange.GeLedgerEntry;
@@ -225,7 +226,7 @@ public class FileIOService
 	private void updateConfigFlags()
 	{
 		logGrandExchangeJson = config.logGrandExchangeJSON();
-		broadcastScreenshotEvent = config.broadcastScreenshot();
+		broadcastScreenshotEvent = config.broadcastScreenshot() != BroadcastColosseumScreenshotOption.NEVER;
 	}
 
 

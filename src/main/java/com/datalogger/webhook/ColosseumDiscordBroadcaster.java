@@ -30,6 +30,7 @@ import static com.datalogger.constants.PluginConstants.COLOSSEUM_ATTEMPT_DIR;
 import com.datalogger.dto.ColosseumAttemptDTO;
 import com.datalogger.dto.ColosseumWaveDTO;
 import com.datalogger.events.DataLoggerConfigChanged;
+import com.datalogger.models.enums.BroadcastColosseumScreenshotOption;
 import com.datalogger.models.enums.ColosseumWebhookFormatter;
 import com.datalogger.models.enums.ScreenshotFormat;
 import com.datalogger.models.enums.WaveStatus;
@@ -64,7 +65,7 @@ public class ColosseumDiscordBroadcaster
 	private boolean broadcastCompletedTrial;
 	private boolean broadcastCancelledTrial;
 	private boolean broadcastFailedTrial;
-	private boolean broadcastScreenshot;
+	private BroadcastColosseumScreenshotOption broadcastScreenshot;
 	private Integer minRewardValue;
 	private Integer minWave;
 
@@ -96,10 +97,10 @@ public class ColosseumDiscordBroadcaster
 	{
 		webhookUrl = config.colosseumDiscordWebhookUrl().trim();
 		enabledDiscordBroadcasting = config.enableWebhookBroadcasting() && webhookUrl != null && !webhookUrl.isEmpty();
+		broadcastScreenshot = config.broadcastScreenshot();
 		broadcastFailedTrial = config.broadcastFailedTrials();
 		broadcastCancelledTrial = config.broadcastCancelledTrials();
 		broadcastCompletedTrial = config.broadcastCompletedTrials();
-		broadcastScreenshot = config.broadcastScreenshot();
 		screenshotFormat = config.screenshotFormat();
 		webhookFormat = config.colosseumWebhookFormat();
 		customTemplate = config.colosseumCustomTemplate();
@@ -145,7 +146,7 @@ public class ColosseumDiscordBroadcaster
 
 		log.info("Submitting {} payload to webhookUrl {}", webhookFormat.name(), webhookUrl);
 
-		if (broadcastScreenshot)
+		if (shouldBroadcastScreenshot(finalWave))
 		{
 			File screenshotFile = getBroadcastScreenshotFile(finalWave, attemptDto.getAttemptId());
 			discordWebhookService.queueWebhook(webhookUrl, payload, screenshotFile);
@@ -188,6 +189,26 @@ public class ColosseumDiscordBroadcaster
 
 		log.info("CurrentAttempt has {}; waveNumber and rewardsValue conditions have {}been met; {}broadcasting run", hasSucceeded ? "succeeded" : "failed", result ? "" : "not ", statusConditionMet&&result ? "" : "not ");
 		return statusConditionMet && result;
+	}
+
+	/**
+	 * Return true if a screenshot is to be attached, given configurations and the final state.
+	 */
+	private boolean shouldBroadcastScreenshot(ColosseumWaveDTO finalWave)
+	{
+		WaveStatus status = WaveStatus.fromString(finalWave.getStatus());
+		switch (status) {
+			case COMPLETED:
+				return broadcastCompletedTrial && broadcastScreenshot.isScreenshotOnSuccess();
+			case FAILED:
+				return broadcastFailedTrial && broadcastScreenshot.isScreenshotOnFailure();
+			case CANCELLED:
+			case CLAIMED:
+				return broadcastCancelledTrial && broadcastScreenshot.isScreenshotOnClaim();
+			default:
+				log.debug("Encountered a non-implemented status of {}", status);
+				return false;
+		}
 	}
 
 	/**
