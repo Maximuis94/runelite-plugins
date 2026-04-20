@@ -86,7 +86,7 @@ public class WeaponTracker
 			int itemId = weapon.getId();
 			if (itemId != currentWeaponId)
 			{
-				log.info("Updated carried weapon from {} to {}", currentWeaponId, itemId);
+				log.debug("Updated carried weapon from {} to {}", currentWeaponId, itemId);
 				currentWeaponId = itemId;
 				baseWeaponId = ItemVariationMapping.map(itemId);
 				weaponStats = null;

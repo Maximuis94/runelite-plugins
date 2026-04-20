@@ -155,7 +155,7 @@ public class GrandExchangeHistoryParser
 	public void parseGeHistory() {
 		if (!allowedToParseHistory())
 		{
-			log.info("Not parsing Grand Exchange history");
+			log.debug("Not parsing Grand Exchange history");
 			return;
 		}
 
@@ -232,10 +232,10 @@ public class GrandExchangeHistoryParser
 
 			fileIOService.saveInternalGeLedger(accountName, hash, mergedEntries);
 
-			log.info("Successfully parsed and saved GE History.");
+			log.debug("Successfully parsed and saved GE History.");
 		}
 		else
-			log.info("Did not enter any entry data from the Grand Exchange history");
+			log.debug("Did not enter any entry data from the Grand Exchange history");
 
 		lastParsed = System.currentTimeMillis();
 		hasParsed = true;

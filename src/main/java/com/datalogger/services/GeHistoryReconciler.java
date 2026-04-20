@@ -71,8 +71,7 @@ public class GeHistoryReconciler {
 
 			if (!foundMatch)
 			{
-//				updatedLedger.add(scraped);
-				log.info("Did not find a matching entry for history entry {}", scraped);
+				log.debug("Did not find a matching entry for history entry {}", scraped);
 			}
 		}
 		return updatedLedger;

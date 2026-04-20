@@ -125,7 +125,7 @@ public class SupplyTracker
 			if (quiverItemQuantity - newQuantity > 5 && newQuantity == 0) return;
 
 			quiverItemQuantity = newQuantity;
-			log.info("Updated quiver arrow quantity to {}", quiverItemQuantity);
+			log.debug("Updated quiver arrow quantity to {}", quiverItemQuantity);
 		}
 	}
 
@@ -142,7 +142,7 @@ public class SupplyTracker
 					nextAttackTick = tickCount + 2;
 					scytheAttacks++;
 
-					log.info("Scythe attacks increased to {}", scytheAttacks);
+					log.debug("Scythe attacks increased to {}", scytheAttacks);
 					break;
 				}
 			case TUMEKENS_SHADOW:
@@ -150,7 +150,7 @@ public class SupplyTracker
 				{
 					nextAttackTick = tickCount + 2;
 					shadowAttacks++;
-					log.info("Shadow attacks increased to {}", shadowAttacks);
+					log.debug("Shadow attacks increased to {}", shadowAttacks);
 					break;
 				}
 		}
@@ -185,7 +185,7 @@ public class SupplyTracker
 		ItemComposition itemComposition = itemManager.getItemComposition(quiverItemId);
 		quiverItemComposition = itemComposition;
 		quiverItemQuantity = client.getVarpValue(DIZANAS_QUIVER_TEMP_AMMO_AMOUNT);
-		log.info("Parsed initial quiver contents {}x {}", quiverItemQuantity, itemComposition.getName());
+		log.debug("Parsed initial quiver contents {}x {}", quiverItemQuantity, itemComposition.getName());
 	}
 
 	/**
@@ -287,8 +287,8 @@ public class SupplyTracker
 				pouch.put(itemId, quantity);
 
 				if (pouch.size() == 1)
-					log.info("Parsing Rune pouch contents...");
-				log.info("Added {}x itemId={} to rune pouch", quantity, itemId);
+					log.debug("Parsing Rune pouch contents...");
+				log.debug("Added {}x itemId={} to rune pouch", quantity, itemId);
 			}
 		}
 		return pouch;
@@ -302,17 +302,17 @@ public class SupplyTracker
 		if (itemId == TUMEKENS_SHADOW)
 		{
 			hasShadow = true;
-			log.info("Enabled tracking of Tumeken's shadow attacks");
+			log.debug("Enabled tracking of Tumeken's shadow attacks");
 		}
 		else if (itemId == SCYTHE_OF_VITUR)
 		{
 			hasScythe = true;
-			log.info("Enabled tracking of Scythe of vitur attacks");
+			log.debug("Enabled tracking of Scythe of vitur attacks");
 		}
 		else if (itemId == BH_RUNE_POUCH || itemId == DIVINE_RUNE_POUCH)
 		{
 			hasRunePouch = true;
-			log.info("Enabled tracking of Rune pouch contents");
+			log.debug("Enabled tracking of Rune pouch contents");
 		}
 		else if (itemId == DIZANAS_QUIVER_INFINITE_BROKEN   || itemId == SKILLCAPE_MAX_DIZANAS_BROKEN || itemId == DIZANAS_QUIVER_BROKEN)
 		{
@@ -361,7 +361,7 @@ public class SupplyTracker
 
 		if (hasQuiver)
 		{
-			log.info("Adding quiver contents {}x {} into inventory", quiverItemQuantity, quiverItemComposition.getName());
+			log.debug("Adding quiver contents {}x {} into inventory", quiverItemQuantity, quiverItemComposition.getName());
 			inventory.merge(quiverItemId, quiverItemQuantity, Integer::sum);
 		}
 	}
@@ -387,7 +387,7 @@ public class SupplyTracker
 		scytheAttacks = 0;
 		shadowAttacks = 0;
 		parseItemContainers(true);
-		log.info("Starting tracking of supplies");
+		log.debug("Starting tracking of supplies");
 	}
 
 	/**
@@ -436,7 +436,7 @@ public class SupplyTracker
 			if (diff > 0)
 			{
 				ItemComposition itemComposition = itemManager.getItemComposition(item);
-				log.info("Consumed: {} x{}", itemComposition.getName(), diff);
+				log.debug("Consumed: {} x{}", itemComposition.getName(), diff);
 				consumedItems.put(item, diff);
 			}
 		});
@@ -446,7 +446,7 @@ public class SupplyTracker
 
 			if (diff > 0)
 			{
-				log.info("Consumed: {} x{}", itemGroup.getBaseItemName(), diff);
+				log.debug("Consumed: {} x{}", itemGroup.getBaseItemName(), diff);
 				consumedDoses.put(itemGroup, diff);
 			}
 		});

@@ -258,7 +258,7 @@ public class ColosseumScanner
 
 			String manticoreTag = manticoreIndexA == npcIndex ? "A" : "B";
 
-			log.info("Manticore {} sequence identified as {} at tick={}", manticoreTag, sequence, client.getTickCount());
+			log.debug("Manticore {} sequence identified as {} at tick={}", manticoreTag, sequence, client.getTickCount());
 		}
 	}
 
@@ -628,10 +628,10 @@ public class ColosseumScanner
 
 		if (result != null)
 		{
-			log.info("Parsed the Results from intermissionUI: {}", result);
+			log.debug("Parsed the Results from intermissionUI: {}", result);
 		}
 		else {
-			log.info("Failed to parse results from intermission UI");
+			log.debug("Failed to parse results from intermission UI");
 		}
 
 		return result;
@@ -707,9 +707,9 @@ public class ColosseumScanner
 	public void updateConfigFlags(boolean startUp)
 	{
 		enabledSwapQuiverLoot = config.logQuiverAsSplinters();
-		log.info("enabledSwapQuiverLoot is set to {}", enabledSwapQuiverLoot);
+		log.debug("enabledSwapQuiverLoot is set to {}", enabledSwapQuiverLoot);
 		timestampFormat = config.logTimestamp();
-		log.info("timestampFormat is set to {}", timestampFormat.name());
+		log.debug("timestampFormat is set to {}", timestampFormat.name());
 
 		if (startUp)
 		{
