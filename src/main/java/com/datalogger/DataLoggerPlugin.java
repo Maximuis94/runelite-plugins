@@ -103,7 +103,7 @@ public class DataLoggerPlugin extends Plugin
 	@Override
 	protected void startUp() throws Exception
 	{
-		log.info("Data Logger starting up...");
+		log.debug("Data Logger starting up...");
 
 		eventBus.register(accountHashMapper);
 		accountHashMapper.loadMappings();
@@ -133,7 +133,7 @@ public class DataLoggerPlugin extends Plugin
 	@Override
 	protected void shutDown()
 	{
-		log.info("Data Logger shutting down...");
+		log.debug("Data Logger shutting down...");
 
 		if (fileIOService != null) {
 			fileIOService.flushAll();

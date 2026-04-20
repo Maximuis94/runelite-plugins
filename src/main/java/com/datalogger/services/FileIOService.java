@@ -121,7 +121,7 @@ public class FileIOService
 		attemptRoot = event.getRoot();
 		account = event.getAccountName();
 		startTime = event.getStartTime();
-		log.info("Initialized Colosseum FileIOService vars with root={}, account={}, startTime={}", attemptRoot, account, startTime);
+		log.debug("Initialized Colosseum FileIOService vars with root={}, account={}, startTime={}", attemptRoot, account, startTime);
 	}
 
 	public static final File PLUGIN_ROOT = new File(RuneLite.RUNELITE_DIR, "data-logger");
@@ -304,7 +304,7 @@ public class FileIOService
 
 			try (BufferedWriter writer = Files.newBufferedWriter(file.toPath(), StandardCharsets.UTF_8)) {
 				gson.toJson(dtos, writer);
-				log.info("Successfully saved Colosseum run to: {}", file.getName());
+				log.debug("Successfully saved Colosseum run to: {}", file.getName());
 			} catch (IOException e) {
 				log.error("Failed to save Colosseum JSON", e);
 			}
@@ -368,7 +368,7 @@ public class FileIOService
 					writer.endArray();
 				}
 
-				log.info("Successfully merged timeline for attempt {} at {}", attemptId, outFile.getAbsolutePath());
+				log.debug("Successfully merged timeline for attempt {} at {}", attemptId, outFile.getAbsolutePath());
 
 				// Clean up temporary files
 				for (File f : toDelete) {
@@ -405,8 +405,8 @@ public class FileIOService
 			// for Java 11+ as it lets you explicitly set UTF-8 encoding.
 			try (FileWriter writer = new FileWriter(targetFile)) {
 				gson.toJson(attemptDto, writer);
-				log.info("Successfully saved Colosseum attempt to {}", targetFile.getAbsolutePath());
-				log.info("Attempt waves: {} finalStatus: {}", attempt.getWaves().size(), attempt.getFinalStatus());
+				log.debug("Successfully saved Colosseum attempt to {}", targetFile.getAbsolutePath());
+				log.debug("Attempt waves: {} finalStatus: {}", attempt.getWaves().size(), attempt.getFinalStatus());
 			} catch (IOException e) {
 				log.error("Failed to save Colosseum attempt log!", e);
 			}
@@ -432,7 +432,7 @@ public class FileIOService
 				File file = new File(directory, fileName + ".png");
 				ImageIO.write(screenshot, "png", file);
 
-				log.info("Saved screenshot to {}", file.getAbsolutePath());
+				log.debug("Saved screenshot to {}", file.getAbsolutePath());
 			} catch (IOException e) {
 				log.error("Failed to save screenshot", e);
 			}
@@ -459,7 +459,7 @@ public class FileIOService
 					java.nio.file.StandardOpenOption.TRUNCATE_EXISTING
 				);
 
-				log.info("Successfully saved Colosseum CSV log to {}", outFile.getAbsolutePath());
+				log.debug("Successfully saved Colosseum CSV log to {}", outFile.getAbsolutePath());
 			} catch (IOException e) {
 				log.error("Failed to write Colosseum CSV log for attempt {}", outFile.getName(), e);
 			}});
@@ -565,7 +565,7 @@ public class FileIOService
 						}
 						catch (Exception ignored)
 						{
-							log.info("Failed to copy the json to the grand-exchange directory.");
+							log.debug("Failed to copy the json to the grand-exchange directory.");
 						}
 					}
 
@@ -654,7 +654,7 @@ public class FileIOService
 	 * Final attempt to write all rows that previously failed to write.
 	 */
 	public void flushAll() {
-		log.info("Waiting for pending background file writes to complete...");
+		log.debug("Waiting for pending background file writes to complete...");
 
 		Future<?> future;
 		while ((future = pendingWrites.poll()) != null) {
@@ -673,7 +673,7 @@ public class FileIOService
 
 			if (backlog.isEmpty()) continue;
 
-			log.info("Attempting final flush of {} rows to {} before shutdown...", backlog.size(), file.getName());
+			log.debug("Attempting final flush of {} rows to {} before shutdown...", backlog.size(), file.getName());
 
 			try (FileWriter fw = new FileWriter(file, true);
 				 BufferedWriter bw = new BufferedWriter(fw);
@@ -683,7 +683,7 @@ public class FileIOService
 				while ((queuedRow = backlog.poll()) != null) {
 					out.println(queuedRow);
 				}
-				log.info("Successfully flushed remaining backlog for {}", file.getName());
+				log.debug("Successfully flushed remaining backlog for {}", file.getName());
 
 			} catch (IOException e) {
 				log.error(
@@ -767,7 +767,7 @@ public class FileIOService
 							item.getQuantity());
 					}
 				}
-				log.info("Successfully exported vault to CSV: {}", csvFile.getName());
+				log.debug("Successfully exported vault to CSV: {}", csvFile.getName());
 			} catch (Exception e) {
 				log.error("Failed to write vault contents to CSV: {}", csvFile.getName(), e);
 			}

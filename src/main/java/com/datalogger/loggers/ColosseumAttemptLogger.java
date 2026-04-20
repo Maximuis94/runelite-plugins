@@ -169,7 +169,7 @@ public class ColosseumAttemptLogger extends AbstractLogger
 		String key = event.getKey();
 		if (key.equals("logColosseum")) {
 			if ((!enabledLogging && currentAttempt != null) && (activeWave || activeTrial)) {
-				log.info("Colosseum logging was disabled mid-run. Cleaning up state.");
+				log.debug("Colosseum logging was disabled mid-run. Cleaning up state.");
 				finalStatus = WaveStatus.CONFIG_DISABLED;
 				failWave();
 				endAttempt(WaveStatus.CONFIG_DISABLED);
@@ -206,8 +206,8 @@ public class ColosseumAttemptLogger extends AbstractLogger
 			waveStartTick = client.getTickCount();
 			setCurrentWave(Integer.parseInt(message.split(" ")[1]));
 			completedWave = currentWave;
-			log.info("Starting wave {} - setting waveStartTick to {}", currentWave, waveStartTick);
-			log.info("Modifier change tick is {}", waveStartTick-5);
+			log.debug("Starting wave {} - setting waveStartTick to {}", currentWave, waveStartTick);
+			log.debug("Modifier change tick is {}", waveStartTick-5);
 			startWave();
 			return;
 		}
@@ -216,8 +216,8 @@ public class ColosseumAttemptLogger extends AbstractLogger
 		{
 			completedWave = 12;
 			waveStartTick = client.getTickCount();
-			log.info("Starting wave 12 - setting waveStartTick to {}", waveStartTick);
-			log.info("Modifier change tick is {}", waveStartTick-5);
+			log.debug("Starting wave 12 - setting waveStartTick to {}", waveStartTick);
+			log.debug("Modifier change tick is {}", waveStartTick-5);
 			startWave();
 			return;
 		}
@@ -225,7 +225,7 @@ public class ColosseumAttemptLogger extends AbstractLogger
 		if (message.startsWith("Wave ") && message.contains("completed! Wave duration:"))
 		{
 			waveEndTick = client.getTickCount();
-			log.info("[WAVE {}] Setting WaveEndTick for wave to {}", currentWave, waveStartTick);
+			log.debug("[WAVE {}] Setting WaveEndTick for wave to {}", currentWave, waveStartTick);
 			waitingForIntermission = true;
 
 			endWave();
@@ -250,23 +250,23 @@ public class ColosseumAttemptLogger extends AbstractLogger
 				List<ColosseumModifier> modifierChoices = parsedTransitionUI.getModifierChoices();
 				if (modifierChoices == null)
 				{
-					log.info("[WAVE {}] Failed to resolve selected modifier; modifierChoices is null", currentWave);
+					log.debug("[WAVE {}] Failed to resolve selected modifier; modifierChoices is null", currentWave);
 				}
 				else if (modifierChoices.size() != 3)
 				{
-					log.info("[WAVE {}] Unexpected amount of modifierchoices: {}", currentWave, modifierChoices);
+					log.debug("[WAVE {}] Unexpected amount of modifierchoices: {}", currentWave, modifierChoices);
 				}
 				else
 				{
 					int selectedModifierIdx = event.getValue()-1;
 					selectedModifier = modifierChoices.get(selectedModifierIdx);
 					parsedTransitionUI.setSelectedModifier(selectedModifier);
-					log.info("[WAVE {}] Varbit {} was changed - new value is {}, set selectedModifier to {}", currentWave, COLOSSEUM_SELECTED_MODIFIER_VARBIT, selectedModifierIdx, selectedModifier);
+					log.debug("[WAVE {}] Varbit {} was changed - new value is {}, set selectedModifier to {}", currentWave, COLOSSEUM_SELECTED_MODIFIER_VARBIT, selectedModifierIdx, selectedModifier);
 				}
 			}
 			else
 			{
-				log.info("[WAVE {}] Failed to resolve selected modifier; parsedTransitionUI is null", currentWave);
+				log.debug("[WAVE {}] Failed to resolve selected modifier; parsedTransitionUI is null", currentWave);
 				selectedModifier = null;
 			}
 		}
@@ -395,7 +395,7 @@ public class ColosseumAttemptLogger extends AbstractLogger
 
 		if (state == GameState.LOGIN_SCREEN || state == GameState.HOPPING) {
 			if (inColosseum && currentAttempt != null) {
-				log.info("Player logged out or disconnected in the Colosseum. Run failed.");
+				log.debug("Player logged out or disconnected in the Colosseum. Run failed.");
 				failWave();
 				inColosseum = false;
 			}
@@ -411,7 +411,7 @@ public class ColosseumAttemptLogger extends AbstractLogger
 				{
 					return;
 				}
-				log.info("Player left the Colosseum (Death/Teleport/Walked out). Run failed.");
+				log.debug("Player left the Colosseum (Death/Teleport/Walked out). Run failed.");
 				failWave();
 			}
 		}
@@ -421,7 +421,7 @@ public class ColosseumAttemptLogger extends AbstractLogger
 	 * Initiates a new Attempt and resets all parameters
 	 */
 	private void startAttempt() {
-		log.info("Starting a new Colosseum attempt.");
+		log.debug("Starting a new Colosseum attempt.");
 		attemptStartTick = client.getTickCount();
 		setCurrentWave(1);
 		activeWave = false;
@@ -459,7 +459,7 @@ public class ColosseumAttemptLogger extends AbstractLogger
 	{
 		attemptEndTick = client.getTickCount();
 		double attemptDuration = BigDecimal.valueOf(.6 * (attemptEndTick - attemptStartTick)).setScale(1, RoundingMode.HALF_UP).doubleValue();
-		log.info("[Wave {}] ColosseumAttemptEnded posted | startTick={} endTick={} duration={}s", currentWave, attemptStartTick, attemptEndTick, attemptDuration);
+		log.debug("[Wave {}] ColosseumAttemptEnded posted | startTick={} endTick={} duration={}s", currentWave, attemptStartTick, attemptEndTick, attemptDuration);
 		eventBus.post(new ColosseumAttemptEnded(currentAttempt.getStartTime()));
 		currentAttempt.setFinalStatus(status);
 		fileIOService.logColosseumAttempt(currentAttempt);
@@ -559,7 +559,7 @@ public class ColosseumAttemptLogger extends AbstractLogger
 		if (activeWave) return;
 
 		waveStartTick = client.getTickCount();
-		log.info("[Wave {}] ColosseumWaveStarted event posted at tick {}", currentWave, waveStartTick);
+		log.debug("[Wave {}] ColosseumWaveStarted event posted at tick {}", currentWave, waveStartTick);
 		eventBus.post(new ColosseumWaveStarted(currentAttempt.getStartTime(), currentWave, waveStartTick));
 		activeWave = true;
 		parsedCurrentWaveIntermission = false;
@@ -586,7 +586,7 @@ public class ColosseumAttemptLogger extends AbstractLogger
 		activeWave = false;
 		waveEndTick = client.getTickCount();
 		eventBus.post(new ColosseumWaveEnded(currentAttempt.getStartTime(), currentWave));
-		log.info("[Wave {}] ColosseumWaveEnded event posted at tick {}", currentWave, client.getTickCount());
+		log.debug("[Wave {}] ColosseumWaveEnded event posted at tick {}", currentWave, client.getTickCount());
 	}
 
 	/**
@@ -624,7 +624,7 @@ public class ColosseumAttemptLogger extends AbstractLogger
 	private ColosseumWave generateCompletedWave(IntermissionUI curUI)
 	{
 		int endTick = client.getTickCount();
-		log.info("Completed wave {} at tick {}", completedWave, endTick);
+		log.debug("Completed wave {} at tick {}", completedWave, endTick);
 
 		List<ItemBundle> loot = parsedTransitionUI != null && parsedTransitionUI.getPotentialLoot() != null
 			? parsedTransitionUI.getPotentialLoot()
@@ -673,7 +673,7 @@ public class ColosseumAttemptLogger extends AbstractLogger
 	private ColosseumWave generateCancelledWave(IntermissionUI curUI)
 	{
 		int endTick = client.getTickCount();
-		log.info("Cancelled wave {} at tick {}", currentWave, endTick);
+		log.debug("Cancelled wave {} at tick {}", currentWave, endTick);
 		List<ItemBundle> loot = parsedTransitionUI != null && parsedTransitionUI.getPotentialLoot() != null
 			? parsedTransitionUI.getPotentialLoot()
 			: new ArrayList<>();
@@ -756,7 +756,7 @@ public class ColosseumAttemptLogger extends AbstractLogger
 	{
 		if (currentWave == waveNumber) return;
 
-		log.info("Updated currentWave value from {} to {} at tick={}", currentWave, waveNumber, client.getTickCount());
+		log.debug("Updated currentWave value from {} to {} at tick={}", currentWave, waveNumber, client.getTickCount());
 		currentWave = waveNumber;
 	}
 }

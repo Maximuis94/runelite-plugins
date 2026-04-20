@@ -145,9 +145,9 @@ public class GrandExchangeLogger extends AbstractLogger
 
 			log.debug("New completed trade detected in slot {}. Submitting...", geSlot);
 			if (handleOffer(geSlot, offer))
-				log.info("Successfully submitted completed trade detected in slot {}.", geSlot);
+				log.debug("Successfully submitted completed trade detected in slot {}.", geSlot);
 			else
-				log.info("Did not submit trade in slot {}.", geSlot);
+				log.debug("Did not submit trade in slot {}.", geSlot);
 		}
 	}
 
@@ -212,7 +212,7 @@ public class GrandExchangeLogger extends AbstractLogger
 		if (cw != null && !cw.isHidden())
 		{
 			this.lastParsedHistory = Instant.now().toEpochMilli();
-			log.info("Attempting to parse GE history....");
+			log.debug("Attempting to parse GE history....");
 			clientThread.invokeLater(this.historyParser::parseGeHistory);
 		}
 	}
