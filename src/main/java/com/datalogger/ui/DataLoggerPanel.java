@@ -28,11 +28,9 @@ import com.datalogger.framework.LogType;
 import com.datalogger.loggers.ItemVaultLogger;
 import java.awt.BorderLayout;
 import java.awt.Color;
-import java.awt.Desktop;
 import java.awt.Dimension;
 import java.awt.GridLayout;
 import java.io.File;
-import java.io.IOException;
 import java.util.concurrent.ScheduledExecutorService;
 import javax.inject.Inject;
 import javax.swing.JButton;
@@ -41,17 +39,16 @@ import javax.swing.border.EmptyBorder;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.PluginPanel;
+import net.runelite.client.util.LinkBrowser;
 
 @Slf4j
 public class DataLoggerPanel extends PluginPanel {
-	private final JPanel logContentDisplay = new JPanel();
-	private final ItemVaultLogger itemVaultLogger;
 	private final ScheduledExecutorService executor;
 
 	@Inject
 	public DataLoggerPanel(ItemVaultLogger itemVaultLogger, ScheduledExecutorService executor) {
-		this.itemVaultLogger = itemVaultLogger;
 		this.executor = executor;
+		final JPanel logContentDisplay = new JPanel();
 
 		// Matches the standard RuneLite sidebar padding
 		this.setBorder(new EmptyBorder(0, 0, 10, 0));
@@ -71,13 +68,13 @@ public class DataLoggerPanel extends PluginPanel {
 		buttonContainer.setBackground(ColorScheme.DARK_GRAY_COLOR);
 
 		JButton openLogsBtn = createStyledButton("Colosseum log directory");
-		openLogsBtn.addActionListener(e -> openDirectory(LogType.COLOSSEUM.getLogDirectory().getAbsolutePath()));
+		openLogsBtn.addActionListener(e -> openDirectory(LogType.COLOSSEUM.getLogDirectory()));
 
 		JButton openDataBtn = createStyledButton("Grand exchange directory");
-		openDataBtn.addActionListener(e -> openDirectory(LogType.GRAND_EXCHANGE.getLogDirectory().getAbsolutePath()));
+		openDataBtn.addActionListener(e -> openDirectory(LogType.GRAND_EXCHANGE.getLogDirectory()));
 
 		JButton openItemVaultBtn = createStyledButton("Item Vault directory");
-		openItemVaultBtn.addActionListener(e -> openDirectory(LogType.ITEM_VAULT.getLogDirectory().getAbsolutePath()));
+		openItemVaultBtn.addActionListener(e -> openDirectory(LogType.ITEM_VAULT.getLogDirectory()));
 
 		JButton exportVaultBtn = createStyledButton("Export Vault Summary");
 		exportVaultBtn.addActionListener(e -> {
@@ -93,45 +90,33 @@ public class DataLoggerPanel extends PluginPanel {
 	}
 
 	/**
-	 * Helper method to open a directory in the native OS file explorer.
+	 * Helper method to open a directory in the native OS file explorer safely using RuneLite's LinkBrowser.
 	 */
-	private void openDirectory(String directoryPath) {
+	private void openDirectory(File dir) {
 		executor.submit(() -> {
-			File dir = new File(directoryPath);
-
 			if (!dir.exists()) {
-				log.warn("Directory does not exist, attempting to create: {}", directoryPath);
+				log.warn("Directory does not exist, attempting to create: {}", dir);
 				if (!dir.mkdirs()) {
-					log.error("Failed to create directory: {}", directoryPath);
+					log.error("Failed to create directory: {}", dir);
 					return;
 				}
 			}
 
-			try {
-				if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.OPEN)) {
-					Desktop.getDesktop().open(dir);
-				} else {
-					log.warn("Desktop API is not supported on this platform. Cannot open file explorer.");
-				}
-			} catch (IOException ex) {
-				log.error("Failed to open directory: {}", directoryPath, ex);
-			}
+			LinkBrowser.open(dir.toString());
 		});
 	}
 
+	/**
+	 * Create and return a JButton with standardized styling
+	 */
 	private JButton createStyledButton(String text) {
 		JButton button = new JButton(text);
 		button.setFocusable(false);
-		button.setPreferredSize(new Dimension(0, 30)); // Standard height for panel buttons
-
-		// RuneLite Standard Button Colors
+		button.setPreferredSize(new Dimension(0, 30));
 		button.setBackground(ColorScheme.DARKER_GRAY_COLOR);
 		button.setForeground(Color.WHITE);
-
-		// Remove the default border and add padding
 		button.setBorder(new EmptyBorder(5, 5, 5, 5));
 
-		// Hover effects to match the RuneLite UI
 		button.addMouseListener(new java.awt.event.MouseAdapter() {
 			public void mouseEntered(java.awt.event.MouseEvent evt) {
 				button.setBackground(ColorScheme.DARKER_GRAY_HOVER_COLOR);
