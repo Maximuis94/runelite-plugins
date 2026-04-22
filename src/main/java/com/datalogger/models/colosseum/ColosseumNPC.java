@@ -25,22 +25,45 @@
 
 package com.datalogger.models.colosseum;
 
+import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Value;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 /**
- * A ColosseumNPC as seen in a ColosseumState
- * orbSequence only applies to Manticores; it is either Unknown or a triplet of attack styles, from bottom to top.
+ * A ColosseumNPC as seen in a ColosseumState. It describes an NPC at a particular place at a particular time during a
+ * trial.
+ * The hp attribute is an approximation based on the visible HP bar. In a nutshell, a higher maxHP value tends to translate
+ * to less accurate hp value, as the visual hp bar resolution is not equal to the exact number of hp
+ * Some attributes only apply to specific mobs;
+ * orbSequence and isSequenceRevealed only applies to Manticores;
+ * it can be completely unknown (1), retro-actively known (2), or known (3).
+ * (1) orbSequence is null and isSequenceRevealed is false, OR;
+ * orbSequence describes the sequence (e.g. MAGIC-RANGE-MELEE) and isSequenceRevealed is false (2) or true (3)
+ * isReinforcements is used to distinguish reinforcements Serpent shamans from its non-reinforcement counterpart, as
+ * all other cases are implied. By definition, it is always true for a Jaguar warrior and Minotaur.
+ * One edge case that does not have a proper solution is a Red flag minotaur (npcId=12813)
+ * Red flag minotaurs behave different, but this version is not (yet?) encoded in the simulator. Since these
+ * minotaurs have the ability to move through other foes and cannot be safe-spotted, they are omitted completely in
+ * generated replays, as they do not affect the behaviour of their allies by blocking their movement.
  */
-@Value
+@Data
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class ColosseumNPC {
-	int npcIndex;
-	int npcId;
-	String name;
-	int x;
-	int y;
-	int hp;
-	int maxHp;
-	String orbSequence;
+	private int npcIndex;
+	private int npcId;
+	private String name;
+	private int x;
+	private int y;
+	private int hp;
+	private int maxHp;
+
+	private String orbSequence;
+	@Builder.Default
+	private boolean isSequenceRevealed = false;
+
+	@Builder.Default
+	private boolean isReinforcements = false;
 }
