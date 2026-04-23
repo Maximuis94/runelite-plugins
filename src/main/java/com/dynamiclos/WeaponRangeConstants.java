@@ -26,10 +26,10 @@
 package com.dynamiclos;
 
 import java.util.Arrays;
-import net.runelite.api.gameval.ItemID;
 
 /**
- * Utility class that provides a mapping for base weapon range per item ID
+ * Static utility class that provides a mapping for base weapon range per item ID.
+ * Weapon ranges that exceed 1 are hard-coded in an array where each index corresponds to the itemId
  */
 public final class WeaponRangeConstants {
 
@@ -37,13 +37,10 @@ public final class WeaponRangeConstants {
 		throw new UnsupportedOperationException("Utility class cannot be instantiated");
 	}
 
-	private static final int[] WEAPON_RANGES = new int[40000];
+	private static final int[] WEAPON_RANGES = new int[35000];
 
 	static {
 		Arrays.fill(WEAPON_RANGES, 1);
-
-		WEAPON_RANGES[ItemID.DRAGON_HALBERD] = 2;
-		WEAPON_RANGES[ItemID.TWISTED_BOW] = 10;
 	}
 
 	/**
