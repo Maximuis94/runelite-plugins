@@ -29,9 +29,12 @@ import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
 
-@ConfigGroup("dynamiclineofsight")
+@ConfigGroup(DynamicLineOfSightConfig.PLUGIN_CONFIG_GROUP)
 public interface DynamicLineOfSightConfig extends Config
 {
+	public static final String PLUGIN_CONFIG_GROUP = "dynamiclineofsight";
+
+
 	@ConfigItem(
 		keyName = "greeting",
 		name = "Welcome Greeting",

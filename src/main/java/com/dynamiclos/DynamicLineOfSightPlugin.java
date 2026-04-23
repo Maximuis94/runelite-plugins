@@ -30,7 +30,10 @@ import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.EquipmentInventorySlot;
+import net.runelite.api.GameState;
 import net.runelite.api.Item;
+import net.runelite.api.WorldView;
+import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.ItemContainerChanged;
 import net.runelite.api.gameval.InventoryID;
 import net.runelite.api.gameval.VarPlayerID;
@@ -58,24 +61,31 @@ public class DynamicLineOfSightPlugin extends Plugin
 	@Inject
 	private LineOfSightOverlay overlay;
 
+	private boolean isMyopiaEnabled = false;
+
 	@Getter
 	private int cachedAttackRange = 1;
 
+	private static final int COLOSSEUM_REGION_ID = 7175;
+	private static final int MYOPIA_VARBIT_ID = VarbitID.COLOSSEUM_MODIFIER_MYOPIA_STACKS_CLIENT;
 	private static final int WORN_EQUIPMENT_ID = InventoryID.WORN;
 	private static final int ATTACK_STYLE_VARP_ID = VarPlayerID.ATTACK;
-	private static final int MYOPIA_VARBIT_ID = VarbitID.COLOSSEUM_MODIFIER_MYOPIA_STACKS_CLIENT;
 	private static final int EQUIPPED_WEAPON_TYPE_VARBIT_ID = VarbitID.COMBAT_WEAPON_CATEGORY;
 
+	private final static int MIN_PLAYER_ATTACK_RANGE = 1;
 	private final static int MAX_PLAYER_ATTACK_RANGE = 10;
 	private final static int WEAPON_SLOT_INDEX = EquipmentInventorySlot.WEAPON.getSlotIdx();
 	private static final int LONGRANGE_STYLE_INDEX = 3;
+	private static final int LONGRANGE_EXTENSION = 2;
 	private static final Set<Integer> LONGRANGE_STYLE_IDS = Set.of(3, 7, 19, 24);
 
 	private int equippedWeaponId = -1;
-	private int myopiaTier = 0;
 	private int attackStyleIndex = -1;
 	private boolean hasLongRangeWeapon = false;
 	private int longRangeBonus = 0;
+
+	private boolean isInColosseum = false;
+	private int myopiaReduction = 0;
 
 	@Override
 	protected void startUp() throws Exception {
@@ -97,6 +107,57 @@ public class DynamicLineOfSightPlugin extends Plugin
 		}
 	}
 
+	private void updateInColosseum()
+	{
+		WorldView topLevelWorldView = client.getTopLevelWorldView();
+
+		if (topLevelWorldView != null)
+		{
+			int[] mapRegions = topLevelWorldView.getMapRegions();
+
+			if (mapRegions != null)
+			{
+				for (int region : mapRegions)
+				{
+					if (region == COLOSSEUM_REGION_ID)
+					{
+						// If I transition from outside to inside, myopia has to be 0
+						myopiaReduction = isInColosseum ? client.getVarbitValue(MYOPIA_VARBIT_ID) * 2 : 0;
+
+						isInColosseum = true;
+						break;
+					}
+				}
+				resetInColosseum();
+			}
+		}
+	}
+
+	private void resetInColosseum()
+	{
+		isInColosseum = false;
+		myopiaReduction = 0;
+	}
+
+	@Subscribe
+	public void onGameStateChanged(GameStateChanged event)
+	{
+		if (!isMyopiaEnabled) return;
+
+		GameState state = event.getGameState();
+
+		if (state == GameState.LOGIN_SCREEN || state == GameState.HOPPING || state == GameState.CONNECTION_LOST)
+		{
+			resetInColosseum();
+			return;
+		}
+
+		if (state == GameState.LOGGED_IN)
+		{
+			updateInColosseum();
+		}
+	}
+
 	@Subscribe
 	public void onVarbitChanged(VarbitChanged event) {
 		int id = event.getVarbitId();
@@ -105,16 +166,18 @@ public class DynamicLineOfSightPlugin extends Plugin
 			updateActiveLongRangeBonus();
 			updateCachedRange();
 		}
-		else if (id == MYOPIA_VARBIT_ID)
-		{
-			myopiaTier = client.getVarpValue(MYOPIA_VARBIT_ID);
-			updateCachedRange();
-		}
+
 		else if (id == EQUIPPED_WEAPON_TYPE_VARBIT_ID)
 		{
 			int equippedWeaponType = client.getVarbitValue(EQUIPPED_WEAPON_TYPE_VARBIT_ID);
 			hasLongRangeWeapon = LONGRANGE_STYLE_IDS.contains(equippedWeaponType);
 			updateActiveLongRangeBonus();
+			updateCachedRange();
+		}
+
+		else if (isInColosseum && id == MYOPIA_VARBIT_ID)
+		{
+			myopiaReduction = client.getVarbitValue(MYOPIA_VARBIT_ID) * 2;
 			updateCachedRange();
 		}
 	}
@@ -126,8 +189,19 @@ public class DynamicLineOfSightPlugin extends Plugin
 	{
 		int equippedWeaponType = client.getVarbitValue(EQUIPPED_WEAPON_TYPE_VARBIT_ID);
 		hasLongRangeWeapon = LONGRANGE_STYLE_IDS.contains(equippedWeaponType);
-		myopiaTier = client.getVarpValue(MYOPIA_VARBIT_ID);
 		attackStyleIndex = client.getVarpValue(ATTACK_STYLE_VARP_ID);
+
+		if (isMyopiaEnabled)
+		{
+			updateInColosseum();
+
+			// If true, plugin was activated during a trial
+			if (isInColosseum)
+			{
+				myopiaReduction = client.getVarbitValue(MYOPIA_VARBIT_ID) * 2;
+			}
+		}
+
 		updateCachedRange();
 	}
 
@@ -136,24 +210,25 @@ public class DynamicLineOfSightPlugin extends Plugin
 	 */
 	private void updateActiveLongRangeBonus()
 	{
-		longRangeBonus = hasLongRangeWeapon && attackStyleIndex == LONGRANGE_STYLE_INDEX ? 2 : 0;
+		longRangeBonus = hasLongRangeWeapon && attackStyleIndex == LONGRANGE_STYLE_INDEX ? LONGRANGE_EXTENSION : 0;
 	}
 
 	/**
 	 * Updates the cached range by checking the weapon and current attack style.
 	 */
 	private void updateCachedRange() {
-		if (client.getGameState() != net.runelite.api.GameState.LOGGED_IN) {
+		if (client.getGameState() != GameState.LOGGED_IN) {
 			return;
 		}
 
 		int baseRange = WeaponRangeConstants.getBaseRange(equippedWeaponId);
-		int newRange = Math.min(baseRange + longRangeBonus, MAX_PLAYER_ATTACK_RANGE) - myopiaTier;
+		int computedRange = Math.min(baseRange + longRangeBonus, MAX_PLAYER_ATTACK_RANGE) - myopiaReduction;
+		int newRange = Math.max(computedRange, MIN_PLAYER_ATTACK_RANGE);
 
 		if (newRange != cachedAttackRange)
 		{
 			cachedAttackRange = newRange;
-			overlay.setActiveAttackRange(baseRange);
+			overlay.setActiveAttackRange(cachedAttackRange);
 		}
 	}
 }
