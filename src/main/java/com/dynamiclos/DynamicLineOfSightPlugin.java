@@ -25,7 +25,9 @@
 
 package com.dynamiclos;
 
+import com.google.inject.Provides;
 import java.util.Set;
+import javax.inject.Inject;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
@@ -35,28 +37,41 @@ import net.runelite.api.Item;
 import net.runelite.api.WorldView;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.ItemContainerChanged;
+import net.runelite.api.events.VarbitChanged;
 import net.runelite.api.gameval.InventoryID;
 import net.runelite.api.gameval.VarPlayerID;
-import net.runelite.api.events.VarbitChanged;
 import net.runelite.api.gameval.VarbitID;
+import net.runelite.client.callback.ClientThread;
+import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
-import net.runelite.client.game.ItemVariationMapping;
+import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.overlay.OverlayManager;
 
-import javax.inject.Inject;
 @Slf4j
 @PluginDescriptor(
 	name = "Dynamic line of sight"
 )
 public class DynamicLineOfSightPlugin extends Plugin
 {
+	@Provides
+	DynamicLineOfSightConfig provideConfig(ConfigManager configManager)
+	{
+		return configManager.getConfig(DynamicLineOfSightConfig.class);
+	}
+
 	@Inject
 	private Client client;
 
 	@Inject
+	private ClientThread clientThread;
+
+	@Inject
 	private OverlayManager overlayManager;
+
+	@Inject
+	private DynamicLineOfSightConfig config;
 
 	@Inject
 	private LineOfSightOverlay overlay;
@@ -69,7 +84,7 @@ public class DynamicLineOfSightPlugin extends Plugin
 	private static final int COLOSSEUM_REGION_ID = 7175;
 	private static final int MYOPIA_VARBIT_ID = VarbitID.COLOSSEUM_MODIFIER_MYOPIA_STACKS_CLIENT;
 	private static final int WORN_EQUIPMENT_ID = InventoryID.WORN;
-	private static final int ATTACK_STYLE_VARP_ID = VarPlayerID.ATTACK;
+	private static final int ATTACK_STYLE_VARP_ID = VarPlayerID.COM_MODE;
 	private static final int EQUIPPED_WEAPON_TYPE_VARBIT_ID = VarbitID.COMBAT_WEAPON_CATEGORY;
 
 	private final static int MIN_PLAYER_ATTACK_RANGE = 1;
@@ -77,9 +92,10 @@ public class DynamicLineOfSightPlugin extends Plugin
 	private final static int WEAPON_SLOT_INDEX = EquipmentInventorySlot.WEAPON.getSlotIdx();
 	private static final int LONGRANGE_STYLE_INDEX = 3;
 	private static final int LONGRANGE_EXTENSION = 2;
-	private static final Set<Integer> LONGRANGE_STYLE_IDS = Set.of(3, 7, 19, 24);
+	private static final Set<Integer> LONGRANGE_STYLE_IDS = Set.of(3, 5, 7, 19, 24);
 
 	private int equippedWeaponId = -1;
+	private int equippedWeaponType = -1;
 	private int attackStyleIndex = -1;
 	private boolean hasLongRangeWeapon = false;
 	private int longRangeBonus = 0;
@@ -90,7 +106,7 @@ public class DynamicLineOfSightPlugin extends Plugin
 	@Override
 	protected void startUp() throws Exception {
 		overlayManager.add(overlay);
-		initialize();
+		clientThread.invokeLater(this::initialize);
 	}
 
 	@Override
@@ -101,9 +117,16 @@ public class DynamicLineOfSightPlugin extends Plugin
 	@Subscribe
 	public void onItemContainerChanged(ItemContainerChanged event) {
 		if (event.getContainerId() == WORN_EQUIPMENT_ID) {
-			Item weaponId = event.getItemContainer().getItem(WEAPON_SLOT_INDEX);
-			equippedWeaponId = weaponId != null ? ItemVariationMapping.map(weaponId.getId()) : -1;
-			updateCachedRange();
+			Item weapon = event.getItemContainer().getItem(WEAPON_SLOT_INDEX);
+			if (weapon == null) return;
+
+			int weaponId = weapon.getId();
+			if (weaponId != equippedWeaponId)
+			{
+				log.debug("Equipped weapon changed from {} to {}", equippedWeaponId, weaponId);
+				equippedWeaponId = weaponId;
+				updateCachedRange();
+			}
 		}
 	}
 
@@ -160,22 +183,28 @@ public class DynamicLineOfSightPlugin extends Plugin
 
 	@Subscribe
 	public void onVarbitChanged(VarbitChanged event) {
-		int id = event.getVarbitId();
-		if (id == ATTACK_STYLE_VARP_ID) {
+		int pId = event.getVarpId();
+		if (pId == ATTACK_STYLE_VARP_ID) {
+			int newIndex = client.getVarpValue(ATTACK_STYLE_VARP_ID);
+			log.debug("AttackStyleIndex was changed from {} to {}", attackStyleIndex, newIndex);
 			attackStyleIndex = client.getVarpValue(ATTACK_STYLE_VARP_ID);
 			updateActiveLongRangeBonus();
 			updateCachedRange();
+			return;
 		}
 
-		else if (id == EQUIPPED_WEAPON_TYPE_VARBIT_ID)
+		int vId = event.getVarbitId();
+		if (vId == EQUIPPED_WEAPON_TYPE_VARBIT_ID)
 		{
-			int equippedWeaponType = client.getVarbitValue(EQUIPPED_WEAPON_TYPE_VARBIT_ID);
-			hasLongRangeWeapon = LONGRANGE_STYLE_IDS.contains(equippedWeaponType);
+			int newEquippedWeaponType = client.getVarbitValue(EQUIPPED_WEAPON_TYPE_VARBIT_ID);
+			hasLongRangeWeapon = LONGRANGE_STYLE_IDS.contains(newEquippedWeaponType);
+			log.debug("Equipped Weapon Type was changed from {} to {}", equippedWeaponType, newEquippedWeaponType);
+			equippedWeaponType = newEquippedWeaponType;
 			updateActiveLongRangeBonus();
 			updateCachedRange();
 		}
 
-		else if (isInColosseum && id == MYOPIA_VARBIT_ID)
+		else if (isInColosseum && vId == MYOPIA_VARBIT_ID)
 		{
 			myopiaReduction = client.getVarbitValue(MYOPIA_VARBIT_ID) * 2;
 			updateCachedRange();
@@ -211,6 +240,7 @@ public class DynamicLineOfSightPlugin extends Plugin
 	private void updateActiveLongRangeBonus()
 	{
 		longRangeBonus = hasLongRangeWeapon && attackStyleIndex == LONGRANGE_STYLE_INDEX ? LONGRANGE_EXTENSION : 0;
+		log.debug("Longrange bonus is {}", longRangeBonus == LONGRANGE_EXTENSION ? "active" : "inactive");
 	}
 
 	/**
@@ -227,6 +257,7 @@ public class DynamicLineOfSightPlugin extends Plugin
 
 		if (newRange != cachedAttackRange)
 		{
+			log.debug("Updated player attack range parameters from {} to {}", cachedAttackRange, newRange);
 			cachedAttackRange = newRange;
 			overlay.setActiveAttackRange(cachedAttackRange);
 		}

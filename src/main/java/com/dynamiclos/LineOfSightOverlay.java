@@ -30,8 +30,11 @@ import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics2D;
 import java.awt.Polygon;
+import java.awt.Shape;
+import java.awt.geom.Area;
 import javax.inject.Inject;
 import net.runelite.api.Client;
+import net.runelite.api.NPC;
 import net.runelite.api.Perspective;
 import net.runelite.api.Player;
 import net.runelite.api.WorldView;
@@ -41,30 +44,24 @@ import net.runelite.api.coords.WorldPoint;
 import net.runelite.client.ui.overlay.Overlay;
 import net.runelite.client.ui.overlay.OverlayLayer;
 import net.runelite.client.ui.overlay.OverlayPosition;
-import net.runelite.client.ui.overlay.OverlayUtil;
 
-/**
- * Class for handling the overlay generation
- */
 public class LineOfSightOverlay extends Overlay {
 
 	private final Client client;
+	private final DynamicLineOfSightConfig config;
 	private int activeWeaponRange = 0;
 
-	public void setActiveAttackRange(int range)
-	{
+	public void setActiveAttackRange(int range) {
 		activeWeaponRange = range;
 	}
 
 	@Inject
-	public LineOfSightOverlay(Client client) {
+	public LineOfSightOverlay(Client client, DynamicLineOfSightConfig config) {
 		this.client = client;
+		this.config = config;
 		setPosition(OverlayPosition.DYNAMIC);
 		setLayer(OverlayLayer.ABOVE_SCENE);
 	}
-
-	private static final Color OUTLINE_COLOR = new Color(0, 255, 255, 200);
-	private static final Color FILL_COLOR = new Color(0, 255, 255, 30);
 
 	@Override
 	public Dimension render(Graphics2D graphics) {
@@ -78,8 +75,94 @@ public class LineOfSightOverlay extends Overlay {
 		WorldArea playerArea = player.getWorldArea();
 		WorldView wv = client.getTopLevelWorldView();
 
-		for (int dx = -activeWeaponRange; dx <= activeWeaponRange; dx++) {
-			for (int dy = -activeWeaponRange; dy <= activeWeaponRange; dy++) {
+		if (config.drawActiveWeaponRange()) {
+			Area activeRangeArea = calculateLineOfSightArea(playerLocation, playerArea, wv, activeWeaponRange);
+			if (!activeRangeArea.isEmpty()) {
+				graphics.setColor(config.activeWeaponFillColor());
+				graphics.fill(activeRangeArea);
+
+				graphics.setColor(config.activeWeaponOutlineColor());
+				graphics.setStroke(new BasicStroke(1));
+				graphics.draw(activeRangeArea);
+			}
+		}
+
+		if (config.drawMaxAttackRange()) {
+			Area maxRangeArea = calculateLineOfSightArea(playerLocation, playerArea, wv, 10);
+			if (!maxRangeArea.isEmpty()) {
+				graphics.setColor(config.maxRangeFillColor());
+				graphics.fill(maxRangeArea);
+
+				graphics.setColor(config.maxRangeOutlineColor());
+				graphics.setStroke(new BasicStroke(1));
+				graphics.draw(maxRangeArea);
+			}
+		}
+
+		boolean highlightActive = config.highlightAttackableEnemies();
+		boolean highlightMax = config.highlightEnemiesWithinMaxRange();
+
+		if (highlightActive || highlightMax) {
+			for (NPC npc : wv.npcs()) {
+				if (npc == null || npc.isDead() || npc.getCombatLevel() == 0) {
+					continue;
+				}
+
+				WorldArea npcArea = npc.getWorldArea();
+				if (npcArea == null) {
+					continue;
+				}
+
+				int distance = playerArea.distanceTo(npcArea);
+				Color enemyHighlightColor = null;
+
+				// --- NEW: Handle Melee Quirk ---
+				boolean inActiveRange;
+				if (activeWeaponRange == 1) {
+					// Safely calculates 1x1 diagonal vs large NPC orthogonal rules
+					inActiveRange = playerArea.isInMeleeDistance(npcArea);
+				} else {
+					inActiveRange = distance <= activeWeaponRange;
+				}
+
+				// Check active weapon range first (smaller bubble priority)
+				if (highlightActive && inActiveRange) {
+					enemyHighlightColor = config.activeWeaponOutlineColor();
+				}
+				// If not in active range, check max range
+				else if (highlightMax && distance <= 10) {
+					enemyHighlightColor = config.maxRangeOutlineColor();
+				}
+
+				// If the enemy falls into either enabled category, perform the LoS check and draw
+				if (enemyHighlightColor != null) {
+					if (playerArea.hasLineOfSightTo(wv, npcArea)) {
+						Shape npcHull = npc.getConvexHull();
+						if (npcHull != null) {
+							graphics.setColor(enemyHighlightColor);
+							graphics.setStroke(new BasicStroke(2));
+							graphics.draw(npcHull);
+						}
+					}
+				}
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * Helper method to calculate the line of sight area for a given range.
+	 */
+	private Area calculateLineOfSightArea(WorldPoint playerLocation, WorldArea playerArea, WorldView wv, int range) {
+		Area area = new Area();
+
+		for (int dx = -range; dx <= range; dx++) {
+			for (int dy = -range; dy <= range; dy++) {
+				if (range == 1 && Math.abs(dx) == 1 && Math.abs(dy) == 1) {
+					continue;
+				}
+
 				WorldPoint targetPoint = new WorldPoint(
 					playerLocation.getX() + dx,
 					playerLocation.getY() + dy,
@@ -95,18 +178,12 @@ public class LineOfSightOverlay extends Overlay {
 						Polygon tilePoly = Perspective.getCanvasTilePoly(client, localPoint);
 
 						if (tilePoly != null) {
-							OverlayUtil.renderPolygon(
-								graphics,
-								tilePoly,
-								OUTLINE_COLOR,
-								FILL_COLOR,
-								new BasicStroke(1)
-							);
+							area.add(new Area(tilePoly));
 						}
 					}
 				}
 			}
 		}
-		return null;
+		return area;
 	}
 }
