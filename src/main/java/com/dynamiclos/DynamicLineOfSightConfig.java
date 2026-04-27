@@ -25,12 +25,7 @@
 
 package com.dynamiclos;
 
-import static com.dynamiclos.PluginConstants.DEFAULT_COLOR_ACTIVE_WEAPON_FILL;
-import static com.dynamiclos.PluginConstants.DEFAULT_COLOR_ACTIVE_WEAPON_OUTLINE;
-import static com.dynamiclos.PluginConstants.DEFAULT_COLOR_MAGIC_FILL;
-import static com.dynamiclos.PluginConstants.DEFAULT_COLOR_MAGIC_OUTLINE;
-import static com.dynamiclos.PluginConstants.DEFAULT_LINE_WIDTH;
-import static com.dynamiclos.PluginConstants.PLUGIN_CONFIG_GROUP;
+import static com.dynamiclos.PluginConstants.*;
 import java.awt.Color;
 import net.runelite.client.config.Alpha;
 import net.runelite.client.config.Config;
@@ -50,28 +45,39 @@ public interface DynamicLineOfSightConfig extends Config
 	@ConfigSection(
 		name = "General Settings",
 		description = "General settings and hotkeys that do not fit into a specific line of sight category",
-		position = 0
+		position = 0,
+		closedByDefault = true
 	)
 	String generalSection = "generalSection";
 
 	@ConfigSection(
+		name = "NPC Colors",
+		description = "Section with various outline and fill colors to assign to particular NPC groups",
+		position = 1,
+		closedByDefault = true
+	)
+	String npcColorSection = "npcColorSection";
+
+	@ConfigSection(
 		name = "Active Weapon Range",
 		description = "Settings for the currently equipped weapon's line of sight",
-		position = 1
+		position = 2,
+		closedByDefault = true
 	)
 	String activeWeaponSection = "activeWeaponSection";
 
 	@ConfigSection(
 		name = "Max Attack Range",
 		description = "Settings for the maximum possible attack range (10 tiles), unaffected by Myopia.",
-		position = 2
+		position = 3,
+		closedByDefault = true
 	)
 	String maxRangeSection = "maxRangeSection";
 
 	@ConfigSection(
 		name = "Fixed Range 1",
 		description = "Settings for configurable fixed distance line of sight 1",
-		position = 3,
+		position = 4,
 		closedByDefault = true
 	)
 	String fixedRange1Section = "fixedRange1Section";
@@ -79,7 +85,7 @@ public interface DynamicLineOfSightConfig extends Config
 	@ConfigSection(
 		name = "Fixed Range 2",
 		description = "Settings for configurable fixed distance line of sight 2",
-		position = 4,
+		position = 5,
 		closedByDefault = true
 	)
 	String fixedRange2Section = "fixedRange2Section";
@@ -87,7 +93,7 @@ public interface DynamicLineOfSightConfig extends Config
 	@ConfigSection(
 		name = "Fixed Range 3",
 		description = "Settings for configurable fixed distance line of sight 3",
-		position = 5,
+		position = 6,
 		closedByDefault = true
 	)
 	String fixedRange3Section = "fixedRange3Section";
@@ -95,7 +101,7 @@ public interface DynamicLineOfSightConfig extends Config
 	@ConfigSection(
 		name = "Fixed Range 4",
 		description = "Settings for configurable fixed distance line of sight 4",
-		position = 6,
+		position = 7,
 		closedByDefault = true
 	)
 	String fixedRange4Section = "fixedRange4Section";
@@ -103,7 +109,7 @@ public interface DynamicLineOfSightConfig extends Config
 	@ConfigSection(
 		name = "Fixed Range 5",
 		description = "Settings for configurable fixed distance line of sight 5",
-		position = 7,
+		position = 8,
 		closedByDefault = true
 	)
 	String fixedRange5Section = "fixedRange5Section";
@@ -138,6 +144,99 @@ public interface DynamicLineOfSightConfig extends Config
 		section = generalSection
 	)
 	default Keybind virtualPlayerLosHotkey() { return Keybind.NOT_SET; }
+
+	@ConfigItem(
+		keyName = "togglePlayerLosHotkey",
+		name = "Toggle player line of sight",
+		description = "Press the configured button to completely enable/disable all player lines of sight",
+		position = 3,
+		section = generalSection
+	)
+	default Keybind togglePlayerLosHotkey() { return Keybind.NOT_SET; }
+
+
+	// =========================================
+	// ACTIVE WEAPON RANGE ITEMS
+	// =========================================
+	@Alpha
+	@ConfigItem(
+		keyName = "meleeNpcOutlineColor",
+		name = "Melee outline color",
+		description = "The outline color for melee NPC lines of sight",
+		position = 0,
+		section = npcColorSection
+	)
+	default Color meleeNpcOutlineColor() { return DEFAULT_COLOR_MELEE_OUTLINE; }
+
+	@Alpha
+	@ConfigItem(
+		keyName = "meleeNpcFillColor",
+		name = "Melee fill color",
+		description = "The fill color for melee NPC lines of sight",
+		position = 1,
+		section = npcColorSection
+	)
+	default Color meleeNpcFillColor() { return DEFAULT_COLOR_MELEE_FILL; }
+
+	@Alpha
+	@ConfigItem(
+		keyName = "rangedNpcOutlineColor",
+		name = "Ranged outline color",
+		description = "The outline color for ranged NPC lines of sight",
+		position = 2,
+		section = npcColorSection
+	)
+	default Color rangedNpcOutlineColor() { return DEFAULT_COLOR_RANGED_OUTLINE; }
+
+	@Alpha
+	@ConfigItem(
+		keyName = "rangedNpcFillColor",
+		name = "Ranged fill color",
+		description = "The fill color for ranged NPC lines of sight",
+		position = 3,
+		section = npcColorSection
+	)
+	default Color rangedNpcFillColor() { return DEFAULT_COLOR_RANGED_FILL; }
+
+	@Alpha
+	@ConfigItem(
+		keyName = "magicNpcOutlineColor",
+		name = "Magic outline color",
+		description = "The outline color for magic NPC lines of sight",
+		position = 4,
+		section = npcColorSection
+	)
+	default Color magicNpcOutlineColor() { return DEFAULT_COLOR_MAGIC_OUTLINE; }
+
+	@Alpha
+	@ConfigItem(
+		keyName = "magicNpcFillColor",
+		name = "Magic fill color",
+		description = "The fill color for magic NPC lines of sight",
+		position = 5,
+		section = npcColorSection
+	)
+	default Color magicNpcFillColor() { return DEFAULT_COLOR_MAGIC_FILL; }
+
+	@Alpha
+	@ConfigItem(
+		keyName = "otherNpcOutlineColor",
+		name = "Hybrid/typeless outline color",
+		description = "The outline color for hybrid/typeless NPC lines of sight",
+		position = 6,
+		section = npcColorSection
+	)
+	default Color otherNpcOutlineColor() { return DEFAULT_COLOR_OTHER_OUTLINE; }
+
+	@Alpha
+	@ConfigItem(
+		keyName = "otherNpcFillColor",
+		name = "Hybrid/typeless fill color",
+		description = "The fill color for hybrid/typeless NPC lines of sight",
+		position = 7,
+		section = npcColorSection
+	)
+	default Color otherNpcFillColor() { return DEFAULT_COLOR_OTHER_FILL; }
 
 
 	// =========================================

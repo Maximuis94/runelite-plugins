@@ -110,6 +110,12 @@ public class LineOfSightOverlay extends Overlay {
 	private Color fixed5OutlineColor, fixed5FillColor;
 	private float fixed5LineWidth;
 
+	// NPC COLORS
+	private Color meleeNpcOutlineColor, meleeNpcFillColor;
+	private Color rangedNpcOutlineColor, rangedNpcFillColor;
+	private Color magicNpcOutlineColor, magicNpcFillColor;
+	private Color otherNpcOutlineColor, otherNpcFillColor;
+
 	// CACHE STATE
 	private WorldPoint lastPlayerLocation = null;
 	private int lastCalculatedActiveRange = -1;
@@ -232,6 +238,15 @@ public class LineOfSightOverlay extends Overlay {
 			enabledFixed3NpcHighlight || enabledFixed4NpcHighlight ||
 			enabledFixed5NpcHighlight;
 
+		meleeNpcOutlineColor = config.meleeNpcOutlineColor();
+		meleeNpcFillColor = config.meleeNpcFillColor();
+		rangedNpcOutlineColor = config.rangedNpcOutlineColor();
+		rangedNpcFillColor = config.rangedNpcFillColor();
+		magicNpcOutlineColor = config.magicNpcOutlineColor();
+		magicNpcFillColor = config.magicNpcFillColor();
+		otherNpcOutlineColor = config.otherNpcOutlineColor();
+		otherNpcFillColor = config.otherNpcFillColor();
+
 		if (myopiaReduction > 0)
 			setMyopiaReduction(myopiaReduction);
 
@@ -316,41 +331,54 @@ public class LineOfSightOverlay extends Overlay {
 			hasAlteredAnyFixedRange = false;
 		}
 
-		if (enabledActiveWeaponLos) {
-			drawTilesArea(graphics, cachedActiveWeaponTiles, activeWeaponFillColor, activeWeaponOutlineColor, activeRangeLineWidth);
-		}
+		if (!plugin.isPlayerLosToggledOff())
+		{
+			if (enabledActiveWeaponLos)
+			{
+				drawTilesArea(graphics, cachedActiveWeaponTiles, activeWeaponFillColor, activeWeaponOutlineColor, activeRangeLineWidth);
+			}
 
-		if (enabledMaxRangeLos) {
-			drawTilesArea(graphics, cachedMaxRangeTiles, maxRangeFillColor, maxRangeOutlineColor, maxRangeLineWidth);
-		}
-		if (enabledFixed1) {
-			drawTilesArea(graphics, cachedFixedRange1Tiles, fixed1FillColor, fixed1OutlineColor, fixed1LineWidth);
-		}
-		if (enabledFixed2) {
-			drawTilesArea(graphics, cachedFixedRange2Tiles, fixed2FillColor, fixed2OutlineColor, fixed2LineWidth);
-		}
-		if (enabledFixed3) {
-			drawTilesArea(graphics, cachedFixedRange3Tiles, fixed3FillColor, fixed3OutlineColor, fixed3LineWidth);
-		}
-		if (enabledFixed4) {
-			drawTilesArea(graphics, cachedFixedRange4Tiles, fixed4FillColor, fixed4OutlineColor, fixed4LineWidth);
-		}
-		if (enabledFixed5) {
-			drawTilesArea(graphics, cachedFixedRange5Tiles, fixed5FillColor, fixed5OutlineColor, fixed5LineWidth);
-		}
+			if (enabledMaxRangeLos)
+			{
+				drawTilesArea(graphics, cachedMaxRangeTiles, maxRangeFillColor, maxRangeOutlineColor, maxRangeLineWidth);
+			}
+			if (enabledFixed1)
+			{
+				drawTilesArea(graphics, cachedFixedRange1Tiles, fixed1FillColor, fixed1OutlineColor, fixed1LineWidth);
+			}
+			if (enabledFixed2)
+			{
+				drawTilesArea(graphics, cachedFixedRange2Tiles, fixed2FillColor, fixed2OutlineColor, fixed2LineWidth);
+			}
+			if (enabledFixed3)
+			{
+				drawTilesArea(graphics, cachedFixedRange3Tiles, fixed3FillColor, fixed3OutlineColor, fixed3LineWidth);
+			}
+			if (enabledFixed4)
+			{
+				drawTilesArea(graphics, cachedFixedRange4Tiles, fixed4FillColor, fixed4OutlineColor, fixed4LineWidth);
+			}
+			if (enabledFixed5)
+			{
+				drawTilesArea(graphics, cachedFixedRange5Tiles, fixed5FillColor, fixed5OutlineColor, fixed5LineWidth);
+			}
 
-		if (enabledAnyNpcHighlight) {
-			highlightVisibleEnemies(wv, playerArea);
+			if (enabledAnyNpcHighlight)
+			{
+				highlightVisibleEnemies(wv, playerArea);
+			}
 		}
 
 		if (enabledNpcLos && (hotkeyAlwaysHeld || plugin.isHotkeyHeld()))
+		{
 			drawHoveredNpcLos(graphics, wv);
+		}
 
 		return null;
 	}
 
 	/**
-	 * Checks the user's cursor to see if they are hovering over a supported Colosseum NPC,
+	 * Checks the user's cursor to see if they are hovering over a supported NPC,
 	 * and draws its line of sight if they are.
 	 */
 	private void drawHoveredNpcLos(Graphics2D graphics, WorldView wv) {
@@ -365,8 +393,11 @@ public class LineOfSightOverlay extends Overlay {
 
 		if (hoveredNpc != null && hoveredNpc.getWorldArea() != null) {
 			int npcId = hoveredNpc.getId();
-			Color outlineColor = NpcLosConstants.getNpcLosOutlineColor(npcId);
-			if (outlineColor == null) return;
+
+			CombatStyle style = NpcLosConstants.getNpcCombatStyle(npcId);
+			if (style == null) return;
+
+			Color outlineColor = getOutlineColorForStyle(style);
 
 			int attackRange = NpcLosConstants.getNpcAttackRange(npcId);
 
@@ -381,7 +412,7 @@ public class LineOfSightOverlay extends Overlay {
 					lastHoveredNpcLocation = currentNpcLocation;
 				}
 
-				Color fillColor = NpcLosConstants.getNpcLosFillColor(npcId);
+				Color fillColor = getFillColorForStyle(style);
 				drawTilesArea(graphics, cachedHoveredNpcTiles, fillColor, outlineColor, 1.0f);
 			}
 		} else {
@@ -389,11 +420,30 @@ public class LineOfSightOverlay extends Overlay {
 		}
 	}
 
+	private Color getOutlineColorForStyle(CombatStyle style) {
+		switch (style) {
+			case MELEE: return meleeNpcOutlineColor;
+			case RANGED: return rangedNpcOutlineColor;
+			case MAGIC: return magicNpcOutlineColor;
+			case OTHER: return otherNpcOutlineColor;
+			default: return null;
+		}
+	}
+
+	private Color getFillColorForStyle(CombatStyle style) {
+		switch (style) {
+			case MELEE: return meleeNpcFillColor;
+			case RANGED: return rangedNpcFillColor;
+			case MAGIC: return magicNpcFillColor;
+			case OTHER: return otherNpcFillColor;
+			default: return null;
+		}
+	}
+
 	/**
 	 * Scans the environment and outlines valid attackable NPCs, prioritizing the shortest applicable attack range.
 	 */
 	private void highlightVisibleEnemies(WorldView wv, WorldArea playerArea) {
-		// Calculate the absolute maximum range the user currently has enabled for CPU optimization
 		int maxEnabledRange = 0;
 		if (enabledHighlightActiveWeaponNpc) maxEnabledRange = Math.max(maxEnabledRange, activeWeaponRange);
 		if (enabledHighlightMaxRangeNpc) maxEnabledRange = Math.max(maxEnabledRange, 10);
@@ -403,7 +453,6 @@ public class LineOfSightOverlay extends Overlay {
 		if (enabledFixed4NpcHighlight) maxEnabledRange = Math.max(maxEnabledRange, fixed4Range);
 		if (enabledFixed5NpcHighlight) maxEnabledRange = Math.max(maxEnabledRange, fixed5Range);
 
-		// If no highlights are enabled, skip checking entirely
 		if (maxEnabledRange == 0) return;
 
 		for (NPC npc : wv.npcs()) {
@@ -414,7 +463,6 @@ public class LineOfSightOverlay extends Overlay {
 			WorldArea npcArea = npc.getWorldArea();
 			int distance = playerArea.distanceTo(npcArea);
 
-			// Early exit: Skip this NPC if it is further away than our largest enabled range
 			if (distance > maxEnabledRange) {
 				continue;
 			}

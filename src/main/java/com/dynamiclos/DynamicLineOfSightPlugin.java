@@ -121,6 +121,7 @@ public class DynamicLineOfSightPlugin extends Plugin
 		clientThread.invokeLater(this::initialize);
 		keyManager.registerKeyListener(losHotkeyListener);
 		keyManager.registerKeyListener(virtualPlayerLosHotkeyListener);
+		keyManager.registerKeyListener(togglePlayerLosHotkeyListener);
 	}
 
 	@Override
@@ -128,6 +129,7 @@ public class DynamicLineOfSightPlugin extends Plugin
 	{
 		keyManager.unregisterKeyListener(losHotkeyListener);
 		keyManager.unregisterKeyListener(virtualPlayerLosHotkeyListener);
+		keyManager.unregisterKeyListener(togglePlayerLosHotkeyListener);
 		overlayManager.remove(overlay);
 	}
 
@@ -279,6 +281,18 @@ public class DynamicLineOfSightPlugin extends Plugin
 		public void hotkeyReleased()
 		{
 			isVirtualPlayerLosHotkeyHeld = false;
+		}
+	};
+
+	@Getter
+	private boolean playerLosToggledOff = false;
+
+	private final HotkeyListener togglePlayerLosHotkeyListener = new HotkeyListener(() -> config.togglePlayerLosHotkey())
+	{
+		@Override
+		public void hotkeyPressed()
+		{
+			playerLosToggledOff = !playerLosToggledOff;
 		}
 	};
 

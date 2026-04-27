@@ -42,7 +42,7 @@ public final class PluginConstants
 	public static final int STAFF_DEFENSIVE_AUTOCAST_STYLE_INDEX = 4;
 	public static final int SPELL_CAST_ATTACK_RANGE = 10;
 
-	public static final float DEFAULT_LINE_WIDTH = .2f;
+	public static final float DEFAULT_LINE_WIDTH = 1.f;
 
 	public static final int DEFAULT_OUTLINE_ALPHA = 200;
 	public static final int DEFAULT_FILL_ALPHA = 15;
@@ -59,17 +59,13 @@ public final class PluginConstants
 	public static final Color DEFAULT_COLOR_MAGIC_OUTLINE = new Color(0,0, 255, DEFAULT_OUTLINE_ALPHA);
 	public static final Color DEFAULT_COLOR_MAGIC_FILL = new Color(0, 0, 255, DEFAULT_FILL_ALPHA);
 
-	public static final Color DEFAULT_COLOR_OTHER = new Color(255, 125, 200);
-	public static final Color DEFAULT_COLOR_OTHER_OUTLINE = new Color(255, 125, 200, DEFAULT_OUTLINE_ALPHA);
-	public static final Color DEFAULT_COLOR_OTHER_FILL = new Color(255, 125, 200, DEFAULT_FILL_ALPHA);
+	public static final Color DEFAULT_COLOR_OTHER = new Color(155, 0, 155);
+	public static final Color DEFAULT_COLOR_OTHER_OUTLINE = new Color(155, 0, 155, DEFAULT_OUTLINE_ALPHA);
+	public static final Color DEFAULT_COLOR_OTHER_FILL = new Color(155, 0, 155, DEFAULT_FILL_ALPHA);
 
 	public static final Color DEFAULT_COLOR_ACTIVE_WEAPON = new Color(255, 0, 125);
 	public static final Color DEFAULT_COLOR_ACTIVE_WEAPON_OUTLINE = new Color(255, 0, 125, DEFAULT_OUTLINE_ALPHA);
 	public static final Color DEFAULT_COLOR_ACTIVE_WEAPON_FILL = new Color(255, 0, 125, DEFAULT_FILL_ALPHA);
-
-	public static final Color DEFAULT_COLOR_ACTIVE_WEAPON_SPEC = new Color(100, 0, 100);
-	public static final Color DEFAULT_COLOR_ACTIVE_WEAPON_SPEC_OUTLINE = new Color(100, 0, 100, DEFAULT_OUTLINE_ALPHA);
-	public static final Color DEFAULT_COLOR_ACTIVE_WEAPON_SPEC_FILL = new Color(100, 0, 100, DEFAULT_FILL_ALPHA);
 
 	public static final int TZ_KIH_A_ID = NpcID.TZHAAR_FIGHTCAVE_SWARM_1A;
 	public static final int TZ_KIH_B_ID = NpcID.TZHAAR_FIGHTCAVE_SWARM_1B;
