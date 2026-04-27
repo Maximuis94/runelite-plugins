@@ -6,10 +6,10 @@
  * modification, are permitted provided that the following conditions are met:
  *
  * 1. Redistributions of source code must retain the above copyright notice, this
- *    list of conditions and the following disclaimer.
+ * list of conditions and the following disclaimer.
  * 2. Redistributions in binary form must reproduce the above copyright notice,
- *    this list of conditions and the following disclaimer in the documentation
- *    and/or other materials provided with the distribution.
+ * this list of conditions and the following disclaimer in the documentation
+ * and/or other materials provided with the distribution.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
@@ -30,37 +30,220 @@ import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics2D;
 import java.awt.Polygon;
-import java.awt.Shape;
-import java.awt.geom.Area;
+import java.util.HashSet;
+import java.util.Set;
 import javax.inject.Inject;
 import net.runelite.api.Client;
+import net.runelite.api.MenuEntry;
 import net.runelite.api.NPC;
 import net.runelite.api.Perspective;
 import net.runelite.api.Player;
+import net.runelite.api.Tile;
 import net.runelite.api.WorldView;
 import net.runelite.api.coords.LocalPoint;
 import net.runelite.api.coords.WorldArea;
 import net.runelite.api.coords.WorldPoint;
+import net.runelite.client.config.Keybind;
 import net.runelite.client.ui.overlay.Overlay;
 import net.runelite.client.ui.overlay.OverlayLayer;
 import net.runelite.client.ui.overlay.OverlayPosition;
+import net.runelite.client.ui.overlay.outline.ModelOutlineRenderer;
 
 public class LineOfSightOverlay extends Overlay {
 
 	private final Client client;
 	private final DynamicLineOfSightConfig config;
-	private int activeWeaponRange = 0;
+	private final ModelOutlineRenderer modelOutlineRenderer;
+	private final DynamicLineOfSightPlugin plugin;
 
-	public void setActiveAttackRange(int range) {
-		activeWeaponRange = range;
-	}
+	private boolean enabledNpcLos = false;
+	private boolean hotkeyAlwaysHeld = false;
+	private Keybind virtualPlayerLosHotkey;
+
+	private int activeWeaponRange = 0;
+	private int myopiaReduction = 0;
+	private boolean isAffectedByMyopia = false;
+	private boolean isAffectedByMyopiaRange1 = false;
+	private boolean isAffectedByMyopiaRange2 = false;
+	private boolean isAffectedByMyopiaRange3 = false;
+	private boolean isAffectedByMyopiaRange4 = false;
+	private boolean isAffectedByMyopiaRange5 = false;
+
+	private boolean enabledAnyNpcHighlight = false;
+	private boolean hasAlteredAnyFixedRange = false;
+
+	private boolean enabledActiveWeaponLos;
+	private Color activeWeaponOutlineColor;
+	private Color activeWeaponFillColor;
+	private float activeRangeLineWidth;
+	private boolean enabledHighlightActiveWeaponNpc;
+
+	private boolean enabledMaxRangeLos;
+	private Color maxRangeOutlineColor;
+	private Color maxRangeFillColor;
+	private float maxRangeLineWidth;
+	private boolean enabledHighlightMaxRangeNpc;
+
+	// FIXED RANGES
+	private boolean enabledFixed1, enabledFixed1NpcHighlight;
+	private int fixed1Range;
+	private Color fixed1OutlineColor, fixed1FillColor;
+	private float fixed1LineWidth;
+
+	private boolean enabledFixed2, enabledFixed2NpcHighlight;
+	private int fixed2Range;
+	private Color fixed2OutlineColor, fixed2FillColor;
+	private float fixed2LineWidth;
+
+	private boolean enabledFixed3, enabledFixed3NpcHighlight;
+	private int fixed3Range;
+	private Color fixed3OutlineColor, fixed3FillColor;
+	private float fixed3LineWidth;
+
+	private boolean enabledFixed4, enabledFixed4NpcHighlight;
+	private int fixed4Range;
+	private Color fixed4OutlineColor, fixed4FillColor;
+	private float fixed4LineWidth;
+
+	private boolean enabledFixed5, enabledFixed5NpcHighlight;
+	private int fixed5Range;
+	private Color fixed5OutlineColor, fixed5FillColor;
+	private float fixed5LineWidth;
+
+	// CACHE STATE
+	private WorldPoint lastPlayerLocation = null;
+	private int lastCalculatedActiveRange = -1;
+	private int lastCalculatedFixed1Range = -1;
+	private int lastCalculatedFixed2Range = -1;
+	private int lastCalculatedFixed3Range = -1;
+	private int lastCalculatedFixed4Range = -1;
+	private int lastCalculatedFixed5Range = -1;
+
+	// CACHE SETS
+	private final Set<WorldPoint> cachedActiveWeaponTiles = new HashSet<>();
+	private final Set<WorldPoint> cachedMaxRangeTiles = new HashSet<>();
+	private final Set<WorldPoint> cachedFixedRange1Tiles = new HashSet<>();
+	private final Set<WorldPoint> cachedFixedRange2Tiles = new HashSet<>();
+	private final Set<WorldPoint> cachedFixedRange3Tiles = new HashSet<>();
+	private final Set<WorldPoint> cachedFixedRange4Tiles = new HashSet<>();
+	private final Set<WorldPoint> cachedFixedRange5Tiles = new HashSet<>();
+
+	private NPC lastHoveredNpc = null;
+	private WorldPoint lastHoveredNpcLocation = null;
+	private final Set<WorldPoint> cachedHoveredNpcTiles = new HashSet<>();
 
 	@Inject
-	public LineOfSightOverlay(Client client, DynamicLineOfSightConfig config) {
+	public LineOfSightOverlay(Client client, DynamicLineOfSightConfig config, ModelOutlineRenderer modelOutlineRenderer, DynamicLineOfSightPlugin plugin) {
 		this.client = client;
 		this.config = config;
+		this.modelOutlineRenderer = modelOutlineRenderer;
+		this.plugin = plugin;
+		parseConfigs();
 		setPosition(OverlayPosition.DYNAMIC);
 		setLayer(OverlayLayer.ABOVE_SCENE);
+	}
+
+	public void setActiveAttackRange(int attackRange, boolean affectedByMyopia) {
+		activeWeaponRange = attackRange;
+		isAffectedByMyopia = affectedByMyopia;
+	}
+
+	public void setMyopiaReduction(int myopiaReduction) {
+		this.myopiaReduction = myopiaReduction;
+
+		int range1 = config.fixedRange1Distance();
+		fixed1Range = Math.max(1, range1 - myopiaReduction);
+		isAffectedByMyopiaRange1 = fixed1Range < range1;
+
+		int range2 = config.fixedRange2Distance();
+		fixed2Range = Math.max(1, range2 - myopiaReduction);
+		isAffectedByMyopiaRange2 = fixed2Range < range2;
+
+		int range3 = config.fixedRange3Distance();
+		fixed3Range = Math.max(1, range3 - myopiaReduction);
+		isAffectedByMyopiaRange3 = fixed3Range < range3;
+
+		int range4 = config.fixedRange4Distance();
+		fixed4Range = Math.max(1, range4 - myopiaReduction);
+		isAffectedByMyopiaRange4 = fixed4Range < range4;
+
+		int range5 = config.fixedRange5Distance();
+		fixed5Range = Math.max(1, range5 - myopiaReduction);
+		isAffectedByMyopiaRange5 = fixed5Range < range5;
+
+		updateHasAlteredAnyFixedRange();
+	}
+
+	public void parseConfigs() {
+		enabledNpcLos = config.enableNpcLos();
+		Keybind key = config.npcLosHotkey();
+		hotkeyAlwaysHeld = key == null || key.equals(Keybind.NOT_SET);
+		virtualPlayerLosHotkey = config.virtualPlayerLosHotkey();
+
+		enabledActiveWeaponLos = config.drawActiveWeaponRange();
+		activeWeaponOutlineColor = config.activeWeaponOutlineColor();
+		activeWeaponFillColor = config.activeWeaponFillColor();
+		activeRangeLineWidth = (float) config.activeWeaponLineWidth();
+		enabledHighlightActiveWeaponNpc = config.highlightAttackableEnemies();
+
+		enabledMaxRangeLos = config.drawMaxAttackRange();
+		maxRangeOutlineColor = config.maxRangeOutlineColor();
+		maxRangeFillColor = config.maxRangeFillColor();
+		maxRangeLineWidth = (float) config.maxRangeLineWidth();
+		enabledHighlightMaxRangeNpc = config.highlightEnemiesWithinMaxRange();
+
+		enabledFixed1 = config.drawFixedRange1();
+		enabledFixed1NpcHighlight = config.highlightEnemiesWithinFixedRange1();
+		fixed1Range = Math.max(1, config.fixedRange1Distance() - myopiaReduction);
+		fixed1OutlineColor = config.fixedRange1OutlineColor();
+		fixed1FillColor = config.fixedRange1FillColor();
+		fixed1LineWidth = (float) config.fixedRange1LineWidth();
+
+		enabledFixed2 = config.drawFixedRange2();
+		enabledFixed2NpcHighlight = config.highlightEnemiesWithinFixedRange2();
+		fixed2Range = Math.max(1, config.fixedRange2Distance() - myopiaReduction);
+		fixed2OutlineColor = config.fixedRange2OutlineColor();
+		fixed2FillColor = config.fixedRange2FillColor();
+		fixed2LineWidth = (float) config.fixedRange2LineWidth();
+
+		enabledFixed3 = config.drawFixedRange3();
+		enabledFixed3NpcHighlight = config.highlightEnemiesWithinFixedRange3();
+		fixed3Range = Math.max(1, config.fixedRange3Distance() - myopiaReduction);
+		fixed3OutlineColor = config.fixedRange3OutlineColor();
+		fixed3FillColor = config.fixedRange3FillColor();
+		fixed3LineWidth = (float) config.fixedRange3LineWidth();
+
+		enabledFixed4 = config.drawFixedRange4();
+		enabledFixed4NpcHighlight = config.highlightEnemiesWithinFixedRange4();
+		fixed4Range = Math.max(1, config.fixedRange4Distance() - myopiaReduction);
+		fixed4OutlineColor = config.fixedRange4OutlineColor();
+		fixed4FillColor = config.fixedRange4FillColor();
+		fixed4LineWidth = (float) config.fixedRange4LineWidth();
+
+		enabledFixed5 = config.drawFixedRange5();
+		enabledFixed5NpcHighlight = config.highlightEnemiesWithinFixedRange5();
+		fixed5Range = Math.max(1, config.fixedRange5Distance() - myopiaReduction);
+		fixed5OutlineColor = config.fixedRange5OutlineColor();
+		fixed5FillColor = config.fixedRange5FillColor();
+		fixed5LineWidth = (float) config.fixedRange5LineWidth();
+
+		enabledAnyNpcHighlight = enabledHighlightActiveWeaponNpc || enabledHighlightMaxRangeNpc ||
+			enabledFixed1NpcHighlight || enabledFixed2NpcHighlight ||
+			enabledFixed3NpcHighlight || enabledFixed4NpcHighlight ||
+			enabledFixed5NpcHighlight;
+
+		if (myopiaReduction > 0)
+			setMyopiaReduction(myopiaReduction);
+
+		updateHasAlteredAnyFixedRange();
+	}
+
+	private void updateHasAlteredAnyFixedRange() {
+		hasAlteredAnyFixedRange = fixed1Range != lastCalculatedFixed1Range ||
+			fixed2Range != lastCalculatedFixed2Range ||
+			fixed3Range != lastCalculatedFixed3Range ||
+			fixed4Range != lastCalculatedFixed4Range ||
+			fixed5Range != lastCalculatedFixed5Range;
 	}
 
 	@Override
@@ -71,119 +254,312 @@ public class LineOfSightOverlay extends Overlay {
 			return null;
 		}
 
-		WorldPoint playerLocation = player.getWorldLocation();
-		WorldArea playerArea = player.getWorldArea();
 		WorldView wv = client.getTopLevelWorldView();
+		WorldArea playerArea = player.getWorldArea();
+		WorldPoint currentLocation = player.getWorldLocation();
 
-		if (config.drawActiveWeaponRange()) {
-			Area activeRangeArea = calculateLineOfSightArea(playerLocation, playerArea, wv, activeWeaponRange);
-			if (!activeRangeArea.isEmpty()) {
-				graphics.setColor(config.activeWeaponFillColor());
-				graphics.fill(activeRangeArea);
+		// Virtual Tile Override
+		boolean isVirtualKeyValid = virtualPlayerLosHotkey != null && !virtualPlayerLosHotkey.equals(Keybind.NOT_SET);
+		if (isVirtualKeyValid && plugin.isVirtualPlayerLosHotkeyHeld()) {
+			Tile hoveredTile = wv.getSelectedSceneTile();
 
-				graphics.setColor(config.activeWeaponOutlineColor());
-				graphics.setStroke(new BasicStroke(1));
-				graphics.draw(activeRangeArea);
+			if (hoveredTile != null && hoveredTile.getWorldLocation() != null) {
+				currentLocation = hoveredTile.getWorldLocation();
+				playerArea = new WorldArea(currentLocation, 1, 1);
 			}
 		}
 
-		if (config.drawMaxAttackRange()) {
-			Area maxRangeArea = calculateLineOfSightArea(playerLocation, playerArea, wv, 10);
-			if (!maxRangeArea.isEmpty()) {
-				graphics.setColor(config.maxRangeFillColor());
-				graphics.fill(maxRangeArea);
+		if (!currentLocation.equals(lastPlayerLocation) ||
+			activeWeaponRange != lastCalculatedActiveRange ||
+			hasAlteredAnyFixedRange) {
 
-				graphics.setColor(config.maxRangeOutlineColor());
-				graphics.setStroke(new BasicStroke(1));
-				graphics.draw(maxRangeArea);
+			cachedActiveWeaponTiles.clear();
+			cachedMaxRangeTiles.clear();
+			cachedFixedRange1Tiles.clear();
+			cachedFixedRange2Tiles.clear();
+			cachedFixedRange3Tiles.clear();
+			cachedFixedRange4Tiles.clear();
+			cachedFixedRange5Tiles.clear();
+
+			if (enabledActiveWeaponLos) {
+				cachedActiveWeaponTiles.addAll(calculateLineOfSightTiles(playerArea, wv, activeWeaponRange, false, isAffectedByMyopia));
 			}
+
+			if (enabledMaxRangeLos) {
+				cachedMaxRangeTiles.addAll(calculateLineOfSightTiles(playerArea, wv, 10, false, false));
+			}
+
+			if (enabledFixed1) {
+				cachedFixedRange1Tiles.addAll(calculateLineOfSightTiles(playerArea, wv, fixed1Range, false, isAffectedByMyopiaRange1));
+			}
+			if (enabledFixed2) {
+				cachedFixedRange2Tiles.addAll(calculateLineOfSightTiles(playerArea, wv, fixed2Range, false, isAffectedByMyopiaRange2));
+			}
+			if (enabledFixed3) {
+				cachedFixedRange3Tiles.addAll(calculateLineOfSightTiles(playerArea, wv, fixed3Range, false, isAffectedByMyopiaRange3));
+			}
+			if (enabledFixed4) {
+				cachedFixedRange4Tiles.addAll(calculateLineOfSightTiles(playerArea, wv, fixed4Range, false, isAffectedByMyopiaRange4));
+			}
+			if (enabledFixed5) {
+				cachedFixedRange5Tiles.addAll(calculateLineOfSightTiles(playerArea, wv, fixed5Range, false, isAffectedByMyopiaRange5));
+			}
+
+			lastPlayerLocation = currentLocation;
+			lastCalculatedActiveRange = activeWeaponRange;
+			lastCalculatedFixed1Range = fixed1Range;
+			lastCalculatedFixed2Range = fixed2Range;
+			lastCalculatedFixed3Range = fixed3Range;
+			lastCalculatedFixed4Range = fixed4Range;
+			lastCalculatedFixed5Range = fixed5Range;
+
+			hasAlteredAnyFixedRange = false;
 		}
 
-		boolean highlightActive = config.highlightAttackableEnemies();
-		boolean highlightMax = config.highlightEnemiesWithinMaxRange();
-
-		if (highlightActive || highlightMax) {
-			for (NPC npc : wv.npcs()) {
-				if (npc == null || npc.isDead() || npc.getCombatLevel() == 0) {
-					continue;
-				}
-
-				WorldArea npcArea = npc.getWorldArea();
-				if (npcArea == null) {
-					continue;
-				}
-
-				int distance = playerArea.distanceTo(npcArea);
-				Color enemyHighlightColor = null;
-
-				// --- NEW: Handle Melee Quirk ---
-				boolean inActiveRange;
-				if (activeWeaponRange == 1) {
-					// Safely calculates 1x1 diagonal vs large NPC orthogonal rules
-					inActiveRange = playerArea.isInMeleeDistance(npcArea);
-				} else {
-					inActiveRange = distance <= activeWeaponRange;
-				}
-
-				// Check active weapon range first (smaller bubble priority)
-				if (highlightActive && inActiveRange) {
-					enemyHighlightColor = config.activeWeaponOutlineColor();
-				}
-				// If not in active range, check max range
-				else if (highlightMax && distance <= 10) {
-					enemyHighlightColor = config.maxRangeOutlineColor();
-				}
-
-				// If the enemy falls into either enabled category, perform the LoS check and draw
-				if (enemyHighlightColor != null) {
-					if (playerArea.hasLineOfSightTo(wv, npcArea)) {
-						Shape npcHull = npc.getConvexHull();
-						if (npcHull != null) {
-							graphics.setColor(enemyHighlightColor);
-							graphics.setStroke(new BasicStroke(2));
-							graphics.draw(npcHull);
-						}
-					}
-				}
-			}
+		if (enabledActiveWeaponLos) {
+			drawTilesArea(graphics, cachedActiveWeaponTiles, activeWeaponFillColor, activeWeaponOutlineColor, activeRangeLineWidth);
 		}
+
+		if (enabledMaxRangeLos) {
+			drawTilesArea(graphics, cachedMaxRangeTiles, maxRangeFillColor, maxRangeOutlineColor, maxRangeLineWidth);
+		}
+		if (enabledFixed1) {
+			drawTilesArea(graphics, cachedFixedRange1Tiles, fixed1FillColor, fixed1OutlineColor, fixed1LineWidth);
+		}
+		if (enabledFixed2) {
+			drawTilesArea(graphics, cachedFixedRange2Tiles, fixed2FillColor, fixed2OutlineColor, fixed2LineWidth);
+		}
+		if (enabledFixed3) {
+			drawTilesArea(graphics, cachedFixedRange3Tiles, fixed3FillColor, fixed3OutlineColor, fixed3LineWidth);
+		}
+		if (enabledFixed4) {
+			drawTilesArea(graphics, cachedFixedRange4Tiles, fixed4FillColor, fixed4OutlineColor, fixed4LineWidth);
+		}
+		if (enabledFixed5) {
+			drawTilesArea(graphics, cachedFixedRange5Tiles, fixed5FillColor, fixed5OutlineColor, fixed5LineWidth);
+		}
+
+		if (enabledAnyNpcHighlight) {
+			highlightVisibleEnemies(wv, playerArea);
+		}
+
+		if (enabledNpcLos && (hotkeyAlwaysHeld || plugin.isHotkeyHeld()))
+			drawHoveredNpcLos(graphics, wv);
 
 		return null;
 	}
 
 	/**
-	 * Helper method to calculate the line of sight area for a given range.
+	 * Checks the user's cursor to see if they are hovering over a supported Colosseum NPC,
+	 * and draws its line of sight if they are.
 	 */
-	private Area calculateLineOfSightArea(WorldPoint playerLocation, WorldArea playerArea, WorldView wv, int range) {
-		Area area = new Area();
+	private void drawHoveredNpcLos(Graphics2D graphics, WorldView wv) {
+		MenuEntry[] menuEntries = client.getMenu().getMenuEntries();
+		if (menuEntries == null || menuEntries.length == 0) {
+			lastHoveredNpc = null;
+			return;
+		}
 
-		for (int dx = -range; dx <= range; dx++) {
-			for (int dy = -range; dy <= range; dy++) {
-				if (range == 1 && Math.abs(dx) == 1 && Math.abs(dy) == 1) {
-					continue;
+		MenuEntry topEntry = menuEntries[menuEntries.length - 1];
+		NPC hoveredNpc = topEntry.getNpc();
+
+		if (hoveredNpc != null && hoveredNpc.getWorldArea() != null) {
+			int npcId = hoveredNpc.getId();
+			Color outlineColor = NpcLosConstants.getNpcLosOutlineColor(npcId);
+			if (outlineColor == null) return;
+
+			int attackRange = NpcLosConstants.getNpcAttackRange(npcId);
+
+			if (attackRange > 0) {
+				WorldPoint currentNpcLocation = hoveredNpc.getWorldLocation();
+
+				if (hoveredNpc != lastHoveredNpc || !currentNpcLocation.equals(lastHoveredNpcLocation)) {
+					cachedHoveredNpcTiles.clear();
+					cachedHoveredNpcTiles.addAll(calculateLineOfSightTiles(hoveredNpc.getWorldArea(), wv, attackRange, true, false));
+
+					lastHoveredNpc = hoveredNpc;
+					lastHoveredNpcLocation = currentNpcLocation;
 				}
 
-				WorldPoint targetPoint = new WorldPoint(
-					playerLocation.getX() + dx,
-					playerLocation.getY() + dy,
-					playerLocation.getPlane()
-				);
+				Color fillColor = NpcLosConstants.getNpcLosFillColor(npcId);
+				drawTilesArea(graphics, cachedHoveredNpcTiles, fillColor, outlineColor, 1.0f);
+			}
+		} else {
+			lastHoveredNpc = null;
+		}
+	}
 
-				WorldArea targetArea = new WorldArea(targetPoint, 1, 1);
+	/**
+	 * Scans the environment and outlines valid attackable NPCs, prioritizing the shortest applicable attack range.
+	 */
+	private void highlightVisibleEnemies(WorldView wv, WorldArea playerArea) {
+		// Calculate the absolute maximum range the user currently has enabled for CPU optimization
+		int maxEnabledRange = 0;
+		if (enabledHighlightActiveWeaponNpc) maxEnabledRange = Math.max(maxEnabledRange, activeWeaponRange);
+		if (enabledHighlightMaxRangeNpc) maxEnabledRange = Math.max(maxEnabledRange, 10);
+		if (enabledFixed1NpcHighlight) maxEnabledRange = Math.max(maxEnabledRange, fixed1Range);
+		if (enabledFixed2NpcHighlight) maxEnabledRange = Math.max(maxEnabledRange, fixed2Range);
+		if (enabledFixed3NpcHighlight) maxEnabledRange = Math.max(maxEnabledRange, fixed3Range);
+		if (enabledFixed4NpcHighlight) maxEnabledRange = Math.max(maxEnabledRange, fixed4Range);
+		if (enabledFixed5NpcHighlight) maxEnabledRange = Math.max(maxEnabledRange, fixed5Range);
 
-				if (playerArea.hasLineOfSightTo(wv, targetArea)) {
-					LocalPoint localPoint = LocalPoint.fromWorld(client, targetPoint);
+		// If no highlights are enabled, skip checking entirely
+		if (maxEnabledRange == 0) return;
 
-					if (localPoint != null) {
-						Polygon tilePoly = Perspective.getCanvasTilePoly(client, localPoint);
+		for (NPC npc : wv.npcs()) {
+			if (npc == null || npc.isDead() || npc.getCombatLevel() == 0 || npc.getWorldArea() == null) {
+				continue;
+			}
 
-						if (tilePoly != null) {
-							area.add(new Area(tilePoly));
-						}
+			WorldArea npcArea = npc.getWorldArea();
+			int distance = playerArea.distanceTo(npcArea);
+
+			// Early exit: Skip this NPC if it is further away than our largest enabled range
+			if (distance > maxEnabledRange) {
+				continue;
+			}
+
+			boolean inActiveRange = (activeWeaponRange == 1) ? playerArea.isInMeleeDistance(npcArea) : (distance <= activeWeaponRange);
+			boolean inFixed1Range = (fixed1Range == 1) ? playerArea.isInMeleeDistance(npcArea) : (distance <= fixed1Range);
+			boolean inFixed2Range = (fixed2Range == 1) ? playerArea.isInMeleeDistance(npcArea) : (distance <= fixed2Range);
+			boolean inFixed3Range = (fixed3Range == 1) ? playerArea.isInMeleeDistance(npcArea) : (distance <= fixed3Range);
+			boolean inFixed4Range = (fixed4Range == 1) ? playerArea.isInMeleeDistance(npcArea) : (distance <= fixed4Range);
+			boolean inFixed5Range = (fixed5Range == 1) ? playerArea.isInMeleeDistance(npcArea) : (distance <= fixed5Range);
+
+			Color enemyHighlightColor = null;
+			float strokeWidth = 0f;
+			int bestRange = Integer.MAX_VALUE;
+
+			if (enabledHighlightMaxRangeNpc && distance <= 10) {
+				enemyHighlightColor = maxRangeOutlineColor;
+				strokeWidth = maxRangeLineWidth;
+				bestRange = 10;
+			}
+
+			if (enabledHighlightActiveWeaponNpc && inActiveRange && activeWeaponRange < bestRange) {
+				enemyHighlightColor = activeWeaponOutlineColor;
+				strokeWidth = activeRangeLineWidth;
+				bestRange = activeWeaponRange;
+			}
+
+			if (enabledFixed1NpcHighlight && inFixed1Range && fixed1Range < bestRange) {
+				enemyHighlightColor = fixed1OutlineColor;
+				strokeWidth = fixed1LineWidth;
+				bestRange = fixed1Range;
+			}
+
+			if (enabledFixed2NpcHighlight && inFixed2Range && fixed2Range < bestRange) {
+				enemyHighlightColor = fixed2OutlineColor;
+				strokeWidth = fixed2LineWidth;
+				bestRange = fixed2Range;
+			}
+
+			if (enabledFixed3NpcHighlight && inFixed3Range && fixed3Range < bestRange) {
+				enemyHighlightColor = fixed3OutlineColor;
+				strokeWidth = fixed3LineWidth;
+				bestRange = fixed3Range;
+			}
+
+			if (enabledFixed4NpcHighlight && inFixed4Range && fixed4Range < bestRange) {
+				enemyHighlightColor = fixed4OutlineColor;
+				strokeWidth = fixed4LineWidth;
+				bestRange = fixed4Range;
+			}
+
+			if (enabledFixed5NpcHighlight && inFixed5Range && fixed5Range < bestRange) {
+				enemyHighlightColor = fixed5OutlineColor;
+				strokeWidth = fixed5LineWidth;
+				bestRange = fixed5Range;
+			}
+
+			if (enemyHighlightColor != null && playerArea.hasLineOfSightTo(wv, npcArea)) {
+				modelOutlineRenderer.drawOutline(npc, Math.max(1, Math.round(strokeWidth)), enemyHighlightColor, 0);
+			}
+		}
+	}
+
+	/**
+	 * Renders a set of WorldPoints to the screen efficiently using edge-detection.
+	 * Bypasses the highly unoptimized java.awt.geom.Area CSG calculations.
+	 */
+	private void drawTilesArea(Graphics2D graphics, Set<WorldPoint> tiles, Color fill, Color outline, float strokeWidth) {
+		if (tiles.isEmpty()) return;
+
+		for (WorldPoint wp : tiles) {
+			LocalPoint lp = LocalPoint.fromWorld(client, wp);
+			if (lp == null) continue;
+
+			Polygon poly = Perspective.getCanvasTilePoly(client, lp);
+			if (poly == null) continue;
+
+			if (fill != null) {
+				graphics.setColor(fill);
+				graphics.fill(poly);
+			}
+
+			if (outline != null) {
+				graphics.setColor(outline);
+				graphics.setStroke(new BasicStroke(strokeWidth));
+
+				if (!tiles.contains(wp.dy(-1))) {
+					graphics.drawLine(poly.xpoints[0], poly.ypoints[0], poly.xpoints[1], poly.ypoints[1]);
+				}
+
+				if (!tiles.contains(wp.dx(1))) {
+					graphics.drawLine(poly.xpoints[1], poly.ypoints[1], poly.xpoints[2], poly.ypoints[2]);
+				}
+
+				if (!tiles.contains(wp.dy(1))) {
+					graphics.drawLine(poly.xpoints[2], poly.ypoints[2], poly.xpoints[3], poly.ypoints[3]);
+				}
+
+				if (!tiles.contains(wp.dx(-1))) {
+					graphics.drawLine(poly.xpoints[3], poly.ypoints[3], poly.xpoints[0], poly.ypoints[0]);
+				}
+			}
+		}
+	}
+
+	/**
+	 * Calculates the line of sight area dynamically based on the size of the source entity
+	 * and returns the valid tiles.
+	 */
+	private Set<WorldPoint> calculateLineOfSightTiles(WorldArea sourceArea, WorldView wv, int range, boolean isNpc, boolean isAffectedByMyopia) {
+		Set<WorldPoint> tiles = new HashSet<>();
+		int z = sourceArea.getPlane();
+
+		int minX = sourceArea.getX() - range;
+		int maxX = sourceArea.getX() + sourceArea.getWidth() - 1 + range;
+		int minY = sourceArea.getY() - range;
+		int maxY = sourceArea.getY() + sourceArea.getHeight() - 1 + range;
+
+		for (int x = minX; x <= maxX; x++) {
+			for (int y = minY; y <= maxY; y++) {
+				WorldPoint targetPoint = new WorldPoint(x, y, z);
+				WorldArea targetTile = new WorldArea(targetPoint, 1, 1);
+
+				boolean inRange;
+				if (range == 1 && !isAffectedByMyopia) {
+					inRange = sourceArea.isInMeleeDistance(targetTile);
+				} else {
+					inRange = sourceArea.distanceTo(targetTile) <= range;
+				}
+
+				if (inRange) {
+					boolean hasLos;
+
+					if (isNpc) {
+						hasLos = targetTile.hasLineOfSightTo(wv, sourceArea);
+					} else {
+						hasLos = sourceArea.hasLineOfSightTo(wv, targetTile);
+					}
+
+					if (hasLos) {
+						tiles.add(targetPoint);
 					}
 				}
 			}
 		}
-		return area;
+		return tiles;
 	}
 }

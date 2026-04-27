@@ -1,0 +1,130 @@
+/*
+ * Copyright (c) 2026, maximuis94 <https://github.com/maximuis94>
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright notice, this
+ *    list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ *    this list of conditions and the following disclaimer in the documentation
+ *    and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
+ * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+package com.dynamiclos;
+
+import static com.dynamiclos.PluginConstants.*;
+import java.awt.Color;
+import java.util.Arrays;
+
+/**
+ * Static utility class for fetching and maintaining NPC related Line of Sight values across multiple minigames
+ * (Colosseum, Inferno, Fight Caves).
+ */
+public final class NpcLosConstants
+{
+	private NpcLosConstants() {
+		throw new UnsupportedOperationException("Utility class cannot be instantiated");
+	}
+
+	private static final int MAX_NPC_ID = 34000;
+	private static final int[] NPC_ATTACK_RANGES = new int[MAX_NPC_ID];
+	private static final Color[] NPC_LOS_OUTLINE_COLORS = new Color[MAX_NPC_ID];
+	private static final Color[] NPC_LOS_FILL_COLORS = new Color[MAX_NPC_ID];
+
+	static {
+		Arrays.fill(NPC_ATTACK_RANGES, 0);
+
+		// =========================================
+		// COLOSSEUM
+		// =========================================
+		mapNpc(JAGUAR_WARRIOR_ID, 1, DEFAULT_COLOR_MELEE_OUTLINE, DEFAULT_COLOR_MELEE_FILL);
+		mapNpc(SERPENT_SHAMAN_ID, 10, DEFAULT_COLOR_MAGIC_OUTLINE, DEFAULT_COLOR_MAGIC_FILL);
+		mapNpc(MINOTAUR_ID, 1, DEFAULT_COLOR_MELEE_OUTLINE, DEFAULT_COLOR_MELEE_FILL);
+		mapNpc(MINOTAUR_ROUTEFIND_ID, 1, DEFAULT_COLOR_MELEE_OUTLINE, DEFAULT_COLOR_MELEE_FILL);
+		mapNpc(WARBANDER_RANGED_ID, 1, DEFAULT_COLOR_RANGED_OUTLINE, DEFAULT_COLOR_RANGED_FILL);
+		mapNpc(WARBANDER_MAGE_ID, 1, DEFAULT_COLOR_MAGIC_OUTLINE, DEFAULT_COLOR_MAGIC_FILL);
+		mapNpc(WARBANDER_MELEE_ID, 1, DEFAULT_COLOR_MELEE_OUTLINE, DEFAULT_COLOR_MELEE_FILL);
+		mapNpc(JAVELIN_COLOSSUS_ID, 15, DEFAULT_COLOR_RANGED_OUTLINE, DEFAULT_COLOR_RANGED_FILL);
+		mapNpc(MANTICORE_ID, 15, DEFAULT_COLOR_OTHER_OUTLINE, DEFAULT_COLOR_OTHER_FILL);
+		mapNpc(SHOCKWAVE_COLOSSUS_ID, 15, DEFAULT_COLOR_MAGIC_OUTLINE, DEFAULT_COLOR_MAGIC_FILL);
+		mapNpc(SOL_HEREDIT_ID, 1, DEFAULT_COLOR_OTHER_OUTLINE, DEFAULT_COLOR_OTHER_FILL);
+		mapNpc(HEALING_TOTEM_ID, 30, DEFAULT_COLOR_OTHER_OUTLINE, DEFAULT_COLOR_OTHER_FILL);
+
+		// =========================================
+		// INFERNO
+		// =========================================
+		mapNpc(TZ_KIH_A_ID, 1, DEFAULT_COLOR_MELEE_OUTLINE, DEFAULT_COLOR_MELEE_FILL);
+		mapNpc(TZ_KIH_B_ID, 1, DEFAULT_COLOR_MELEE_OUTLINE, DEFAULT_COLOR_MELEE_FILL);
+		mapNpc(TZ_KEK_A_ID, 1, DEFAULT_COLOR_MELEE_OUTLINE, DEFAULT_COLOR_MELEE_FILL);
+		mapNpc(TZ_KEK_B_ID, 1, DEFAULT_COLOR_MELEE_OUTLINE, DEFAULT_COLOR_MELEE_FILL);
+		mapNpc(TZ_KEK_SPAWN_ID, 1, DEFAULT_COLOR_MELEE_OUTLINE, DEFAULT_COLOR_MELEE_FILL);
+		mapNpc(TOK_XIL_A_ID, 15, DEFAULT_COLOR_RANGED_OUTLINE, DEFAULT_COLOR_RANGED_FILL);
+		mapNpc(TOK_XIL_B_ID, 15, DEFAULT_COLOR_RANGED_OUTLINE, DEFAULT_COLOR_RANGED_FILL);
+		mapNpc(YT_MEJKOT_A_ID, 1, DEFAULT_COLOR_MELEE_OUTLINE, DEFAULT_COLOR_MELEE_FILL);
+		mapNpc(YT_MEJKOT_B_ID, 1, DEFAULT_COLOR_MELEE_OUTLINE, DEFAULT_COLOR_MELEE_FILL);
+		mapNpc(KET_ZEK_A_ID, 15, DEFAULT_COLOR_MAGIC_OUTLINE, DEFAULT_COLOR_MAGIC_FILL);
+		mapNpc(KET_ZEK_B_ID, 15, DEFAULT_COLOR_MAGIC_OUTLINE, DEFAULT_COLOR_MAGIC_FILL);
+		mapNpc(TZTOK_JAD_ID, 15, DEFAULT_COLOR_OTHER_OUTLINE, DEFAULT_COLOR_OTHER_FILL);
+		mapNpc(YT_HURKOT_ID, 1, DEFAULT_COLOR_MELEE_OUTLINE, DEFAULT_COLOR_MELEE_FILL);
+
+		// =========================================
+		// INFERNO
+		// =========================================
+		mapNpc(JAL_NIB_ID, 1, DEFAULT_COLOR_MELEE_OUTLINE, DEFAULT_COLOR_MELEE_FILL);
+		mapNpc(JAL_MEJ_RAH_ID, 4, DEFAULT_COLOR_RANGED_OUTLINE, DEFAULT_COLOR_RANGED_FILL);
+		mapNpc(JAL_AK_ID, 15, DEFAULT_COLOR_OTHER_OUTLINE, DEFAULT_COLOR_OTHER_FILL);
+		mapNpc(JAL_AKREK_MEJ_ID, 15, DEFAULT_COLOR_MAGIC_OUTLINE, DEFAULT_COLOR_MAGIC_FILL);
+		mapNpc(JAL_AKREK_XIL_ID, 15, DEFAULT_COLOR_RANGED_OUTLINE, DEFAULT_COLOR_RANGED_FILL);
+		mapNpc(JAL_AKREK_KET_ID, 1, DEFAULT_COLOR_MELEE_OUTLINE, DEFAULT_COLOR_MELEE_FILL);
+		mapNpc(JAL_IMKOT_ID, 1, DEFAULT_COLOR_MELEE_OUTLINE, DEFAULT_COLOR_MELEE_FILL);
+		mapNpc(JAL_XIL_ID, 15, DEFAULT_COLOR_RANGED_OUTLINE, DEFAULT_COLOR_RANGED_FILL);
+		mapNpc(JAL_ZEK_ID, 15, DEFAULT_COLOR_MAGIC_OUTLINE, DEFAULT_COLOR_MAGIC_FILL);
+		mapNpc(JALTOK_JAD_ID, 15, DEFAULT_COLOR_OTHER_OUTLINE, DEFAULT_COLOR_OTHER_FILL);
+		mapNpc(JAL_YT_HURKOT_ID, 1, DEFAULT_COLOR_MELEE_OUTLINE, DEFAULT_COLOR_MELEE_FILL);
+		mapNpc(JALTOK_JAD_FINAL_ID, 15, DEFAULT_COLOR_OTHER_OUTLINE, DEFAULT_COLOR_OTHER_FILL);
+		mapNpc(JAL_YT_HURKOT_FINAL_ID, 1, DEFAULT_COLOR_MELEE_OUTLINE, DEFAULT_COLOR_MELEE_FILL);
+		mapNpc(TZKAL_ZUK_ID, 0, DEFAULT_COLOR_OTHER_OUTLINE, DEFAULT_COLOR_OTHER_FILL);
+		mapNpc(JAL_MEJJAK_ID, 3, DEFAULT_COLOR_OTHER_OUTLINE, DEFAULT_COLOR_OTHER_FILL);
+
+		// Challenges
+		mapNpc(CHALLENGE_JALTOK_JAD_ID, 15, DEFAULT_COLOR_OTHER_OUTLINE, DEFAULT_COLOR_OTHER_FILL);
+		mapNpc(CHALLENGE_YT_HURKOT_ID, 1, DEFAULT_COLOR_MELEE_OUTLINE, DEFAULT_COLOR_MELEE_FILL);
+	}
+
+	/**
+	 * Helper method to cleanly populate the arrays in the static block
+	 */
+	private static void mapNpc(int npcId, int range, Color outline, Color fill) {
+		NPC_ATTACK_RANGES[npcId] = range;
+		NPC_LOS_OUTLINE_COLORS[npcId] = outline;
+		NPC_LOS_FILL_COLORS[npcId] = fill;
+	}
+
+	public static int getNpcAttackRange(int npcId) {
+		if (npcId < 0 || npcId >= MAX_NPC_ID) return 0;
+		return NPC_ATTACK_RANGES[npcId];
+	}
+
+	public static Color getNpcLosOutlineColor(int npcId) {
+		if (npcId < 0 || npcId >= MAX_NPC_ID) return null;
+		return NPC_LOS_OUTLINE_COLORS[npcId];
+	}
+
+	public static Color getNpcLosFillColor(int npcId) {
+		if (npcId < 0 || npcId >= MAX_NPC_ID) return null;
+		return NPC_LOS_FILL_COLORS[npcId];
+	}
+}

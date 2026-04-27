@@ -25,6 +25,11 @@
 
 package com.dynamiclos;
 
+import static com.dynamiclos.PluginConstants.PLUGIN_CONFIG_GROUP;
+import static com.dynamiclos.PluginConstants.SPELL_CAST_ATTACK_RANGE;
+import static com.dynamiclos.PluginConstants.STAFF_AUTOCAST_STYLE_INDEX;
+import static com.dynamiclos.PluginConstants.STAFF_DEFENSIVE_AUTOCAST_STYLE_INDEX;
+import static com.dynamiclos.PluginConstants.STAFF_EQUIPMENT_TYPE_ID;
 import com.google.inject.Provides;
 import java.util.Set;
 import javax.inject.Inject;
@@ -45,13 +50,17 @@ import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
+import net.runelite.client.input.KeyManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.overlay.OverlayManager;
+import net.runelite.client.util.HotkeyListener;
 
 @Slf4j
 @PluginDescriptor(
-	name = "Dynamic line of sight"
+	name = "Dynamic line of sight",
+	description = "Adds a dynamically updating Line of Sight outline based on weapon wielded and Myopia tier",
+	tags = {"weapon", "attack", "range", "line", "sight", "los", "myopia", "fortis", "colosseum"}
 )
 public class DynamicLineOfSightPlugin extends Plugin
 {
@@ -76,7 +85,8 @@ public class DynamicLineOfSightPlugin extends Plugin
 	@Inject
 	private LineOfSightOverlay overlay;
 
-	private boolean isMyopiaEnabled = false;
+	@Inject
+	private KeyManager keyManager;
 
 	@Getter
 	private int cachedAttackRange = 1;
@@ -102,21 +112,43 @@ public class DynamicLineOfSightPlugin extends Plugin
 
 	private boolean isInColosseum = false;
 	private int myopiaReduction = 0;
+	private boolean isAffectedByMyopia = false;
 
 	@Override
-	protected void startUp() throws Exception {
+	protected void startUp() throws Exception
+	{
 		overlayManager.add(overlay);
 		clientThread.invokeLater(this::initialize);
+		keyManager.registerKeyListener(losHotkeyListener);
+		keyManager.registerKeyListener(virtualPlayerLosHotkeyListener);
 	}
 
 	@Override
-	protected void shutDown() throws Exception {
+	protected void shutDown() throws Exception
+	{
+		keyManager.unregisterKeyListener(losHotkeyListener);
+		keyManager.unregisterKeyListener(virtualPlayerLosHotkeyListener);
 		overlayManager.remove(overlay);
 	}
 
+	private static boolean isPluginConfig(ConfigChanged event)
+	{
+		return event.getGroup().equals(PLUGIN_CONFIG_GROUP);
+	}
+
 	@Subscribe
-	public void onItemContainerChanged(ItemContainerChanged event) {
-		if (event.getContainerId() == WORN_EQUIPMENT_ID) {
+	public void onConfigChanged(ConfigChanged event)
+	{
+		if (!isPluginConfig(event)) return;
+
+		overlay.parseConfigs();
+	}
+
+	@Subscribe
+	public void onItemContainerChanged(ItemContainerChanged event)
+	{
+		if (event.getContainerId() == WORN_EQUIPMENT_ID)
+		{
 			Item weapon = event.getItemContainer().getItem(WEAPON_SLOT_INDEX);
 			if (weapon == null) return;
 
@@ -144,20 +176,21 @@ public class DynamicLineOfSightPlugin extends Plugin
 				{
 					if (region == COLOSSEUM_REGION_ID)
 					{
-						// If I transition from outside to inside, myopia has to be 0
-						myopiaReduction = isInColosseum ? client.getVarbitValue(MYOPIA_VARBIT_ID) * 2 : 0;
-
+						log.debug("Player has entered the Colosseum");
 						isInColosseum = true;
-						break;
+						updateMyopiaReduction();
+						return;
 					}
 				}
-				resetInColosseum();
+				if (isInColosseum)
+					resetInColosseum();
 			}
 		}
 	}
 
 	private void resetInColosseum()
 	{
+		log.debug("Resetting Colosseum-related values");
 		isInColosseum = false;
 		myopiaReduction = 0;
 	}
@@ -165,8 +198,6 @@ public class DynamicLineOfSightPlugin extends Plugin
 	@Subscribe
 	public void onGameStateChanged(GameStateChanged event)
 	{
-		if (!isMyopiaEnabled) return;
-
 		GameState state = event.getGameState();
 
 		if (state == GameState.LOGIN_SCREEN || state == GameState.HOPPING || state == GameState.CONNECTION_LOST)
@@ -182,17 +213,8 @@ public class DynamicLineOfSightPlugin extends Plugin
 	}
 
 	@Subscribe
-	public void onVarbitChanged(VarbitChanged event) {
-		int pId = event.getVarpId();
-		if (pId == ATTACK_STYLE_VARP_ID) {
-			int newIndex = client.getVarpValue(ATTACK_STYLE_VARP_ID);
-			log.debug("AttackStyleIndex was changed from {} to {}", attackStyleIndex, newIndex);
-			attackStyleIndex = client.getVarpValue(ATTACK_STYLE_VARP_ID);
-			updateActiveLongRangeBonus();
-			updateCachedRange();
-			return;
-		}
-
+	public void onVarbitChanged(VarbitChanged event)
+	{
 		int vId = event.getVarbitId();
 		if (vId == EQUIPPED_WEAPON_TYPE_VARBIT_ID)
 		{
@@ -202,14 +224,63 @@ public class DynamicLineOfSightPlugin extends Plugin
 			equippedWeaponType = newEquippedWeaponType;
 			updateActiveLongRangeBonus();
 			updateCachedRange();
+			return;
 		}
 
-		else if (isInColosseum && vId == MYOPIA_VARBIT_ID)
+		else if (vId == MYOPIA_VARBIT_ID)
 		{
-			myopiaReduction = client.getVarbitValue(MYOPIA_VARBIT_ID) * 2;
+			isInColosseum = true;
+			updateMyopiaReduction();
+			updateCachedRange();
+			return;
+		}
+
+		int pId = event.getVarpId();
+		if (pId == ATTACK_STYLE_VARP_ID)
+		{
+			int newIndex = client.getVarpValue(ATTACK_STYLE_VARP_ID);
+			log.debug("AttackStyleIndex was changed from {} to {}", attackStyleIndex, newIndex);
+			attackStyleIndex = client.getVarpValue(ATTACK_STYLE_VARP_ID);
+			updateActiveLongRangeBonus();
 			updateCachedRange();
 		}
 	}
+
+	@Getter
+	private boolean isHotkeyHeld = false;
+
+	private final HotkeyListener losHotkeyListener = new HotkeyListener(() -> config.npcLosHotkey())
+	{
+		@Override
+		public void hotkeyPressed()
+		{
+			isHotkeyHeld = true;
+		}
+
+		@Override
+		public void hotkeyReleased()
+		{
+			isHotkeyHeld = false;
+		}
+	};
+
+	@Getter
+	private boolean isVirtualPlayerLosHotkeyHeld = false;
+
+	private final HotkeyListener virtualPlayerLosHotkeyListener = new HotkeyListener(() -> config.virtualPlayerLosHotkey())
+	{
+		@Override
+		public void hotkeyPressed()
+		{
+			isVirtualPlayerLosHotkeyHeld = true;
+		}
+
+		@Override
+		public void hotkeyReleased()
+		{
+			isVirtualPlayerLosHotkeyHeld = false;
+		}
+	};
 
 	/**
 	 * Initialization method that attempts to determine all dynamic values that may affect range.
@@ -220,18 +291,37 @@ public class DynamicLineOfSightPlugin extends Plugin
 		hasLongRangeWeapon = LONGRANGE_STYLE_IDS.contains(equippedWeaponType);
 		attackStyleIndex = client.getVarpValue(ATTACK_STYLE_VARP_ID);
 
-		if (isMyopiaEnabled)
-		{
-			updateInColosseum();
+		updateInColosseum();
 
-			// If true, plugin was activated during a trial
-			if (isInColosseum)
-			{
-				myopiaReduction = client.getVarbitValue(MYOPIA_VARBIT_ID) * 2;
-			}
+		// If true, plugin was activated during a trial
+		if (isInColosseum)
+		{
+			updateMyopiaReduction();
 		}
 
 		updateCachedRange();
+	}
+
+	/**
+	 * Updates the value of myopiaReduction and logs changes
+	 */
+	private void updateMyopiaReduction()
+	{
+		if (!isInColosseum)
+		{
+			log.debug("Player is not in Colosseum - updated myopiaReduction from {} to 0", myopiaReduction);
+			myopiaReduction = 0;
+		}
+		else
+		{
+			int newValue = client.getVarbitValue(MYOPIA_VARBIT_ID) * 2;
+			if (newValue != myopiaReduction)
+			{
+				log.debug("Updated myopiaReduction from {} to {}", myopiaReduction, newValue);
+				myopiaReduction = newValue;
+				overlay.setMyopiaReduction(myopiaReduction);
+			}
+		}
 	}
 
 	/**
@@ -244,6 +334,14 @@ public class DynamicLineOfSightPlugin extends Plugin
 	}
 
 	/**
+	 * Return true if the equippedWeaponType and attackStyleIndex suggest the Player is autocasting spells
+	 */
+	private boolean isAutocasting()
+	{
+		return equippedWeaponType == STAFF_EQUIPMENT_TYPE_ID && attackStyleIndex == STAFF_AUTOCAST_STYLE_INDEX || attackStyleIndex == STAFF_DEFENSIVE_AUTOCAST_STYLE_INDEX;
+	}
+
+	/**
 	 * Updates the cached range by checking the weapon and current attack style.
 	 */
 	private void updateCachedRange() {
@@ -251,15 +349,19 @@ public class DynamicLineOfSightPlugin extends Plugin
 			return;
 		}
 
-		int baseRange = WeaponRangeConstants.getBaseRange(equippedWeaponId);
+		int baseRange = isAutocasting() ? SPELL_CAST_ATTACK_RANGE : WeaponRangeConstants.getBaseRange(equippedWeaponId);
+
 		int computedRange = Math.min(baseRange + longRangeBonus, MAX_PLAYER_ATTACK_RANGE) - myopiaReduction;
 		int newRange = Math.max(computedRange, MIN_PLAYER_ATTACK_RANGE);
 
-		if (newRange != cachedAttackRange)
+		boolean newIsAffectedByMyopia = baseRange > 1 && myopiaReduction > 0;
+
+		if (newRange != cachedAttackRange || newIsAffectedByMyopia != isAffectedByMyopia)
 		{
 			log.debug("Updated player attack range parameters from {} to {}", cachedAttackRange, newRange);
 			cachedAttackRange = newRange;
-			overlay.setActiveAttackRange(cachedAttackRange);
+			isAffectedByMyopia = newIsAffectedByMyopia;
+			overlay.setActiveAttackRange(cachedAttackRange, isAffectedByMyopia);
 		}
 	}
 }
