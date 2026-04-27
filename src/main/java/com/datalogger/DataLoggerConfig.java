@@ -26,6 +26,7 @@ package com.datalogger;
 
 import static com.datalogger.constants.PluginConstants.CONFIG_GROUP;
 import com.datalogger.models.enums.BroadcastColosseumScreenshotOption;
+import com.datalogger.models.enums.ColosseumBroadcastMode;
 import com.datalogger.models.enums.ColosseumWebhookFormatter;
 import com.datalogger.models.enums.ScreenshotFormat;
 import com.datalogger.models.enums.TimestampFormat;
@@ -201,10 +202,19 @@ public interface DataLoggerConfig extends Config {
 	default boolean logQuiverAsSplinters() { return false; }
 
 	@ConfigItem(
+		keyName = "screenshotBetweenWaves",
+		name = "Colosseum Wave Completion",
+		description = "Automatically take a screenshot after completing a wave when the intermission/rewards chest UI is visible",
+		position = 3,
+		section = COLOSSEUM_SECTION
+	)
+	default boolean screenshotBetweenWaves() { return false; }
+
+	@ConfigItem(
 		keyName = "colosseumTag",
 		name = "Tag",
 		description = "A custom tag that will be assigned to logged entries (e.g. to distinguish between specific setups)",
-		position = 3,
+		position = 4,
 		section = COLOSSEUM_SECTION
 	)
 	default String colosseumTag() { return ""; }
@@ -213,7 +223,7 @@ public interface DataLoggerConfig extends Config {
 		keyName = "autoMergeWaveLogs",
 		name = "Auto merge wave logs",
 		description = "Automatically merge all wave log files after an attempt is completed.",
-		position = 4,
+		position = 5,
 		section = COLOSSEUM_SECTION
 	)
 	default boolean autoMergeWaveLogs() { return false; }
@@ -222,7 +232,7 @@ public interface DataLoggerConfig extends Config {
 		keyName = "trackSupplies",
 		name = "Track supply/ammo consumption",
 		description = "Track supplies and ammo consumed during a Colosseum attempt",
-		position = 5,
+		position = 6,
 		section = COLOSSEUM_SECTION
 	)
 	default boolean trackSupplies() { return true; }
@@ -308,19 +318,10 @@ public interface DataLoggerConfig extends Config {
 	// --- Screenshot Items ---
 
 	@ConfigItem(
-		keyName = "screenshotBetweenWaves",
-		name = "Colosseum Wave Completion",
-		description = "Automatically take a screenshot after completing a wave when the intermission/rewards chest UI is visible",
-		position = 0,
-		section = SCREENSHOT_SECTION
-	)
-	default boolean screenshotBetweenWaves() { return false; }
-
-	@ConfigItem(
 		keyName = "screenshotFormat",
 		name = "Screenshot format",
 		description = "Select the file format for screenshots. PNG is lossless quality, JPEG reduces file size.",
-		position = 1,
+		position = 0,
 		section = SCREENSHOT_SECTION
 	)
 	default ScreenshotFormat screenshotFormat() {
@@ -340,18 +341,6 @@ public interface DataLoggerConfig extends Config {
 	default boolean enableWebhookBroadcasting() { return true; }
 
 	@ConfigItem(
-		keyName = "colosseumWebhookFormat",
-		name = "Webhook Format",
-		description = "Select the format to apply for broadcasting Colosseum trials",
-		position = 1,
-		section = DISCORD_SECTION
-	)
-	default ColosseumWebhookFormatter colosseumWebhookFormat()
-	{
-		return ColosseumWebhookFormatter.DETAILED;
-	}
-
-	@ConfigItem(
 		keyName = "colosseumDiscordWebhookUrl",
 		name = "Colosseum webhook URL",
 		description = "The Discord Webhook URL used to broadcast completed Colosseum runs.",
@@ -365,46 +354,37 @@ public interface DataLoggerConfig extends Config {
 
 	@ConfigItem(
 		keyName = "broadcastCompletedTrials",
-		name = "Broadcast completed trials",
-		description = "Broadcast a completed trial after opening the chest rewards UI.",
+		name = "Completed",
+		description = "How to broadcast a completed trial after opening the chest rewards UI.",
 		position = 3,
 		section = DISCORD_SECTION
 	)
-	default boolean broadcastCompletedTrials() { return true; }
+	default ColosseumBroadcastMode broadcastCompletedTrials() { return ColosseumBroadcastMode.SKIP; }
 
 	@ConfigItem(
 		keyName = "broadcastCancelledTrials",
-		name = "Broadcast cancelled trials",
-		description = "Broadcast a cancelled trial after opening the chest rewards UI",
+		name = "Cancelled",
+		description = "How to broadcast a cancelled trial after opening the chest rewards UI",
 		position = 4,
 		section = DISCORD_SECTION
 	)
-	default boolean broadcastCancelledTrials() { return true; }
+	default ColosseumBroadcastMode broadcastCancelledTrials() { return ColosseumBroadcastMode.SKIP; }
 
 	@ConfigItem(
 		keyName = "broadcastFailedTrials",
-		name = "Broadcast failed trials",
-		description = "Broadcast a failed trial after taking lethal damage",
+		name = "Failed",
+		description = "How to broadcast a failed trial after taking lethal damage",
 		position = 5,
 		section = DISCORD_SECTION
 	)
-	default boolean broadcastFailedTrials() { return true; }
-
-	@ConfigItem(
-		keyName = "broadcastScreenshot",
-		name = "Add screenshot",
-		description = "Attach a screenshot to the broadcast",
-		position = 6,
-		section = DISCORD_SECTION
-	)
-	default BroadcastColosseumScreenshotOption broadcastScreenshot() { return BroadcastColosseumScreenshotOption.NEVER; }
+	default ColosseumBroadcastMode broadcastFailedTrials() { return ColosseumBroadcastMode.SKIP; }
 
 	@Range(min = 0)
 	@ConfigItem(
 		keyName = "broadcastRewardThreshold",
 		name = "Min. reward (k)",
 		description = "Reward value threshold (* 1000 gp) for broadcasting a finished trial",
-		position = 7,
+		position = 6,
 		section = DISCORD_SECTION
 	)
 	default int broadcastRewardThreshold()
@@ -417,7 +397,7 @@ public interface DataLoggerConfig extends Config {
 		keyName = "broadcastWaveThreshold",
 		name = "Min. wave (1-12)",
 		description = "Only broadcast finished trials if they reached at least this wave",
-		position = 8,
+		position = 7,
 		section = DISCORD_SECTION
 	)
 	default int broadcastWaveThreshold() {

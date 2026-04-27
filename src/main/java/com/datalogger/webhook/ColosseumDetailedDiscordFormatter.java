@@ -56,6 +56,72 @@ public final class ColosseumDetailedDiscordFormatter
 	@Nonnull
 	public static JsonObject buildPayload(@Nonnull ColosseumAttemptDTO dto, @Nonnull DataLoggerConfig config) {
 		JsonObject embed = generateBaseEmbed(dto.getAccount());
+//		StringBuilder description = new StringBuilder();
+//
+//		List<String> topStats = new ArrayList<>();
+//		if (config.includeStatus()) {
+//			topStats.add(String.format("**Status:** %s | %s/12 completed",
+//				dto.getResult().toLowerCase(),
+//				getWavesCompleted(dto.getWaves())));
+//		}
+//		if (config.includeTime()) {
+//			topStats.add(String.format("**Time:** %s", formatSeconds(dto.getTotalTime())));
+//		}
+//		if (config.includeGlory()) {
+//			topStats.add(String.format("**Glory:** %,d", dto.getTotalGlory()));
+//		}
+//
+//		if (!topStats.isEmpty()) {
+//			description.append(String.join(" | ", topStats)).append("\n");
+//		}
+//
+//		if (config.includeModifiers()) {
+//			String activeModifiers = formatActiveModifiers(dto.getActiveModifiers(), true);
+//			description.append(String.format("**Modifiers**: [ %s ]\n", activeModifiers));
+//		}
+//
+//		List<String> econStats = new ArrayList<>();
+//		if (config.includeRewardValue()) {
+//			econStats.add(String.format("**Reward:** %,d gp", dto.getRewardsValue()));
+//		}
+//		if (config.includeSupplyValue()) {
+//			econStats.add(String.format("**Supplies:** %,d gp", dto.getConsumedSupplyValue()));
+//		}
+//
+//		if (!econStats.isEmpty()) {
+//			description.append(String.join(" | ", econStats)).append("\n");
+//		}
+
+		embed.addProperty("description", buildDescription(dto, config));
+
+		JsonArray fields = new JsonArray();
+		if (dto.getWaves() != null) {
+			int nWaves = dto.getWaves().size();
+
+			for (ColosseumWaveDTO wave : dto.getWaves()) {
+				WaveStatus status = wave.getWave() < nWaves ? WaveStatus.COMPLETED : WaveStatus.fromString(wave.getStatus());
+
+				String statusString = (status == WaveStatus.CLAIMED || status == WaveStatus.CANCELLED)
+					? "cancelled"
+					: status.getEmoji();
+
+				StringBuilder fieldName = new StringBuilder("Wave " + wave.getWave() + ": " + statusString);
+
+				if (config.includeTime() && !statusString.equals("cancelled")) {
+					fieldName.append(" | ").append(formatSeconds(wave.getTimeTaken()));
+				}
+
+				String waveSummary = formatColosseumWave(wave, config);
+
+				addField(fields, fieldName.toString(), waveSummary, true);
+			}
+		}
+		embed.add("fields", fields);
+		return wrapEmbedIntoPayload(embed);
+	}
+
+	public static String buildDescription(@Nonnull ColosseumAttemptDTO dto, @Nonnull DataLoggerConfig config)
+	{
 		StringBuilder description = new StringBuilder();
 
 		List<String> topStats = new ArrayList<>();
@@ -91,32 +157,6 @@ public final class ColosseumDetailedDiscordFormatter
 		if (!econStats.isEmpty()) {
 			description.append(String.join(" | ", econStats)).append("\n");
 		}
-
-		embed.addProperty("description", description.toString());
-
-		JsonArray fields = new JsonArray();
-		if (dto.getWaves() != null) {
-			int nWaves = dto.getWaves().size();
-
-			for (ColosseumWaveDTO wave : dto.getWaves()) {
-				WaveStatus status = wave.getWave() < nWaves ? WaveStatus.COMPLETED : WaveStatus.fromString(wave.getStatus());
-
-				String statusString = (status == WaveStatus.CLAIMED || status == WaveStatus.CANCELLED)
-					? "cancelled"
-					: status.getEmoji();
-
-				StringBuilder fieldName = new StringBuilder("Wave " + wave.getWave() + ": " + statusString);
-
-				if (config.includeTime() && !statusString.equals("cancelled")) {
-					fieldName.append(" | ").append(formatSeconds(wave.getTimeTaken()));
-				}
-
-				String waveSummary = formatColosseumWave(wave, config);
-
-				addField(fields, fieldName.toString(), waveSummary, true);
-			}
-		}
-		embed.add("fields", fields);
-		return wrapEmbedIntoPayload(embed);
+		return description.toString();
 	}
 }

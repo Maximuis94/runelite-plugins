@@ -119,7 +119,7 @@ public class DataLoggerPlugin extends Plugin
 	@Override
 	protected void startUp() throws Exception
 	{
-		log.info("Data Logger starting up...");
+		log.debug("Data Logger starting up...");
 		ItemCharge.setItemManager(itemManager);
 		ConsumableItemGroup.setItemManager(itemManager);
 		eventBus.register(accountHashMapper);
@@ -154,7 +154,7 @@ public class DataLoggerPlugin extends Plugin
 	@Override
 	protected void shutDown()
 	{
-		log.info("Data Logger shutting down...");
+		log.debug("Data Logger shutting down...");
 
 		if (fileIOService != null) {
 			fileIOService.flushAll();

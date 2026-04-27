@@ -23,12 +23,41 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.datalogger.models.enums;
+package com.datalogger.utils;
 
-/**
- * Colosseum webhook format choices
- */
-public enum ColosseumWebhookFormatter
+import java.awt.Color;
+import java.awt.Font;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
+import java.awt.image.BufferedImage;
+
+public class ImageUtil
 {
-	DETAILED, CONCISE, CUSTOM, SCREENSHOT
+	private static final Font DEFAULT_FONT = new Font("Runescape Small", Font.BOLD, 16);
+	private static final Color TEXT_BACKGROUND_COLOR = new Color(199, 183, 152);
+
+	public static BufferedImage appendDataBarToScreenshot(BufferedImage screenshot, int barHeight)
+	{
+		int originalWidth = screenshot.getWidth();
+		int originalHeight = screenshot.getHeight();
+
+		BufferedImage expandedImage = new BufferedImage(
+			originalWidth,
+			originalHeight + barHeight,
+			BufferedImage.TYPE_INT_RGB
+		);
+
+		Graphics2D g = expandedImage.createGraphics();
+
+		// Draw the original screenshot at the top
+		g.drawImage(screenshot, 0, 0, null);
+
+		// Paint the solid dark background bar underneath it
+		g.setColor(TEXT_BACKGROUND_COLOR);
+		g.fillRect(0, originalHeight, originalWidth, barHeight);
+
+		g.dispose();
+
+		return expandedImage;
+	}
 }

@@ -103,7 +103,7 @@ public class ColosseumTimelineLogger {
 		root = new File(event.getRoot());
 		account = event.getAccountName();
 		attemptId = String.format("%s_%s", account, event.getStartTime());
-		log.info("Registered root={} in TimelineLogger", root);
+		log.debug("Registered root={} in TimelineLogger", root);
 	}
 
 	@Subscribe

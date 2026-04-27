@@ -141,7 +141,7 @@ public class GrandExchangeLogger extends AbstractLogger
 
 			log.debug("Attempting to submit completed trade in GE slot {}...", geSlot);
 			if (handleOffer(geSlot, offer))
-				log.info("Submitted completed offer from GE slot {}", geSlot);
+				log.debug("Submitted completed offer from GE slot {}", geSlot);
 		}
 	}
 
@@ -151,7 +151,7 @@ public class GrandExchangeLogger extends AbstractLogger
 	private void onCollectActiveGrandExchangeOffers()
 	{
 		collectionScriptRunning = true;
-		log.info("Offers are being collected - attempting to submit completed offers before they are cleared");
+		log.debug("Offers are being collected - attempting to submit completed offers before they are cleared");
 		submitCompletedOffers();
 		collectionScriptRunning = false;
 	}
@@ -209,7 +209,7 @@ public class GrandExchangeLogger extends AbstractLogger
 		if (cw != null && !cw.isHidden())
 		{
 			this.lastParsedHistory = Instant.now().toEpochMilli();
-			log.info("Attempting to parse GE history....");
+			log.debug("Attempting to parse GE history....");
 			clientThread.invokeLater(this.historyParser::parseGeHistory);
 		}
 	}

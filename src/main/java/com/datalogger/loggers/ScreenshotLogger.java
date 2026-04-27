@@ -34,7 +34,6 @@ import com.datalogger.events.ColosseumAttemptStarted;
 import com.datalogger.events.DataLoggerConfigChanged;
 import com.datalogger.events.PlayerDied;
 import com.datalogger.framework.LogType;
-import com.datalogger.models.enums.BroadcastColosseumScreenshotOption;
 import com.datalogger.models.enums.ScreenshotFormat;
 import com.datalogger.services.FileIOService;
 import java.awt.image.BufferedImage;
@@ -91,14 +90,11 @@ public class ScreenshotLogger {
 	 */
 	public void updateConfigFlags()
 	{
-		BroadcastColosseumScreenshotOption broadcastScreenshotConfig = config.broadcastScreenshot();
 		screenshotBetweenColosseumWaves = config.screenshotBetweenWaves();
-
-		screenshotColosseumSuccess = broadcastScreenshotConfig.isScreenshotOnSuccess();
-		screenshotColosseumClaim = broadcastScreenshotConfig.isScreenshotOnClaim();
-		screenshotColosseumRewardsUI = broadcastScreenshotConfig.isScreenshotOnRewardsUI();
-
-		screenshotColosseumDeath = broadcastScreenshotConfig.isScreenshotOnFailure();
+		screenshotColosseumSuccess = config.broadcastCompletedTrials().isAttachScreenshot();
+		screenshotColosseumClaim = config.broadcastCancelledTrials().isAttachScreenshot();
+		screenshotColosseumRewardsUI = screenshotColosseumSuccess || screenshotColosseumClaim;
+		screenshotColosseumDeath = config.broadcastFailedTrials().isAttachScreenshot();
 
 		screenshotFormat = config.screenshotFormat();
 	}

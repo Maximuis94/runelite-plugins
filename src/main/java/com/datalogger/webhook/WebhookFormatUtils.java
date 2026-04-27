@@ -142,4 +142,35 @@ public final class WebhookFormatUtils
 
 		return String.join("\n", lines);
 	}
+
+	/**
+	 * Formats an individual wave's statistics for the detailed view.
+	 */
+	public static String formatColosseumWaveLine(ColosseumWaveDTO dto, DataLoggerConfig config) {
+		List<String> segments = new ArrayList<>();
+
+		if (config.includeReward()) {
+			ItemBundle loot = dto.getEarnedLoot();
+			String lootString = loot != null ? String.format("%dx %s", loot.getQuantity(), loot.getItemName()) : "None";
+			segments.add(lootString);
+		}
+
+		if (config.includeModifiers()) {
+			String modString = formatModifierChoices(dto, true);
+			segments.add("Mod: " + modString);
+		}
+
+		if (config.includeGlory()) {
+			String gloryBase = String.format("Glory: %,d / %,d", dto.getWaveGlory(), dto.getTotalGlory());
+			String gloryDetails = String.format(" - C:%,d D:%s S:%,d M:%,d",
+				dto.getCompletionBonus(),
+				damageBonusString(dto.getDamageBonus(), dto.getDamageTaken()),
+				dto.getSpeedBonus(),
+				dto.getModifierGlory()
+			);
+			segments.add(gloryBase + " " + gloryDetails);
+		}
+
+		return String.join(" | ", segments);
+	}
 }

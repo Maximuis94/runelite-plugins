@@ -25,10 +25,42 @@
 
 package com.datalogger.models.enums;
 
+import javax.annotation.Nullable;
+import lombok.Getter;
+
 /**
- * Colosseum webhook format choices
+ * Various ways to broadcast a completed Colosseum trial
  */
-public enum ColosseumWebhookFormatter
+@Getter
+public enum ColosseumBroadcastMode
 {
-	DETAILED, CONCISE, CUSTOM, SCREENSHOT
+	SKIP("Don't broadcast", null, false),
+	CONCISE("Concise", ColosseumWebhookFormatter.CONCISE, false),
+	CONCISE_SCREENSHOT("Concise+screenshot", ColosseumWebhookFormatter.CONCISE, true),
+	CUSTOM_TEMPLATE("Custom", ColosseumWebhookFormatter.CUSTOM, false),
+	CUSTOM_TEMPLATE_SCREENSHOT("Custom+screenshot", ColosseumWebhookFormatter.CUSTOM, true),
+	DETAILED("Detailed", ColosseumWebhookFormatter.DETAILED, false),
+	DETAILED_SCREENSHOT("Detailed+screenshot", ColosseumWebhookFormatter.DETAILED, true),
+	SCREENSHOT("Screenshot", null, true),
+	DETAILED_WATERMARKED_SCREENSHOT("Detailed screenshot", ColosseumWebhookFormatter.SCREENSHOT, true);
+
+	private final String name;
+
+	@Nullable
+	private final ColosseumWebhookFormatter formatter;
+
+	private final boolean attachScreenshot;
+
+	ColosseumBroadcastMode(String name, @Nullable ColosseumWebhookFormatter formatter, boolean attachScreenshot)
+	{
+		this.name = name;
+		this.formatter = formatter;
+		this.attachScreenshot = attachScreenshot;
+	}
+
+	@Override
+	public String toString()
+	{
+		return name;
+	}
 }

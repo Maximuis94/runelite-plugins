@@ -38,7 +38,6 @@ import com.datalogger.framework.LogType;
 import com.datalogger.models.colosseum.ColosseumAttempt;
 import com.datalogger.models.colosseum.ColosseumState;
 import com.datalogger.models.colosseum.ColosseumWave;
-import com.datalogger.models.enums.BroadcastColosseumScreenshotOption;
 import com.datalogger.models.enums.ScreenshotFormat;
 import com.datalogger.models.grandexchange.ActiveGeOffer;
 import com.datalogger.models.grandexchange.GeLedgerEntry;
@@ -119,7 +118,6 @@ public class FileIOService
 	private final DataLoggerConfig config;
 	private final EventBus eventBus;
 	private boolean logGrandExchangeJson;
-	private boolean broadcastScreenshotEvent;
 
 	private String accountName = "";
 	private String accountHashString = "";
@@ -179,7 +177,7 @@ public class FileIOService
 			log.warn("Failed to create Colosseum attempt directory at: {}. Logs/screenshots may fail to save.", attemptRoot);
 		}
 
-		log.info("Initialized Colosseum FileIOService vars with root={}, account={}, startTime={}", attemptRoot, accountName, startTime);
+		log.debug("Initialized Colosseum FileIOService vars with root={}, account={}, startTime={}", attemptRoot, accountName, startTime);
 	}
 
 	@Subscribe
@@ -215,7 +213,7 @@ public class FileIOService
 		}
 		else if (hasValidAccountInfo)
 		{
-			log.info("AccountHash info has expired and does not match the currently active session.");
+			log.debug("AccountHash info has expired and does not match the currently active session.");
 			hasExpiredAccountInfo = true;
 		}
 	}
@@ -226,7 +224,6 @@ public class FileIOService
 	private void updateConfigFlags()
 	{
 		logGrandExchangeJson = config.logGrandExchangeJSON();
-		broadcastScreenshotEvent = config.broadcastScreenshot() != BroadcastColosseumScreenshotOption.NEVER;
 	}
 
 
@@ -282,6 +279,7 @@ public class FileIOService
 	/**
 	 * Returns a File reference based on the input provided and the plugin configurations
 	 * @param type The data that is to be logged
+	 * @param account The account that the data relates to
 	 * @return File reference based on inputs provided and strategy selected
 	 */
 	public File getTargetFile(LogType type) {
@@ -301,6 +299,7 @@ public class FileIOService
 
 	/**
 	 * Parse the properties file associated with the given account hash
+	 * @param accountHash The account hash that indicates which file is to be parsed
 	 * @return The contents of the parsed properties file
 	 */
 	public Properties getAccountState() {
@@ -319,6 +318,7 @@ public class FileIOService
 
 	/**
 	 * Export properties associated with accountHash to its corresponding file
+	 * @param accountHash Account hash String
 	 * @param props Properties that are to be saved.
 	 */
 	public void saveAccountState(Properties props) {
@@ -384,7 +384,7 @@ public class FileIOService
 
 			try (BufferedWriter writer = Files.newBufferedWriter(file.toPath(), StandardCharsets.UTF_8)) {
 				gson.toJson(dtos, writer);
-				log.info("Successfully saved Colosseum run to: {}", file.getName());
+				log.debug("Successfully saved Colosseum run to: {}", file.getName());
 			} catch (IOException e) {
 				log.error("Failed to save Colosseum JSON", e);
 			}
@@ -445,7 +445,7 @@ public class FileIOService
 					writer.endArray();
 				}
 
-				log.info("Successfully merged timeline for attempt {} at {}", attemptId, outFile.getAbsolutePath());
+				log.debug("Successfully merged timeline for attempt {} at {}", attemptId, outFile.getAbsolutePath());
 
 				for (File f : toDelete) {
 					if (f.delete()) {
@@ -474,7 +474,7 @@ public class FileIOService
 				 PrintWriter out = new PrintWriter(bw)) {
 
 				out.println(jsonLine);
-				log.info("Successfully appended attempt to internal history.");
+				log.debug("Successfully appended attempt to internal history.");
 
 			} catch (IOException e) {
 				log.error("Failed to append to internal Colosseum history!", e);
@@ -487,7 +487,7 @@ public class FileIOService
 
 			try (FileWriter writer = new FileWriter(attemptLogJsonFile)) {
 				gson.toJson(attemptDto, writer);
-				log.info("Successfully saved Colosseum attempt to {}", attemptLogJsonFile.getAbsolutePath());
+				log.debug("Successfully saved Colosseum attempt to {}", attemptLogJsonFile.getAbsolutePath());
 			} catch (IOException e) {
 				log.error("Failed to save Colosseum attempt log!", e);
 			}
@@ -503,7 +503,7 @@ public class FileIOService
 	 * @param format The format of the image file
 	 */
 	public void saveScreenshot(BufferedImage image, File rootDir, String fileName, ScreenshotFormat format, boolean shouldBroadcast) throws IOException {
-		log.info("Attempting to save screenshot at directory {} with fileName {}", rootDir, fileName);
+		log.debug("Attempting to save screenshot at directory {} with fileName {}", rootDir, fileName);
 
 		if (!ensureDirectoryExists(rootDir)) {
 			return;
@@ -523,7 +523,7 @@ public class FileIOService
 			ImageIO.write(image, "png", outputFile);
 		}
 		String absolutePath = outputFile.getAbsolutePath();
-		log.info("Posting ScreenshotFileCreated event for {} shouldBroadcast={}", absolutePath, shouldBroadcast);
+		log.debug("Posting ScreenshotFileCreated event for {} shouldBroadcast={}", absolutePath, shouldBroadcast);
 		eventBus.post(new ScreenshotFileCreated(absolutePath));
 
 	}
@@ -544,7 +544,7 @@ public class FileIOService
 					java.nio.file.StandardOpenOption.TRUNCATE_EXISTING
 				);
 
-				log.info("Successfully saved Colosseum CSV log to {}", outFile.getAbsolutePath());
+				log.debug("Successfully saved Colosseum CSV log to {}", outFile.getAbsolutePath());
 			} catch (IOException e) {
 				log.error("Failed to write Colosseum CSV log for attempt {}", outFile.getName(), e);
 			}});
@@ -634,7 +634,7 @@ public class FileIOService
 						}
 						catch (Exception ignored)
 						{
-							log.info("Failed to copy the json to the grand-exchange directory.");
+							log.debug("Failed to copy the json to the grand-exchange directory.");
 						}
 					}
 
@@ -683,7 +683,7 @@ public class FileIOService
 			return new ArrayList<>();
 		}
 
-		log.info("Loading active GE offers for account {} with hash {}...", accountName, accountHashString);
+		log.debug("Loading active GE offers for account {} with hash {}...", accountName, accountHashString);
 		return loadActiveGeOffers(accountHashString);
 	}
 
@@ -772,7 +772,7 @@ public class FileIOService
 
 	public void saveActiveGeOffers(List<ActiveGeOffer> offers)
 	{
-		log.info("Saving active GE offers for account {}", accountName);
+		log.debug("Saving active GE offers for account {}", accountName);
 		saveActiveGeOffers(accountHashString, offers);
 	}
 
@@ -780,7 +780,7 @@ public class FileIOService
 	 * Final attempt to write all rows that previously failed to write.
 	 */
 	public void flushAll() {
-		log.info("Waiting for pending background file writes to complete...");
+		log.debug("Waiting for pending background file writes to complete...");
 
 		Instant timeLimit = Instant.now().plusMillis(MAX_FLUSH_TIME_MS);
 
@@ -813,7 +813,7 @@ public class FileIOService
 
 			if (backlog.isEmpty()) continue;
 
-			log.info("Attempting final flush of {} rows to {} before shutdown...", backlog.size(), file.getName());
+			log.debug("Attempting final flush of {} rows to {} before shutdown...", backlog.size(), file.getName());
 
 			try (FileWriter fw = new FileWriter(file, true);
 				 BufferedWriter bw = new BufferedWriter(fw);
@@ -828,7 +828,7 @@ public class FileIOService
 					failedWrites.remove(file);
 				}
 
-				log.info("Successfully flushed remaining backlog for {}", file.getName());
+				log.debug("Successfully flushed remaining backlog for {}", file.getName());
 
 			} catch (IOException e) {
 				log.error(
@@ -871,7 +871,7 @@ public class FileIOService
 							item.getQuantity());
 					}
 				}
-				log.info("Successfully exported vault to CSV: {}", csvFile.getName());
+				log.debug("Successfully exported vault to CSV: {}", csvFile.getName());
 			} catch (Exception e) {
 				log.error("Failed to write vault contents to CSV: {}", csvFile.getName(), e);
 			}
@@ -997,7 +997,7 @@ public class FileIOService
 				log.debug("Colosseum root directory does not exist. Skipping merge.");
 				return;
 			}
-			log.info("Attempting to merge all Colosseum wave json logs into {}", COLOSSEUM_WAVE_LOG_MERGED_JSON);
+			log.debug("Attempting to merge all Colosseum wave json logs into {}", COLOSSEUM_WAVE_LOG_MERGED_JSON);
 
 			File[] attemptDirs = PluginConstants.COLOSSEUM_ATTEMPT_DIR.listFiles(File::isDirectory);
 			if (attemptDirs == null || attemptDirs.length == 0) {
@@ -1056,7 +1056,7 @@ public class FileIOService
 				}
 
 				writer.endArray();
-				log.info("Successfully merged data of {} waves from {} log files into {}", nWaves, nLogs, COLOSSEUM_WAVE_LOG_MERGED_JSON.getName());
+				log.debug("Successfully merged data of {} waves from {} log files into {}", nWaves, nLogs, COLOSSEUM_WAVE_LOG_MERGED_JSON.getName());
 
 			} catch (IOException e) {
 				log.error("Failed to write merged Colosseum wave logs to {}", COLOSSEUM_WAVE_LOG_MERGED_JSON.getName(), e);
@@ -1074,7 +1074,7 @@ public class FileIOService
 				log.debug("Colosseum root directory does not exist. Skipping CSV merge.");
 				return;
 			}
-			log.info("Attempting to merge all Colosseum wave csv logs...");
+			log.debug("Attempting to merge all Colosseum wave csv logs...");
 
 			File[] attemptDirs = PluginConstants.COLOSSEUM_ATTEMPT_DIR.listFiles(File::isDirectory);
 			if (attemptDirs == null || attemptDirs.length == 0) {
@@ -1178,7 +1178,7 @@ public class FileIOService
 						log.error("Failed to parse CSV wave log for attempt: {}", attemptId, e);
 					}
 				}
-				log.info("Successfully merged all {} waves from {} Colosseum CSV wave logs into {}", nWaves, nLogs, COLOSSEUM_WAVE_LOG_MERGED_CSV.getName());
+				log.debug("Successfully merged all {} waves from {} Colosseum CSV wave logs into {}", nWaves, nLogs, COLOSSEUM_WAVE_LOG_MERGED_CSV.getName());
 			} catch (IOException e) {
 				log.error("Failed to write merged Colosseum CSV file", e);
 			}
@@ -1194,7 +1194,7 @@ public class FileIOService
 		try (FileWriter writer = new FileWriter(file))
 		{
 			gson.toJson(supplies, writer);
-			log.info("Successfully exported supplies to JSON: {}", file.getAbsolutePath());
+			log.debug("Successfully exported supplies to JSON: {}", file.getAbsolutePath());
 		}
 		catch (IOException e)
 		{
@@ -1242,7 +1242,7 @@ public class FileIOService
 
 			writer.printf("Total,,,%d%n", totalGp);
 
-			log.info("Successfully exported supplies to CSV: {}", file.getAbsolutePath());
+			log.debug("Successfully exported supplies to CSV: {}", file.getAbsolutePath());
 		}
 		catch (IOException e)
 		{

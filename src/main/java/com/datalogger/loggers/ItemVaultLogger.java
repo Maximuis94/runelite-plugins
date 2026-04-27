@@ -182,7 +182,7 @@ public class ItemVaultLogger extends AbstractLogger
 			Map<String, BankedItem[]> allVaultData = fileIOService.readAllVaultFilesRaw();
 
 			if (allVaultData.isEmpty()) {
-				log.info("No saved vaults found to load into memory.");
+				log.debug("No saved vaults found to load into memory.");
 				return;
 			}
 
@@ -236,7 +236,7 @@ public class ItemVaultLogger extends AbstractLogger
 				loadGeVaultIntoMemory(accountHash);
 			}
 
-			log.info("Successfully loaded {} vault files into memory across {} accounts.", loadedFiles, vaultCache.size());
+			log.debug("Successfully loaded {} vault files into memory across {} accounts.", loadedFiles, vaultCache.size());
 		});
 	}
 
@@ -285,18 +285,18 @@ public class ItemVaultLogger extends AbstractLogger
 	 */
 	public void exportAggregatedData()
 	{
-		log.info("Attempting to export aggregated vault data...");
+		log.debug("Attempting to export aggregated vault data...");
 		List<BankedItem> items = aggregateAllAccounts();
 
 		if (items == null || items.isEmpty()) {
-			log.info("No aggregated data found to export.");
+			log.debug("No aggregated data found to export.");
 			return;
 		}
 
 		fileIOService.saveJson(MERGED_ITEM_VAULT_JSON, items);
 		fileIOService.writeVaultCsv(MERGED_ITEM_VAULT_CSV, items, true);
 
-		log.info("Successfully exported aggregated wealth summary for {} unique items.", items.size());
+		log.debug("Successfully exported aggregated wealth summary for {} unique items.", items.size());
 	}
 
 	/**
