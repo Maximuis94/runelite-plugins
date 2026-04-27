@@ -301,6 +301,7 @@ public class ColosseumAttemptLogger extends AbstractLogger
 				{
 					int selectedModifierIdx = event.getValue()-1;
 					selectedModifier = modifierChoices.get(selectedModifierIdx);
+					activeModifiers.add(selectedModifier.name());
 					parsedTransitionUI.setSelectedModifier(selectedModifier);
 					log.debug("[WAVE {}] Varbit {} was changed - new value is {}, set selectedModifier to {}", currentWave, COLOSSEUM_SELECTED_MODIFIER_VARBIT, selectedModifierIdx, selectedModifier);
 				}
@@ -365,10 +366,23 @@ public class ColosseumAttemptLogger extends AbstractLogger
 	}
 
 	@Subscribe
-	public void onGameTick(GameTick event) {
-		if (!enabledLogging || !inColosseum) return;
+	public void onActorDeath(ActorDeath event)
+	{
+		if (supplyTracker.isTracking() && event.getActor() == client.getLocalPlayer())
+		{
+			eventBus.post(new PlayerDied(client.getTickCount(), LogType.COLOSSEUM));
+			log.debug("Player died at wave {}. Stopping tracker before respawn.", currentWave);
 
-		if (activeWave && !scanner.scannedManticoreSequences(currentWave)) {
+			supplyTracker.stopTracking(currentAttempt.getAttemptRoot(), currentAttempt.getSupplyFileName(),true, enabledCsvLogging);
+			activeWave = false;
+		}
+	}
+
+	@Subscribe
+	public void onGameTick(GameTick event) {
+		if (!enabledLogging || !inColosseum || !activeWave) return;
+
+		if (!scanner.scannedManticoreSequences(currentWave)) {
 			WorldView wv = client.getTopLevelWorldView();
 			if (wv != null) {
 				scanner.parseManticoreAttackSequences(wv.npcs());
@@ -427,7 +441,6 @@ public class ColosseumAttemptLogger extends AbstractLogger
 		}
 	}
 
-
 	@Subscribe
 	public void onGameStateChanged(GameStateChanged event) {
 		if (!enabledLogging) return;
@@ -437,6 +450,7 @@ public class ColosseumAttemptLogger extends AbstractLogger
 		if (state == GameState.LOGIN_SCREEN || state == GameState.HOPPING) {
 			if (inColosseum && currentAttempt != null) {
 				log.debug("Player logged out or disconnected in the Colosseum. Run failed.");
+				finalStatus = WaveStatus.LOGGED_OUT;
 				failWave();
 				inColosseum = false;
 			}
@@ -465,21 +479,31 @@ public class ColosseumAttemptLogger extends AbstractLogger
 		log.debug("Starting a new Colosseum attempt.");
 		attemptStartTick = client.getTickCount();
 		setCurrentWave(1);
+		activeModifiers.clear();
 		activeWave = false;
 		startTime = Instant.ofEpochMilli(System.currentTimeMillis())
 			.atZone(ZoneId.systemDefault())
-			.format(DateTimeFormatter.ofPattern("yyMMdd_HHmmss"));
+			.format(COLOSSEUM_TRIAL_TIMESTAMP_FORMATTER);
 		totalTimeTaken = .0;
-		String attemptId = String.format("%s_%s", getAccountName(), startTime);
 		currentAttempt = new ColosseumAttempt(attemptStartTick, getAccountName());
-		attemptRoot = new File(FileIOService.COLOSSEUM_ROOT_DIR, attemptId);
 		finalStatus = null;
 		activeTrial = true;
 		waitingForIntermission = true;
 		inColosseum = true;
 		parsedTransitionUI = null;
 		parsedCurrentWaveIntermission = false;
-		eventBus.post(new ColosseumAttemptStarted(currentAttempt.getStartTime(), getAccountName(), currentAttempt.getRootDirectory().getAbsolutePath()));
+
+		if (trackSupplies)
+		{
+			supplyTracker.startTracking();
+			supplyTracker.setTag(currentAttempt.getAttemptId());
+		}
+
+		bossWavePhase = 0;
+		Arrays.fill(bossWavePhaseTickCounts, -1);
+
+		eventBus.post(new ColosseumAttemptStarted(currentAttempt.getStartTime(), getAccountName(), currentAttempt.getAttemptRoot().getAbsolutePath()));
+		log.debug("Starting a new ColosseumAttempt for account {} - Data will be saved in {}", getAccountName(), currentAttempt.getAttemptRoot().getAbsolutePath());
 
 		entryTag = config.colosseumTag();
 		try
@@ -493,6 +517,38 @@ public class ColosseumAttemptLogger extends AbstractLogger
 	}
 
 	/**
+	 * Preprocess the rewards attributes of the ongoing attempt and set them in the ColosseumAttempt instance.
+	 */
+	private void preprocessAttemptRewards()
+	{
+		int[] totalValue = {0};
+
+		Map<Integer, Integer> rewards = currentAttempt.getRewards();
+		Map<String, ValuedItemStack> namedRewards = new HashMap<>();
+		if (rewards != null) {
+			rewards.keySet().forEach(itemId -> {
+				ItemComposition comp = itemManager.getItemComposition(itemId);
+				int price = itemManager.getItemPrice(itemId);
+				int qty = rewards.getOrDefault(itemId, 0);
+				int value = price * qty;
+
+				totalValue[0] += value;
+				namedRewards.put(comp.getName(), new ValuedItemStack(qty, value));
+			});
+		}
+		currentAttempt.setNamedRewards(namedRewards, totalValue[0]);
+	}
+
+	/**
+	 * Update properties needed to generate the dto, then generate+return the ColosseumAttemptDto
+	 */
+	private ColosseumAttemptDTO generateColosseumAttemptDto()
+	{
+		preprocessAttemptRewards();
+		return currentAttempt.toDTO();
+	}
+
+	/**
 	 * Wrap up the ongoing attempt by merging the timeline of states, logging the current attempt and writing the CSV log,
 	 * depending on user-defined configurations.
 	 */
@@ -503,11 +559,45 @@ public class ColosseumAttemptLogger extends AbstractLogger
 		log.debug("[Wave {}] ColosseumAttemptEnded posted | startTick={} endTick={} duration={}s", currentWave, attemptStartTick, attemptEndTick, attemptDuration);
 		eventBus.post(new ColosseumAttemptEnded(currentAttempt.getStartTime()));
 		currentAttempt.setFinalStatus(status);
-		fileIOService.logColosseumAttempt(currentAttempt);
+
+		TrackedSupplies supplies = supplyTracker.getConsumedItems();
+		currentAttempt.setConsumedSupplies(supplies);
+
+		File attemptJsonFile = currentAttempt.getWaveLogJsonFile();
+		ColosseumAttemptDTO dto = generateColosseumAttemptDto();
+		fileIOService.logColosseumAttempt(dto, attemptJsonFile);
+
+		if (colosseumDiscordBroadcaster.isEnabledDiscordBroadcasting())
+		{
+			log.debug("Broadcasting colosseum trial info...");
+			colosseumDiscordBroadcaster.broadcastToDiscord(dto);
+		}
+
+		if (currentWave == 12 && bossWavePhaseTickCounts[0] != -1 && bossWavePhaseTickCounts[1] != -1)
+		{
+			double totalTimeTaken = 0;
+			log.debug("Time taken per boss phase");
+			for (int phase = 1; phase < bossWavePhaseTickCounts.length; phase++)
+			{
+				double phaseTimeTaken = BigDecimal.valueOf(.6*(bossWavePhaseTickCounts[phase]- bossWavePhaseTickCounts[phase-1])).setScale(1, RoundingMode.HALF_UP).doubleValue();
+				totalTimeTaken += phaseTimeTaken;
+				log.debug("Phase {}: [{}-{}] HP {} seconds (total: {})", phase, BOSS_HP_AT_PHASE.get(phase-1), BOSS_HP_AT_PHASE.get(phase), phaseTimeTaken, totalTimeTaken);
+			}
+		}
 
 		if (enabledCsvLogging)
+		{
 			fileIOService.writeColosseumCSVLog(currentAttempt, writeCsvLog());
+		}
+		if (trackSupplies)
+			supplyTracker.stopTracking(currentAttempt.getAttemptRoot(), currentAttempt.getSupplyFileName(), true, enabledCsvLogging);
+
 		currentAttempt = null;
+
+		if (autoMergeWaveFiles)
+		{
+			fileIOService.mergeColosseumWaveLogs();
+		}
 	}
 
 	/**
@@ -523,7 +613,7 @@ public class ColosseumAttemptLogger extends AbstractLogger
 			log.debug("Completing ColosseumWave for wave {}", currentWave);
 			ColosseumWave completedWave = completeWave(newUI);
 			log.debug("{}", completedWave.toDTO());
-			currentAttempt.submitWave(completedWave);
+			submitWave(completedWave);
 			selectedModifier = null;
 		}
 		parsedTransitionUI = newUI;
@@ -532,79 +622,10 @@ public class ColosseumAttemptLogger extends AbstractLogger
 	}
 
 	/**
-	 * Ongoing wave has failed; update it accordingly and submit it. Subsequently, end the ongoing attempt.
+	 * Sets tracked NPC data to null
 	 */
-	private void failWave() {
-		if (currentAttempt == null || finalStatus != null && finalStatus != WaveStatus.CONFIG_DISABLED) return;
-		activeWave = false;
-		endWave();
-		final WaveStatus submitStatus;
-		if (finalStatus == null)
-		{
-			submitStatus = WaveStatus.FAILED;
-			log.debug("[Wave {}] Failed wave during ongoing Colosseum attempt at tick={} finalStatus was set to {}", currentWave, client.getTickCount(), finalStatus);
-		}
-		else
-		{
-			log.debug("[Wave {}] Failed wave during ongoing Colosseum attempt at tick={} with finalStatus={}", currentWave, client.getTickCount(), finalStatus);
-			submitStatus = finalStatus;
-		}
-
-		List<ItemBundle> loot = parsedTransitionUI != null && parsedTransitionUI.getPotentialLoot() != null ? parsedTransitionUI.getPotentialLoot() : new ArrayList<>();
-
-		double timeTaken = getWaveTimeTaken();
-		totalTimeTaken = totalTimeTaken + timeTaken;
-		ColosseumWave failedWave = ColosseumWave.builder()
-			.wave(currentWave)
-			.status(submitStatus)
-			.accountName(entryAccount)
-			.tag(entryTag)
-			.earnedLoot(loot)
-			.modifierChoices(parsedTransitionUI != null ? parsedTransitionUI.getModifierChoices() : new ArrayList<>())
-			.chosenModifier(selectedModifier)
-			.startTick(waveStartTick)
-			.endTick(waveEndTick)
-			.timeTaken(timeTaken)
-			.speedBonus(0)
-			.damageTaken(0)
-			.damageBonus(0)
-			.modifierGlory(0)
-			.completionBonus(0)
-			.waveGlory(0)
-			.totalGlory(parsedTransitionUI != null ? parsedTransitionUI.getTotalGlory() : 0)
-			.totalTimeTaken(totalTimeTaken)
-			.serpentShamanSpawn(serpentShamanSpawn)
-			.javelinColossusSpawnA(javelinColossusSpawnA)
-			.javelinColossusSpawnB(javelinColossusSpawnB)
-			.manticoreSpawnA(manticoreSpawnA)
-			.manticoreSequenceA(scanner.getManticoreSequenceA())
-			.manticoreSpawnB(manticoreSpawnB)
-			.manticoreSequenceB(scanner.getManticoreSequenceB())
-			.shockwaveColossusSpawnA(shockwaveColossusSpawnA)
-			.shockwaveColossusSpawnB(shockwaveColossusSpawnB)
-			.jaguarWarriorReinforcementsSpawn(jaguarWarriorReinforcementsSpawn)
-			.serpentShamanReinforcementsSpawn(serpentShamanReinforcementsSpawn)
-			.minotaurReinforcementsSpawn(minotaurReinforcementsSpawn)
-			.build();
-
-		log.debug(failedWave.toString());
-
-		currentAttempt.submitWave(failedWave);
-		endAttempt(submitStatus);
-	}
-
-	/**
-	 * Start a new wave by resetting all wave-specific values and notify that a new wave has started
-	 */
-	private void startWave() {
-		if (activeWave) return;
-
-		waveStartTick = client.getTickCount();
-		log.debug("[Wave {}] ColosseumWaveStarted event posted at tick {}", currentWave, waveStartTick);
-		eventBus.post(new ColosseumWaveStarted(currentAttempt.getStartTime(), currentWave, waveStartTick));
-		activeWave = true;
-		parsedCurrentWaveIntermission = false;
-
+	private void resetNpcData()
+	{
 		serpentShamanSpawn = null;
 		javelinColossusSpawnA = null;
 		javelinColossusSpawnB = null;
@@ -612,12 +633,23 @@ public class ColosseumAttemptLogger extends AbstractLogger
 		manticoreSpawnB = null;
 		shockwaveColossusSpawnA = null;
 		shockwaveColossusSpawnB = null;
-
 		jaguarWarriorReinforcementsSpawn = null;
 		serpentShamanReinforcementsSpawn = null;
 		minotaurReinforcementsSpawn = null;
 
-		scanner.resetManticoreSequences();
+		if (scanner != null) scanner.resetManticoreSequences();
+	}
+
+	/**
+	 * Start a new wave by resetting all wave-specific values and notify that a new wave has started
+	 */
+	private void startWave() {
+		if (activeWave) return;
+		log.debug("[Wave {}] ColosseumWaveStarted event posted at tick {}", currentWave, waveStartTick);
+		eventBus.post(new ColosseumWaveStarted(currentAttempt.getStartTime(), currentWave, waveStartTick));
+		activeWave = true;
+		parsedCurrentWaveIntermission = false;
+		resetNpcData();
 	}
 
 	/**
@@ -660,262 +692,6 @@ public class ColosseumAttemptLogger extends AbstractLogger
 	}
 
 	/**
-	 * Generate a completed wave by combining new data with the previously parsed UI data and return it
-	 */
-	private ColosseumWave generateCompletedWave(IntermissionUI curUI)
-	{
-		int endTick = client.getTickCount();
-		log.debug("Completed wave {} at tick {}", completedWave, endTick);
-
-		List<ItemBundle> loot = parsedTransitionUI != null && parsedTransitionUI.getPotentialLoot() != null
-			? parsedTransitionUI.getPotentialLoot()
-			: new ArrayList<>();
-
-		double timeTaken = getWaveTimeTaken();
-		totalTimeTaken = totalTimeTaken + timeTaken;
-		return ColosseumWave.builder()
-			.wave(completedWave)
-			.status(WaveStatus.COMPLETED)
-			.accountName(entryAccount)
-			.tag(entryTag)
-			.earnedLoot(loot)
-			.modifierChoices(parsedTransitionUI.getModifierChoices())
-			.chosenModifier(parsedTransitionUI.getSelectedModifier())
-			.startTick(waveStartTick)
-			.endTick(waveEndTick)
-			.timeTaken(timeTaken)
-			.totalTimeTaken(totalTimeTaken)
-			.speedBonus(curUI.getSpeedBonusGlory())
-			.damageTaken(curUI.getDamageTakenAmount())
-			.damageBonus(curUI.getDamageTakenGlory())
-			.modifierGlory(curUI.getModChoiceGlory())
-			.completionBonus(curUI.getWaveBonusGlory())
-			.waveGlory(curUI.getWaveGlory())
-			.totalGlory(curUI.getTotalGlory())
-			.serpentShamanSpawn(serpentShamanSpawn)
-			.javelinColossusSpawnA(javelinColossusSpawnA)
-			.javelinColossusSpawnB(javelinColossusSpawnB)
-			.manticoreSpawnA(manticoreSpawnA)
-			.manticoreSequenceA(scanner.getManticoreSequenceA())
-			.manticoreSpawnB(manticoreSpawnB)
-			.manticoreSequenceB(scanner.getManticoreSequenceB())
-			.shockwaveColossusSpawnA(shockwaveColossusSpawnA)
-			.shockwaveColossusSpawnB(shockwaveColossusSpawnB)
-			.jaguarWarriorReinforcementsSpawn(jaguarWarriorReinforcementsSpawn)
-			.serpentShamanReinforcementsSpawn(serpentShamanReinforcementsSpawn)
-			.minotaurReinforcementsSpawn(minotaurReinforcementsSpawn)
-
-			.build();
-	}
-
-	/**
-	 * Generate a cancelled wave and return it. Occurs if the rewards chest is opened before wave 12.
-	 */
-	private ColosseumWave generateCancelledWave(IntermissionUI curUI)
-	{
-		int endTick = client.getTickCount();
-		log.debug("Cancelled wave {} at tick {}", currentWave, endTick);
-		List<ItemBundle> loot = parsedTransitionUI != null && parsedTransitionUI.getPotentialLoot() != null
-			? parsedTransitionUI.getPotentialLoot()
-			: new ArrayList<>();
-		return ColosseumWave.builder()
-			.wave(completedWave+1)
-			.status(WaveStatus.CANCELLED)
-			.accountName(entryAccount)
-			.tag(entryTag)
-			.earnedLoot(loot)
-			.modifierChoices(parsedTransitionUI != null ? parsedTransitionUI.getModifierChoices() : new ArrayList<>())
-			.chosenModifier(null)
-			.startTick(endTick)
-			.endTick(endTick)
-			.timeTaken(0)
-			.totalTimeTaken(totalTimeTaken)
-			.speedBonus(0)
-			.damageTaken(0)
-			.damageBonus(0)
-			.modifierGlory(0)
-			.completionBonus(0)
-			.waveGlory(0)
-			.totalGlory(curUI.getTotalGlory())
-			.serpentShamanSpawn(null)
-			.javelinColossusSpawnA(null)
-			.javelinColossusSpawnB(null)
-			.manticoreSpawnA(null)
-			.manticoreSequenceA(null)
-			.manticoreSpawnB(null)
-			.manticoreSequenceB(null)
-			.shockwaveColossusSpawnA(null)
-			.shockwaveColossusSpawnB(null)
-			.jaguarWarriorReinforcementsSpawn(null)
-			.serpentShamanReinforcementsSpawn(null)
-			.minotaurReinforcementsSpawn(null)
-			.build();
-	}
-
-	@Override
-	public LogType getLogType()
-	{
-		return LogType.COLOSSEUM;
-	}
-
-	@Override
-	public String getCsvHeader()
-	{
-		return ColosseumWave.csvHeader();
-	}
-
-	@Override
-	public boolean isEnabled()
-	{
-		return enabledLogging;
-	}
-
-	/**
-	 * Compute the time taken based on wave start and end ticks, return it with up to one decimal in seconds.
-	 */
-	private double getWaveTimeTaken()
-	{
-		return BigDecimal.valueOf(.6 * (waveEndTick - waveStartTick)).setScale(1, RoundingMode.HALF_UP).doubleValue();
-	}
-
-	public String writeCsvLog() {
-		if (currentAttempt == null || currentAttempt.getWaves() == null || currentAttempt.getWaves().isEmpty()) {
-			return "";
-		}
-		StringBuilder sb = new StringBuilder();
-		for (ColosseumWave wave : currentAttempt.getWaves()) {
-			sb.append(wave.toCsvRow()).append("\n");
-		}
-
-		return sb.toString();
-	}
-
-	/**
-	 * Updates the value of currentWave and logs a message
-	 */
-	private void setCurrentWave(int waveNumber)
-	{
-		if (currentWave == waveNumber) return;
-
-		log.debug("Updated currentWave value from {} to {} at tick={}", currentWave, waveNumber, client.getTickCount());
-				log.debug("Colosseum logging was disabled mid-run. Cleaning up state.");
-					activeModifiers.add(selectedModifier.name());
-	@Subscribe
-	public void onActorDeath(ActorDeath event)
-	{
-		if (supplyTracker.isTracking() && event.getActor() == client.getLocalPlayer())
-		{
-			eventBus.post(new PlayerDied(client.getTickCount(), LogType.COLOSSEUM));
-			log.debug("Player died at wave {}. Stopping tracker before respawn.", currentWave);
-
-			supplyTracker.stopTracking(currentAttempt.getAttemptRoot(), currentAttempt.getSupplyFileName(),true, enabledCsvLogging);
-			activeWave = false;
-		}
-	}
-
-		if (!enabledLogging || !inColosseum || !activeWave) return;
-		if (!scanner.scannedManticoreSequences(currentWave)) {
-				log.debug("Player logged out or disconnected in the Colosseum. Run failed.");
-				finalStatus = WaveStatus.LOGGED_OUT;
-		activeModifiers.clear();
-			.format(COLOSSEUM_TRIAL_TIMESTAMP_FORMATTER);
-
-		if (trackSupplies)
-		{
-			supplyTracker.startTracking();
-			supplyTracker.setTag(currentAttempt.getAttemptId());
-		}
-
-		bossWavePhase = 0;
-		Arrays.fill(bossWavePhaseTickCounts, -1);
-
-		eventBus.post(new ColosseumAttemptStarted(currentAttempt.getStartTime(), getAccountName(), currentAttempt.getAttemptRoot().getAbsolutePath()));
-		log.debug("Starting a new ColosseumAttempt for account {} - Data will be saved in {}", getAccountName(), currentAttempt.getAttemptRoot().getAbsolutePath());
-	/**
-	 * Preprocess the rewards attributes of the ongoing attempt and set them in the ColosseumAttempt instance.
-	 */
-	private void preprocessAttemptRewards()
-	{
-		int[] totalValue = {0};
-
-		Map<Integer, Integer> rewards = currentAttempt.getRewards();
-		Map<String, ValuedItemStack> namedRewards = new HashMap<>();
-		if (rewards != null) {
-			rewards.keySet().forEach(itemId -> {
-				ItemComposition comp = itemManager.getItemComposition(itemId);
-				int price = itemManager.getItemPrice(itemId);
-				int qty = rewards.getOrDefault(itemId, 0);
-				int value = price * qty;
-
-				totalValue[0] += value;
-				namedRewards.put(comp.getName(), new ValuedItemStack(qty, value));
-			});
-		}
-		currentAttempt.setNamedRewards(namedRewards, totalValue[0]);
-	}
-
-	/**
-	 * Update properties needed to generate the dto, then generate+return the ColosseumAttemptDto
-	 */
-	private ColosseumAttemptDTO generateColosseumAttemptDto()
-	{
-		preprocessAttemptRewards();
-		return currentAttempt.toDTO();
-	}
-
-
-		TrackedSupplies supplies = supplyTracker.getConsumedItems();
-		currentAttempt.setConsumedSupplies(supplies);
-
-		File attemptJsonFile = currentAttempt.getWaveLogJsonFile();
-		ColosseumAttemptDTO dto = generateColosseumAttemptDto();
-		fileIOService.logColosseumAttempt(dto, attemptJsonFile);
-
-		if (colosseumDiscordBroadcaster.isEnabledDiscordBroadcasting())
-		{
-			log.debug("Broadcasting colosseum trial info...");
-			colosseumDiscordBroadcaster.broadcastToDiscord(dto);
-		}
-
-		if (currentWave == 12 && bossWavePhaseTickCounts[0] != -1 && bossWavePhaseTickCounts[1] != -1)
-		{
-			double totalTimeTaken = 0;
-			log.debug("Time taken per boss phase");
-			for (int phase = 1; phase < bossWavePhaseTickCounts.length; phase++)
-			{
-				double phaseTimeTaken = BigDecimal.valueOf(.6*(bossWavePhaseTickCounts[phase]- bossWavePhaseTickCounts[phase-1])).setScale(1, RoundingMode.HALF_UP).doubleValue();
-				totalTimeTaken += phaseTimeTaken;
-				log.debug("Phase {}: [{}-{}] HP {} seconds (total: {})", phase, BOSS_HP_AT_PHASE.get(phase-1), BOSS_HP_AT_PHASE.get(phase), phaseTimeTaken, totalTimeTaken);
-			}
-		}
-		{
-		}
-		if (trackSupplies)
-			supplyTracker.stopTracking(currentAttempt.getAttemptRoot(), currentAttempt.getSupplyFileName(), true, enabledCsvLogging);
-
-
-		if (autoMergeWaveFiles)
-		{
-			fileIOService.mergeColosseumWaveLogs();
-		}
-			submitWave(completedWave);
-	 * Sets tracked NPC data to null
-	private void resetNpcData()
-	{
-		if (scanner != null) scanner.resetManticoreSequences();
-	}
-
-	/**
-	 * Start a new wave by resetting all wave-specific values and notify that a new wave has started
-	 */
-	private void startWave() {
-		if (activeWave) return;
-		log.debug("[Wave {}] ColosseumWaveStarted event posted at tick {}", currentWave, waveStartTick);
-		eventBus.post(new ColosseumWaveStarted(currentAttempt.getStartTime(), currentWave, waveStartTick));
-		activeWave = true;
-		parsedCurrentWaveIntermission = false;
-		resetNpcData();
-	/**
 	 * Creates a pre-populated builder for a ColosseumWave with all the common
 	 * state tracking variables shared across different wave outcomes.
 	 */
@@ -954,11 +730,29 @@ public class ColosseumAttemptLogger extends AbstractLogger
 			.minotaurReinforcementsSpawn(minotaurReinforcementsSpawn);
 	}
 
+	/**
+	 * Generate a completed wave by combining new data with the previously parsed UI data and return it
+	 */
 	private ColosseumWave generateCompletedWave(IntermissionUI curUI) {
+		int endTick = client.getTickCount();
+		log.debug("Completed wave {} at tick {}", completedWave, endTick);
+
+		double timeTaken = getWaveTimeTaken();
 		totalTimeTaken = BigDecimal.valueOf(totalTimeTaken + timeTaken).setScale(1, RoundingMode.HALF_UP).doubleValue();
 
 		return buildBaseWave()
+			.wave(completedWave)
+			.status(WaveStatus.COMPLETED)
 			.chosenModifier(parsedTransitionUI != null ? parsedTransitionUI.getSelectedModifier() : null)
+			.timeTaken(timeTaken)
+			.totalTimeTaken(totalTimeTaken)
+			.speedBonus(curUI.getSpeedBonusGlory())
+			.damageTaken(curUI.getDamageTakenAmount())
+			.damageBonus(curUI.getDamageTakenGlory())
+			.modifierGlory(curUI.getModChoiceGlory())
+			.completionBonus(curUI.getWaveBonusGlory())
+			.waveGlory(curUI.getWaveGlory())
+			.totalGlory(curUI.getTotalGlory())
 			.build();
 	}
 
@@ -979,6 +773,7 @@ public class ColosseumAttemptLogger extends AbstractLogger
 			log.debug("[Wave {}] Failed wave during ongoing Colosseum attempt at tick={} with finalStatus={}", currentWave, client.getTickCount(), finalStatus);
 			submitStatus = finalStatus;
 		}
+
 		double timeTaken = getWaveTimeTaken();
 		totalTimeTaken = BigDecimal.valueOf(totalTimeTaken + timeTaken).setScale(1, RoundingMode.HALF_UP).doubleValue();
 
@@ -995,18 +790,38 @@ public class ColosseumAttemptLogger extends AbstractLogger
 			.modifierGlory(0)
 			.completionBonus(0)
 			.waveGlory(0)
+			.build();
 
 		log.debug(failedWave.toString());
 		submitWave(failedWave);
 		endAttempt(submitStatus);
+	}
+
+	/**
+	 * Generate a cancelled wave and return it. Occurs if the rewards chest is opened before wave 12.
+	 */
 	private ColosseumWave generateCancelledWave(IntermissionUI curUI) {
+		int endTick = client.getTickCount();
 		log.debug("Cancelled wave {} at tick {}", currentWave, endTick);
 		resetNpcData();
 		return buildBaseWave()
 			.wave(completedWave + 1)
+			.status(WaveStatus.CANCELLED)
+			.chosenModifier(null)
+			.timeTaken(0)
+			.totalTimeTaken(totalTimeTaken)
 			.totalGlory(curUI.getTotalGlory())
 			.startTick(endTick)
 			.endTick(endTick)
+			.speedBonus(0)
+			.damageTaken(0)
+			.damageBonus(0)
+			.modifierGlory(0)
+			.completionBonus(0)
+			.waveGlory(0)
+			.build();
+	}
+
 	/**
 	 * Processes a completed or failed wave and updates the current attempt's state.
 	 * @param wave The ColosseumWave object that was just finished/failed.
@@ -1046,9 +861,55 @@ public class ColosseumAttemptLogger extends AbstractLogger
 		}
 	}
 
+	@Override
+	public LogType getLogType()
+	{
+		return LogType.COLOSSEUM;
+	}
+
+	@Override
+	public String getCsvHeader()
+	{
+		return ColosseumWave.csvHeader();
+	}
+
+	@Override
+	public boolean isEnabled()
+	{
+		return enabledLogging;
+	}
+
+	/**
+	 * Compute the time taken based on wave start and end ticks, return it with up to one decimal in seconds.
+	 */
+	private double getWaveTimeTaken()
+	{
+		return BigDecimal.valueOf(.6 * (waveEndTick - waveStartTick)).setScale(1, RoundingMode.HALF_UP).doubleValue();
+	}
+
 	/**
 	 * Generate and return a String that is to be written into the CSV log
 	 */
+	public String writeCsvLog() {
+		if (currentAttempt == null || currentAttempt.getWaves() == null || currentAttempt.getWaves().isEmpty()) {
+			return "";
+		}
+		StringBuilder sb = new StringBuilder();
+		for (ColosseumWave wave : currentAttempt.getWaves()) {
+			sb.append(wave.toCsvRow()).append("\n");
+		}
+
+		return sb.toString();
+	}
+
+	/**
+	 * Updates the value of currentWave and logs a message
+	 */
+	private void setCurrentWave(int waveNumber)
+	{
+		if (currentWave == waveNumber) return;
+
+		log.debug("Updated currentWave value from {} to {} at tick={}", currentWave, waveNumber, client.getTickCount());
 		currentWave = waveNumber;
 	}
 	/**
