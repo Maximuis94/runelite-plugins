@@ -31,9 +31,12 @@ import java.awt.Dimension;
 import java.awt.Graphics2D;
 import java.awt.Polygon;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import javax.inject.Inject;
 import net.runelite.api.Client;
+import net.runelite.api.CollisionData;
+import net.runelite.api.CollisionDataFlag;
 import net.runelite.api.MenuEntry;
 import net.runelite.api.NPC;
 import net.runelite.api.Perspective;
@@ -48,6 +51,7 @@ import net.runelite.client.ui.overlay.Overlay;
 import net.runelite.client.ui.overlay.OverlayLayer;
 import net.runelite.client.ui.overlay.OverlayPosition;
 import net.runelite.client.ui.overlay.outline.ModelOutlineRenderer;
+import net.runelite.client.util.Text;
 
 public class LineOfSightOverlay extends Overlay {
 
@@ -57,6 +61,7 @@ public class LineOfSightOverlay extends Overlay {
 	private final DynamicLineOfSightPlugin plugin;
 
 	private boolean enabledNpcLos = false;
+	private boolean mutualExclusivePlayerNpcLos = false;
 	private boolean hotkeyAlwaysHeld = false;
 	private Keybind virtualPlayerLosHotkey;
 
@@ -138,6 +143,9 @@ public class LineOfSightOverlay extends Overlay {
 	private WorldPoint lastHoveredNpcLocation = null;
 	private final Set<WorldPoint> cachedHoveredNpcTiles = new HashSet<>();
 
+	private final Set<Integer> ignoredNpcIds = new HashSet<>();
+	private final Set<String> ignoredNpcNames = new HashSet<>();
+
 	@Inject
 	public LineOfSightOverlay(Client client, DynamicLineOfSightConfig config, ModelOutlineRenderer modelOutlineRenderer, DynamicLineOfSightPlugin plugin) {
 		this.client = client;
@@ -149,11 +157,18 @@ public class LineOfSightOverlay extends Overlay {
 		setLayer(OverlayLayer.ABOVE_SCENE);
 	}
 
+	/**
+	 * Updates the attackRange of the currently equipped weapon and whether it was affected by Myopia or not
+	 */
 	public void setActiveAttackRange(int attackRange, boolean affectedByMyopia) {
 		activeWeaponRange = attackRange;
 		isAffectedByMyopia = affectedByMyopia;
 	}
 
+	/**
+	 * Sets the given attack range reduction that follows from the active Myopia tier and subsequently updates all
+	 * affected attack ranges.
+	 */
 	public void setMyopiaReduction(int myopiaReduction) {
 		this.myopiaReduction = myopiaReduction;
 
@@ -193,6 +208,7 @@ public class LineOfSightOverlay extends Overlay {
 		enabledHighlightActiveWeaponNpc = config.highlightAttackableEnemies();
 
 		enabledMaxRangeLos = config.drawMaxAttackRange();
+		mutualExclusivePlayerNpcLos = config.mutualExclusivePlayerNpcLos();
 		maxRangeOutlineColor = config.maxRangeOutlineColor();
 		maxRangeFillColor = config.maxRangeFillColor();
 		maxRangeLineWidth = (float) config.maxRangeLineWidth();
@@ -247,12 +263,56 @@ public class LineOfSightOverlay extends Overlay {
 		otherNpcOutlineColor = config.otherNpcOutlineColor();
 		otherNpcFillColor = config.otherNpcFillColor();
 
+		updateIgnoredNpcs();
+
 		if (myopiaReduction > 0)
 			setMyopiaReduction(myopiaReduction);
 
 		updateHasAlteredAnyFixedRange();
 	}
 
+	/**
+	 * Parses the comma-separated config string into cached Sets for O(1) lookups.
+	 * Call this during startUp() and inside onConfigChanged().
+	 */
+	public void updateIgnoredNpcs() {
+		ignoredNpcIds.clear();
+		ignoredNpcNames.clear();
+
+		String configValue = config.ignoreNPCS();
+		if (configValue == null || configValue.trim().isEmpty()) {
+			return;
+		}
+
+		List<String> entries = Text.fromCSV(configValue);
+		for (String entry : entries) {
+			try {
+				ignoredNpcIds.add(Integer.parseInt(entry));
+			} catch (NumberFormatException e) {
+				ignoredNpcNames.add(entry.toLowerCase());
+			}
+		}
+	}
+
+	/**
+	 * Checks if the given NPC is in the ignore list.
+	 */
+	public boolean isNpcIgnored(NPC npc) {
+		if (npc == null) {
+			return true;
+		}
+
+		if (ignoredNpcIds.contains(npc.getId())) {
+			return true;
+		}
+
+		String name = npc.getName();
+		return name != null && ignoredNpcNames.contains(name.toLowerCase());
+	}
+
+	/**
+	 * Updates the hasAlteredAnyFixedRange flag
+	 */
 	private void updateHasAlteredAnyFixedRange() {
 		hasAlteredAnyFixedRange = fixed1Range != lastCalculatedFixed1Range ||
 			fixed2Range != lastCalculatedFixed2Range ||
@@ -269,11 +329,22 @@ public class LineOfSightOverlay extends Overlay {
 			return null;
 		}
 
+		boolean drawNpcLos = enabledNpcLos && !plugin.isNpcLosToggledOff() && (hotkeyAlwaysHeld || plugin.isHotkeyHeld());
+
 		WorldView wv = client.getTopLevelWorldView();
 		WorldArea playerArea = player.getWorldArea();
 		WorldPoint currentLocation = player.getWorldLocation();
 
-		// Virtual Tile Override
+		boolean mutuallyExcludedPlayerLos;
+		if (drawNpcLos)
+		{
+			drawHoveredNpcLos(graphics, wv);
+			mutuallyExcludedPlayerLos = mutualExclusivePlayerNpcLos && lastHoveredNpc != null;
+		}
+		else {
+			mutuallyExcludedPlayerLos = false;
+		}
+
 		boolean isVirtualKeyValid = virtualPlayerLosHotkey != null && !virtualPlayerLosHotkey.equals(Keybind.NOT_SET);
 		if (isVirtualKeyValid && plugin.isVirtualPlayerLosHotkeyHeld()) {
 			Tile hoveredTile = wv.getSelectedSceneTile();
@@ -333,45 +404,43 @@ public class LineOfSightOverlay extends Overlay {
 
 		if (!plugin.isPlayerLosToggledOff())
 		{
-			if (enabledActiveWeaponLos)
+			if (!mutuallyExcludedPlayerLos)
 			{
-				drawTilesArea(graphics, cachedActiveWeaponTiles, activeWeaponFillColor, activeWeaponOutlineColor, activeRangeLineWidth);
-			}
+				if (enabledActiveWeaponLos)
+				{
+					drawTilesArea(graphics, cachedActiveWeaponTiles, activeWeaponFillColor, activeWeaponOutlineColor, activeRangeLineWidth);
+				}
 
-			if (enabledMaxRangeLos)
-			{
-				drawTilesArea(graphics, cachedMaxRangeTiles, maxRangeFillColor, maxRangeOutlineColor, maxRangeLineWidth);
-			}
-			if (enabledFixed1)
-			{
-				drawTilesArea(graphics, cachedFixedRange1Tiles, fixed1FillColor, fixed1OutlineColor, fixed1LineWidth);
-			}
-			if (enabledFixed2)
-			{
-				drawTilesArea(graphics, cachedFixedRange2Tiles, fixed2FillColor, fixed2OutlineColor, fixed2LineWidth);
-			}
-			if (enabledFixed3)
-			{
-				drawTilesArea(graphics, cachedFixedRange3Tiles, fixed3FillColor, fixed3OutlineColor, fixed3LineWidth);
-			}
-			if (enabledFixed4)
-			{
-				drawTilesArea(graphics, cachedFixedRange4Tiles, fixed4FillColor, fixed4OutlineColor, fixed4LineWidth);
-			}
-			if (enabledFixed5)
-			{
-				drawTilesArea(graphics, cachedFixedRange5Tiles, fixed5FillColor, fixed5OutlineColor, fixed5LineWidth);
+				if (enabledMaxRangeLos)
+				{
+					drawTilesArea(graphics, cachedMaxRangeTiles, maxRangeFillColor, maxRangeOutlineColor, maxRangeLineWidth);
+				}
+				if (enabledFixed1)
+				{
+					drawTilesArea(graphics, cachedFixedRange1Tiles, fixed1FillColor, fixed1OutlineColor, fixed1LineWidth);
+				}
+				if (enabledFixed2)
+				{
+					drawTilesArea(graphics, cachedFixedRange2Tiles, fixed2FillColor, fixed2OutlineColor, fixed2LineWidth);
+				}
+				if (enabledFixed3)
+				{
+					drawTilesArea(graphics, cachedFixedRange3Tiles, fixed3FillColor, fixed3OutlineColor, fixed3LineWidth);
+				}
+				if (enabledFixed4)
+				{
+					drawTilesArea(graphics, cachedFixedRange4Tiles, fixed4FillColor, fixed4OutlineColor, fixed4LineWidth);
+				}
+				if (enabledFixed5)
+				{
+					drawTilesArea(graphics, cachedFixedRange5Tiles, fixed5FillColor, fixed5OutlineColor, fixed5LineWidth);
+				}
 			}
 
 			if (enabledAnyNpcHighlight)
 			{
 				highlightVisibleEnemies(wv, playerArea);
 			}
-		}
-
-		if (enabledNpcLos && (hotkeyAlwaysHeld || plugin.isHotkeyHeld()))
-		{
-			drawHoveredNpcLos(graphics, wv);
 		}
 
 		return null;
@@ -391,7 +460,7 @@ public class LineOfSightOverlay extends Overlay {
 		MenuEntry topEntry = menuEntries[menuEntries.length - 1];
 		NPC hoveredNpc = topEntry.getNpc();
 
-		if (hoveredNpc != null && hoveredNpc.getWorldArea() != null) {
+		if (hoveredNpc != null && !isNpcIgnored(hoveredNpc) && hoveredNpc.getWorldArea() != null) {
 			int npcId = hoveredNpc.getId();
 
 			CombatStyle style = NpcLosConstants.getNpcCombatStyle(npcId);
@@ -420,6 +489,9 @@ public class LineOfSightOverlay extends Overlay {
 		}
 	}
 
+	/**
+	 * Return the outline color configured for the given CombatStyle
+	 */
 	private Color getOutlineColorForStyle(CombatStyle style) {
 		switch (style) {
 			case MELEE: return meleeNpcOutlineColor;
@@ -430,6 +502,9 @@ public class LineOfSightOverlay extends Overlay {
 		}
 	}
 
+	/**
+	 * Return the fill color configured for the given CombatStyle
+	 */
 	private Color getFillColorForStyle(CombatStyle style) {
 		switch (style) {
 			case MELEE: return meleeNpcFillColor;
@@ -581,8 +656,23 @@ public class LineOfSightOverlay extends Overlay {
 		int minY = sourceArea.getY() - range;
 		int maxY = sourceArea.getY() + sourceArea.getHeight() - 1 + range;
 
+		CollisionData[] collisionData = wv.getCollisionMaps();
+		int[][] collisionFlags = (collisionData != null && collisionData[z] != null) ? collisionData[z].getFlags() : null;
+
 		for (int x = minX; x <= maxX; x++) {
 			for (int y = minY; y <= maxY; y++) {
+				if (collisionFlags != null) {
+					int sceneX = x - wv.getBaseX();
+					int sceneY = y - wv.getBaseY();
+
+					if (sceneX >= 0 && sceneX < 104 && sceneY >= 0 && sceneY < 104) {
+						int flag = collisionFlags[sceneX][sceneY];
+						if ((flag & (CollisionDataFlag.BLOCK_MOVEMENT_OBJECT | CollisionDataFlag.BLOCK_MOVEMENT_FLOOR)) != 0) {
+							continue;
+						}
+					}
+				}
+
 				WorldPoint targetPoint = new WorldPoint(x, y, z);
 				WorldArea targetTile = new WorldArea(targetPoint, 1, 1);
 
@@ -597,7 +687,11 @@ public class LineOfSightOverlay extends Overlay {
 					boolean hasLos;
 
 					if (isNpc) {
-						hasLos = targetTile.hasLineOfSightTo(wv, sourceArea);
+						int nearestX = Math.max(sourceArea.getX(), Math.min(targetPoint.getX(), sourceArea.getX() + sourceArea.getWidth() - 1));
+						int nearestY = Math.max(sourceArea.getY(), Math.min(targetPoint.getY(), sourceArea.getY() + sourceArea.getHeight() - 1));
+						WorldArea nearestSourceTile = new WorldArea(nearestX, nearestY, 1, 1, z);
+
+						hasLos = targetTile.hasLineOfSightTo(wv, nearestSourceTile);
 					} else {
 						hasLos = sourceArea.hasLineOfSightTo(wv, targetTile);
 					}

@@ -59,8 +59,8 @@ import net.runelite.client.util.HotkeyListener;
 @Slf4j
 @PluginDescriptor(
 	name = "Dynamic line of sight",
-	description = "Adds a dynamically updating Line of Sight outline based on weapon wielded and Myopia tier",
-	tags = {"weapon", "attack", "range", "line", "sight", "los", "myopia", "fortis", "colosseum"}
+	description = "Adds customizable player Lines of Sight. Uses current weapon and Myopia tier. Adds NPC LoS for Colosseum, Inferno and Fight Caves.",
+	tags = {"combat","weapon", "attack", "range", "line", "sight", "los", "myopia", "fortis", "colosseum", "fight", "caves", "inferno", "safespot", "safe", "spot", "npc"}
 )
 public class DynamicLineOfSightPlugin extends Plugin
 {
@@ -122,6 +122,7 @@ public class DynamicLineOfSightPlugin extends Plugin
 		keyManager.registerKeyListener(losHotkeyListener);
 		keyManager.registerKeyListener(virtualPlayerLosHotkeyListener);
 		keyManager.registerKeyListener(togglePlayerLosHotkeyListener);
+		keyManager.registerKeyListener(toggleNpcLosHotkeyListener);
 	}
 
 	@Override
@@ -130,6 +131,7 @@ public class DynamicLineOfSightPlugin extends Plugin
 		keyManager.unregisterKeyListener(losHotkeyListener);
 		keyManager.unregisterKeyListener(virtualPlayerLosHotkeyListener);
 		keyManager.unregisterKeyListener(togglePlayerLosHotkeyListener);
+		keyManager.unregisterKeyListener(toggleNpcLosHotkeyListener);
 		overlayManager.remove(overlay);
 	}
 
@@ -293,6 +295,18 @@ public class DynamicLineOfSightPlugin extends Plugin
 		public void hotkeyPressed()
 		{
 			playerLosToggledOff = !playerLosToggledOff;
+		}
+	};
+
+	@Getter
+	private boolean npcLosToggledOff = false;
+
+	private final HotkeyListener toggleNpcLosHotkeyListener = new HotkeyListener(() -> config.toggleNpcLosHotkey())
+	{
+		@Override
+		public void hotkeyPressed()
+		{
+			npcLosToggledOff = !npcLosToggledOff;
 		}
 	};
 

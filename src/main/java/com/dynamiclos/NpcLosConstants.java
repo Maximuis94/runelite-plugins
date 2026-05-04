@@ -28,8 +28,7 @@ package com.dynamiclos;
 import static com.dynamiclos.PluginConstants.*;
 
 /**
- * Static utility class for fetching and maintaining NPC related Line of Sight values across multiple minigames
- * (Colosseum, Inferno, Fight Caves).
+ * Static utility class for fetching and maintaining NPC related Line of Sight values of Colosseum, Inferno and Fight Caves foes
  */
 public final class NpcLosConstants
 {
@@ -42,8 +41,6 @@ public final class NpcLosConstants
 	private static final CombatStyle[] NPC_COMBAT_STYLES = new CombatStyle[MAX_NPC_ID];
 
 	static {
-		// By default, primitive ints are 0, and Objects are null.
-		// A range of 0 or a null style means we do not draw LoS for that NPC.
 
 		// =========================================
 		// COLOSSEUM
@@ -52,14 +49,14 @@ public final class NpcLosConstants
 		mapNpc(SERPENT_SHAMAN_ID, 10, CombatStyle.MAGIC);
 		mapNpc(MINOTAUR_ID, 1, CombatStyle.MELEE);
 		mapNpc(MINOTAUR_ROUTEFIND_ID, 1, CombatStyle.MELEE);
-		mapNpc(WARBANDER_RANGED_ID, 15, CombatStyle.RANGED);
-		mapNpc(WARBANDER_MAGE_ID, 15, CombatStyle.MAGIC);
+		mapNpc(WARBANDER_RANGED_ID, 1, CombatStyle.RANGED);
+		mapNpc(WARBANDER_MAGE_ID, 1, CombatStyle.MAGIC);
 		mapNpc(WARBANDER_MELEE_ID, 1, CombatStyle.MELEE);
 		mapNpc(JAVELIN_COLOSSUS_ID, 15, CombatStyle.RANGED);
 		mapNpc(MANTICORE_ID, 15, CombatStyle.OTHER);
 		mapNpc(SHOCKWAVE_COLOSSUS_ID, 15, CombatStyle.MAGIC);
 		mapNpc(SOL_HEREDIT_ID, 1, CombatStyle.OTHER);
-		mapNpc(HEALING_TOTEM_ID, 30, CombatStyle.OTHER);
+		mapNpc(HEALING_TOTEM_ID, 20, CombatStyle.OTHER);
 
 		// =========================================
 		// FIGHT CAVES

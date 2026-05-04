@@ -38,10 +38,6 @@ import net.runelite.client.config.Range;
 @ConfigGroup(PLUGIN_CONFIG_GROUP)
 public interface DynamicLineOfSightConfig extends Config
 {
-	// =========================================
-	// CONFIG SECTIONS
-	// =========================================
-
 	@ConfigSection(
 		name = "General Settings",
 		description = "General settings and hotkeys that do not fit into a specific line of sight category",
@@ -114,15 +110,20 @@ public interface DynamicLineOfSightConfig extends Config
 	)
 	String fixedRange5Section = "fixedRange5Section";
 
-	// =========================================
-	// GENERAL SETTINGS
-	// =========================================
+	@ConfigItem(
+		keyName = "mutualExclusivePlayerNpcLos",
+		name = "Mutually exclusive player/NPC LoS",
+		description = "If checked, the player line of sight is hidden while the NPC line of sight is shown.",
+		position = 0,
+		section = generalSection
+	)
+	default boolean mutualExclusivePlayerNpcLos() { return true; }
 
 	@ConfigItem(
 		keyName = "enableNpcLos",
 		name = "Enable NPC LoS Hotkey",
 		description = "If checked, render the NPC line of sight below the cursor for Colosseum NPCs. If enabled, behaviour can be limited by setting a key.",
-		position = 0,
+		position = 1,
 		section = generalSection
 	)
 	default boolean enableNpcLos() { return false; }
@@ -130,17 +131,26 @@ public interface DynamicLineOfSightConfig extends Config
 	@ConfigItem(
 		keyName = "npcLosHotkey",
 		name = "Show NPC LoS Hotkey",
-		description = "Hold this key to show the line of sight of the hovered NPC.",
-		position = 1,
+		description = "Hold this key to show the line of sight of the hovered NPC while the key is pressed.",
+		position = 2,
 		section = generalSection
 	)
 	default Keybind npcLosHotkey() { return Keybind.NOT_SET; }
 
 	@ConfigItem(
+		keyName = "toggleNpcLosHotkey",
+		name = "Toggle NPC line of sight",
+		description = "Press this key to quickly enable/disable all NPC lines of sight",
+		position = 3,
+		section = generalSection
+	)
+	default Keybind toggleNpcLosHotkey() { return Keybind.NOT_SET; }
+
+	@ConfigItem(
 		keyName = "virtualPlayerLosHotkey",
 		name = "Virtual player LoS Hotkey",
-		description = "Hold this key to draw the player line of sight from the cursor instead.",
-		position = 2,
+		description = "Hold this key to draw the player line of sight the tile underneath the cursor while the key is pressed.",
+		position = 4,
 		section = generalSection
 	)
 	default Keybind virtualPlayerLosHotkey() { return Keybind.NOT_SET; }
@@ -148,16 +158,21 @@ public interface DynamicLineOfSightConfig extends Config
 	@ConfigItem(
 		keyName = "togglePlayerLosHotkey",
 		name = "Toggle player line of sight",
-		description = "Press the configured button to completely enable/disable all player lines of sight",
-		position = 3,
+		description = "Press this key to quickly enable/disable all player lines of sight",
+		position = 5,
 		section = generalSection
 	)
 	default Keybind togglePlayerLosHotkey() { return Keybind.NOT_SET; }
 
+	@ConfigItem(
+		keyName = "ignoreNPCS",
+		name = "Ignore NPCs",
+		description = "NPC ids/names to ignore. Separate them with ','. E.g., 'Serpent shaman,Javelin Colossus'",
+		position = 6,
+		section = generalSection
+	)
+	default String ignoreNPCS() { return ""; }
 
-	// =========================================
-	// ACTIVE WEAPON RANGE ITEMS
-	// =========================================
 	@Alpha
 	@ConfigItem(
 		keyName = "meleeNpcOutlineColor",
