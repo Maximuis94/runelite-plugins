@@ -27,16 +27,20 @@ package com.datalogger.services.itemvault.variable;
 
 import com.datalogger.models.enums.VaultType;
 import com.datalogger.models.itemvault.BankedItem;
+import com.google.gson.reflect.TypeToken;
 import java.io.File;
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.inject.Singleton;
+import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.gameval.ItemID;
 import net.runelite.api.gameval.VarbitID;
 
+@Slf4j
 @Singleton
 public class MasterScrollBookParser extends AbstractVariableVaultParser
 {
@@ -80,20 +84,65 @@ public class MasterScrollBookParser extends AbstractVariableVaultParser
 	@Override
 	protected List<BankedItem> translateVariablesToItems()
 	{
-		return buildItemsFromVarbits(this.currentVarbitValues, currentAccountHash, currentAccountName);
-	}
+		List<BankedItem> items = new ArrayList<>();
 
-	@Override
-	public List<BankedItem> parseOfflineFile(long accountHash, File vaultFile)
-	{
-		VariableState loadedState = fileIOService.readJson(vaultFile, VariableState.class);
-
-		if (loadedState == null || loadedState.varbits == null)
+		for (Map.Entry<Integer, ItemRatio[]> entry : SCROLL_VARBITS.entrySet())
 		{
-			return new ArrayList<>();
+			int varbitId = entry.getKey();
+
+			if (varbitId == VarbitID.BOOKOFSCROLLS_WATSON_HIGHBITS || varbitId == VarbitID.BOOKOFSCROLLS_WATSON_LOWBITS)
+			{
+				continue;
+			}
+
+			int amount = currentVarbitValues.getOrDefault(varbitId, 0);
+			if (amount > 0)
+			{
+				ItemRatio ratio = entry.getValue()[0];
+				String name = itemNameCache.computeIfAbsent(ratio.getItemId(), id -> itemManager.getItemComposition(id).getName());
+
+				items.add(new BankedItem(
+					getVaultLabel(),
+					currentAccountHash,
+					currentAccountName,
+					ratio.getItemId(),
+					name,
+					(long) amount * ratio.getQuantityPerVarbit()
+				));
+			}
 		}
-		return buildItemsFromVarbits(loadedState.varbits, accountHash, "Offline Account");
+
+		int watsonLow = currentVarbitValues.getOrDefault(VarbitID.BOOKOFSCROLLS_WATSON_LOWBITS, 0);
+		int watsonHigh = currentVarbitValues.getOrDefault(VarbitID.BOOKOFSCROLLS_WATSON_HIGHBITS, 0);
+		int watsonTotal = (watsonHigh << 14) | watsonLow;
+
+		if (watsonTotal > 0)
+		{
+			String name = itemNameCache.computeIfAbsent(ItemID.TELEPORTSCROLL_WATSON, id -> itemManager.getItemComposition(id).getName());
+			items.add(new BankedItem(
+				getVaultLabel(),
+				currentAccountHash,
+				currentAccountName,
+				ItemID.TELEPORTSCROLL_WATSON,
+				name,
+				watsonTotal
+			));
+		}
+
+		return items;
 	}
+
+//	@Override
+//	public List<BankedItem> parseOfflineFile(long accountHash, File vaultFile)
+//	{
+//		VariableState loadedState = fileIOService.readJson(vaultFile, VariableState.class);
+//
+//		if (loadedState == null || loadedState.varbits == null)
+//		{
+//			return new ArrayList<>();
+//		}
+//		return buildItemsFromVarbits(loadedState.varbits, accountHash, "Offline Account");
+//	}
 
 	/**
 	 * Shared logic to convert a map of Varbits into a list of exported BankedItems.
@@ -121,15 +170,60 @@ public class MasterScrollBookParser extends AbstractVariableVaultParser
 			String itemName = itemNameCache.computeIfAbsent(itemId, id -> itemManager.getItemComposition(id).getName());
 
 			items.add(new BankedItem(
-				getVaultLabel(), // Uses the dynamic label for standardizing outputs
+				getVaultLabel(),
 				accountHash,
 				accountName,
 				itemId,
 				itemName,
-				entry.getValue() // No need for .intValue() since quantity in BankedItem is a long
+				entry.getValue()
 			));
 		}
 
 		return items;
 	}
+
+//	@Override
+//	protected void loadSessionData(File cacheFile)
+//	{
+//		Type type = new TypeToken<List<BankedItem>>(){}.getType();
+//		List<BankedItem> loadedItems = fileIOService.readJson(cacheFile, type);
+//
+//		if (loadedItems == null || loadedItems.isEmpty())
+//		{
+//			return;
+//		}
+//
+//		currentVarbitValues.clear();
+//
+//		for (BankedItem item : loadedItems)
+//		{
+//			int targetItemId = item.getItemId();
+//			long quantity = item.getQuantity();
+//
+//			if (targetItemId == ItemID.TELEPORTSCROLL_WATSON)
+//			{
+//				currentVarbitValues.put(VarbitID.BOOKOFSCROLLS_WATSON_LOWBITS, (int) (quantity & 0x3FFF));
+//				currentVarbitValues.put(VarbitID.BOOKOFSCROLLS_WATSON_HIGHBITS, (int) (quantity >> 14));
+//				continue; // Move to next item
+//			}
+//
+//			for (Map.Entry<Integer, ItemRatio[]> entry : SCROLL_VARBITS.entrySet())
+//			{
+//				int varbitId = entry.getKey();
+//
+//				if (varbitId == VarbitID.BOOKOFSCROLLS_WATSON_HIGHBITS || varbitId == VarbitID.BOOKOFSCROLLS_WATSON_LOWBITS)
+//				{
+//					continue;
+//				}
+//
+//				ItemRatio ratio = entry.getValue()[0];
+//				if (ratio.getItemId() == targetItemId)
+//				{
+//					currentVarbitValues.put(varbitId, (int) (quantity / ratio.getQuantityPerVarbit()));
+//					log.debug("Parsed {}x {} from scrollbook cache file", item.getQuantity(), item.getItemName());
+//					break;
+//				}
+//			}
+//		}
+//	}
 }

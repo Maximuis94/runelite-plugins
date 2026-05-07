@@ -27,7 +27,9 @@ package com.datalogger.services.itemvault.variable;
 
 import com.datalogger.models.enums.VaultType;
 import com.datalogger.models.itemvault.BankedItem;
+import com.google.gson.reflect.TypeToken;
 import java.io.File;
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -75,32 +77,59 @@ public class QuiverParser extends AbstractVariableVaultParser
 		));
 	}
 
-	@Override
-	public List<BankedItem> parseOfflineFile(long accountHash, File vaultFile)
-	{
-		VariableState loadedState = fileIOService.readJson(vaultFile, VariableState.class);
+//	@Override
+//	protected void loadSessionData(File cacheFile)
+//	{
+//		Type type = new TypeToken<List<BankedItem>>(){}.getType();
+//		List<BankedItem> loadedItems = fileIOService.readJson(cacheFile, type);
+//
+//		if (loadedItems == null || loadedItems.isEmpty())
+//		{
+//			return;
+//		}
+//
+//		BankedItem item = loadedItems.get(0);
+//
+//		currentVarpValues.clear();
+//		currentVarpValues.put(DIZANAS_QUIVER_TEMP_AMMO, item.getItemId());
+//		currentVarpValues.put(DIZANAS_QUIVER_TEMP_AMMO_AMOUNT, (int) item.getQuantity());
+//
+//		if (item.getQuantity() > 0)
+//		{
+//			log.debug("Loaded quiver variables from file: {}x {}", item.getQuantity(), item.getItemName());
+//		}
+//		else
+//		{
+//			log.debug("Loaded empty quiver data");
+//		}
+//	}
 
-		if (loadedState == null || loadedState.varps == null)
-		{
-			return new ArrayList<>();
-		}
-
-		int itemId = loadedState.varps.getOrDefault(DIZANAS_QUIVER_TEMP_AMMO, -1);
-		int quantity = loadedState.varps.getOrDefault(DIZANAS_QUIVER_TEMP_AMMO_AMOUNT, 0);
-
-		if (itemId <= 0 || quantity <= 0)
-		{
-			return new ArrayList<>();
-		}
-
-		String resolvedName = accountHashMapper.getAccountName(accountHash);
-		return List.of(new BankedItem(
-			getVaultType(),
-			accountHash,
-			resolvedName,
-			itemId,
-			itemManager.getItemComposition(itemId).getName(),
-			quantity
-		));
-	}
+//	@Override
+//	public List<BankedItem> parseOfflineFile(long accountHash, File vaultFile)
+//	{
+//		VariableState loadedState = fileIOService.readJson(vaultFile, VariableState.class);
+//
+//		if (loadedState == null || loadedState.varps == null)
+//		{
+//			return new ArrayList<>();
+//		}
+//
+//		int itemId = loadedState.varps.getOrDefault(DIZANAS_QUIVER_TEMP_AMMO, -1);
+//		int quantity = loadedState.varps.getOrDefault(DIZANAS_QUIVER_TEMP_AMMO_AMOUNT, 0);
+//
+//		if (itemId <= 0 || quantity <= 0)
+//		{
+//			return new ArrayList<>();
+//		}
+//
+//		String resolvedName = accountHashMapper.getAccountName(accountHash);
+//		return List.of(new BankedItem(
+//			getVaultType(),
+//			accountHash,
+//			resolvedName,
+//			itemId,
+//			itemManager.getItemComposition(itemId).getName(),
+//			quantity
+//		));
+//	}
 }

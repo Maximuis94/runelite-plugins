@@ -64,7 +64,7 @@ public abstract class AbstractVaultParser implements VaultParser
 	protected boolean hasGlobalConfigEnabled = false;
 	protected boolean hasItemConfigEnabled = true;
 
-	protected boolean isEnabled = false;
+	protected boolean isEnabled = true;
 
 	/**
 	 * Representation of a certain quantity of items per ItemCharge, for instance.
@@ -110,7 +110,7 @@ public abstract class AbstractVaultParser implements VaultParser
 		return fileIOService.getInternalVaultFile(getVaultType());
 	}
 
-	private void updateAccountHash(long accountHash, String accountName)
+	protected void updateAccountHash(long accountHash, String accountName)
 	{
 		hasValidAccountHash = accountHash != -1;
 
@@ -172,34 +172,67 @@ public abstract class AbstractVaultParser implements VaultParser
 	@Override
 	public List<BankedItem> parseOfflineFile(long accountHash, File vaultFile)
 	{
-		// 1. Define the type for a List of BankedItems to avoid type erasure
-		Type type = new TypeToken<List<BankedItem>>(){}.getType();
-		List<BankedItem> loadedItems = fileIOService.readJson(vaultFile, type);
+		// 1. Read the JSON directly as an array of BankedItems
+		BankedItem[] loadedItems = fileIOService.readJson(vaultFile, BankedItem[].class);
 
-		if (loadedItems == null || loadedItems.isEmpty())
+		if (loadedItems == null || loadedItems.length == 0)
 		{
 			return new ArrayList<>();
 		}
 
-		// 2. Resolve the account name from the hash mapper
-		String resolvedName = accountHashMapper.getAccountName(accountHash);
-		List<BankedItem> items = new ArrayList<>();
+		List<BankedItem> items = new ArrayList<>(loadedItems.length);
+		String accountName = accountHashMapper.getAccountName(accountHash);
 
-		// 3. Reconstruct items with the correct offline context
+		// 2. Re-hydrate the slim items with their account and vault context
 		for (BankedItem item : loadedItems)
 		{
-			items.add(new BankedItem(
-				getVaultType(),
-				accountHash,
-				resolvedName,
-				item.getItemId(),
-				item.getItemName(),
-				item.getQuantity()
-			));
+			if (item.getItemId() > 0 && item.getQuantity() > 0)
+			{
+				items.add(new BankedItem(
+					getVaultType(),
+					accountHash,
+					accountName, // Uses the resolved name instead of hardcoded "Offline Account"
+					item.getItemId(),
+					item.getItemName(),
+					item.getQuantity()
+				));
+			}
 		}
 
 		return items;
 	}
+
+//	@Override
+//	public List<BankedItem> parseOfflineFile(long accountHash, File vaultFile)
+//	{
+//		// 1. Define the type for a List of BankedItems to avoid type erasure
+//		Type type = new TypeToken<List<BankedItem>>(){}.getType();
+//		List<BankedItem> loadedItems = fileIOService.readJson(vaultFile, type);
+//
+//		if (loadedItems == null || loadedItems.isEmpty())
+//		{
+//			return new ArrayList<>();
+//		}
+//
+//		// 2. Resolve the account name from the hash mapper
+//		String resolvedName = accountHashMapper.getAccountName(accountHash);
+//		List<BankedItem> items = new ArrayList<>();
+//
+//		// 3. Reconstruct items with the correct offline context
+//		for (BankedItem item : loadedItems)
+//		{
+//			items.add(new BankedItem(
+//				getVaultType(),
+//				accountHash,
+//				resolvedName,
+//				item.getItemId(),
+//				item.getItemName(),
+//				item.getQuantity()
+//			));
+//		}
+//
+//		return items;
+//	}
 
 	@Override
 	public String getVaultLabel() {

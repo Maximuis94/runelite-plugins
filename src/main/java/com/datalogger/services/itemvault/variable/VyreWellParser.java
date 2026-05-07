@@ -35,8 +35,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.inject.Singleton;
+import lombok.extern.slf4j.Slf4j;
 import static net.runelite.api.gameval.VarbitID.TOB_LOBBY_WELL_CONTENTS;
 
+@Slf4j
 @Singleton
 public class VyreWellParser extends AbstractVariableVaultParser
 {
@@ -52,7 +54,6 @@ public class VyreWellParser extends AbstractVariableVaultParser
 	@Override
 	protected Set<Integer> getTrackedVarbitIds()
 	{
-		// Only track the Varbits; parent class will ignore Varps
 		return Set.of(TOB_LOBBY_WELL_CONTENTS);
 	}
 
@@ -63,13 +64,13 @@ public class VyreWellParser extends AbstractVariableVaultParser
 		int varbitValue = currentVarbitValues.getOrDefault(TOB_LOBBY_WELL_CONTENTS, 0);
 		if (varbitValue <= 0) return items;
 
+		log.debug("Vyre well varbit value is {}", varbitValue);
 		for (Map.Entry<Integer, Integer> entry : vyreWellCharge.getInputItem().entrySet())
 		{
 			int itemId = entry.getKey();
 			int quantityPerBatch = entry.getValue();
 
-			// Math fixed: Added division by nCharges (100) to calculate the correct refund
-			long totalQuantity = (long) varbitValue * quantityPerBatch / vyreWellCharge.getNCharges();
+			long totalQuantity = (long) varbitValue * quantityPerBatch;
 
 			if (totalQuantity > 0)
 			{
@@ -88,47 +89,45 @@ public class VyreWellParser extends AbstractVariableVaultParser
 		return items;
 	}
 
-	@Override
-	public List<BankedItem> parseOfflineFile(long accountHash, File vaultFile)
-	{
-		// Read using the new VariableState wrapper to prevent Type Erasure
-		VariableState loadedState = fileIOService.readJson(vaultFile, VariableState.class);
-
-		if (loadedState == null || loadedState.varbits == null)
-		{
-			return new ArrayList<>();
-		}
-
-		int charges = loadedState.varbits.getOrDefault(TOB_LOBBY_WELL_CONTENTS, 0);
-
-		if (charges <= 0)
-		{
-			return new ArrayList<>();
-		}
-
-		List<BankedItem> items = new ArrayList<>();
-
-		for (Map.Entry<Integer, Integer> entry : vyreWellCharge.getOutputItem().entrySet())
-		{
-			int itemId = entry.getKey();
-			int qtyPerBatch = entry.getValue();
-
-			// Math fixed: Added division by nCharges
-			long totalQty = (long) charges * qtyPerBatch / vyreWellCharge.getNCharges();
-
-			if (totalQty > 0)
-			{
-				String itemName = itemNameCache.computeIfAbsent(itemId, id -> itemManager.getItemComposition(id).getName());
-				items.add(new BankedItem(
-					getVaultLabel(),
-					accountHash,
-					"Offline Account", // Name resolution is now delegated to VaultManager
-					itemId,
-					itemName,
-					totalQty
-				));
-			}
-		}
-		return items;
-	}
+//	@Override
+//	public List<BankedItem> parseOfflineFile(long accountHash, File vaultFile)
+//	{
+//		VariableState loadedState = fileIOService.readJson(vaultFile, VariableState.class);
+//
+//		if (loadedState == null || loadedState.varbits == null)
+//		{
+//			return new ArrayList<>();
+//		}
+//
+//		int charges = loadedState.varbits.getOrDefault(TOB_LOBBY_WELL_CONTENTS, 0);
+//
+//		if (charges <= 0)
+//		{
+//			return new ArrayList<>();
+//		}
+//
+//		List<BankedItem> items = new ArrayList<>();
+//
+//		for (Map.Entry<Integer, Integer> entry : vyreWellCharge.getOutputItem().entrySet())
+//		{
+//			int itemId = entry.getKey();
+//			int qtyPerBatch = entry.getValue();
+//
+//			long totalQty = (long) charges * qtyPerBatch / vyreWellCharge.getNCharges();
+//
+//			if (totalQty > 0)
+//			{
+//				String itemName = itemNameCache.computeIfAbsent(itemId, id -> itemManager.getItemComposition(id).getName());
+//				items.add(new BankedItem(
+//					getVaultLabel(),
+//					accountHash,
+//					"Offline Account",
+//					itemId,
+//					itemName,
+//					totalQty
+//				));
+//			}
+//		}
+//		return items;
+//	}
 }

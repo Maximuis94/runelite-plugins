@@ -33,74 +33,54 @@ import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.EquipmentInventorySlot;
 import net.runelite.api.gameval.ItemID;
-import net.runelite.client.util.Text;
 
 @Slf4j
 @Singleton
-public class VenatorBowParser extends AbstractItemChargeParser
+public class ToxicBlowpipeParser extends AbstractItemChargeParser
 {
-	// Because we sanitize the string first, our regex patterns can ignore color tags completely!
-	private static final Pattern CHARGE_PATTERN = Pattern.compile("^You use [\\d,]+ ancient essence to charge your venator bow\\. It now has ([\\d,]+) charges\\.");
-	private static final Pattern UPDATE_PATTERN = Pattern.compile("^Your venator bow has ([\\d,]+) charges remaining\\.");
+	// CPU Optimization: Pre-compiling the regex in a static final field ensures it
+	// is only compiled once at class load, avoiding expensive runtime compilation.
+	// This regex safely handles the string whether it contains raw <col> tags or if
+	// they have been stripped out by Text.removeTags() upstream.
+	private static final Pattern SCALES_PATTERN = Pattern.compile("Scales:\\s*(?:<col=[^>]+>)?([\\d,]+)");
 
 	@Override
 	protected EquipmentInventorySlot getEquipmentSlot()
 	{
-		return EquipmentInventorySlot.WEAPON;
+		return EquipmentInventorySlot.WEAPON; //
 	}
 
 	@Override
 	protected int getBaseItemId()
 	{
-		return ItemID.VENATOR_BOW;
+		return ItemID.TOXIC_BLOWPIPE;
+	}
+
+	@Override
+	protected Integer parseChargeCount(String message)
+	{
+		Matcher matcher = SCALES_PATTERN.matcher(message);
+		if (matcher.find()) //[cite: 10]
+		{
+			// Group 1 extracts just the numbers and commas (e.g., "15,893")
+			String cleanNumber = matcher.group(1).replace(",", ""); //[cite: 10]
+			try
+			{
+				return Integer.parseInt(cleanNumber); //[cite: 10]
+			}
+			catch (NumberFormatException e)
+			{
+				log.warn("Failed to parse toxic blowpipe scales from string: {}", cleanNumber);
+				return null; //[cite: 10]
+			}
+		}
+		return null; //[cite: 10]
 	}
 
 	@Override
 	protected @NonNull ItemCharge getItemChargeType()
 	{
-		return ItemCharge.VENATOR_BOW;
-	}
-
-	@Override
-	protected Integer parseChargeCount(String rawMessage)
-	{
-		if (!rawMessage.contains("enator bow"))
-		{
-			return null;
-		}
-
-		String cleanMessage = Text.removeTags(rawMessage);
-
-		if (cleanMessage.startsWith("You fully uncharge your venator bow"))
-		{
-			return 0;
-		}
-
-		Matcher updateMatcher = UPDATE_PATTERN.matcher(cleanMessage);
-		if (updateMatcher.find())
-		{
-			return cleanAndParseInt(updateMatcher.group(1));
-		}
-
-		Matcher chargeMatcher = CHARGE_PATTERN.matcher(cleanMessage);
-		if (chargeMatcher.find())
-		{
-			return cleanAndParseInt(chargeMatcher.group(1));
-		}
-
-		return null;
-	}
-
-	private Integer cleanAndParseInt(String amount)
-	{
-		try
-		{
-			return Integer.parseInt(amount.replace(",", ""));
-		}
-		catch (NumberFormatException e)
-		{
-			log.error("Failed to parse Venator Bow charge string: {}", amount, e);
-			return 0;
-		}
+		// Note: Ensure TOXIC_BLOWPIPE is registered in your ItemCharge enum!
+		return ItemCharge.ZULRAH_SCALE;
 	}
 }

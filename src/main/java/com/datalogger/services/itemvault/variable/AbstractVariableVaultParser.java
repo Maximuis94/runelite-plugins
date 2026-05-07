@@ -50,6 +50,9 @@ public abstract class AbstractVariableVaultParser extends AbstractVaultParser
 	@Inject protected ItemManager itemManager;
 	@Inject protected ItemVaultLogger itemVaultLogger;
 
+	private boolean pendingLoginSync = false;
+	private int loginSyncTicks = 0;
+
 	private boolean needsLogging = false;
 	private int debounceTicks = 0;
 	private static final int TICKS_TO_WAIT = 5;
@@ -73,12 +76,36 @@ public abstract class AbstractVariableVaultParser extends AbstractVaultParser
 	@Override
 	protected void loadSessionData(File cacheFile)
 	{
-		VariableState loadedState = fileIOService.readJson(cacheFile, VariableState.class);
+//		VariableState loadedState = fileIOService.readJson(cacheFile, VariableState.class);
+//
+//		if (loadedState != null)
+//		{
+//			if (loadedState.varps != null) this.currentVarpValues = loadedState.varps;
+//			if (loadedState.varbits != null) this.currentVarbitValues = loadedState.varbits;
+//		}
+	}
 
-		if (loadedState != null)
+	@Override
+	public void setupAccountHash()
+	{
+		super.setupAccountHash();
+
+		if (hasValidAccountHash)
 		{
-			if (loadedState.varps != null) this.currentVarpValues = loadedState.varps;
-			if (loadedState.varbits != null) this.currentVarbitValues = loadedState.varbits;
+			pendingLoginSync = true;
+			loginSyncTicks = 0;
+		}
+	}
+
+	@Override
+	protected void updateAccountHash(long accountHash, String accountName)
+	{
+		super.updateAccountHash(accountHash, accountName);
+
+		if (hasValidAccountHash)
+		{
+			pendingLoginSync = true;
+			loginSyncTicks = 0;
 		}
 	}
 
@@ -91,7 +118,9 @@ public abstract class AbstractVariableVaultParser extends AbstractVaultParser
 		int varbitId = event.getVarbitId();
 		if (varbitId != -1 && getTrackedVarbitIds().contains(varbitId))
 		{
-			currentVarbitValues.put(varbitId, client.getVarbitValue(varbitId));
+			int varbitValue = currentVarbitValues.get(varbitId);
+			currentVarbitValues.put(varbitId, varbitValue);
+			log.info("Updating varbitId {} to value {}", varbitId, varbitValue);
 			changed = true;
 		}
 
@@ -112,14 +141,52 @@ public abstract class AbstractVariableVaultParser extends AbstractVaultParser
 	@Subscribe
 	public void onGameTick(GameTick event)
 	{
-		if (!isEnabled || !needsLogging) return;
+		if (!isEnabled) return;
 
-		debounceTicks++;
-		if (debounceTicks >= TICKS_TO_WAIT)
+		// 1. Initial Login Sync Check
+		if (pendingLoginSync)
 		{
-			needsLogging = false;
-			ensureAccountNameIsCached();
-			processVault();
+			loginSyncTicks++;
+			boolean hasData = false;
+
+			for (int varbitId : getTrackedVarbitIds())
+			{
+				if (client.getVarbitValue(varbitId) > 0)
+				{
+					hasData = true;
+					break;
+				}
+			}
+
+			if (!hasData)
+			{
+				for (int varpId : getTrackedVarpIds())
+				{
+					if (client.getVarpValue(varpId) > 0)
+					{
+						hasData = true;
+						break;
+					}
+				}
+			}
+
+			if (hasData || loginSyncTicks >= 10)
+			{
+				pendingLoginSync = false;
+				needsLogging = true;
+				debounceTicks = TICKS_TO_WAIT; // Bypass debounce to force an immediate save
+			}
+		}
+
+		if (needsLogging)
+		{
+			debounceTicks++;
+			if (debounceTicks >= TICKS_TO_WAIT)
+			{
+				needsLogging = false;
+				ensureAccountNameIsCached();
+				processVault();
+			}
 		}
 	}
 
@@ -148,13 +215,13 @@ public abstract class AbstractVariableVaultParser extends AbstractVaultParser
 		for (int varpId : getTrackedVarpIds()) currentVarpValues.put(varpId, client.getVarpValue(varpId));
 		for (int varbitId : getTrackedVarbitIds()) currentVarbitValues.put(varbitId, client.getVarbitValue(varbitId));
 
-		if (hasValidAccountHash)
-		{
-			VariableState stateToSave = new VariableState();
-			stateToSave.varps = this.currentVarpValues;
-			stateToSave.varbits = this.currentVarbitValues;
-			fileIOService.writeJson(vaultFile, stateToSave);
-		}
+//		if (hasValidAccountHash)
+//		{
+//			VariableState stateToSave = new VariableState();
+//			stateToSave.varps = this.currentVarpValues;
+//			stateToSave.varbits = this.currentVarbitValues;
+//			fileIOService.writeJson(vaultFile, stateToSave);
+//		}
 
 		List<BankedItem> parsedItems = translateVariablesToItems();
 		if (parsedItems != null && !parsedItems.isEmpty())
