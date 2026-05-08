@@ -75,6 +75,7 @@ public class VaultManager {
 	@Inject private SanguinestiStaffParser sanguinestiStaffParser;
 	@Inject private QuiverParser quiverParser;
 	@Inject private MasterScrollBookParser masterScrollBookParser;
+	@Inject private StashUnitParser stashUnitParser;
 
 	private static final File ITEM_VAULT_ALL_JSON = new File(PluginConstants.ITEM_VAULT_DIR, "item-vaults-all.json");
 	private static final File ITEM_VAULT_ALL_CSV = new File(PluginConstants.ITEM_VAULT_DIR, "item-vaults-all.csv");
@@ -104,7 +105,8 @@ public class VaultManager {
 			eyeOfAyakParser,
 			sanguinestiStaffParser,
 			quiverParser,
-			masterScrollBookParser
+			masterScrollBookParser,
+			stashUnitParser
 		);
 	}
 

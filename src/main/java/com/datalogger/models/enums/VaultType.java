@@ -49,6 +49,7 @@ public enum VaultType
 	BOLT_POUCH(-1, -1),
 	TRIDENT_OF_THE_SEAS(-1, -1),
 	TRIDENT_OF_THE_SWAMP(-1, -1),
+	STASH_UNITS(-1, -1),
 
 
 	;
