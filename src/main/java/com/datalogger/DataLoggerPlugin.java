@@ -304,7 +304,7 @@ public class DataLoggerPlugin extends Plugin
 		{
 			log.info("Player has logged out or is hopping. Resetting account parameters.");
 			sessionInitialized = false;
-			eventBus.post(new AccountSessionStarted("", -1, null, false));
+			eventBus.post(new AccountSessionStarted("-1", -1, null, false));
 			coloScanner.clearState();
 		}
 	}
