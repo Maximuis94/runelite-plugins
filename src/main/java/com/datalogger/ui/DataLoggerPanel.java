@@ -34,6 +34,7 @@ import com.datalogger.loggers.ColosseumAttemptLogger;
 import com.datalogger.loggers.ItemVaultLogger;
 import com.datalogger.services.DiscordWebhookService;
 import com.datalogger.services.FileIOService;
+import com.datalogger.services.itemvault.VaultManager;
 import com.datalogger.webhook.ColosseumCustomDiscordFormatter;
 import com.datalogger.webhook.ColosseumDiscordBroadcaster;
 import com.google.gson.Gson;
@@ -73,7 +74,7 @@ public class DataLoggerPanel extends PluginPanel {
 	private final Gson gson;
 	private final DataLoggerConfig config;
 	private final VaultManager vaultManager;
-	private ClientThread clientThread;
+	private final ClientThread clientThread;
 
 	private Instant waitUntil;
 

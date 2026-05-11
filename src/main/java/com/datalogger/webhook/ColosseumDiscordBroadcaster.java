@@ -173,9 +173,7 @@ public class ColosseumDiscordBroadcaster
 		JsonObject payload = generatePayload(attemptDto, webhookFormatter, attachScreenshot);
 
 		if (payload == null) return;
-		log.debug("Submitting {} payload to webhookUrl {}", webhookFormat.name(), webhookUrl);
-
-		log.info("Submitting {} payload to webhookUrl {}", webhookFormatter, webhookUrl);
+		log.debug("Submitting {} payload to webhookUrl {}", webhookFormatter, webhookUrl);
 
 		if (attachScreenshot)
 		{
