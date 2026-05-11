@@ -34,17 +34,15 @@ import net.runelite.client.game.ItemVariationMapping;
 
 @Slf4j
 @Singleton
-public class VenatorBowParser extends AbstractItemChargeParser
+public class CrawsBowParser extends AbstractItemChargeParser
 {
-	private static final int BASE_ID = ItemVariationMapping.map(ItemID.VENATOR_BOW);
+	private static final int BASE_ID = ItemVariationMapping.map(ItemID.WILD_CAVE_BOW_CHARGED);
 
-	private static final String UNCHARGE_PREFIX = "You fully uncharge your venator bow";
-	private static final String CHECK_PREFIX_LOWER = "Your venator bow has ";
-	private static final String CHECK_PREFIX_UPPER = "Your Venator bow has ";
-	private static final String CHARGE_PREFIX = "You use ";
+	private static final String CHECK_PREFIX = "Your bow has ";
+	private static final String UPDATE_PREFIX = "Your weapon has ";
+	private static final String CHARGE_PREFIX = "You add ";
 
-	private static final String CHARGE_TARGET = "venator bow";
-	private static final String CHARGE_NOW_HAS = "It now has ";
+	private static final String CHARGE_TOTAL_PHRASE = " giving it a total of ";
 
 	@Override
 	protected int getBaseItemId()
@@ -55,16 +53,15 @@ public class VenatorBowParser extends AbstractItemChargeParser
 	@Override
 	protected @NonNull ItemCharge getItemChargeType()
 	{
-		return ItemCharge.VENATOR_BOW;
+		return ItemCharge.CRAWS_BOW;
 	}
 
 	@Override
 	protected String[] getMessagePrefixes()
 	{
 		return new String[] {
-			UNCHARGE_PREFIX,
-			CHECK_PREFIX_LOWER,
-			CHECK_PREFIX_UPPER,
+			CHECK_PREFIX,
+			UPDATE_PREFIX,
 			CHARGE_PREFIX
 		};
 	}
@@ -72,34 +69,35 @@ public class VenatorBowParser extends AbstractItemChargeParser
 	@Override
 	protected Integer parseChargeCount(String message)
 	{
-		if (message.startsWith(UNCHARGE_PREFIX))
+		if (message.startsWith(CHECK_PREFIX))
 		{
-			return 0;
-		}
-
-		if (message.startsWith(CHECK_PREFIX_LOWER) || message.startsWith(CHECK_PREFIX_UPPER))
-		{
-			int startIndex = CHECK_PREFIX_LOWER.length();
-			int endIndex = message.indexOf(" charges remaining.", startIndex);
-
+			int endIndex = message.indexOf(" charges left", CHECK_PREFIX.length());
 			if (endIndex != -1)
 			{
-				String numberStr = message.substring(startIndex, endIndex);
+				String numberStr = message.substring(CHECK_PREFIX.length(), endIndex);
 				return cleanAndParseInt(numberStr);
 			}
 		}
 
-		if (message.startsWith(CHARGE_PREFIX) && message.contains(CHARGE_TARGET))
+		if (message.startsWith(UPDATE_PREFIX))
 		{
-			int startIndex = message.lastIndexOf(CHARGE_NOW_HAS);
-			if (startIndex != -1)
+			int endIndex = message.indexOf(" charges remaining", UPDATE_PREFIX.length());
+			if (endIndex != -1)
 			{
-				int endIndex = message.indexOf(" charges.", startIndex);
-				if (endIndex != -1)
-				{
-					String numberStr = message.substring(startIndex + CHARGE_NOW_HAS.length(), endIndex);
-					return cleanAndParseInt(numberStr);
-				}
+				String numberStr = message.substring(UPDATE_PREFIX.length(), endIndex);
+				return cleanAndParseInt(numberStr);
+			}
+		}
+
+		if (message.startsWith(CHARGE_PREFIX) && message.contains(CHARGE_TOTAL_PHRASE))
+		{
+			int startIndex = message.indexOf(CHARGE_TOTAL_PHRASE) + CHARGE_TOTAL_PHRASE.length();
+
+			int endIndex = message.indexOf(" charge", startIndex);
+			if (endIndex != -1)
+			{
+				String numberStr = message.substring(startIndex, endIndex);
+				return cleanAndParseInt(numberStr);
 			}
 		}
 
@@ -114,7 +112,7 @@ public class VenatorBowParser extends AbstractItemChargeParser
 		}
 		catch (NumberFormatException e)
 		{
-			log.error("Failed to parse Venator Bow charge string: {}", amount, e);
+			log.error("Failed to parse Craw's bow charge string: {}", amount, e);
 			return null;
 		}
 	}

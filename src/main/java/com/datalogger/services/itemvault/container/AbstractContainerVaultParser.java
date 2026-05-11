@@ -39,8 +39,6 @@ import net.runelite.api.events.GameTick;
 import net.runelite.api.events.ItemContainerChanged;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.game.ItemManager;
-import com.google.gson.reflect.TypeToken;
-import java.lang.reflect.Type;
 
 @Slf4j
 public abstract class AbstractContainerVaultParser extends AbstractVaultParser
@@ -65,8 +63,7 @@ public abstract class AbstractContainerVaultParser extends AbstractVaultParser
 	@Override
 	protected void loadSessionData(File cacheFile)
 	{
-		Type type = new TypeToken<List<BankedItem>>(){}.getType();
-		List<BankedItem> loadedItems = fileIOService.readJson(cacheFile, type);
+		List<BankedItem> loadedItems = fileIOService.readJson(cacheFile, BankedItem.LIST_TYPE);
 
 		if (loadedItems != null)
 		{
@@ -94,10 +91,20 @@ public abstract class AbstractContainerVaultParser extends AbstractVaultParser
 		processVault();
 	}
 
+	/**
+	 * Hook allowing subclasses to reject a container state (e.g., filtered banks).
+	 */
+	protected boolean isValidStateToSave(ItemContainer container)
+	{
+		return true;
+	}
+
 	private void processVault()
 	{
 		ItemContainer container = client.getItemContainer(getContainerId());
 		if (container == null) return;
+
+		if (!isValidStateToSave(container)) return;
 
 		List<BankedItem> parsedItems = new ArrayList<>();
 

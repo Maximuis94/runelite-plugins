@@ -116,14 +116,14 @@ public class ColosseumDiscordBroadcaster
 		List<ColosseumWaveDTO> waves = attemptDto.getWaves();
 		if (waves == null || waves.isEmpty())
 		{
-			log.info("Did not broadcast trial-- there are no waves...");
+			log.debug("Did not broadcast trial-- there are no waves...");
 			return;
 		}
 
 		ColosseumWaveDTO finalWave = waves.get(waves.size() - 1);
 		if (!shouldBroadcastAttempt(finalWave, attemptDto.getRewardsValue()))
 		{
-			log.info("Did not broadcast trial-- Prerequisite conditions were not met...");
+			log.debug("Did not broadcast trial-- Prerequisite conditions were not met...");
 			return;
 		}
 
@@ -143,7 +143,7 @@ public class ColosseumDiscordBroadcaster
 				break;
 		}
 
-		log.info("Submitting {} payload to webhookUrl {}", webhookFormat.name(), webhookUrl);
+		log.debug("Submitting {} payload to webhookUrl {}", webhookFormat.name(), webhookUrl);
 
 		if (broadcastScreenshot)
 		{
@@ -186,7 +186,7 @@ public class ColosseumDiscordBroadcaster
 
 		boolean result = (netReward > minRewardValue || finalWave.getWave() >= minWave);
 
-		log.info("CurrentAttempt has {}; waveNumber and rewardsValue conditions have {}been met; {}broadcasting run", hasSucceeded ? "succeeded" : "failed", result ? "" : "not ", statusConditionMet&&result ? "" : "not ");
+		log.debug("CurrentAttempt has {}; waveNumber and rewardsValue conditions have {}been met; {}broadcasting run", hasSucceeded ? "succeeded" : "failed", result ? "" : "not ", statusConditionMet&&result ? "" : "not ");
 		return statusConditionMet && result;
 	}
 
@@ -222,7 +222,7 @@ public class ColosseumDiscordBroadcaster
 		String extension = screenshotFormat.getExtension();
 		File root = new File(COLOSSEUM_ATTEMPT_DIR, trialId);
 		File file = new File(root, String.format("wave-%02d%s.%s", waveNumber, affix, extension));
-		log.info("Identified broadcast screenshot file {}", file.getAbsolutePath());
+		log.debug("Identified broadcast screenshot file {}", file.getAbsolutePath());
 
 		return file;
 	}

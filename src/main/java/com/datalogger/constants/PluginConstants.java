@@ -49,6 +49,7 @@ public final class PluginConstants
 	public static final File INTERNAL_ITEM_CHARGE_DIR = new File(INTERNAL_ROOT_DIR, "item-charges");
 	public static final File INTERNAL_COLOSSEUM_DIR = new File(INTERNAL_ROOT_DIR, "colosseum");
 	public static final File INTERNAL_COLOSSEUM_ATTEMPT_HISTORY = new File(INTERNAL_COLOSSEUM_DIR, "attempt-history.jsonl");
+	public static final File PLUGIN_LOG_FILE = new File(INTERNAL_ROOT_DIR, "debug.log");
 
 	private PluginConstants() {}
 

@@ -27,51 +27,96 @@ package com.datalogger.services.itemvault.variable;
 
 import com.datalogger.models.enums.VaultType;
 import com.datalogger.models.itemvault.BankedItem;
-import com.google.gson.reflect.TypeToken;
-import java.io.File;
-import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import javax.inject.Singleton;
 import lombok.extern.slf4j.Slf4j;
-import static net.runelite.api.gameval.VarPlayerID.DIZANAS_QUIVER_TEMP_AMMO;
-import static net.runelite.api.gameval.VarPlayerID.DIZANAS_QUIVER_TEMP_AMMO_AMOUNT;
+import net.runelite.api.gameval.ItemID;
+import static net.runelite.api.gameval.VarbitID.BLAST_FURNACE_COINSINCOFFER;
+import static net.runelite.api.gameval.VarbitID.MISC_COFFERS;
+import static net.runelite.api.gameval.VarbitID.NZONE_CASH;
+import static net.runelite.api.gameval.VarbitID.BR_COFFER;
 
 @Slf4j
 @Singleton
-public class QuiverParser extends AbstractVariableVaultParser
+public class CofferParser extends AbstractVariableVaultParser
 {
+
+	private static final Map<Integer, String> VARP_COFFERS = Map.of();
+
+	private static final Map<Integer, String> VARBIT_COFFERS = Map.of(
+		BLAST_FURNACE_COINSINCOFFER, "BLAST_FURNACE_COFFER",
+		NZONE_CASH, "NIGHTMARE_ZONE_COFFER",
+		MISC_COFFERS, "MISCELLANIA_COFFER",
+//		SERVANTS_MONEYBAG_VARBIT, "SERVANT_COFFER",
+		BR_COFFER, "LMS_COFFER"
+	);
+
 	@Override
 	public VaultType getVaultType()
 	{
-		return VaultType.QUIVER;
+		return VaultType.COFFER;
 	}
 
 	@Override
 	protected Set<Integer> getTrackedVarpIds()
 	{
-		return Set.of(DIZANAS_QUIVER_TEMP_AMMO, DIZANAS_QUIVER_TEMP_AMMO_AMOUNT);
+		return VARP_COFFERS.keySet();
+	}
+
+	@Override
+	protected Set<Integer> getTrackedVarbitIds()
+	{
+		return VARBIT_COFFERS.keySet();
 	}
 
 	@Override
 	protected List<BankedItem> translateVariablesToItems()
 	{
-		int quiverItemId = currentVarpValues.getOrDefault(DIZANAS_QUIVER_TEMP_AMMO, -1);
-		int quiverItemQuantity = currentVarpValues.getOrDefault(DIZANAS_QUIVER_TEMP_AMMO_AMOUNT, 0);
+		List<BankedItem> items = new ArrayList<>();
 
-		if (!isEnabled || quiverItemQuantity <= 0 || quiverItemId <= 0)
+		for (Map.Entry<Integer, String> entry : VARP_COFFERS.entrySet())
 		{
-			return new ArrayList<>();
+			int varpId = entry.getKey();
+			String cofferName = entry.getValue();
+			int amount = currentVarpValues.getOrDefault(varpId, 0);
+
+			if (amount > 0)
+			{
+				items.add(createCofferItem(cofferName, amount));
+			}
 		}
 
-		return List.of(new BankedItem(
-			getVaultLabel(),
+		for (Map.Entry<Integer, String> entry : VARBIT_COFFERS.entrySet())
+		{
+			int varbitId = entry.getKey();
+			String cofferName = entry.getValue();
+			int amount = currentVarbitValues.getOrDefault(varbitId, 0);
+
+			if (amount > 0)
+			{
+				items.add(createCofferItem(cofferName, amount));
+			}
+		}
+
+		return items;
+	}
+
+	/**
+	 * Helper method to construct the BankedItem.
+	 * Binds the GP amount to the specific coffer name while keeping the standard Coin Item ID.
+	 */
+	private BankedItem createCofferItem(String cofferName, long amount)
+	{
+		return new BankedItem(
+			getVaultType(),
 			currentAccountHash,
 			currentAccountName,
-			quiverItemId,
-			itemManager.getItemComposition(quiverItemId).getName(),
-			quiverItemQuantity
-		));
+			ItemID.COINS,
+			cofferName,
+			amount
+		);
 	}
 }

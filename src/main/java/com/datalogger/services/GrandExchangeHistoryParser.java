@@ -63,7 +63,7 @@ public class GrandExchangeHistoryParser
 	private boolean hasParsed = false;
 	private long lastParsed = 0;
 	private static final int ELEMENTS_PER_ROW = 6;
-	private static final long COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes in milliseconds
+	private static final long COOLDOWN_MS = 5 * 60 * 1000;
 
 	@Inject
 	public GrandExchangeHistoryParser(Client client, FileIOService fileIOService, DataLoggerConfig config, ItemManager itemManager)
@@ -154,7 +154,7 @@ public class GrandExchangeHistoryParser
 	public void parseGeHistory() {
 		if (!allowedToParseHistory())
 		{
-			log.info("Not parsing Grand Exchange history");
+			log.debug("Not parsing Grand Exchange history");
 			return;
 		}
 
@@ -230,10 +230,10 @@ public class GrandExchangeHistoryParser
 
 			fileIOService.saveInternalGeLedger(mergedEntries);
 
-			log.info("Successfully parsed and saved GE History.");
+			log.debug("Successfully parsed and saved GE History.");
 		}
 		else
-			log.info("Did not enter any entry data from the Grand Exchange history");
+			log.debug("Did not enter any entry data from the Grand Exchange history");
 
 		lastParsed = System.currentTimeMillis();
 		hasParsed = true;

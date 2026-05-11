@@ -28,7 +28,6 @@ package com.datalogger.services.itemvault.variable;
 import com.datalogger.models.enums.ItemCharge;
 import com.datalogger.models.enums.VaultType;
 import com.datalogger.models.itemvault.BankedItem;
-import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -88,46 +87,4 @@ public class VyreWellParser extends AbstractVariableVaultParser
 		}
 		return items;
 	}
-
-//	@Override
-//	public List<BankedItem> parseOfflineFile(long accountHash, File vaultFile)
-//	{
-//		VariableState loadedState = fileIOService.readJson(vaultFile, VariableState.class);
-//
-//		if (loadedState == null || loadedState.varbits == null)
-//		{
-//			return new ArrayList<>();
-//		}
-//
-//		int charges = loadedState.varbits.getOrDefault(TOB_LOBBY_WELL_CONTENTS, 0);
-//
-//		if (charges <= 0)
-//		{
-//			return new ArrayList<>();
-//		}
-//
-//		List<BankedItem> items = new ArrayList<>();
-//
-//		for (Map.Entry<Integer, Integer> entry : vyreWellCharge.getOutputItem().entrySet())
-//		{
-//			int itemId = entry.getKey();
-//			int qtyPerBatch = entry.getValue();
-//
-//			long totalQty = (long) charges * qtyPerBatch / vyreWellCharge.getNCharges();
-//
-//			if (totalQty > 0)
-//			{
-//				String itemName = itemNameCache.computeIfAbsent(itemId, id -> itemManager.getItemComposition(id).getName());
-//				items.add(new BankedItem(
-//					getVaultLabel(),
-//					accountHash,
-//					"Offline Account",
-//					itemId,
-//					itemName,
-//					totalQty
-//				));
-//			}
-//		}
-//		return items;
-//	}
 }

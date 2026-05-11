@@ -23,10 +23,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.datalogger.services.itemvault;
+package com.datalogger.services.itemvault.other;
 
 import com.datalogger.models.enums.VaultType;
 import com.datalogger.models.itemvault.BankedItem;
+import com.datalogger.services.itemvault.AbstractVaultParser;
 import com.google.gson.reflect.TypeToken;
 import java.io.File;
 import java.lang.reflect.Type;
@@ -73,7 +74,7 @@ public class POHCostumeRoomParser extends AbstractVaultParser
 	@Override
 	protected void loadSessionData(File cacheFile)
 	{
-		Type type = new TypeToken<Map<Integer, List<CostumeItem>>>(){}.getType();
+		Type type = new TypeToken<List<CostumeItem>>(){}.getType();
 		List<CostumeItem> loadedData = fileIOService.readJson(cacheFile, type);
 		if (loadedData != null)
 		{
@@ -182,21 +183,24 @@ public class POHCostumeRoomParser extends AbstractVaultParser
 	@Override
 	public List<BankedItem> parseOfflineFile(long accountHash, File vaultFile)
 	{
-		Type type = new TypeToken<Map<Integer, List<CostumeItem>>>(){}.getType();
-		Map<Integer, List<CostumeItem>> offlineData = fileIOService.readJson(vaultFile, type);
+		Type type = new TypeToken<List<CostumeItem>>(){}.getType();
+		List<CostumeItem> offlineData = fileIOService.readJson(vaultFile, type);
 
 		List<BankedItem> items = new ArrayList<>();
 		if (offlineData == null) return items;
 
 		String accountName = accountHashMapper.getAccountName(accountHash);
-
-		for (List<CostumeItem> entryItems : offlineData.values())
+		for (CostumeItem item : offlineData)
 		{
-			for (CostumeItem item : entryItems)
-			{
-				items.add(new BankedItem(getVaultType(), accountHash, accountName, item.getItemId(), item.getItemName(), 1L));
-			}
+			items.add(new BankedItem(getVaultType(), accountHash, accountName, item.getItemId(), item.getItemName(), 1L));
 		}
+//		for (List<CostumeItem> entryItems : offlineData.values())
+//		{
+//			for (CostumeItem item : offlineData.values())
+//			{
+//				items.add(new BankedItem(getVaultType(), accountHash, accountName, item.getItemId(), item.getItemName(), 1L));
+//			}
+//		}
 		return items;
 	}
 }

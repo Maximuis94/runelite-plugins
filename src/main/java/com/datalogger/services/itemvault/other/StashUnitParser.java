@@ -23,11 +23,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.datalogger.services.itemvault;
+package com.datalogger.services.itemvault.other;
 
 import com.datalogger.models.enums.StashUnitData;
 import com.datalogger.models.enums.VaultType;
 import com.datalogger.models.itemvault.BankedItem;
+import com.datalogger.services.itemvault.AbstractVaultParser;
 import com.google.gson.reflect.TypeToken;
 import java.io.File;
 import java.lang.reflect.Type;
@@ -239,8 +240,6 @@ public class StashUnitParser extends AbstractVaultParser
 	@Subscribe
 	public void onGameTick(GameTick event)
 	{
-		// 3. Debounce the JSON Save: The noticeboard triggers the script ~100 times in a single tick.
-		// By waiting for the GameTick, we execute a single, perfectly clean batch save to the disk.
 		if (watsonSyncPending && hasValidAccountHash)
 		{
 			fileIOService.writeJson(vaultFile, stashStates);

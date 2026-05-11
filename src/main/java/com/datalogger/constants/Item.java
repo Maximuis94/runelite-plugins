@@ -43,6 +43,7 @@ public final class Item
 		public static final int GE_HISTORY_CHILD_ID = 3;
 		public static final int BANK_GROUP_ID = 12;
 		public static final int BANK_CHILD_ID = 12;
+		public static final int BANK_OCCUPIED_SLOTS_CHILD_ID = 5;
 		public static final int SEED_VAULT_GROUP_ID = 631;
 		public static final int SEED_VAULT_CHILD_ID = 15;
 	}
@@ -52,6 +53,7 @@ public final class Item
 	 */
 	public static class Values
 	{
+		public static final int N_GE_SLOTS = 8;
 		public static final double TAX_RATE = 0.02;
 		public static final double TAX_MULTIPLIER = 1.-TAX_RATE;
 		public static final int MAX_ITEM_TAX = 5000000;

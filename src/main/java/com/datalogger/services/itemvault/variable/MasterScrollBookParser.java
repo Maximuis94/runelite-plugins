@@ -27,9 +27,6 @@ package com.datalogger.services.itemvault.variable;
 
 import com.datalogger.models.enums.VaultType;
 import com.datalogger.models.itemvault.BankedItem;
-import com.google.gson.reflect.TypeToken;
-import java.io.File;
-import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -131,99 +128,4 @@ public class MasterScrollBookParser extends AbstractVariableVaultParser
 
 		return items;
 	}
-
-//	@Override
-//	public List<BankedItem> parseOfflineFile(long accountHash, File vaultFile)
-//	{
-//		VariableState loadedState = fileIOService.readJson(vaultFile, VariableState.class);
-//
-//		if (loadedState == null || loadedState.varbits == null)
-//		{
-//			return new ArrayList<>();
-//		}
-//		return buildItemsFromVarbits(loadedState.varbits, accountHash, "Offline Account");
-//	}
-
-	/**
-	 * Shared logic to convert a map of Varbits into a list of exported BankedItems.
-	 */
-	private List<BankedItem> buildItemsFromVarbits(Map<Integer, Integer> varbitMap, long accountHash, String accountName)
-	{
-		Map<Integer, Long> consolidatedQuantities = new HashMap<>();
-
-		for (Map.Entry<Integer, ItemRatio[]> entry : SCROLL_VARBITS.entrySet())
-		{
-			int varbitValue = varbitMap.getOrDefault(entry.getKey(), 0);
-			if (varbitValue <= 0) continue;
-
-			for (ItemRatio ratio : entry.getValue())
-			{
-				long totalQuantity = (long) varbitValue * ratio.getQuantityPerVarbit();
-				consolidatedQuantities.merge(ratio.getItemId(), totalQuantity, Long::sum);
-			}
-		}
-
-		List<BankedItem> items = new ArrayList<>();
-		for (Map.Entry<Integer, Long> entry : consolidatedQuantities.entrySet())
-		{
-			int itemId = entry.getKey();
-			String itemName = itemNameCache.computeIfAbsent(itemId, id -> itemManager.getItemComposition(id).getName());
-
-			items.add(new BankedItem(
-				getVaultLabel(),
-				accountHash,
-				accountName,
-				itemId,
-				itemName,
-				entry.getValue()
-			));
-		}
-
-		return items;
-	}
-
-//	@Override
-//	protected void loadSessionData(File cacheFile)
-//	{
-//		Type type = new TypeToken<List<BankedItem>>(){}.getType();
-//		List<BankedItem> loadedItems = fileIOService.readJson(cacheFile, type);
-//
-//		if (loadedItems == null || loadedItems.isEmpty())
-//		{
-//			return;
-//		}
-//
-//		currentVarbitValues.clear();
-//
-//		for (BankedItem item : loadedItems)
-//		{
-//			int targetItemId = item.getItemId();
-//			long quantity = item.getQuantity();
-//
-//			if (targetItemId == ItemID.TELEPORTSCROLL_WATSON)
-//			{
-//				currentVarbitValues.put(VarbitID.BOOKOFSCROLLS_WATSON_LOWBITS, (int) (quantity & 0x3FFF));
-//				currentVarbitValues.put(VarbitID.BOOKOFSCROLLS_WATSON_HIGHBITS, (int) (quantity >> 14));
-//				continue; // Move to next item
-//			}
-//
-//			for (Map.Entry<Integer, ItemRatio[]> entry : SCROLL_VARBITS.entrySet())
-//			{
-//				int varbitId = entry.getKey();
-//
-//				if (varbitId == VarbitID.BOOKOFSCROLLS_WATSON_HIGHBITS || varbitId == VarbitID.BOOKOFSCROLLS_WATSON_LOWBITS)
-//				{
-//					continue;
-//				}
-//
-//				ItemRatio ratio = entry.getValue()[0];
-//				if (ratio.getItemId() == targetItemId)
-//				{
-//					currentVarbitValues.put(varbitId, (int) (quantity / ratio.getQuantityPerVarbit()));
-//					log.debug("Parsed {}x {} from scrollbook cache file", item.getQuantity(), item.getItemName());
-//					break;
-//				}
-//			}
-//		}
-//	}
 }

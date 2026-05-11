@@ -93,7 +93,7 @@ public class ItemVaultParser
 
 		if (widget == null || widget.getChildren() == null)
 		{
-			log.info("Unable to extract or parse widget for vault {}", vaultType.name());
+			log.debug("Unable to extract or parse widget for vault {}", vaultType.name());
 			return parsedItems;
 		}
 		if (isMembersWorld)
@@ -117,7 +117,7 @@ public class ItemVaultParser
 			}
 		}
 
-		log.info("Parsed a total of {} different items for vault {}", parsedItems.size(), vaultType.name());
+		log.debug("Parsed a total of {} different items for vault {}", parsedItems.size(), vaultType.name());
 		return parsedItems;
 	}
 

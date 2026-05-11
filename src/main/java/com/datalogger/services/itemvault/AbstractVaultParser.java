@@ -31,11 +31,11 @@ import com.datalogger.events.DataLoggerConfigChanged;
 import com.datalogger.models.itemvault.BankedItem;
 import com.datalogger.services.AccountHashMapper;
 import com.datalogger.services.FileIOService;
-import com.google.gson.reflect.TypeToken;
 import java.io.File;
-import java.lang.reflect.Type;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 import javax.inject.Inject;
 import lombok.Value;
 import lombok.extern.slf4j.Slf4j;
@@ -54,7 +54,6 @@ public abstract class AbstractVaultParser implements VaultParser
 	@Inject protected DataLoggerConfig config;
 	@Inject protected FileIOService fileIOService;
 	@Inject protected AccountHashMapper accountHashMapper;
-//	@Inject protected VaultScanner vaultScanner;
 
 	protected long currentAccountHash = -1;
 	protected String currentAccountName = "Unknown";
@@ -144,7 +143,7 @@ public abstract class AbstractVaultParser implements VaultParser
 	 */
 	protected void updateItemSpecificConfig()
 	{
-		// Empty by default, acts as 'true'
+
 	}
 
 	private void updateIsEnabled()
@@ -172,7 +171,6 @@ public abstract class AbstractVaultParser implements VaultParser
 	@Override
 	public List<BankedItem> parseOfflineFile(long accountHash, File vaultFile)
 	{
-		// 1. Read the JSON directly as an array of BankedItems
 		BankedItem[] loadedItems = fileIOService.readJson(vaultFile, BankedItem[].class);
 
 		if (loadedItems == null || loadedItems.length == 0)
@@ -180,62 +178,46 @@ public abstract class AbstractVaultParser implements VaultParser
 			return new ArrayList<>();
 		}
 
-		List<BankedItem> items = new ArrayList<>(loadedItems.length);
 		String accountName = accountHashMapper.getAccountName(accountHash);
 
-		// 2. Re-hydrate the slim items with their account and vault context
-		for (BankedItem item : loadedItems)
-		{
-			if (item.getItemId() > 0 && item.getQuantity() > 0)
-			{
-				items.add(new BankedItem(
-					getVaultType(),
-					accountHash,
-					accountName, // Uses the resolved name instead of hardcoded "Offline Account"
-					item.getItemId(),
-					item.getItemName(),
-					item.getQuantity()
-				));
-			}
-		}
+		return Arrays.stream(loadedItems)
 
-		return items;
+			.filter(item -> item.getItemId() > 0 && item.getQuantity() > 0)
+
+			.map(item -> new BankedItem(
+				getVaultType(),
+				accountHash,
+				accountName,
+				item.getItemId(),
+				item.getItemName(),
+				item.getQuantity()
+			))
+
+			.collect(Collectors.toList());
 	}
-
-//	@Override
-//	public List<BankedItem> parseOfflineFile(long accountHash, File vaultFile)
-//	{
-//		// 1. Define the type for a List of BankedItems to avoid type erasure
-//		Type type = new TypeToken<List<BankedItem>>(){}.getType();
-//		List<BankedItem> loadedItems = fileIOService.readJson(vaultFile, type);
-//
-//		if (loadedItems == null || loadedItems.isEmpty())
-//		{
-//			return new ArrayList<>();
-//		}
-//
-//		// 2. Resolve the account name from the hash mapper
-//		String resolvedName = accountHashMapper.getAccountName(accountHash);
-//		List<BankedItem> items = new ArrayList<>();
-//
-//		// 3. Reconstruct items with the correct offline context
-//		for (BankedItem item : loadedItems)
-//		{
-//			items.add(new BankedItem(
-//				getVaultType(),
-//				accountHash,
-//				resolvedName,
-//				item.getItemId(),
-//				item.getItemName(),
-//				item.getQuantity()
-//			));
-//		}
-//
-//		return items;
-//	}
 
 	@Override
 	public String getVaultLabel() {
 		return getVaultType().name();
+	}
+
+	/**
+	 * Saves a list of BankedItems to the local cache file in the "slim" format
+	 * (only itemId, itemName, and quantity) to standardize JSON outputs.
+	 */
+	protected void saveSlimVaultCache(List<BankedItem> items)
+	{
+		if (vaultFile == null || !hasValidAccountHash) return;
+
+		List<java.util.Map<String, Object>> slimItems = items.stream()
+			.map(item -> {
+				java.util.Map<String, Object> map = new java.util.LinkedHashMap<>();
+				map.put("itemId", item.getItemId());
+				map.put("itemName", item.getItemName());
+				map.put("quantity", item.getQuantity());
+				return map;
+			}).collect(java.util.stream.Collectors.toList());
+
+		fileIOService.writeJson(vaultFile, slimItems);
 	}
 }

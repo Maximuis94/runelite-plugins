@@ -26,58 +26,119 @@
 package com.datalogger.services.itemvault.itemcharge;
 
 import com.datalogger.models.enums.ItemCharge;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import javax.inject.Singleton;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
-import net.runelite.api.EquipmentInventorySlot;
 import net.runelite.api.gameval.ItemID;
+import net.runelite.client.game.ItemVariationMapping;
 
 @Slf4j
 @Singleton
 public class ScytheOfViturParser extends AbstractItemChargeParser
 {
-	private static final Pattern CHARGE_PATTERN = Pattern.compile("^Your Scythe of vitur has ([\\d,]+) c");
+	private static final int BASE_ID = ItemVariationMapping.map(ItemID.SCYTHE_OF_VITUR);
 
-	//	private static final String FULLY_CHARGED_MESSAGE = "Your weapon is fully charged.";
-	private static final int MAX_CHARGES = 2500;
+	private static final String UNCHARGE_PREFIX = "You uncharge your scythe into the well";
+	private static final String CHECK_PREFIX = "Your Scythe of vitur has ";
+	private static final String UPDATE_PREFIX = "Your scythe has ";
+	private static final String CHARGE_PREFIX = "You apply ";
 
-	@Override
-	protected EquipmentInventorySlot getEquipmentSlot()
-	{
-		return EquipmentInventorySlot.WEAPON;
-	}
+	private static final String CHARGE_TARGET = "Scythe of vitur";
+	private static final String TOTAL_PHRASE = "It now has ";
+	private static final String CHARGES_REMAINING_SUFFIX = " charges remaining.";
 
 	@Override
 	protected int getBaseItemId()
 	{
-		return ItemID.SCYTHE_OF_VITUR;
-	}
-
-	@Override
-	protected Integer parseChargeCount(String message)
-	{
-		Matcher matcher = CHARGE_PATTERN.matcher(message);
-		if (matcher.find())
-		{
-			String cleanNumber = matcher.group(1).replace(",", "");
-			try
-			{
-				return Integer.parseInt(cleanNumber);
-			}
-			catch (NumberFormatException e)
-			{
-				log.warn("Failed to parse Scythe of vitur charges from string: {}", cleanNumber);
-				return null;
-			}
-		}
-		return null;
+		return BASE_ID;
 	}
 
 	@Override
 	protected @NonNull ItemCharge getItemChargeType()
 	{
 		return ItemCharge.SCYTHE_OF_VITUR;
+	}
+
+	@Override
+	protected String[] getMessagePrefixes()
+	{
+		return new String[] {
+			UNCHARGE_PREFIX,
+			CHECK_PREFIX,
+			UPDATE_PREFIX,
+			CHARGE_PREFIX
+		};
+	}
+
+	@Override
+	protected Integer parseChargeCount(String message)
+	{
+		if (message.startsWith(UNCHARGE_PREFIX))
+		{
+			return 0;
+		}
+
+		if (message.startsWith(CHECK_PREFIX))
+		{
+			int endIndex = message.indexOf(CHARGES_REMAINING_SUFFIX, CHECK_PREFIX.length());
+			if (endIndex != -1)
+			{
+				String numberStr = message.substring(CHECK_PREFIX.length(), endIndex);
+				return cleanAndParseInt(numberStr);
+			}
+		}
+
+		if (message.startsWith(UPDATE_PREFIX))
+		{
+			int endIndex = message.indexOf(CHARGES_REMAINING_SUFFIX, UPDATE_PREFIX.length());
+			if (endIndex != -1)
+			{
+				String numberStr = message.substring(UPDATE_PREFIX.length(), endIndex);
+				return cleanAndParseInt(numberStr);
+			}
+		}
+
+		if (message.startsWith(CHARGE_PREFIX) && message.contains(CHARGE_TARGET))
+		{
+			int totalIndex = message.lastIndexOf(TOTAL_PHRASE);
+			if (totalIndex != -1)
+			{
+				int endIndex = message.indexOf(" charges in total.", totalIndex);
+				if (endIndex != -1)
+				{
+					String numberStr = message.substring(totalIndex + TOTAL_PHRASE.length(), endIndex);
+					return cleanAndParseInt(numberStr);
+				}
+			}
+			else
+			{
+				int endIndex = message.indexOf(" charges to", CHARGE_PREFIX.length());
+				if (endIndex != -1)
+				{
+					String numberStr = message.substring(CHARGE_PREFIX.length(), endIndex);
+					Integer addedCharges = cleanAndParseInt(numberStr);
+
+					if (addedCharges != null && this.currentCharges >= 0)
+					{
+						return this.currentCharges + addedCharges;
+					}
+				}
+			}
+		}
+
+		return null;
+	}
+
+	private Integer cleanAndParseInt(String amount)
+	{
+		try
+		{
+			return Integer.parseInt(amount.replace(",", "").trim());
+		}
+		catch (NumberFormatException e)
+		{
+			log.error("Failed to parse Scythe of vitur charge string: {}", amount, e);
+			return null;
+		}
 	}
 }

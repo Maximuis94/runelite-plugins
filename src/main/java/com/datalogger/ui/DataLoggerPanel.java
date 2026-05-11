@@ -142,7 +142,7 @@ public class DataLoggerPanel extends PluginPanel {
 
 	private void writeMergedCsvFile()
 	{
-		log.info("Writing merged itemvault CSV file");
+		log.debug("Writing merged itemvault CSV file");
 		vaultManager.writeMergedCsvFile();
 	}
 
@@ -179,7 +179,7 @@ public class DataLoggerPanel extends PluginPanel {
 		if (userSelection == JFileChooser.APPROVE_OPTION) {
 			File fileToParse = fileChooser.getSelectedFile();
 
-			log.info("Selected file for custom template test: {}", fileToParse.getName());
+			log.debug("Selected file for custom template test: {}", fileToParse.getName());
 
 			executor.submit(() -> {
 				try (Reader reader = new FileReader(fileToParse)) {
@@ -195,7 +195,7 @@ public class DataLoggerPanel extends PluginPanel {
 								JOptionPane.ERROR_MESSAGE);
 							return;
 						}
-						log.info("Successfully parsed attempt {}. Firing Discord webhook with custom template...", parsedDto.getAttemptId());
+						log.debug("Successfully parsed attempt {}. Firing Discord webhook with custom template...", parsedDto.getAttemptId());
 						String url = config.colosseumDiscordWebhookUrl();
 						if (url == null || url.trim().isEmpty())
 						{
@@ -234,14 +234,14 @@ public class DataLoggerPanel extends PluginPanel {
 		if (userSelection == JFileChooser.APPROVE_OPTION) {
 			File fileToParse = fileChooser.getSelectedFile();
 
-			log.info("Selected file for Discord test: {}", fileToParse.getName());
+			log.debug("Selected file for Discord test: {}", fileToParse.getName());
 
 			executor.submit(() -> {
 				try (Reader reader = new FileReader(fileToParse)) {
 					ColosseumAttemptDTO parsedDto = gson.fromJson(reader, ColosseumAttemptDTO.class);
 
 					if (parsedDto != null) {
-						log.info("Successfully parsed attempt {}. Firing Discord webhook...", parsedDto.getAttemptId());
+						log.debug("Successfully parsed attempt {}. Firing Discord webhook...", parsedDto.getAttemptId());
 						String url = config.colosseumDiscordWebhookUrl();
 						if (url == null || url.trim().isEmpty())
 						{

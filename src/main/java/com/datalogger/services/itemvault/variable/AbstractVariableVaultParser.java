@@ -65,25 +65,8 @@ public abstract class AbstractVariableVaultParser extends AbstractVaultParser
 
 	protected abstract List<BankedItem> translateVariablesToItems();
 
-	/**
-	 * Wrapper class to securely save both maps into a single JSON file.
-	 */
-	protected static class VariableState {
-		Map<Integer, Integer> varps = new HashMap<>();
-		Map<Integer, Integer> varbits = new HashMap<>();
-	}
-
 	@Override
-	protected void loadSessionData(File cacheFile)
-	{
-//		VariableState loadedState = fileIOService.readJson(cacheFile, VariableState.class);
-//
-//		if (loadedState != null)
-//		{
-//			if (loadedState.varps != null) this.currentVarpValues = loadedState.varps;
-//			if (loadedState.varbits != null) this.currentVarbitValues = loadedState.varbits;
-//		}
-	}
+	protected void loadSessionData(File cacheFile) {}
 
 	@Override
 	public void setupAccountHash()
@@ -120,7 +103,7 @@ public abstract class AbstractVariableVaultParser extends AbstractVaultParser
 		{
 			int varbitValue = currentVarbitValues.get(varbitId);
 			currentVarbitValues.put(varbitId, varbitValue);
-			log.info("Updating varbitId {} to value {}", varbitId, varbitValue);
+			log.debug("Updating varbitId {} to value {}", varbitId, varbitValue);
 			changed = true;
 		}
 
@@ -143,7 +126,6 @@ public abstract class AbstractVariableVaultParser extends AbstractVaultParser
 	{
 		if (!isEnabled) return;
 
-		// 1. Initial Login Sync Check
 		if (pendingLoginSync)
 		{
 			loginSyncTicks++;
@@ -214,14 +196,6 @@ public abstract class AbstractVariableVaultParser extends AbstractVaultParser
 	{
 		for (int varpId : getTrackedVarpIds()) currentVarpValues.put(varpId, client.getVarpValue(varpId));
 		for (int varbitId : getTrackedVarbitIds()) currentVarbitValues.put(varbitId, client.getVarbitValue(varbitId));
-
-//		if (hasValidAccountHash)
-//		{
-//			VariableState stateToSave = new VariableState();
-//			stateToSave.varps = this.currentVarpValues;
-//			stateToSave.varbits = this.currentVarbitValues;
-//			fileIOService.writeJson(vaultFile, stateToSave);
-//		}
 
 		List<BankedItem> parsedItems = translateVariablesToItems();
 		if (parsedItems != null && !parsedItems.isEmpty())

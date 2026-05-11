@@ -31,20 +31,18 @@ import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.gameval.ItemID;
 import net.runelite.client.game.ItemVariationMapping;
+import net.runelite.client.util.Text;
 
 @Slf4j
 @Singleton
-public class VenatorBowParser extends AbstractItemChargeParser
+public class WarpedSceptreParser extends AbstractItemChargeParser
 {
-	private static final int BASE_ID = ItemVariationMapping.map(ItemID.VENATOR_BOW);
+	private static final int BASE_ID = ItemVariationMapping.map(ItemID.WARPED_SCEPTRE);
 
-	private static final String UNCHARGE_PREFIX = "You fully uncharge your venator bow";
-	private static final String CHECK_PREFIX_LOWER = "Your venator bow has ";
-	private static final String CHECK_PREFIX_UPPER = "Your Venator bow has ";
-	private static final String CHARGE_PREFIX = "You use ";
-
-	private static final String CHARGE_TARGET = "venator bow";
-	private static final String CHARGE_NOW_HAS = "It now has ";
+	private static final String UNCHARGE_PREFIX = "You uncharge your warped sceptre";
+	private static final String CHECK_UPDATE_PREFIX = "Your warped sceptre has ";
+	private static final String CHARGE_PREFIX = "You add ";
+	private static final String CHARGE_TARGET = "warped sceptre";
 
 	@Override
 	protected int getBaseItemId()
@@ -55,7 +53,7 @@ public class VenatorBowParser extends AbstractItemChargeParser
 	@Override
 	protected @NonNull ItemCharge getItemChargeType()
 	{
-		return ItemCharge.VENATOR_BOW;
+		return ItemCharge.WARPED_SCEPTRE;
 	}
 
 	@Override
@@ -63,42 +61,42 @@ public class VenatorBowParser extends AbstractItemChargeParser
 	{
 		return new String[] {
 			UNCHARGE_PREFIX,
-			CHECK_PREFIX_LOWER,
-			CHECK_PREFIX_UPPER,
+			CHECK_UPDATE_PREFIX,
 			CHARGE_PREFIX
 		};
 	}
 
 	@Override
-	protected Integer parseChargeCount(String message)
+	protected Integer parseChargeCount(String rawMessage)
 	{
+		String message = Text.removeTags(rawMessage);
+
 		if (message.startsWith(UNCHARGE_PREFIX))
 		{
 			return 0;
 		}
 
-		if (message.startsWith(CHECK_PREFIX_LOWER) || message.startsWith(CHECK_PREFIX_UPPER))
+		if (message.startsWith(CHECK_UPDATE_PREFIX))
 		{
-			int startIndex = CHECK_PREFIX_LOWER.length();
-			int endIndex = message.indexOf(" charges remaining.", startIndex);
-
+			int endIndex = message.indexOf(" charges remaining.", CHECK_UPDATE_PREFIX.length());
 			if (endIndex != -1)
 			{
-				String numberStr = message.substring(startIndex, endIndex);
+				String numberStr = message.substring(CHECK_UPDATE_PREFIX.length(), endIndex);
 				return cleanAndParseInt(numberStr);
 			}
 		}
 
 		if (message.startsWith(CHARGE_PREFIX) && message.contains(CHARGE_TARGET))
 		{
-			int startIndex = message.lastIndexOf(CHARGE_NOW_HAS);
-			if (startIndex != -1)
+			int endIndex = message.indexOf(" charges to", CHARGE_PREFIX.length());
+			if (endIndex != -1)
 			{
-				int endIndex = message.indexOf(" charges.", startIndex);
-				if (endIndex != -1)
+				String numberStr = message.substring(CHARGE_PREFIX.length(), endIndex);
+				Integer addedCharges = cleanAndParseInt(numberStr);
+
+				if (addedCharges != null && this.currentCharges >= 0)
 				{
-					String numberStr = message.substring(startIndex + CHARGE_NOW_HAS.length(), endIndex);
-					return cleanAndParseInt(numberStr);
+					return this.currentCharges + addedCharges;
 				}
 			}
 		}
@@ -114,7 +112,7 @@ public class VenatorBowParser extends AbstractItemChargeParser
 		}
 		catch (NumberFormatException e)
 		{
-			log.error("Failed to parse Venator Bow charge string: {}", amount, e);
+			log.error("Failed to parse Warped Sceptre charge string: {}", amount, e);
 			return null;
 		}
 	}

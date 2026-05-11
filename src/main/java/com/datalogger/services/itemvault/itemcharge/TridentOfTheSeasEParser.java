@@ -26,61 +26,87 @@
 package com.datalogger.services.itemvault.itemcharge;
 
 import com.datalogger.models.enums.ItemCharge;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import javax.inject.Singleton;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
-import net.runelite.api.EquipmentInventorySlot;
 import net.runelite.api.gameval.ItemID;
+import net.runelite.client.game.ItemVariationMapping;
 
 @Slf4j
 @Singleton
-public class ToxicBlowpipeParser extends AbstractItemChargeParser
+public class TridentOfTheSeasEParser extends AbstractItemChargeParser
 {
-	// CPU Optimization: Pre-compiling the regex in a static final field ensures it
-	// is only compiled once at class load, avoiding expensive runtime compilation.
-	// This regex safely handles the string whether it contains raw <col> tags or if
-	// they have been stripped out by Text.removeTags() upstream.
-	private static final Pattern SCALES_PATTERN = Pattern.compile("Scales:\\s*(?:<col=[^>]+>)?([\\d,]+)");
+	private static final int BASE_ID = ItemVariationMapping.map(ItemID.TOTS_I_CHARGED);
 
-	@Override
-	protected EquipmentInventorySlot getEquipmentSlot()
-	{
-		return EquipmentInventorySlot.WEAPON; //
-	}
+	private static final String UNCHARGE_MESSAGE = "You uncharge your Uncharged trident (e).";
+	private static final String CHECK_UPDATE_PREFIX = "Your Trident of the seas (e) has ";
+	private static final String CHARGE_PREFIX = "You add ";
+	private static final String CHARGE_TARGET = "Trident of the seas (e)";
+	private static final String NEW_TOTAL_PHRASE = "New total: ";
 
 	@Override
 	protected int getBaseItemId()
 	{
-		return ItemID.TOXIC_BLOWPIPE;
-	}
-
-	@Override
-	protected Integer parseChargeCount(String message)
-	{
-		Matcher matcher = SCALES_PATTERN.matcher(message);
-		if (matcher.find()) //[cite: 10]
-		{
-			// Group 1 extracts just the numbers and commas (e.g., "15,893")
-			String cleanNumber = matcher.group(1).replace(",", ""); //[cite: 10]
-			try
-			{
-				return Integer.parseInt(cleanNumber); //[cite: 10]
-			}
-			catch (NumberFormatException e)
-			{
-				log.warn("Failed to parse toxic blowpipe scales from string: {}", cleanNumber);
-				return null; //[cite: 10]
-			}
-		}
-		return null; //[cite: 10]
+		return BASE_ID;
 	}
 
 	@Override
 	protected @NonNull ItemCharge getItemChargeType()
 	{
-		// Note: Ensure TOXIC_BLOWPIPE is registered in your ItemCharge enum!
-		return ItemCharge.ZULRAH_SCALE;
+		return ItemCharge.TRIDENT_OF_THE_SEAS_E;
+	}
+
+	@Override
+	protected String[] getMessagePrefixes()
+	{
+		return new String[] {
+			UNCHARGE_MESSAGE,
+			CHECK_UPDATE_PREFIX,
+			CHARGE_PREFIX
+		};
+	}
+
+	@Override
+	protected Integer parseChargeCount(String message)
+	{
+		if (message.equals(UNCHARGE_MESSAGE))
+		{
+			return 0;
+		}
+
+		if (message.startsWith(CHECK_UPDATE_PREFIX))
+		{
+			int endIndex = message.indexOf(" charges", CHECK_UPDATE_PREFIX.length());
+			if (endIndex != -1)
+			{
+				String numberStr = message.substring(CHECK_UPDATE_PREFIX.length(), endIndex);
+				return cleanAndParseInt(numberStr);
+			}
+		}
+
+		if (message.startsWith(CHARGE_PREFIX) && message.contains(CHARGE_TARGET))
+		{
+			int startIndex = message.lastIndexOf(NEW_TOTAL_PHRASE);
+			if (startIndex != -1)
+			{
+				String numberStr = message.substring(startIndex + NEW_TOTAL_PHRASE.length());
+				return cleanAndParseInt(numberStr);
+			}
+		}
+
+		return null;
+	}
+
+	private Integer cleanAndParseInt(String amount)
+	{
+		try
+		{
+			return Integer.parseInt(amount.replace(",", "").trim());
+		}
+		catch (NumberFormatException e)
+		{
+			log.error("Failed to parse Trident of the seas (e) charge string: {}", amount, e);
+			return null;
+		}
 	}
 }

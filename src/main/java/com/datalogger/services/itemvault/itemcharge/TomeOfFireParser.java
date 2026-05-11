@@ -34,17 +34,17 @@ import net.runelite.client.game.ItemVariationMapping;
 
 @Slf4j
 @Singleton
-public class VenatorBowParser extends AbstractItemChargeParser
+public class TomeOfFireParser extends AbstractItemChargeParser
 {
-	private static final int BASE_ID = ItemVariationMapping.map(ItemID.VENATOR_BOW);
+	private static final int BASE_ID = ItemVariationMapping.map(ItemID.TOME_OF_FIRE);
 
-	private static final String UNCHARGE_PREFIX = "You fully uncharge your venator bow";
-	private static final String CHECK_PREFIX_LOWER = "Your venator bow has ";
-	private static final String CHECK_PREFIX_UPPER = "Your Venator bow has ";
-	private static final String CHARGE_PREFIX = "You use ";
+	private static final String UNCHARGE_MESSAGE = "You empty your book of pages";
+	private static final String CHECK_CHARGE_PREFIX = "Your tome has been charged with Burnt Pages. It currently holds ";
+	private static final String REMOVE_ONE_PREFIX = "You remove a page from the book. Your tome currently holds ";
+	private static final String REMOVE_X_PREFIX = "You remove ";
 
-	private static final String CHARGE_TARGET = "venator bow";
-	private static final String CHARGE_NOW_HAS = "It now has ";
+	private static final String REMOVE_X_MID = " pages from the book. Your tome currently holds ";
+	private static final String CHARGES_SUFFIX = " charges.";
 
 	@Override
 	protected int getBaseItemId()
@@ -55,51 +55,56 @@ public class VenatorBowParser extends AbstractItemChargeParser
 	@Override
 	protected @NonNull ItemCharge getItemChargeType()
 	{
-		return ItemCharge.VENATOR_BOW;
+		return ItemCharge.TOME_OF_FIRE;
 	}
 
 	@Override
 	protected String[] getMessagePrefixes()
 	{
 		return new String[] {
-			UNCHARGE_PREFIX,
-			CHECK_PREFIX_LOWER,
-			CHECK_PREFIX_UPPER,
-			CHARGE_PREFIX
+			UNCHARGE_MESSAGE,
+			CHECK_CHARGE_PREFIX,
+			REMOVE_ONE_PREFIX,
+			REMOVE_X_PREFIX
 		};
 	}
 
 	@Override
 	protected Integer parseChargeCount(String message)
 	{
-		if (message.startsWith(UNCHARGE_PREFIX))
+		if (message.startsWith(UNCHARGE_MESSAGE))
 		{
 			return 0;
 		}
 
-		if (message.startsWith(CHECK_PREFIX_LOWER) || message.startsWith(CHECK_PREFIX_UPPER))
+		if (message.startsWith(CHECK_CHARGE_PREFIX))
 		{
-			int startIndex = CHECK_PREFIX_LOWER.length();
-			int endIndex = message.indexOf(" charges remaining.", startIndex);
-
+			int endIndex = message.indexOf(CHARGES_SUFFIX, CHECK_CHARGE_PREFIX.length());
 			if (endIndex != -1)
 			{
-				String numberStr = message.substring(startIndex, endIndex);
+				String numberStr = message.substring(CHECK_CHARGE_PREFIX.length(), endIndex);
 				return cleanAndParseInt(numberStr);
 			}
 		}
 
-		if (message.startsWith(CHARGE_PREFIX) && message.contains(CHARGE_TARGET))
+		if (message.startsWith(REMOVE_ONE_PREFIX))
 		{
-			int startIndex = message.lastIndexOf(CHARGE_NOW_HAS);
-			if (startIndex != -1)
+			int endIndex = message.indexOf(CHARGES_SUFFIX, REMOVE_ONE_PREFIX.length());
+			if (endIndex != -1)
 			{
-				int endIndex = message.indexOf(" charges.", startIndex);
-				if (endIndex != -1)
-				{
-					String numberStr = message.substring(startIndex + CHARGE_NOW_HAS.length(), endIndex);
-					return cleanAndParseInt(numberStr);
-				}
+				String numberStr = message.substring(REMOVE_ONE_PREFIX.length(), endIndex);
+				return cleanAndParseInt(numberStr);
+			}
+		}
+
+		if (message.startsWith(REMOVE_X_PREFIX) && message.contains(REMOVE_X_MID))
+		{
+			int startIndex = message.indexOf(REMOVE_X_MID) + REMOVE_X_MID.length();
+			int endIndex = message.indexOf(CHARGES_SUFFIX, startIndex);
+			if (endIndex != -1)
+			{
+				String numberStr = message.substring(startIndex, endIndex);
+				return cleanAndParseInt(numberStr);
 			}
 		}
 
@@ -114,7 +119,7 @@ public class VenatorBowParser extends AbstractItemChargeParser
 		}
 		catch (NumberFormatException e)
 		{
-			log.error("Failed to parse Venator Bow charge string: {}", amount, e);
+			log.error("Failed to parse Tome of fire charge string: {}", amount, e);
 			return null;
 		}
 	}

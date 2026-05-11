@@ -28,9 +28,7 @@ package com.datalogger.services.itemvault.variable;
 import com.datalogger.constants.Item;
 import com.datalogger.models.enums.VaultType;
 import com.datalogger.models.itemvault.BankedItem;
-import com.google.gson.reflect.TypeToken;
 import java.io.File;
-import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -103,8 +101,7 @@ public class RunePouchParser extends AbstractVariableVaultParser
 	@Override
 	protected void loadSessionData(File cacheFile)
 	{
-		Type type = new TypeToken<List<BankedItem>>(){}.getType();
-		List<BankedItem> loadedItems = fileIOService.readJson(cacheFile, type);
+		List<BankedItem> loadedItems = fileIOService.readJson(cacheFile, BankedItem.LIST_TYPE);
 
 		if (loadedItems == null || loadedItems.isEmpty()) return;
 

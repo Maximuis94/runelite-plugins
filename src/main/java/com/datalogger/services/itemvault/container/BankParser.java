@@ -25,13 +25,24 @@
 
 package com.datalogger.services.itemvault.container;
 
+import static com.datalogger.constants.Item.InterfaceID.BANK_GROUP_ID;
+import static com.datalogger.constants.Item.InterfaceID.BANK_OCCUPIED_SLOTS_CHILD_ID;
 import com.datalogger.models.enums.VaultType;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import javax.inject.Singleton;
+import lombok.extern.slf4j.Slf4j;
+import net.runelite.api.Item;
+import net.runelite.api.ItemContainer;
 import net.runelite.api.gameval.InventoryID;
+import net.runelite.api.widgets.Widget;
 
+@Slf4j
 @Singleton
 public class BankParser extends AbstractContainerVaultParser
 {
+	private boolean isShowingFullBank = false;
+
 	@Override
 	public VaultType getVaultType()
 	{
@@ -42,5 +53,46 @@ public class BankParser extends AbstractContainerVaultParser
 	protected int getContainerId()
 	{
 		return InventoryID.BANK;
+	}
+
+	@Override
+	protected boolean isValidStateToSave(ItemContainer container)
+	{
+		Widget itemCountWidget = client.getWidget(BANK_GROUP_ID, BANK_OCCUPIED_SLOTS_CHILD_ID);
+
+		if (itemCountWidget == null || itemCountWidget.isHidden())
+		{
+			return isShowingFullBank;
+		}
+
+		String text = itemCountWidget.getText();
+
+		Matcher matcher = Pattern.compile("^(\\d+)").matcher(text);
+
+		if (matcher.find())
+		{
+			int expectedBankSize = Integer.parseInt(matcher.group(1));
+			int actualOccupiedSlots = 0;
+
+			for (Item item : container.getItems())
+			{
+				if (item.getId() > 0)
+				{
+					actualOccupiedSlots++;
+				}
+			}
+
+			if (actualOccupiedSlots != expectedBankSize)
+			{
+				isShowingFullBank = false;
+				log.debug("Bank is currently filtered. Expected {} items, but found {}. Skipping save.", expectedBankSize, actualOccupiedSlots);
+			}
+			else
+			{
+				log.debug("Bank is currently not filtered. Expected {} items and found {}.", expectedBankSize, actualOccupiedSlots);
+				isShowingFullBank = true;
+			}
+		}
+		return isShowingFullBank;
 	}
 }

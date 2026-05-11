@@ -47,10 +47,11 @@ public enum VaultType
 	MASTER_SCROLL_BOOK(-1, -1),
 	QUIVER(-1, -1),
 	BOLT_POUCH(-1, -1),
-	TRIDENT_OF_THE_SEAS(-1, -1),
-	TRIDENT_OF_THE_SWAMP(-1, -1),
 	STASH_UNITS(-1, -1),
 	POH_COSTUME_ROOM(-1, -1),
+	FARMING_TOOLS(-1, -1),
+	TOA_PICKAXE(-1, -1),
+	COFFER(-1, -1)
 
 
 	;

@@ -28,39 +28,45 @@ package com.datalogger.services.itemvault.itemcharge;
 import com.datalogger.models.enums.ItemCharge;
 import com.datalogger.models.enums.VaultType;
 import com.datalogger.models.itemvault.BankedItem;
+import com.datalogger.services.InventoryStateManager;
 import com.datalogger.services.itemvault.AbstractVaultParser;
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import javax.inject.Inject;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.ChatMessageType;
-import net.runelite.api.EquipmentInventorySlot;
-import net.runelite.api.Item;
-import net.runelite.api.ItemContainer;
 import net.runelite.api.events.ChatMessage;
-import net.runelite.api.gameval.InventoryID;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.game.ItemManager;
-import net.runelite.client.game.ItemVariationMapping;
+import net.runelite.client.util.Text;
 
 /**
- * Template class for tracking item-specific charges. Charges covered by subclasses are tied to a specific item, i.e. a
+ * Template class for tracking item-specific charges. Charges covered by subclasses are tied to a specific item, e.g. a
  * Trident of the seas, as one can have multiple tridents that each have their own, separate count of item charges.
+ * However, an assumption that is made, is that someone has only one of each item that can hold charges.
+ * Item charge parsers only use chat messages to update the charge count.
  */
 @Slf4j
 public abstract class AbstractItemChargeParser extends AbstractVaultParser
 {
 	@Inject protected ItemManager itemManager;
+	@Inject protected InventoryStateManager inventoryStateManager;
 
 	protected int currentCharges = -1;
 
-	protected abstract EquipmentInventorySlot getEquipmentSlot();
 	protected abstract int getBaseItemId();
+
+	/**
+	 * Define an array of starting strings that indicate a message belongs to this parser.
+	 * Acts as an ultra-fast O(1) gatekeeper before complex parsing occurs.
+	 */
+	protected abstract String[] getMessagePrefixes();
+
 	protected abstract Integer parseChargeCount(String message);
+
 	@NonNull protected abstract ItemCharge getItemChargeType();
 
 	@Override
@@ -70,130 +76,109 @@ public abstract class AbstractItemChargeParser extends AbstractVaultParser
 	}
 
 	@Override
-	public String getVaultLabel() {
+	public String getVaultLabel()
+	{
 		return getItemChargeType().name();
 	}
-
 
 	@Override
 	protected void loadSessionData(File cacheFile)
 	{
-		Integer loadedCharges = fileIOService.readJson(cacheFile, Integer.class);
-		currentCharges = (loadedCharges != null) ? loadedCharges : -1;
+		List<BankedItem> loadedItems = fileIOService.readJson(cacheFile, BankedItem.LIST_TYPE);
+
+		if (loadedItems == null || loadedItems.isEmpty())
+		{
+			currentCharges = -1;
+			return;
+		}
+
+		BankedItem item = loadedItems.get(0);
+		ItemCharge chargeType = getItemChargeType();
+		int batchSize = chargeType.getNCharges();
+
+		Integer qtyPerBatch = chargeType.getOutputItem().get(item.getItemId());
+
+		if (qtyPerBatch != null && qtyPerBatch > 0)
+		{
+			currentCharges = (int) (item.getQuantity() * batchSize / qtyPerBatch);
+			log.debug("Restored {} charges from file based on item {}", currentCharges, item.getItemName());
+		}
+		else
+		{
+			currentCharges = -1;
+		}
 	}
 
 	@Override
 	public List<BankedItem> parseVault()
 	{
-		List<BankedItem> items = new ArrayList<>();
 		if (currentCharges > 0 && isEnabled)
 		{
-			ItemCharge chargeType = getItemChargeType();
-
-			if (chargeType.getInputItem() != null)
-			{
-				for (Map.Entry<Integer, Integer> entry : chargeType.getOutputItem().entrySet())
-				{
-					int outputItemId = entry.getKey();
-					int quantityPerBatch = entry.getValue();
-
-					int totalQty = currentCharges * quantityPerBatch / chargeType.getNCharges();
-
-					if (totalQty > 0)
-					{
-						String itemName = itemManager.getItemComposition(outputItemId).getName();
-
-						items.add(new BankedItem(
-							getVaultType(),
-							currentAccountHash,
-							currentAccountName,
-							outputItemId,
-							itemName,
-							totalQty
-						));
-					}
-				}
-			}
+			return convertChargesToBankedItems(currentAccountHash, currentCharges, getItemChargeType());
 		}
-		return items;
+		return new ArrayList<>();
 	}
 
-//	@Override
-//	public List<BankedItem> parseVault()
-//	{
-//		List<BankedItem> items = new ArrayList<>();
-//		if (currentCharges > 0 && isEnabled)
-//		{
-//			String itemName = itemManager.getItemComposition(getBaseItemId()).getName();
-//			items.add(new BankedItem(
-//				getVaultType(),
-//				currentAccountHash,
-//				currentAccountName,
-//				getBaseItemId(),
-//				itemName,
-//				currentCharges
-//			));
-//		}
-//		return items;
-//	}
+	/**
+	 * Gatekeeper function that returns true if the message is to be ignored
+	 */
+	private boolean skipMessage(ChatMessage event)
+	{
+		if (!isEnabled) return true;
+		if (!isRelevantChatMessage(event.getType())) return true;
+		return !inventoryStateManager.hasBaseItem(getBaseItemId());
+	}
 
 	@Subscribe
 	public void onChatMessage(ChatMessage event)
 	{
-		if (!isEnabled) return;
-		if (!isRelevantChatMessage(event.getType())) return;
-		if (!isItemCurrentlyPossessed()) return;
+		if (skipMessage(event)) return;
+
+		String cleanMessage = Text.removeTags(event.getMessage());
+		boolean matchesPrefix = false;
+
+		for (String prefix : getMessagePrefixes())
+		{
+			if (cleanMessage.startsWith(prefix))
+			{
+				matchesPrefix = true;
+				break;
+			}
+		}
+		if (!matchesPrefix) return;
 
 		ensureAccountNameIsCached();
 
-		Integer parsedCharges = parseChargeCount(event.getMessage());
+		Integer parsedCharges = parseChargeCount(cleanMessage);
 		if (parsedCharges != null)
 		{
-			this.currentCharges = parsedCharges;
-			log.debug("Parsed {} charges: {}", getItemChargeType().name(), currentCharges);
-			saveChargesToDisk();
+			setItemCharges(parsedCharges);
 		}
 	}
 
-	private boolean isRelevantChatMessage(ChatMessageType messageType)
+	/**
+	 * Sets the number of item charges to nCharges.
+	 */
+	public void setItemCharges(int nCharges)
 	{
-		return messageType == ChatMessageType.GAMEMESSAGE || messageType == ChatMessageType.SPAM;
+		log.debug("ItemCharges for {} set to {}", getItemChargeType().name(), currentCharges);
+		this.currentCharges = nCharges;
+		saveChargesToDisk();
 	}
 
-	private boolean isItemCurrentlyPossessed()
+	protected boolean isRelevantChatMessage(ChatMessageType messageType)
 	{
-		EquipmentInventorySlot slot = getEquipmentSlot();
-		if (slot != null)
-		{
-			ItemContainer equipment = client.getItemContainer(InventoryID.WORN);
-			if (equipment != null)
-			{
-				Item baseItem = equipment.getItem(getEquipmentSlot().getSlotIdx());
-				if (baseItem != null)
-				{
-
-					if (ItemVariationMapping.map(baseItem.getId()) == getBaseItemId())
-					{
-						return true;
-					}
-				}
-			}
-		}
-
-		ItemContainer inventory = client.getItemContainer(InventoryID.INV);
-		if (inventory == null) return false;
-
-		int baseTargetId = ItemVariationMapping.map(getBaseItemId());
-
-		return Arrays.stream(inventory.getItems())
-			.anyMatch(item -> ItemVariationMapping.map(item.getId()) == baseTargetId);
+		return messageType == ChatMessageType.GAMEMESSAGE ||
+			messageType == ChatMessageType.MESBOX;
 	}
 
 	protected void saveChargesToDisk()
 	{
-		if (hasValidAccountHash)
+		if (hasValidAccountHash && currentCharges >= 0)
 		{
-			fileIOService.writeJson(vaultFile, currentCharges);
+			List<BankedItem> itemsToSave = convertChargesToBankedItems(currentAccountHash, currentCharges, getItemChargeType());
+//			fileIOService.writeJson(vaultFile, itemsToSave);
+			saveSlimVaultCache(itemsToSave);
 		}
 	}
 
@@ -206,21 +191,7 @@ public abstract class AbstractItemChargeParser extends AbstractVaultParser
 	@Override
 	public String getFilePrefix()
 	{
-		// Uses the helper method from ItemCharge.java
 		return getItemChargeType().fileNameString();
-	}
-
-	@Override
-	public List<BankedItem> parseOfflineFile(long accountHash, File vaultFile)
-	{
-		Integer charges = fileIOService.readJson(vaultFile, Integer.class);
-
-		if (charges == null || charges <= 0)
-		{
-			return new ArrayList<>();
-		}
-
-		return convertChargesToBankedItems(accountHash, charges, getItemChargeType());
 	}
 
 	/**
@@ -232,27 +203,29 @@ public abstract class AbstractItemChargeParser extends AbstractVaultParser
 		List<BankedItem> items = new ArrayList<>();
 
 		String resolvedAccountName = accountHashMapper.getAccountName(hash);
-
 		int batchSize = type.getNCharges();
 
-		for (Map.Entry<Integer, Integer> entry : type.getOutputItem().entrySet())
+		if (type.getOutputItem() != null)
 		{
-			int itemId = entry.getKey();
-			int qtyPerBatch = entry.getValue();
-
-			long totalQty = (long) charges * qtyPerBatch / batchSize;
-
-			if (totalQty > 0)
+			for (Map.Entry<Integer, Integer> entry : type.getOutputItem().entrySet())
 			{
-				String itemName = itemManager.getItemComposition(itemId).getName();
-				items.add(new BankedItem(
-					getVaultType(),
-					hash,
-					resolvedAccountName,
-					itemId,
-					itemName,
-					totalQty
-				));
+				int itemId = entry.getKey();
+				int qtyPerBatch = entry.getValue();
+
+				long totalQty = (long) charges * qtyPerBatch / batchSize;
+
+				if (totalQty > 0)
+				{
+					String itemName = itemManager.getItemComposition(itemId).getName();
+					items.add(new BankedItem(
+						getVaultType(),
+						hash,
+						resolvedAccountName,
+						itemId,
+						itemName,
+						totalQty
+					));
+				}
 			}
 		}
 		return items;

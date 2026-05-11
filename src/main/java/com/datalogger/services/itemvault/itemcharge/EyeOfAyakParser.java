@@ -31,102 +31,88 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import javax.inject.Singleton;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
-import net.runelite.api.EquipmentInventorySlot;
 import net.runelite.api.gameval.ItemID;
+import net.runelite.client.game.ItemVariationMapping;
 
 @Slf4j
 @Singleton
 public class EyeOfAyakParser extends AbstractItemChargeParser
 {
-	private static final String itemMsgName = "Eye of Ayak";
-	private static final Pattern CHARGED_TEARS_PATTERN = Pattern.compile("^The Eye of Ayak has been charged with demon tears\\. It currently has ([\\d,]+) charges\\.");
-	private static final Pattern CHARGED_RUNES_PATTERN = Pattern.compile("^The Eye of Ayak has been charged with runes\\. It currently has ([\\d,]+) charges\\.");
-	private static final Pattern UPDATE_PATTERN = Pattern.compile("^The Eye of Ayak has ([\\d,]+) charges remaining\\.");
+	private static final int BASE_ID = ItemVariationMapping.map(ItemID.EYE_OF_AYAK);
+
 	private static final String UNCHARGE_MESSAGE = "You uncharge the Eye of Ayak.";
+	private static final String UMBRELLA_PREFIX = "The Eye of Ayak has ";
+	private static final String TEARS_PREFIX = "The Eye of Ayak has been charged with demon tears. It currently has ";
+	private static final String RUNES_PREFIX = "The Eye of Ayak has been charged with runes. It currently has ";
+	private static final String CHARGES_SUFFIX = " charges.";
+	private static final String REMAINING_SUFFIX = " charges remaining.";
 
-	private AyakState ayakState = new AyakState();
-
-	private static class AyakState {
-		ItemCharge currentType;
-		int count;
-	}
-
-	@Override
-	protected void loadSessionData(File cacheFile)
-	{
-		AyakState loadedState = fileIOService.readJson(cacheFile, AyakState.class);
-		if (loadedState != null) {
-			this.ayakState = loadedState;
-		}
-	}
-
-	@Override
-	protected void saveChargesToDisk()
-	{
-		if (hasValidAccountHash)
-		{
-			fileIOService.writeJson(vaultFile, ayakState);
-		}
-	}
-
-	@Override
-	protected EquipmentInventorySlot getEquipmentSlot()
-	{
-		return EquipmentInventorySlot.WEAPON;
-	}
+	private ItemCharge currentType = null;
 
 	@Override
 	protected int getBaseItemId()
 	{
-		return ItemID.EYE_OF_AYAK;
+		return BASE_ID;
+	}
+
+	@Override
+	protected @NonNull ItemCharge getItemChargeType()
+	{
+		return ItemCharge.EYE_OF_AYAK;
+	}
+
+	@Override
+	protected String[] getMessagePrefixes()
+	{
+		return new String[] {
+			UNCHARGE_MESSAGE,
+			UMBRELLA_PREFIX
+		};
 	}
 
 	@Override
 	protected Integer parseChargeCount(String message)
 	{
-		if (!message.contains(itemMsgName))
-		{
-			return null;
-		}
-
 		if (message.equals(UNCHARGE_MESSAGE))
 		{
-			ayakState.currentType = null;
-			ayakState.count = 0;
+			this.currentType = null;
 			return 0;
 		}
 
-		Matcher tearMatcher = CHARGED_TEARS_PATTERN.matcher(message);
-		if (tearMatcher.find())
+		if (message.startsWith(TEARS_PREFIX))
 		{
-			ayakState.currentType = ItemCharge.EYE_OF_AYAK_TEARS;
-			ayakState.count = cleanAndParseInt(tearMatcher.group(1));
-			return ayakState.count;
-		}
-
-		Matcher runeMatcher = CHARGED_RUNES_PATTERN.matcher(message);
-		if (runeMatcher.find())
-		{
-			ayakState.currentType = ItemCharge.EYE_OF_AYAK_RUNES;
-			ayakState.count = cleanAndParseInt(runeMatcher.group(1));
-			return ayakState.count;
-		}
-
-		Matcher updateMatcher = UPDATE_PATTERN.matcher(message);
-		if (updateMatcher.find())
-		{
-			ayakState.count = cleanAndParseInt(updateMatcher.group(1));
-
-			if (ayakState.currentType == null)
+			int endIndex = message.indexOf(CHARGES_SUFFIX, TEARS_PREFIX.length());
+			if (endIndex != -1)
 			{
-				log.debug("Eye of Ayak charge update received, but charge type is unknown. Defaulting to Demon Tears for export.");
+				this.currentType = ItemCharge.EYE_OF_AYAK_TEARS;
+				return cleanAndParseInt(message.substring(TEARS_PREFIX.length(), endIndex));
 			}
-			return ayakState.count;
+		}
+
+		if (message.startsWith(RUNES_PREFIX))
+		{
+			int endIndex = message.indexOf(CHARGES_SUFFIX, RUNES_PREFIX.length());
+			if (endIndex != -1)
+			{
+				this.currentType = ItemCharge.EYE_OF_AYAK_RUNES;
+				return cleanAndParseInt(message.substring(RUNES_PREFIX.length(), endIndex));
+			}
+		}
+
+		if (message.startsWith(UMBRELLA_PREFIX))
+		{
+			int endIndex = message.indexOf(REMAINING_SUFFIX, UMBRELLA_PREFIX.length());
+			if (endIndex != -1)
+			{
+				if (this.currentType == null)
+				{
+					log.debug("Eye of Ayak charge update received, but charge type is unknown. Defaulting to Demon Tears for export.");
+				}
+				return cleanAndParseInt(message.substring(UMBRELLA_PREFIX.length(), endIndex));
+			}
 		}
 
 		return null;
@@ -136,27 +122,63 @@ public class EyeOfAyakParser extends AbstractItemChargeParser
 	{
 		try
 		{
-			return Integer.parseInt(amount.replace(",", ""));
+			return Integer.parseInt(amount.replace(",", "").trim());
 		}
 		catch (NumberFormatException e)
 		{
 			log.error("Failed to parse Eye of Ayak charge string: {}", amount, e);
-			return 0;
+			return null;
 		}
 	}
 
-	@Override
-	protected @NonNull ItemCharge getItemChargeType()
-	{
-		return ItemCharge.EYE_OF_AYAK;
-	}
-
 	/**
-	 * Return the relevant ItemCharge, given previous checks. Defaults to demon tears.
+	 * Return the relevant ItemCharge. Defaults to demon tears.
 	 */
 	private @NonNull ItemCharge getRelevantChargeType()
 	{
-		return ayakState.currentType != null ? ayakState.currentType : ItemCharge.EYE_OF_AYAK_TEARS;
+		return this.currentType != null ? this.currentType : ItemCharge.EYE_OF_AYAK_TEARS;
+	}
+
+	@Override
+	protected void loadSessionData(File cacheFile)
+	{
+		List<BankedItem> loadedItems = fileIOService.readJson(cacheFile, BankedItem.LIST_TYPE);
+
+		if (loadedItems == null || loadedItems.isEmpty())
+		{
+			this.currentType = null;
+			this.currentCharges = -1;
+			return;
+		}
+
+		BankedItem item = loadedItems.get(0);
+		int itemId = item.getItemId();
+
+		if (itemId == ItemID.DEMON_TEAR)
+		{
+			this.currentType = ItemCharge.EYE_OF_AYAK_TEARS;
+			this.currentCharges = (int) item.getQuantity();
+		}
+		else if (itemId == ItemID.CHAOSRUNE || itemId == ItemID.DEATHRUNE)
+		{
+			this.currentType = ItemCharge.EYE_OF_AYAK_RUNES;
+
+			if (itemId == ItemID.CHAOSRUNE)
+			{
+				this.currentCharges = (int) item.getQuantity();
+			}
+			else
+			{
+				this.currentCharges = (int) (item.getQuantity() / 2);
+			}
+		}
+		else
+		{
+			this.currentType = null;
+			this.currentCharges = -1;
+		}
+
+		log.debug("Restored {} Eye of Ayak charges of type {}", currentCharges, currentType);
 	}
 
 	@Override
@@ -164,29 +186,32 @@ public class EyeOfAyakParser extends AbstractItemChargeParser
 	{
 		List<BankedItem> items = new ArrayList<>();
 
-		if (ayakState.count > 0 && isEnabled)
+		if (currentCharges > 0 && isEnabled)
 		{
 			ItemCharge exportType = getRelevantChargeType();
 
-			for (Map.Entry<Integer, Integer> entry : exportType.getInputItem().entrySet())
+			if (exportType.getInputItem() != null)
 			{
-				int inputItemId = entry.getKey();
-				int quantityPerBatch = entry.getValue();
-
-				int totalQty = ayakState.count * quantityPerBatch / exportType.getNCharges();
-
-				if (totalQty > 0)
+				for (Map.Entry<Integer, Integer> entry : exportType.getInputItem().entrySet())
 				{
-					String itemName = itemManager.getItemComposition(inputItemId).getName();
+					int inputItemId = entry.getKey();
+					int quantityPerBatch = entry.getValue();
 
-					items.add(new BankedItem(
-						getVaultType(),
-						currentAccountHash,
-						currentAccountName,
-						inputItemId,
-						itemName,
-						totalQty
-					));
+					long totalQty = (long) currentCharges * quantityPerBatch / exportType.getNCharges();
+
+					if (totalQty > 0)
+					{
+						String itemName = itemManager.getItemComposition(inputItemId).getName();
+
+						items.add(new BankedItem(
+							getVaultType(),
+							currentAccountHash,
+							currentAccountName,
+							inputItemId,
+							itemName,
+							totalQty
+						));
+					}
 				}
 			}
 		}
@@ -194,16 +219,12 @@ public class EyeOfAyakParser extends AbstractItemChargeParser
 	}
 
 	@Override
-	public List<BankedItem> parseOfflineFile(long accountHash, File vaultFile)
+	protected void saveChargesToDisk()
 	{
-		AyakState offlineState = fileIOService.readJson(vaultFile, AyakState.class);
-		if (offlineState == null || offlineState.count <= 0)
+		if (hasValidAccountHash && currentCharges >= 0)
 		{
-			return new ArrayList<>();
+			List<BankedItem> itemsToSave = parseVault();
+			fileIOService.writeJson(vaultFile, itemsToSave);
 		}
-		ItemCharge chargeType = offlineState.currentType != null
-			? offlineState.currentType
-			: ItemCharge.EYE_OF_AYAK_TEARS;
-		return convertChargesToBankedItems(accountHash, offlineState.count, chargeType);
 	}
 }

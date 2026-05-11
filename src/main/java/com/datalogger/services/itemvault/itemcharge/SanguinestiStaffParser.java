@@ -26,34 +26,28 @@
 package com.datalogger.services.itemvault.itemcharge;
 
 import com.datalogger.models.enums.ItemCharge;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import javax.inject.Singleton;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
-import net.runelite.api.EquipmentInventorySlot;
 import net.runelite.api.gameval.ItemID;
-import net.runelite.client.util.Text;
+import net.runelite.client.game.ItemVariationMapping;
 
 @Slf4j
 @Singleton
 public class SanguinestiStaffParser extends AbstractItemChargeParser
 {
-	private static final String INITIAL_CHECK_ITEM_NAME = "anguinesti staff";
-	private static final String UNCHARGE_MESSAGE = "You uncharge your Sanguinesti staff";
-	private static final Pattern CHARGE_PATTERN = Pattern.compile("^You apply ([\\d,]+) charges to your Sanguinesti staff\\.");
-	private static final Pattern UPDATE_PATTERN = Pattern.compile("^Your Sanguinesti staff has ([\\d,]+) charges remaining\\.");
+	private static final int BASE_ID = ItemVariationMapping.map(ItemID.SANGUINESTI_STAFF);
 
-	@Override
-	protected EquipmentInventorySlot getEquipmentSlot()
-	{
-		return EquipmentInventorySlot.WEAPON;
-	}
+	private static final String UNCHARGE_PREFIX = "You uncharge your Sanguinesti staff";
+	private static final String CHECK_UPDATE_PREFIX = "Your Sanguinesti staff has ";
+	private static final String CHARGE_PREFIX = "You apply ";
+	private static final String CHARGE_TARGET = "Sanguinesti staff";
+	private static final String TOTAL_PHRASE = "It now has ";
 
 	@Override
 	protected int getBaseItemId()
 	{
-		return ItemID.SANGUINESTI_STAFF;
+		return BASE_ID;
 	}
 
 	@Override
@@ -63,30 +57,59 @@ public class SanguinestiStaffParser extends AbstractItemChargeParser
 	}
 
 	@Override
-	protected Integer parseChargeCount(String rawMessage)
+	protected String[] getMessagePrefixes()
 	{
-		if (!rawMessage.contains(INITIAL_CHECK_ITEM_NAME))
-		{
-			return null;
-		}
+		return new String[] {
+			UNCHARGE_PREFIX,
+			CHECK_UPDATE_PREFIX,
+			CHARGE_PREFIX
+		};
+	}
 
-		String cleanMessage = Text.removeTags(rawMessage);
-
-		if (cleanMessage.startsWith(UNCHARGE_MESSAGE))
+	@Override
+	protected Integer parseChargeCount(String message)
+	{
+		if (message.startsWith(UNCHARGE_PREFIX))
 		{
 			return 0;
 		}
 
-		Matcher chargeMatcher = CHARGE_PATTERN.matcher(cleanMessage);
-		if (chargeMatcher.find())
+		if (message.startsWith(CHECK_UPDATE_PREFIX))
 		{
-			return cleanAndParseInt(chargeMatcher.group(1));
+			int endIndex = message.indexOf(" charges remaining.", CHECK_UPDATE_PREFIX.length());
+			if (endIndex != -1)
+			{
+				String numberStr = message.substring(CHECK_UPDATE_PREFIX.length(), endIndex);
+				return cleanAndParseInt(numberStr);
+			}
 		}
 
-		Matcher updateMatcher = UPDATE_PATTERN.matcher(cleanMessage);
-		if (updateMatcher.find())
+		if (message.startsWith(CHARGE_PREFIX) && message.contains(CHARGE_TARGET))
 		{
-			return cleanAndParseInt(updateMatcher.group(1));
+			int totalIndex = message.lastIndexOf(TOTAL_PHRASE);
+			if (totalIndex != -1)
+			{
+				int endIndex = message.indexOf(" charges in total.", totalIndex);
+				if (endIndex != -1)
+				{
+					String numberStr = message.substring(totalIndex + TOTAL_PHRASE.length(), endIndex);
+					return cleanAndParseInt(numberStr);
+				}
+			}
+			else
+			{
+				int endIndex = message.indexOf(" charges to", CHARGE_PREFIX.length());
+				if (endIndex != -1)
+				{
+					String numberStr = message.substring(CHARGE_PREFIX.length(), endIndex);
+					Integer addedCharges = cleanAndParseInt(numberStr);
+
+					if (addedCharges != null && this.currentCharges >= 0)
+					{
+						return this.currentCharges + addedCharges;
+					}
+				}
+			}
 		}
 
 		return null;
@@ -96,12 +119,12 @@ public class SanguinestiStaffParser extends AbstractItemChargeParser
 	{
 		try
 		{
-			return Integer.parseInt(amount.replace(",", ""));
+			return Integer.parseInt(amount.replace(",", "").trim());
 		}
 		catch (NumberFormatException e)
 		{
 			log.error("Failed to parse Sanguinesti staff charge string: {}", amount, e);
-			return 0;
+			return null;
 		}
 	}
 }

@@ -34,17 +34,15 @@ import net.runelite.client.game.ItemVariationMapping;
 
 @Slf4j
 @Singleton
-public class VenatorBowParser extends AbstractItemChargeParser
+public class TridentOfTheSwampEParser extends AbstractItemChargeParser
 {
-	private static final int BASE_ID = ItemVariationMapping.map(ItemID.VENATOR_BOW);
+	private static final int BASE_ID = ItemVariationMapping.map(ItemID.TOXIC_TOTS_I_CHARGED);
 
-	private static final String UNCHARGE_PREFIX = "You fully uncharge your venator bow";
-	private static final String CHECK_PREFIX_LOWER = "Your venator bow has ";
-	private static final String CHECK_PREFIX_UPPER = "Your Venator bow has ";
-	private static final String CHARGE_PREFIX = "You use ";
-
-	private static final String CHARGE_TARGET = "venator bow";
-	private static final String CHARGE_NOW_HAS = "It now has ";
+	private static final String UNCHARGE_MESSAGE = "You uncharge your Uncharged toxic trident (e).";
+	private static final String CHECK_UPDATE_PREFIX = "Your Trident of the swamp (e) has ";
+	private static final String CHARGE_PREFIX = "You add ";
+	private static final String CHARGE_TARGET = "Trident of the swamp (e)";
+	private static final String NEW_TOTAL_PHRASE = "New total: ";
 
 	@Override
 	protected int getBaseItemId()
@@ -55,16 +53,15 @@ public class VenatorBowParser extends AbstractItemChargeParser
 	@Override
 	protected @NonNull ItemCharge getItemChargeType()
 	{
-		return ItemCharge.VENATOR_BOW;
+		return ItemCharge.TOXIC_TRIDENT_E;
 	}
 
 	@Override
 	protected String[] getMessagePrefixes()
 	{
 		return new String[] {
-			UNCHARGE_PREFIX,
-			CHECK_PREFIX_LOWER,
-			CHECK_PREFIX_UPPER,
+			UNCHARGE_MESSAGE,
+			CHECK_UPDATE_PREFIX,
 			CHARGE_PREFIX
 		};
 	}
@@ -72,34 +69,28 @@ public class VenatorBowParser extends AbstractItemChargeParser
 	@Override
 	protected Integer parseChargeCount(String message)
 	{
-		if (message.startsWith(UNCHARGE_PREFIX))
+		if (message.equals(UNCHARGE_MESSAGE))
 		{
 			return 0;
 		}
 
-		if (message.startsWith(CHECK_PREFIX_LOWER) || message.startsWith(CHECK_PREFIX_UPPER))
+		if (message.startsWith(CHECK_UPDATE_PREFIX))
 		{
-			int startIndex = CHECK_PREFIX_LOWER.length();
-			int endIndex = message.indexOf(" charges remaining.", startIndex);
-
+			int endIndex = message.indexOf(" charges", CHECK_UPDATE_PREFIX.length());
 			if (endIndex != -1)
 			{
-				String numberStr = message.substring(startIndex, endIndex);
+				String numberStr = message.substring(CHECK_UPDATE_PREFIX.length(), endIndex);
 				return cleanAndParseInt(numberStr);
 			}
 		}
 
 		if (message.startsWith(CHARGE_PREFIX) && message.contains(CHARGE_TARGET))
 		{
-			int startIndex = message.lastIndexOf(CHARGE_NOW_HAS);
+			int startIndex = message.lastIndexOf(NEW_TOTAL_PHRASE);
 			if (startIndex != -1)
 			{
-				int endIndex = message.indexOf(" charges.", startIndex);
-				if (endIndex != -1)
-				{
-					String numberStr = message.substring(startIndex + CHARGE_NOW_HAS.length(), endIndex);
-					return cleanAndParseInt(numberStr);
-				}
+				String numberStr = message.substring(startIndex + NEW_TOTAL_PHRASE.length());
+				return cleanAndParseInt(numberStr);
 			}
 		}
 
@@ -114,7 +105,7 @@ public class VenatorBowParser extends AbstractItemChargeParser
 		}
 		catch (NumberFormatException e)
 		{
-			log.error("Failed to parse Venator Bow charge string: {}", amount, e);
+			log.error("Failed to parse Trident of the swamp (e) charge string: {}", amount, e);
 			return null;
 		}
 	}

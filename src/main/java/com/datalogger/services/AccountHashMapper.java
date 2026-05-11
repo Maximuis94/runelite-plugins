@@ -98,7 +98,7 @@ public class AccountHashMapper
 				hashToNameCache.putAll(diskMappings);
 			}
 
-			log.info("Loaded {} account hash mappings into memory.", hashToNameCache.size());
+			log.debug("Loaded {} account hash mappings into memory.", hashToNameCache.size());
 		});
 	}
 

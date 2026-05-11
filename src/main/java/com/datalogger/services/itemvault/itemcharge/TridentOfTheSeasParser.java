@@ -26,58 +26,87 @@
 package com.datalogger.services.itemvault.itemcharge;
 
 import com.datalogger.models.enums.ItemCharge;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import javax.inject.Singleton;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
-import net.runelite.api.EquipmentInventorySlot;
 import net.runelite.api.gameval.ItemID;
+import net.runelite.client.game.ItemVariationMapping;
 
 @Slf4j
 @Singleton
 public class TridentOfTheSeasParser extends AbstractItemChargeParser
 {
-	private static final Pattern CHARGE_PATTERN = Pattern.compile("^Your Trident of the seas has ([\\d,]+)");
+	private static final int BASE_ID = ItemVariationMapping.map(ItemID.TOTS_CHARGED);
 
-//	private static final String FULLY_CHARGED_MESSAGE = "Your weapon is fully charged.";
-	private static final int MAX_CHARGES = 2500;
-
-	@Override
-	protected EquipmentInventorySlot getEquipmentSlot()
-	{
-		return EquipmentInventorySlot.WEAPON;
-	}
+	private static final String UNCHARGE_MESSAGE = "You uncharge your Uncharged trident.";
+	private static final String CHECK_UPDATE_PREFIX = "Your Trident of the seas has ";
+	private static final String CHARGE_PREFIX = "You add ";
+	private static final String CHARGE_TARGET = "Trident of the seas";
+	private static final String NEW_TOTAL_PHRASE = "New total: ";
 
 	@Override
 	protected int getBaseItemId()
 	{
-		return ItemID.TOTS;
-	}
-
-	@Override
-	protected Integer parseChargeCount(String message)
-	{
-		Matcher matcher = CHARGE_PATTERN.matcher(message);
-		if (matcher.find())
-		{
-			String cleanNumber = matcher.group(1).replace(",", "");
-			try
-			{
-				return Integer.parseInt(cleanNumber);
-			}
-			catch (NumberFormatException e)
-			{
-				log.warn("Failed to parse trident charges from string: {}", cleanNumber);
-				return null;
-			}
-		}
-		return null;
+		return BASE_ID;
 	}
 
 	@Override
 	protected @NonNull ItemCharge getItemChargeType()
 	{
 		return ItemCharge.TRIDENT_OF_THE_SEAS;
+	}
+
+	@Override
+	protected String[] getMessagePrefixes()
+	{
+		return new String[] {
+			UNCHARGE_MESSAGE,
+			CHECK_UPDATE_PREFIX,
+			CHARGE_PREFIX
+		};
+	}
+
+	@Override
+	protected Integer parseChargeCount(String message)
+	{
+		if (message.equals(UNCHARGE_MESSAGE))
+		{
+			return 0;
+		}
+
+		if (message.startsWith(CHECK_UPDATE_PREFIX))
+		{
+			int endIndex = message.indexOf(" charges", CHECK_UPDATE_PREFIX.length());
+			if (endIndex != -1)
+			{
+				String numberStr = message.substring(CHECK_UPDATE_PREFIX.length(), endIndex);
+				return cleanAndParseInt(numberStr);
+			}
+		}
+
+		if (message.startsWith(CHARGE_PREFIX) && message.contains(CHARGE_TARGET))
+		{
+			int startIndex = message.lastIndexOf(NEW_TOTAL_PHRASE);
+			if (startIndex != -1)
+			{
+				String numberStr = message.substring(startIndex + NEW_TOTAL_PHRASE.length());
+				return cleanAndParseInt(numberStr);
+			}
+		}
+
+		return null;
+	}
+
+	private Integer cleanAndParseInt(String amount)
+	{
+		try
+		{
+			return Integer.parseInt(amount.replace(",", "").trim());
+		}
+		catch (NumberFormatException e)
+		{
+			log.error("Failed to parse Trident of the seas charge string: {}", amount, e);
+			return null;
+		}
 	}
 }

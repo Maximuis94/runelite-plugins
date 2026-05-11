@@ -26,11 +26,16 @@
 package com.datalogger.models.itemvault;
 
 import com.datalogger.models.enums.VaultType;
+import com.google.gson.reflect.TypeToken;
+import java.lang.reflect.Type;
+import java.util.List;
 import lombok.Value;
 
 @Value
 public class BankedItem
 {
+	public static final Type LIST_TYPE = new TypeToken<List<BankedItem>>(){}.getType();
+
 	long accountHash;
 	String accountName;
 	String vaultType;

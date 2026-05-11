@@ -32,16 +32,36 @@ import com.datalogger.services.AccountHashMapper;
 import com.datalogger.services.FileIOService;
 import com.datalogger.services.itemvault.container.BankParser;
 import com.datalogger.services.itemvault.container.SeedVaultParser;
+import com.datalogger.services.itemvault.itemcharge.AccursedSceptreParser;
+import com.datalogger.services.itemvault.itemcharge.CrawsBowParser;
 import com.datalogger.services.itemvault.itemcharge.EyeOfAyakParser;
 import com.datalogger.services.itemvault.itemcharge.SanguinestiStaffParser;
 import com.datalogger.services.itemvault.itemcharge.ScytheOfViturParser;
+import com.datalogger.services.itemvault.itemcharge.ThammaronsSceptreParser;
+import com.datalogger.services.itemvault.itemcharge.TomeOfEarthParser;
+import com.datalogger.services.itemvault.itemcharge.TomeOfFireParser;
+import com.datalogger.services.itemvault.itemcharge.TomeOfWaterParser;
+import com.datalogger.services.itemvault.itemcharge.TonalzticsOfRalosParser;
+import com.datalogger.services.itemvault.itemcharge.TridentOfTheSeasEParser;
 import com.datalogger.services.itemvault.itemcharge.TridentOfTheSeasParser;
+import com.datalogger.services.itemvault.itemcharge.TridentOfTheSwampEParser;
 import com.datalogger.services.itemvault.itemcharge.TridentOfTheSwampParser;
 import com.datalogger.services.itemvault.itemcharge.TumekensShadowParser;
+import com.datalogger.services.itemvault.itemcharge.UrsineChainmaceParser;
 import com.datalogger.services.itemvault.itemcharge.VenatorBowParser;
+import com.datalogger.services.itemvault.itemcharge.ViggorasChainmaceParser;
+import com.datalogger.services.itemvault.itemcharge.WarpedSceptreParser;
+import com.datalogger.services.itemvault.itemcharge.WebweaverBowParser;
+import com.datalogger.services.itemvault.other.ActiveGrandExchangeOfferParser;
+import com.datalogger.services.itemvault.other.POHCostumeRoomParser;
+import com.datalogger.services.itemvault.other.StashUnitParser;
+import com.datalogger.services.itemvault.other.ToxicBlowpipeParser;
+import com.datalogger.services.itemvault.variable.CofferParser;
+import com.datalogger.services.itemvault.variable.FarmingToolsParser;
 import com.datalogger.services.itemvault.variable.MasterScrollBookParser;
 import com.datalogger.services.itemvault.variable.QuiverParser;
 import com.datalogger.services.itemvault.variable.RunePouchParser;
+import com.datalogger.services.itemvault.variable.ToaPickaxeParser;
 import com.datalogger.services.itemvault.variable.VyreWellParser;
 import com.google.inject.Singleton;
 import java.io.File;
@@ -66,17 +86,35 @@ public class VaultManager {
 	@Inject private SeedVaultParser seedVaultParser;
 	@Inject private VyreWellParser vyreWellParser;
 	@Inject private RunePouchParser runePouchParser;
+	@Inject private CofferParser cofferParser;
 	@Inject private TridentOfTheSeasParser tridentOfTheSeasParser;
+	@Inject private TridentOfTheSeasEParser tridentOfTheSeasEParser;
 	@Inject private TridentOfTheSwampParser tridentOfTheSwampParser;
+	@Inject private TridentOfTheSwampEParser tridentOfTheSwampEParser;
 	@Inject private ScytheOfViturParser scytheOfViturParser;
 	@Inject private TumekensShadowParser tumekensShadowParser;
 	@Inject private VenatorBowParser venatorBowParser;
 	@Inject private EyeOfAyakParser eyeOfAyakParser;
 	@Inject private SanguinestiStaffParser sanguinestiStaffParser;
+	@Inject private WarpedSceptreParser warpedSceptreParser;
+	@Inject private ViggorasChainmaceParser viggorasChainmaceParser;
+	@Inject private UrsineChainmaceParser ursineChainmaceParser;
+	@Inject private CrawsBowParser crawsBowParser;
+	@Inject private WebweaverBowParser webweaverBowParser;
+	@Inject private ThammaronsSceptreParser thammaronsSceptreParser;
+	@Inject private AccursedSceptreParser accursedSceptreParser;
+	@Inject private TomeOfEarthParser tomeOfEarthParser;
+	@Inject private TomeOfFireParser tomeOfFireParser;
+	@Inject private TomeOfWaterParser tomeOfWaterParser;
+	@Inject private TonalzticsOfRalosParser tonalzticsOfRalosParser;
+	@Inject private ToxicBlowpipeParser toxicBlowpipeParser;
 	@Inject private QuiverParser quiverParser;
 	@Inject private MasterScrollBookParser masterScrollBookParser;
 	@Inject private StashUnitParser stashUnitParser;
 	@Inject private POHCostumeRoomParser pohCostumeRoomParser;
+	@Inject private FarmingToolsParser farmingToolsParser;
+	@Inject private ToaPickaxeParser toaPickaxeParser;
+	@Inject private ActiveGrandExchangeOfferParser activeGrandExchangeOfferParser;
 
 	private static final File ITEM_VAULT_ALL_JSON = new File(PluginConstants.ITEM_VAULT_DIR, "item-vaults-all.json");
 	private static final File ITEM_VAULT_ALL_CSV = new File(PluginConstants.ITEM_VAULT_DIR, "item-vaults-all.csv");
@@ -87,10 +125,6 @@ public class VaultManager {
 	private final List<BankedItem> masterList = new ArrayList<>();
 	private final List<ValuedItemBundle> mergedItemCounts = new ArrayList<>();
 
-	/**
-	 * Guice automatically calls methods annotated with @Inject after the constructor finishes.
-	 * We use this to group our parsers into a manageable list.
-	 */
 	@Inject
 	private void init() {
 		activeParsers = List.of(
@@ -98,17 +132,35 @@ public class VaultManager {
 			seedVaultParser,
 			vyreWellParser,
 			runePouchParser,
+			cofferParser,
 			tridentOfTheSeasParser,
+			tridentOfTheSeasEParser,
 			tridentOfTheSwampParser,
+			tridentOfTheSwampEParser,
 			tumekensShadowParser,
 			scytheOfViturParser,
 			venatorBowParser,
 			eyeOfAyakParser,
 			sanguinestiStaffParser,
+			warpedSceptreParser,
+			viggorasChainmaceParser,
+			ursineChainmaceParser,
+			crawsBowParser,
+			webweaverBowParser,
+			thammaronsSceptreParser,
+			accursedSceptreParser,
+			tomeOfEarthParser,
+			tomeOfFireParser,
+			tomeOfWaterParser,
+			tonalzticsOfRalosParser,
+			toxicBlowpipeParser,
 			quiverParser,
 			masterScrollBookParser,
 			stashUnitParser,
-			pohCostumeRoomParser
+			pohCostumeRoomParser,
+			farmingToolsParser,
+			toaPickaxeParser,
+			activeGrandExchangeOfferParser
 		);
 	}
 
@@ -122,7 +174,7 @@ public class VaultManager {
 				((AbstractVaultParser) parser).setupAccountHash();
 			}
 		}
-		log.info("Vault Manager initialized and registered {} parsers.", activeParsers.size());
+		log.debug("Vault Manager initialized and registered {} parsers.", activeParsers.size());
 	}
 
 	public void shutDown() {
@@ -131,7 +183,7 @@ public class VaultManager {
 		for (VaultParser parser : activeParsers) {
 			eventBus.unregister(parser);
 		}
-		log.info("Vault Manager shut down successfully.");
+		log.debug("Vault Manager shut down successfully.");
 	}
 
 	/**
@@ -175,7 +227,7 @@ public class VaultManager {
 			if (jsonFiles == null) continue;
 
 			String accountName = accountHashMapper.getAccountName(accountHash);
-			log.info("Parsing vault files for account: {}", accountName);
+			log.debug("Parsing vault files for account: {}", accountName);
 
 			for (File vaultFile : jsonFiles) {
 				if (!vaultFile.getName().endsWith(".json")) continue;
@@ -184,7 +236,7 @@ public class VaultManager {
 				VaultParser matchedParser = parserMap.get(prefix);
 
 				if (matchedParser != null) {
-					log.info("Parsing vault file {} of account {}", vaultFile.getName(), accountName);
+					log.debug("Parsing vault file {} of account {}", vaultFile.getName(), accountName);
 					try {
 						List<BankedItem> rawItems = matchedParser.parseOfflineFile(accountHash, vaultFile);
 						String vaultLabel = matchedParser.getVaultLabel();
