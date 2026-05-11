@@ -135,7 +135,7 @@ public class ColosseumDiscordBroadcaster
 		List<ColosseumWaveDTO> waves = attemptDto.getWaves();
 		if (waves == null || waves.isEmpty())
 		{
-			log.info("Did not broadcast trial-- there are no waves...");
+			log.debug("Did not broadcast trial-- there are no waves...");
 			return;
 		}
 
@@ -173,6 +173,7 @@ public class ColosseumDiscordBroadcaster
 		JsonObject payload = generatePayload(attemptDto, webhookFormatter, attachScreenshot);
 
 		if (payload == null) return;
+		log.debug("Submitting {} payload to webhookUrl {}", webhookFormat.name(), webhookUrl);
 
 		log.info("Submitting {} payload to webhookUrl {}", webhookFormatter, webhookUrl);
 
@@ -203,7 +204,7 @@ public class ColosseumDiscordBroadcaster
 		int netReward = status != WaveStatus.COMPLETED ? 0 : totalReward + finalWave.getLootValue();
 		boolean result = (netReward > minRewardValue || finalWave.getWave() >= minWave);
 
-		log.info("CurrentAttempt has {}; waveNumber and rewardsValue conditions have {}been met; {}broadcasting run", hasSucceeded ? "succeeded" : "failed", result ? "" : "not ", statusConditionMet&&result ? "" : "not ");
+		log.debug("CurrentAttempt has {}; waveNumber and rewardsValue conditions have {}been met; {}broadcasting run", hasSucceeded ? "succeeded" : "failed", result ? "" : "not ", statusConditionMet&&result ? "" : "not ");
 		return statusConditionMet && result;
 	}
 

@@ -150,7 +150,7 @@ public class DiscordWebhookService
 
 		if (screenshotFile.exists())
 		{
-			log.info("Screenshot already exists, submitting screenshot and payload");
+			log.debug("Screenshot already exists, submitting screenshot and payload");
 			screenshotWebhook(queuedPayload);
 		}
 		else
@@ -167,13 +167,13 @@ public class DiscordWebhookService
 	@Subscribe
 	public void onScreenshotFileCreated(ScreenshotFileCreated event)
 	{
-		log.info("Received ScreenshotFileCreated event for path: {}", event.getAbsolutePath());
+		log.debug("Received ScreenshotFileCreated event for path: {}", event.getAbsolutePath());
 		String path = event.getAbsolutePath();
 		QueuedPayload data = pendingWebhooks.getIfPresent(path);
 
 		if (data == null)
 		{
-			log.info("Did not find a matching cached payload...");
+			log.debug("Did not find a matching cached payload...");
 			return;
 		}
 

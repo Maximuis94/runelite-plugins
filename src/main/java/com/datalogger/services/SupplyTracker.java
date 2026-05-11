@@ -127,7 +127,7 @@ public class SupplyTracker
 			if (quiverItemQuantity - newQuantity > 5 && newQuantity == 0) return;
 
 			quiverItemQuantity = newQuantity;
-			log.info("Updated quiver arrow quantity to {}", quiverItemQuantity);
+			log.debug("Updated quiver arrow quantity to {}", quiverItemQuantity);
 		}
 	}
 
@@ -148,7 +148,7 @@ public class SupplyTracker
 		ItemComposition itemComposition = itemManager.getItemComposition(quiverItemId);
 		quiverItemComposition = itemComposition;
 		quiverItemQuantity = client.getVarpValue(DIZANAS_QUIVER_TEMP_AMMO_AMOUNT);
-		log.info("Parsed initial quiver contents {}x {}", quiverItemQuantity, itemComposition.getName());
+		log.debug("Parsed initial quiver contents {}x {}", quiverItemQuantity, itemComposition.getName());
 	}
 
 	/**
@@ -250,8 +250,8 @@ public class SupplyTracker
 				pouch.put(itemId, quantity);
 
 				if (pouch.size() == 1)
-					log.info("Parsing Rune pouch contents...");
-				log.info("Added {}x itemId={} to rune pouch", quantity, itemId);
+					log.debug("Parsing Rune pouch contents...");
+				log.debug("Added {}x itemId={} to rune pouch", quantity, itemId);
 			}
 		}
 		return pouch;
@@ -265,12 +265,12 @@ public class SupplyTracker
 		if (!hasWeaponWithCharges && TrackedEquipment.getByBaseId(baseItemId) != null && baseItemId != BLOOD_AMULET)
 		{
 			hasWeaponWithCharges = true;
-			log.info("Detected a weapon that consumes charges");
+			log.debug("Detected a weapon that consumes charges");
 		}
 		else if (baseItemId == BH_RUNE_POUCH || baseItemId == DIVINE_RUNE_POUCH)
 		{
 			hasRunePouch = true;
-			log.info("Enabled tracking of Rune pouch contents");
+			log.debug("Enabled tracking of Rune pouch contents");
 		}
 		else if (baseItemId == DIZANAS_QUIVER_INFINITE_BROKEN   || baseItemId == SKILLCAPE_MAX_DIZANAS_BROKEN || baseItemId == DIZANAS_QUIVER_BROKEN)
 		{
@@ -339,7 +339,7 @@ public class SupplyTracker
 
 		if (hasQuiver)
 		{
-			log.info("Adding quiver contents {}x {} into inventory", quiverItemQuantity, quiverItemComposition.getName());
+			log.debug("Adding quiver contents {}x {} into inventory", quiverItemQuantity, quiverItemComposition.getName());
 			inventory.merge(quiverItemId, quiverItemQuantity, Integer::sum);
 		}
 
@@ -368,7 +368,7 @@ public class SupplyTracker
 		isTracking = true;
 		parseInitialItemContainers();
 		equipmentTracker.resetAttackCount();
-		log.info("Starting tracking of supplies");
+		log.debug("Starting tracking of supplies");
 		validateTrackingAudio();
 	}
 
@@ -402,7 +402,7 @@ public class SupplyTracker
 	 */
 	public TrackedSupplies getConsumedItems()
 	{
-		log.info("Fetching consumed items...");
+		log.debug("Fetching consumed items...");
 		SupplySnapshot snapshot = getInventorySnapshot();
 
 		Map<ConsumableItemGroup, Integer> consumedDoses = new HashMap<>();
@@ -417,7 +417,7 @@ public class SupplyTracker
 			if (diff > 0)
 			{
 				ItemComposition itemComposition = itemManager.getItemComposition(item);
-				log.info("Consumed item: {} x{}", itemComposition.getName(), diff);
+				log.debug("Consumed item: {} x{}", itemComposition.getName(), diff);
 				consumedItems.put(item, diff);
 				int price = itemManager.getItemPrice(item);
 				int value = diff * (price > 0 ? price : itemComposition.getHaPrice());
@@ -433,7 +433,7 @@ public class SupplyTracker
 
 			if (diff > 0)
 			{
-				log.info("Consumed dose: {} x{}", itemGroup.getBaseItemName(), diff);
+				log.debug("Consumed dose: {} x{}", itemGroup.getBaseItemName(), diff);
 				consumedDoses.put(itemGroup, diff);
 				int value = itemGroup.getDoseValue() * diff;
 				totalValue[0] += value;
@@ -505,7 +505,7 @@ public class SupplyTracker
 				prefs.setSoundEffectVolume(0);
 			}
 			hasUnmutedAudio = false;
-			log.info("Muted the audio after unmuting it before initiating the tracking of supplies.");
+			log.debug("Muted the audio after unmuting it before initiating the tracking of supplies.");
 		}
 
 	}

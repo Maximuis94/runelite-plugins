@@ -63,7 +63,7 @@ public class GrandExchangeHistoryParser
 	private boolean hasParsed = false;
 	private long lastParsed = 0;
 	private static final int ELEMENTS_PER_ROW = 6;
-	private static final long COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes in milliseconds
+	private static final long COOLDOWN_MS = 5 * 60 * 1000;
 
 	@Inject
 	public GrandExchangeHistoryParser(Client client, FileIOService fileIOService, DataLoggerConfig config, ItemManager itemManager)

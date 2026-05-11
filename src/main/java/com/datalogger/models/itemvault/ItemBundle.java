@@ -25,6 +25,9 @@
 
 package com.datalogger.models.itemvault;
 
+import com.google.gson.reflect.TypeToken;
+import java.lang.reflect.Type;
+import java.util.List;
 import lombok.Value;
 import net.runelite.api.ItemComposition;
 
@@ -34,6 +37,8 @@ import net.runelite.api.ItemComposition;
 @Value
 public class ItemBundle
 {
+	public static final Type LIST_TYPE = new TypeToken<List<ItemBundle>>(){}.getType();
+
 	int itemId;
 	String itemName;
 	int quantity;

@@ -36,11 +36,26 @@ import lombok.Getter;
 import net.runelite.api.events.WidgetLoaded;
 
 @Getter
-public enum VaultType {
+public enum VaultType
+{
 	BANK(BANK_GROUP_ID, BANK_CHILD_ID),
 	SEED_VAULT(SEED_VAULT_GROUP_ID, SEED_VAULT_CHILD_ID),
 	GRAND_EXCHANGE(-1, -1),
-	VYRE_WELL(-1, -1);
+	VYRE_WELL(-1, -1),
+	RUNE_POUCH(-1, -1),
+	ITEM_CHARGES(-1, -1),
+	MASTER_SCROLL_BOOK(-1, -1),
+	QUIVER(-1, -1),
+	BOLT_POUCH(-1, -1),
+	STASH_UNITS(-1, -1),
+	POH_COSTUME_ROOM(-1, -1),
+	FARMING_TOOLS(-1, -1),
+	TOA_PICKAXE(-1, -1),
+	COFFER(-1, -1)
+
+
+	;
+
 
 	private final int groupId;
 	private final int childId;
@@ -83,12 +98,23 @@ public enum VaultType {
 		}
 	}
 
-	/**
-	 * Return the internal json file associated with the given accountHash.
-	 */
-	public File getInternalFile(long accountHash)
+	public static File getInternalRoot(long accountHash)
 	{
-		return new File(INTERNAL_VAULT_DIR, fileNameString() + "_" + accountHash + ".json");
+		return new File(INTERNAL_VAULT_DIR, String.valueOf(accountHash));
+	}
+
+	public static File getInternalRoot(String accountHash)
+	{
+		return new File(INTERNAL_VAULT_DIR, accountHash);
+	}
+
+	/**
+	 * Return the internal json file associated with the given accountHash used to store specific vault data.
+	 */
+	public File getInternalFile(File parent, long accountHash)
+	{
+		String hash = String.valueOf(accountHash);
+		return new File(parent, fileNameString() + "_" + hash + ".json");
 	}
 
 	/**
@@ -106,4 +132,12 @@ public enum VaultType {
 	{
 		return new File(ITEM_VAULT_DIR, fileNameString() + "_" + accountHash + ".json");
 	}
+
+//	/**
+//	 * Return the File used to track unlocked vaults for the given accountHash across sessions.
+//	 */
+//	public File getUnlockedVaultCacheFile(long accountHash)
+//	{
+//		return new File(INTERNAL_VAULT_DIR, "unlocked-vaults-cache_" + accountHash + ".json");
+//	}
 }

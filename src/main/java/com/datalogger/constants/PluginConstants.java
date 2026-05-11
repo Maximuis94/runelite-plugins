@@ -46,8 +46,10 @@ public final class PluginConstants
 	public static final File GRAND_EXCHANGE_ACTIVE_OFFERS_DIR = new File(GRAND_EXCHANGE_DIR, "active-offers");
 	public static final File INTERNAL_ROOT_DIR = new File(PLUGIN_ROOT, "internal");
 	public static final File INTERNAL_VAULT_DIR = new File(INTERNAL_ROOT_DIR, "item-vault");
+	public static final File INTERNAL_ITEM_CHARGE_DIR = new File(INTERNAL_ROOT_DIR, "item-charges");
 	public static final File INTERNAL_COLOSSEUM_DIR = new File(INTERNAL_ROOT_DIR, "colosseum");
 	public static final File INTERNAL_COLOSSEUM_ATTEMPT_HISTORY = new File(INTERNAL_COLOSSEUM_DIR, "attempt-history.jsonl");
+	public static final File PLUGIN_LOG_FILE = new File(INTERNAL_ROOT_DIR, "debug.log");
 
 	private PluginConstants() {}
 
@@ -58,4 +60,7 @@ public final class PluginConstants
 	public static final int ITEM_VALUE_UPDATE_FREQUENCY_SECONDS = 600;
 	public static final int UNMUTE_COOLDOWN_SECONDS = 600;
 	public static final int WEBHOOK_TEST_COOLDOWN_SECONDS_SUCCESS = 5;
+
+	// ID that is ignored in enum mapping creation
+	public static final int IGNORED_ENUM_ID = -1;
 }

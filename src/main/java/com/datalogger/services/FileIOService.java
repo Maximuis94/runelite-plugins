@@ -38,10 +38,13 @@ import com.datalogger.framework.LogType;
 import com.datalogger.models.colosseum.ColosseumAttempt;
 import com.datalogger.models.colosseum.ColosseumState;
 import com.datalogger.models.colosseum.ColosseumWave;
+import com.datalogger.models.enums.ItemCharge;
 import com.datalogger.models.enums.ScreenshotFormat;
+import com.datalogger.models.enums.VaultType;
 import com.datalogger.models.grandexchange.ActiveGeOffer;
 import com.datalogger.models.grandexchange.GeLedgerEntry;
 import com.datalogger.models.itemvault.BankedItem;
+import com.datalogger.models.itemvault.ValuedItemBundle;
 import com.datalogger.models.supplytracker.ValuedItemStack;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
@@ -121,6 +124,8 @@ public class FileIOService
 
 	private String accountName = "";
 	private String accountHashString = "";
+	@Getter
+	private File internalVaultRoot = null;
 
 	@Getter
 	private boolean hasValidAccountInfo = false;
@@ -209,6 +214,7 @@ public class FileIOService
 		{
 			this.accountName = accountName;
 			this.accountHashString = accountHashString;
+			internalVaultRoot = VaultType.getInternalRoot(accountHashString);
 			hasValidAccountInfo = true;
 		}
 		else if (hasValidAccountInfo)
@@ -287,6 +293,22 @@ public class FileIOService
 		File accountDir = new File(type.getLogDirectory(), accountName.toLowerCase());
 
 		return new File(accountDir, type.getDirectoryName() + "_" + date + ".csv");
+	}
+
+	/**
+	 * Return the internal vault json file relevant for the account that is logged in associated with the given VaultType
+	 */
+	public File getInternalVaultFile(VaultType vaultType)
+	{
+		return new File(internalVaultRoot, vaultType.fileNameString() + "_" + accountHashString + ".json");
+	}
+
+	/**
+	 * Return the internal vault json file relevant for the account that is logged in associated with the given VaultType
+	 */
+	public File getInternalVaultFile(ItemCharge itemCharge)
+	{
+		return new File(internalVaultRoot, itemCharge.fileNameString() + "_" + accountHashString + ".json");
 	}
 
 	/**
@@ -881,32 +903,98 @@ public class FileIOService
 	}
 
 	/**
+	 * Writes merged aggregated vault data to csvFile (i.e., each item, if present, has exactly one row)
+	 * @param csvFile Output File
+	 * @param items Row data
+	 */
+	public void writeVaultCsv(File csvFile, List<ValuedItemBundle> items) {
+		Future<?> future = executor.submit(() -> {
+			File parentDir = csvFile.getParentFile();
+
+			if (!ensureDirectoryExists(parentDir)) {
+				return;
+			}
+
+			try (BufferedWriter bw = Files.newBufferedWriter(csvFile.toPath(), StandardCharsets.UTF_8);
+				 PrintWriter out = new PrintWriter(bw)) {
+
+				out.println("ItemID,ItemName,Quantity,Value");
+					for (ValuedItemBundle item : items) {
+						out.printf("%d,%s,%d,%d%n",
+							item.getItemId(),
+							item.getItemName(),
+							item.getQuantity(),
+							item.getValue());
+					}
+				log.debug("Successfully exported vault to CSV: {}", csvFile.getName());
+			} catch (Exception e) {
+				log.error("Failed to write vault contents to CSV: {}", csvFile.getName(), e);
+			}
+		});
+
+		pendingWrites.add(future);
+	}
+
+	/**
 	 * Reads all vault JSON files from the disk.
 	 * Returns a Map where the key is the filename and the value is the array of raw items.
 	 */
-	public Map<String, BankedItem[]> readAllVaultFilesRaw() {
+	public Map<Long, Map<VaultType, List<BankedItem>>> readAllVaultFilesRaw()
+	{
+		Map<Long, Map<VaultType, List<BankedItem>>> allData = new HashMap<>();
 		File directory = PluginConstants.INTERNAL_VAULT_DIR;
-		if (!directory.exists() || !directory.isDirectory()) {
-			return new HashMap<>();
+
+		if (!directory.exists() || !directory.isDirectory())
+		{
+			return allData;
 		}
 
-		File[] vaultFiles = directory.listFiles((dir, name) -> name.endsWith(".json"));
-		if (vaultFiles == null || vaultFiles.length == 0) {
-			return new HashMap<>();
-		}
+		// 1. Iterate over Account Hash Subdirectories
+		File[] accountDirs = directory.listFiles(File::isDirectory);
+		if (accountDirs == null) return allData;
 
-		Map<String, BankedItem[]> fileContents = new HashMap<>();
-		for (File file : vaultFiles) {
-			try (Reader reader = new FileReader(file)) {
-				BankedItem[] parsedItems = gson.fromJson(reader, BankedItem[].class);
-				if (parsedItems != null) {
-					fileContents.put(file.getName(), parsedItems);
+		for (File accountDir : accountDirs)
+		{
+			long accountHash;
+			try
+			{
+				accountHash = Long.parseLong(accountDir.getName());
+			}
+			catch (NumberFormatException e)
+			{
+				continue; // Skip any folders that aren't numeric account hashes
+			}
+
+			// 2. Iterate over Vault JSON files inside the account directory
+			File[] vaultFiles = accountDir.listFiles((dir, name) -> name.endsWith(".json"));
+			if (vaultFiles == null) continue;
+
+			Map<VaultType, List<BankedItem>> accountVaults = new HashMap<>();
+			for (File file : vaultFiles)
+			{
+				try (Reader reader = new FileReader(file))
+				{
+					String typeName = file.getName().replace(".json", "").toUpperCase().replace("-", "_");
+					VaultType vaultType = VaultType.valueOf(typeName);
+
+					List<BankedItem> parsedItems = gson.fromJson(reader, BankedItem.LIST_TYPE);
+					if (parsedItems != null && !parsedItems.isEmpty())
+					{
+						accountVaults.put(vaultType, parsedItems);
+					}
 				}
-			} catch (Exception e) {
-				log.error("Failed to read items from vault file: {}", file.getName(), e);
+				catch (Exception e)
+				{
+					log.error("Failed to read items from vault file: {}", file.getName(), e);
+				}
+			}
+
+			if (!accountVaults.isEmpty())
+			{
+				allData.put(accountHash, accountVaults);
 			}
 		}
-		return fileContents;
+		return allData;
 	}
 
 	/**
@@ -1187,7 +1275,7 @@ public class FileIOService
 	}
 
 	/**
-	 * Serializes the TrackedSupplies object into a beautifully formatted JSON file.
+	 * Serializes the TrackedSupplies object into a formatted JSON file.
 	 */
 	public void exportToJson(File file, TrackedSuppliesDTO supplies)
 	{
@@ -1247,6 +1335,47 @@ public class FileIOService
 		catch (IOException e)
 		{
 			log.error("Failed to write CSV export.", e);
+		}
+	}
+
+	/**
+	 * Writes any Java object to a specified file as JSON.
+	 */
+	public void writeJson(File file, Object data)
+	{
+		Future<?> future = executor.submit(() -> {
+			if (file.getParentFile() != null && !file.getParentFile().exists())
+			{
+				file.getParentFile().mkdirs();
+			}
+
+			try (FileWriter writer = new FileWriter(file))
+			{
+				gson.toJson(data, writer);
+			}
+			catch (IOException e)
+			{
+				log.error("Failed to write JSON to file: {}", file.getName(), e);
+			}
+		});
+		pendingWrites.add(future);
+	}
+
+	/**
+	 * Reads JSON from a file and parses it into the specified Generic Type.
+	 */
+	public <T> T readJson(File file, Type typeOfT)
+	{
+		if (!file.exists()) return null;
+
+		try (FileReader reader = new FileReader(file))
+		{
+			return gson.fromJson(reader, typeOfT);
+		}
+		catch (Exception e)
+		{
+			log.error("Failed to read JSON from file: {}", file.getName(), e);
+			return null;
 		}
 	}
 }

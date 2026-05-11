@@ -216,7 +216,7 @@ public class CombatTracker
 
 		equipmentTracker.addWeaponAttack(baseWeaponId);
 
-		log.info("[TICK {}] Verified attack with baseWeaponId={} via [{}]", tickCount, baseWeaponId, attackSource.name());
+		log.debug("[TICK {}] Verified attack with baseWeaponId={} via [{}]", tickCount, baseWeaponId, attackSource.name());
 		isCurrentlyRegisteringAttack = false;
 	}
 

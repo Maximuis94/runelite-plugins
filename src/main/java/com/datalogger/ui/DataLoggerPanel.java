@@ -60,6 +60,7 @@ import javax.swing.JPanel;
 import javax.swing.border.EmptyBorder;
 import javax.swing.filechooser.FileNameExtensionFilter;
 import lombok.extern.slf4j.Slf4j;
+import net.runelite.client.callback.ClientThread;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.PluginPanel;
 
@@ -71,16 +72,20 @@ public class DataLoggerPanel extends PluginPanel {
 	private final ColosseumDiscordBroadcaster colosseumDiscordBroadcaster;
 	private final Gson gson;
 	private final DataLoggerConfig config;
+	private final VaultManager vaultManager;
+	private ClientThread clientThread;
 
 	private Instant waitUntil;
 
 	@Inject
-	public DataLoggerPanel(ItemVaultLogger itemVaultLogger, ScheduledExecutorService executor, FileIOService fileIOService, DiscordWebhookService discordWebhookService, Gson gson, DataLoggerConfig config, ColosseumAttemptLogger logger, ColosseumDiscordBroadcaster colosseumDiscordBroadcaster) {
+	public DataLoggerPanel(ItemVaultLogger itemVaultLogger, ScheduledExecutorService executor, FileIOService fileIOService, DiscordWebhookService discordWebhookService, Gson gson, DataLoggerConfig config, ColosseumAttemptLogger logger, ColosseumDiscordBroadcaster colosseumDiscordBroadcaster, VaultManager vaultManager, ClientThread clientThread) {
 		this.executor = executor;
 		this.discordWebhookService = discordWebhookService;
 		this.config = config;
 		this.gson = gson;
 		this.colosseumDiscordBroadcaster = colosseumDiscordBroadcaster;
+		this.vaultManager = vaultManager;
+		this.clientThread = clientThread;
 
 		this.setBorder(new EmptyBorder(0, 0, 10, 0));
 		this.setBackground(ColorScheme.DARK_GRAY_COLOR);
@@ -110,8 +115,37 @@ public class DataLoggerPanel extends PluginPanel {
 		buttonContainer.add(openDataBtn);
 		buttonContainer.add(testCustomTemplateButton());
 		buttonContainer.add(testDiscordButton());
+//		buttonContainer.add(testDiscordButton());
+		buttonContainer.add(writeMergedLogsButton());
 
 		add(buttonContainer, BorderLayout.SOUTH);
+	}
+
+	private JButton writeMergedLogsButton()
+	{
+		String BUTTON_LABEL = "Write merged ItemVault CSV";
+		JButton writeMergedLogsFileButton = createStyledButton(BUTTON_LABEL, null);
+		writeMergedLogsFileButton.addActionListener(e -> {
+			writeMergedLogsFileButton.setEnabled(false); // Prevent spam clicking
+			writeMergedLogsFileButton.setText("Exporting...");
+
+			clientThread.invokeLater(() -> {
+				vaultManager.writeMergedCsvFile();
+
+				javax.swing.SwingUtilities.invokeLater(() -> {
+					writeMergedLogsFileButton.setEnabled(true);
+					writeMergedLogsFileButton.setText(BUTTON_LABEL);
+				});
+			});
+		});
+		writeMergedLogsFileButton.setToolTipText("Merge all internal itemvault log files and merge contents into a single CSV file");
+		return writeMergedLogsFileButton;
+	}
+
+	private void writeMergedCsvFile()
+	{
+		log.debug("Writing merged itemvault CSV file");
+		vaultManager.writeMergedCsvFile();
 	}
 
 	private JButton testCustomTemplateButton()
@@ -147,7 +181,7 @@ public class DataLoggerPanel extends PluginPanel {
 		if (userSelection == JFileChooser.APPROVE_OPTION) {
 			File fileToParse = fileChooser.getSelectedFile();
 
-			log.info("Selected file for custom template test: {}", fileToParse.getName());
+			log.debug("Selected file for custom template test: {}", fileToParse.getName());
 
 			executor.submit(() -> {
 				try (Reader reader = new FileReader(fileToParse)) {
@@ -163,7 +197,7 @@ public class DataLoggerPanel extends PluginPanel {
 								JOptionPane.ERROR_MESSAGE);
 							return;
 						}
-						log.info("Successfully parsed attempt {}. Firing Discord webhook with custom template...", parsedDto.getAttemptId());
+						log.debug("Successfully parsed attempt {}. Firing Discord webhook with custom template...", parsedDto.getAttemptId());
 						String url = config.colosseumDiscordWebhookUrl();
 						if (url == null || url.trim().isEmpty())
 						{
@@ -202,14 +236,14 @@ public class DataLoggerPanel extends PluginPanel {
 		if (userSelection == JFileChooser.APPROVE_OPTION) {
 			File fileToParse = fileChooser.getSelectedFile();
 
-			log.info("Selected file for Discord test: {}", fileToParse.getName());
+			log.debug("Selected file for Discord test: {}", fileToParse.getName());
 
 			executor.submit(() -> {
 				try (Reader reader = new FileReader(fileToParse)) {
 					ColosseumAttemptDTO parsedDto = gson.fromJson(reader, ColosseumAttemptDTO.class);
 
 					if (parsedDto != null) {
-						log.info("Successfully parsed attempt {}. Firing Discord webhook...", parsedDto.getAttemptId());
+						log.debug("Successfully parsed attempt {}. Firing Discord webhook...", parsedDto.getAttemptId());
 						String url = config.colosseumDiscordWebhookUrl();
 						if (url == null || url.trim().isEmpty())
 						{

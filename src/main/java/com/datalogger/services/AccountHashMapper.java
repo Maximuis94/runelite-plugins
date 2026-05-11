@@ -103,11 +103,11 @@ public class AccountHashMapper
 	}
 
 	/**
-	 * Get the account name for a given account hash.
+	 * Get the account name for a given account hash. Return the hash as String if there is no matching accountName
 	 */
 	public String getAccountName(long accountHash)
 	{
-		return hashToNameCache.getOrDefault(accountHash, "Unknown");
+		return hashToNameCache.getOrDefault(accountHash, String.valueOf(accountHash));
 	}
 
 	/**
