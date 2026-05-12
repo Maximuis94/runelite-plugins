@@ -98,16 +98,16 @@ public class AccountHashMapper
 				hashToNameCache.putAll(diskMappings);
 			}
 
-			log.info("Loaded {} account hash mappings into memory.", hashToNameCache.size());
+			log.debug("Loaded {} account hash mappings into memory.", hashToNameCache.size());
 		});
 	}
 
 	/**
-	 * Get the account name for a given account hash.
+	 * Get the account name for a given account hash. Return the hash as String if there is no matching accountName
 	 */
 	public String getAccountName(long accountHash)
 	{
-		return hashToNameCache.getOrDefault(accountHash, "Unknown");
+		return hashToNameCache.getOrDefault(accountHash, String.valueOf(accountHash));
 	}
 
 	/**

@@ -45,7 +45,8 @@ public enum AttackType
 	MAGIC_EARTH(CombatType.MAGIC),
 	MAGIC_FIRE(CombatType.MAGIC),
 
-	TYPELESS(CombatType.TYPELESS);
+	TYPELESS(CombatType.TYPELESS),
+	NO_COMBAT(null);
 
 	private final CombatType combatType;
 

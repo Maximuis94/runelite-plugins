@@ -22,6 +22,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
 package com.datalogger.loggers;
 
 import com.datalogger.DataLoggerConfig;
@@ -30,7 +31,6 @@ import com.datalogger.events.DataLoggerConfigChanged;
 import com.datalogger.framework.AbstractLogger;
 import com.datalogger.framework.LogType;
 import com.datalogger.models.enums.VaultType;
-import com.datalogger.models.grandexchange.ActiveGeOffer;
 import com.datalogger.models.itemvault.BankedItem;
 import com.datalogger.services.AccountHashMapper;
 import com.datalogger.services.FileIOService;
@@ -46,7 +46,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import lombok.extern.slf4j.Slf4j;
-import net.runelite.api.GrandExchangeOfferState;
 import net.runelite.client.eventbus.Subscribe;
 
 @Slf4j
@@ -62,7 +61,7 @@ public class ItemVaultLogger extends AbstractLogger
 	private final ScheduledExecutorService executor;
 
 	private final Map<Long, Map<VaultType, List<BankedItem>>> vaultCache = new ConcurrentHashMap<>();
-	private Set<Long> ignoredAccountHashes;
+	private Set<Long> ignoredAccountHashes = new HashSet<>();
 
 	@Inject
 	private ItemVaultLogger(
@@ -76,8 +75,6 @@ public class ItemVaultLogger extends AbstractLogger
 		this.accountHashMapper = accountHashMapper;
 		this.executor = executor;
 	}
-
-
 
 	@Subscribe
 	public void onDataLoggerConfigChanged(DataLoggerConfigChanged event)
@@ -172,76 +169,51 @@ public class ItemVaultLogger extends AbstractLogger
 	}
 
 	/**
-	 * Iterates over all saved vault JSON files, parses the VaultType and accountHash
-	 * from the file names, and loads them into the live memory cache.
+	 * Synchronously reads all saved vault JSON files from disk and populates the cache.
 	 */
-	public void loadAllVaultsIntoMemory() {
-		// Wrap the entire load process in the background executor!
-		executor.submit(() -> {
-			// 1. Let FileIOService handle the disk reads
-			Map<String, BankedItem[]> allVaultData = fileIOService.readAllVaultFilesRaw();
+	public void loadAllVaultsIntoMemory()
+	{
+		Map<Long, Map<VaultType, List<BankedItem>>> diskData = fileIOService.readAllVaultFilesRaw();
 
-			if (allVaultData.isEmpty()) {
-				log.info("No saved vaults found to load into memory.");
-				return;
-			}
+		if (diskData.isEmpty()) {
+			log.debug("No saved vaults found to load into memory.");
+			return;
+		}
 
-			int loadedFiles = 0;
+		for (Map.Entry<Long, Map<VaultType, List<BankedItem>>> entry : diskData.entrySet())
+		{
+			long accountHash = entry.getKey();
+			String accountName = accountHashMapper.getAccountName(accountHash);
 
-			// 2. Process the in-memory data
-			for (Map.Entry<String, BankedItem[]> entry : allVaultData.entrySet()) {
-				String fileName = entry.getKey();
-				BankedItem[] parsedItems = entry.getValue();
+			for (Map.Entry<VaultType, List<BankedItem>> vaultEntry : entry.getValue().entrySet())
+			{
+				VaultType type = vaultEntry.getKey();
+				List<BankedItem> items = vaultEntry.getValue();
 
-				String nameWithoutExt = fileName.substring(0, fileName.length() - 5);
-				int lastDashIndex = nameWithoutExt.lastIndexOf('_');
-
-				if (lastDashIndex == -1) {
-					log.warn("Skipping file with unrecognizable format: {}", fileName);
-					continue;
+				// Enforce proper metadata
+				List<BankedItem> enrichedItems = new ArrayList<>();
+				for (BankedItem item : items)
+				{
+					enrichedItems.add(new BankedItem(
+						type,
+						accountHash,
+						accountName,
+						item.getItemId(),
+						item.getItemName(),
+						item.getQuantity()
+					));
 				}
 
-				String vaultTypeStr = nameWithoutExt.substring(0, lastDashIndex);
-				String hashStr = nameWithoutExt.substring(lastDashIndex + 1);
-
-				try {
-					String enumName = vaultTypeStr.toUpperCase().replace("-", "_");
-					VaultType vaultType = VaultType.valueOf(enumName);
-					long accountHash = Long.parseLong(hashStr);
-					String accountName = accountHashMapper.getAccountName(accountHash);
-
-					List<BankedItem> enrichedItems = new ArrayList<>();
-					for (BankedItem item : parsedItems) {
-						enrichedItems.add(new BankedItem(
-							vaultType,
-							accountHash,
-							accountName,
-							item.getItemId(),
-							item.getItemName(),
-							item.getQuantity()
-						));
-					}
-
-					vaultCache.computeIfAbsent(accountHash, k -> new ConcurrentHashMap<>())
-						.put(vaultType, enrichedItems);
-
-					loadedFiles++;
-				} catch (IllegalArgumentException e) {
-					log.warn("Could not parse VaultType or AccountHash from file name: {}. Skipping.", fileName);
-				}
+				vaultCache.computeIfAbsent(accountHash, k -> new ConcurrentHashMap<>())
+					.put(type, enrichedItems);
 			}
+		}
 
-			// 3. Trigger GE Vault loads
-			for (long accountHash : vaultCache.keySet()) {
-				loadGeVaultIntoMemory(accountHash);
-			}
-
-			log.info("Successfully loaded {} vault files into memory across {} accounts.", loadedFiles, vaultCache.size());
-		});
+		log.debug("Successfully loaded vault files into memory across {} accounts.", diskData.size());
 	}
 
 	/**
-	 * Receives parsed items from the BankParser, updates the cache, and saves to disk.
+	 * Receives parsed items from a VaultParser, updates the cache, and saves to disk.
 	 */
 	public void logVault(long accountHash, String accountName, VaultType vaultType, List<BankedItem> items)
 	{
@@ -253,6 +225,7 @@ public class ItemVaultLogger extends AbstractLogger
 		}
 
 		updateVault(accountHash, vaultType, items);
+
 		executor.submit(() -> {
 			List<java.util.Map<String, Object>> slimItems = items.stream()
 				.map(item -> {
@@ -263,7 +236,7 @@ public class ItemVaultLogger extends AbstractLogger
 					return map;
 				}).collect(java.util.stream.Collectors.toList());
 
-			File internalJson = vaultType.getInternalFile(accountHash);
+			File internalJson = fileIOService.getInternalVaultFile(vaultType);
 			fileIOService.saveJson(internalJson, slimItems);
 
 			if (config.logItemVaultJSON())
@@ -285,24 +258,26 @@ public class ItemVaultLogger extends AbstractLogger
 	 */
 	public void exportAggregatedData()
 	{
-		log.info("Attempting to export aggregated vault data...");
-		List<BankedItem> items = aggregateAllAccounts();
+		// Wrap the export in an executor so the Heavy Disk IO from aggregateAllAccounts() runs safely in the background
+		executor.submit(() -> {
+			log.debug("Attempting to export aggregated vault data...");
+			List<BankedItem> items = aggregateAllAccounts();
 
-		if (items == null || items.isEmpty()) {
-			log.info("No aggregated data found to export.");
-			return;
-		}
+			if (items == null || items.isEmpty()) {
+				log.debug("No aggregated data found to export.");
+				return;
+			}
 
-		fileIOService.saveJson(MERGED_ITEM_VAULT_JSON, items);
-		fileIOService.writeVaultCsv(MERGED_ITEM_VAULT_CSV, items, true);
+			fileIOService.saveJson(MERGED_ITEM_VAULT_JSON, items);
+			fileIOService.writeVaultCsv(MERGED_ITEM_VAULT_CSV, items, true);
 
-		log.info("Successfully exported aggregated wealth summary for {} unique items.", items.size());
+			log.debug("Successfully exported aggregated wealth summary for {} unique items.", items.size());
+		});
 	}
 
 	/**
 	 * Parses the skipItemVaultAccountList config entry and translates the account names
 	 * into a Set of Account Hashes to be ignored.
-	 * * @return A Set of account hashes that should be skipped
 	 */
 	public void updateIgnoredAccountHashes()
 	{
@@ -337,98 +312,6 @@ public class ItemVaultLogger extends AbstractLogger
 		ignoredAccountHashes = ignoredHashes;
 	}
 
-	/**
-	 * Translates a single GE offer into physical BankedItems representing ONLY
-	 * the unfulfilled portion of the offer (assuming completed parts are collected).
-	 */
-	private BankedItem translateGeOfferToItems(long accountHash, String accountName, ActiveGeOffer offer)
-	{
-		final int COINS_ITEM_ID = 995;
-
-		int remainingQuantity = offer.getTotalQuantity() - offer.getQuantitySold();
-
-		if (remainingQuantity <= 0) {
-			return null;
-		}
-
-		if (offer.isBuy())
-		{
-			return new BankedItem(
-				VaultType.GRAND_EXCHANGE,
-				accountHash,
-				accountName,
-				COINS_ITEM_ID,
-				"Coins",
-				(long) remainingQuantity * offer.getOfferPrice()
-			);
-		}
-		else
-		{
-			return new BankedItem(
-				VaultType.GRAND_EXCHANGE,
-				accountHash,
-				accountName,
-				offer.getItemId(),
-				offer.getItemName(),
-				remainingQuantity
-			);
-		}
-
-	}
-
-	private boolean isActiveOffer(GrandExchangeOfferState state)
-	{
-		return state == GrandExchangeOfferState.BUYING || state == GrandExchangeOfferState.SELLING;
-	}
-
-	/**
-	 * Loads active GE offers from disk, translates unfulfilled offers into items,
-	 * merges duplicates (like Coins), and stores them in the vault cache.
-	 */
-	public void loadGeVaultIntoMemory(long accountHash)
-	{
-		String hashStr = String.valueOf(accountHash);
-		String accountName = accountHashMapper.getAccountName(accountHash);
-
-		List<ActiveGeOffer> activeOffers = fileIOService.loadActiveGeOffers(hashStr);
-
-		if (activeOffers == null || activeOffers.isEmpty()) {
-			return;
-		}
-
-		// Use a map to merge identical items (e.g., combining GP from multiple buy slots)
-		Map<Integer, BankedItem> mergedGeVault = new HashMap<>();
-
-		for (ActiveGeOffer offer : activeOffers)
-		{
-			if (!isActiveOffer(offer.getState())) {
-				continue;
-			}
-
-			BankedItem geOffer = translateGeOfferToItems(accountHash, accountName, offer);
-			if (geOffer == null) continue;
-
-			mergedGeVault.merge(
-				geOffer.getItemId(),
-				geOffer,
-				(existing, incoming) -> new BankedItem(
-					VaultType.GRAND_EXCHANGE,
-					accountHash,
-					accountName,
-					existing.getItemId(),
-					existing.getItemName(),
-					existing.getQuantity() + incoming.getQuantity()
-				)
-				);
-		}
-
-		if (!mergedGeVault.isEmpty()) {
-			List<BankedItem> finalVaultItems = new ArrayList<>(mergedGeVault.values());
-			updateVault(accountHash, VaultType.GRAND_EXCHANGE, finalVaultItems);
-			log.debug("Loaded {} unique physical item stacks from locked GE offers into memory for {}", finalVaultItems.size(), accountName);
-		}
-	}
-
 	@Override
 	public LogType getLogType()
 	{
@@ -444,7 +327,7 @@ public class ItemVaultLogger extends AbstractLogger
 	@Override
 	public boolean isEnabled()
 	{
-		return config.logColosseum();
+		return config.logItemVault();
 	}
 
 	@Override

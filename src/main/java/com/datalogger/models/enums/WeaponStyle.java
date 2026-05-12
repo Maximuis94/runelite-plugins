@@ -50,7 +50,9 @@ public enum WeaponStyle
 	MAGIC_AUTOCAST(Collections.emptyMap(), 0, 0, Skill.MAGIC, Skill.HITPOINTS),
 	MAGIC_DEFENSIVE_AUTOCAST(Collections.emptyMap(), 0, 0, Skill.MAGIC, Skill.DEFENCE, Skill.HITPOINTS),
 
-	SALAMANDER_MAGIC(Map.of(Skill.DEFENCE, 3), 0, 0, Skill.MAGIC, Skill.HITPOINTS);
+	SALAMANDER_MAGIC(Map.of(Skill.DEFENCE, 3), 0, 0, Skill.MAGIC, Skill.HITPOINTS),
+	NO_COMBAT(Collections.emptyMap(), 0, 0),
+	;
 
 	private final Map<Skill, Integer> invisibleSkillBoosts;
 	private final int attackSpeedBoost;

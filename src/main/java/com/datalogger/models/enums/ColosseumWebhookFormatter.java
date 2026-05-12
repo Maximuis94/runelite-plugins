@@ -30,5 +30,5 @@ package com.datalogger.models.enums;
  */
 public enum ColosseumWebhookFormatter
 {
-	DETAILED, CONCISE, CUSTOM
+	DETAILED, CONCISE, CUSTOM, SCREENSHOT
 }

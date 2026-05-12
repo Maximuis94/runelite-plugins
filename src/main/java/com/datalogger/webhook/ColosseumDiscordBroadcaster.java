@@ -30,6 +30,7 @@ import static com.datalogger.constants.PluginConstants.COLOSSEUM_ATTEMPT_DIR;
 import com.datalogger.dto.ColosseumAttemptDTO;
 import com.datalogger.dto.ColosseumWaveDTO;
 import com.datalogger.events.DataLoggerConfigChanged;
+import com.datalogger.models.enums.ColosseumBroadcastMode;
 import com.datalogger.models.enums.ColosseumWebhookFormatter;
 import com.datalogger.models.enums.ScreenshotFormat;
 import com.datalogger.models.enums.WaveStatus;
@@ -61,16 +62,14 @@ public class ColosseumDiscordBroadcaster
 
 	@Getter
 	private boolean enabledDiscordBroadcasting;
-	private boolean broadcastCompletedTrial;
-	private boolean broadcastCancelledTrial;
-	private boolean broadcastFailedTrial;
-	private boolean broadcastScreenshot;
+	private ColosseumBroadcastMode broadcastCompletedTrial;
+	private ColosseumBroadcastMode broadcastCancelledTrial;
+	private ColosseumBroadcastMode broadcastFailedTrial;
 	private Integer minRewardValue;
 	private Integer minWave;
 
 	private String webhookUrl;
 	private ScreenshotFormat screenshotFormat;
-	private ColosseumWebhookFormatter webhookFormat;
 	private String customTemplate;
 
 	private final DataLoggerConfig config;
@@ -99,12 +98,33 @@ public class ColosseumDiscordBroadcaster
 		broadcastFailedTrial = config.broadcastFailedTrials();
 		broadcastCancelledTrial = config.broadcastCancelledTrials();
 		broadcastCompletedTrial = config.broadcastCompletedTrials();
-		broadcastScreenshot = config.broadcastScreenshot();
 		screenshotFormat = config.screenshotFormat();
-		webhookFormat = config.colosseumWebhookFormat();
 		customTemplate = config.colosseumCustomTemplate();
 		minRewardValue = config.broadcastRewardThreshold() * 1000;
 		minWave = config.broadcastWaveThreshold();
+	}
+
+	private JsonObject generatePayload(ColosseumAttemptDTO attemptDTO, ColosseumWebhookFormatter formatter, boolean attachScreenshot)
+	{
+		if (formatter == null)
+		{
+			return attachScreenshot ? ColosseumScreenshotDiscordFormatter.buildPayload() : null;
+		}
+
+		switch (formatter)
+		{
+			case CONCISE:
+				return ColosseumConciseDiscordFormatter.buildPayload(attemptDTO, config);
+			case CUSTOM:
+				return ColosseumCustomDiscordFormatter.buildPayload(attemptDTO, customTemplate);
+			case SCREENSHOT:
+				return ColosseumScreenshotDiscordFormatter.buildPayload();
+			case DETAILED:
+				return ColosseumDetailedDiscordFormatter.buildPayload(attemptDTO, config);
+			default:
+				log.debug("Unexpected state occurred for webhook format: {}", formatter);
+				return null;
+		}
 	}
 
 	/**
@@ -112,42 +132,58 @@ public class ColosseumDiscordBroadcaster
 	 */
 	public void broadcastToDiscord(ColosseumAttemptDTO attemptDto)
 	{
-
 		List<ColosseumWaveDTO> waves = attemptDto.getWaves();
 		if (waves == null || waves.isEmpty())
 		{
-			log.info("Did not broadcast trial-- there are no waves...");
+			log.debug("Did not broadcast trial-- there are no waves...");
 			return;
 		}
 
 		ColosseumWaveDTO finalWave = waves.get(waves.size() - 1);
-		if (!shouldBroadcastAttempt(finalWave, attemptDto.getRewardsValue()))
-		{
-			log.info("Did not broadcast trial-- Prerequisite conditions were not met...");
-			return;
-		}
 
-		JsonObject payload;
-
-		switch (webhookFormat)
+		ColosseumBroadcastMode broadcastMode;
+		switch (WaveStatus.fromString(attemptDto.getResult()))
 		{
-			case CONCISE:
-				payload = ColosseumConciseDiscordFormatter.buildPayload(attemptDto, config);
+			case COMPLETED:
+				broadcastMode = broadcastCompletedTrial;
+//				webhookFormatter = broadcastCompletedTrial;
+//				attachScreenshot = broadcastCompletedTrial.isAttachScreenshot();
+//				isScreenshotFormat = (webhookFormat == ColosseumWebhookFormatter.SCREENSHOT);
+//				payload = generatePayload(attemptDto, broadcastCompletedTrial);
+//				attachScreenshot = isScreenshotFormat || shouldBroadcastScreenshot(finalWave);
 				break;
-			case CUSTOM:
-				payload = ColosseumCustomDiscordFormatter.buildPayload(attemptDto, customTemplate);
+			case FAILED:
+				broadcastMode = broadcastFailedTrial;
+//				isScreenshotFormat = (webhookFormat == ColosseumWebhookFormatter.SCREENSHOT);
+//				payload = generatePayload(attemptDto, broadcastFailedTrial);
+//				attachScreenshot = isScreenshotFormat || shouldBroadcastScreenshot(finalWave);
 				break;
-			case DETAILED:
 			default:
-				payload = ColosseumDetailedDiscordFormatter.buildPayload(attemptDto, config);
+				broadcastMode = broadcastCancelledTrial;
+
+//				isScreenshotFormat = (webhookFormat == ColosseumWebhookFormatter.SCREENSHOT);
+//				payload = generatePayload(attemptDto, broadcastCancelledTrial);
+//				attachScreenshot = isScreenshotFormat || shouldBroadcastScreenshot(finalWave);
 				break;
 		}
+		ColosseumWebhookFormatter webhookFormatter = broadcastMode.getFormatter();
+		boolean attachScreenshot = broadcastMode.isAttachScreenshot();
+		if (!shouldBroadcastAttempt(finalWave, attemptDto.getRewardsValue(), webhookFormatter != null || attachScreenshot)) return;
 
-		log.info("Submitting {} payload to webhookUrl {}", webhookFormat.name(), webhookUrl);
+		JsonObject payload = generatePayload(attemptDto, webhookFormatter, attachScreenshot);
 
-		if (broadcastScreenshot)
+		if (payload == null) return;
+		log.debug("Submitting {} payload to webhookUrl {}", webhookFormatter, webhookUrl);
+
+		if (attachScreenshot)
 		{
 			File screenshotFile = getBroadcastScreenshotFile(finalWave, attemptDto.getAttemptId());
+
+			if (webhookFormatter == ColosseumWebhookFormatter.SCREENSHOT && screenshotFile != null && screenshotFile.exists())
+			{
+				screenshotFile = ColosseumScreenshotDiscordFormatter.createProjectedScreenshotFile(screenshotFile, attemptDto, config);
+			}
+
 			discordWebhookService.queueWebhook(webhookUrl, payload, screenshotFile);
 		}
 		else
@@ -159,36 +195,36 @@ public class ColosseumDiscordBroadcaster
 	/**
 	 * Return true if the finished trial should be broadcast.
 	 */
-	private boolean shouldBroadcastAttempt(ColosseumWaveDTO finalWave, int totalReward)
+	private boolean shouldBroadcastAttempt(ColosseumWaveDTO finalWave, int totalReward, boolean statusConditionMet)
 	{
 		WaveStatus status = WaveStatus.fromString(finalWave.getStatus());
 		boolean hasSucceeded = status != WaveStatus.FAILED && status != WaveStatus.LOGGED_OUT;
-
-		// Include the potential loot as well, if the final wave was not completed
 		int netReward = status != WaveStatus.COMPLETED ? 0 : totalReward + finalWave.getLootValue();
-
-
-		boolean statusConditionMet;
-		switch (status) {
-			case COMPLETED:
-				statusConditionMet = broadcastCompletedTrial;
-				break;
-			case FAILED:
-				statusConditionMet = broadcastFailedTrial;
-				break;
-			case CANCELLED:
-			case CLAIMED:
-				statusConditionMet = broadcastCancelledTrial;
-				break;
-			default:
-				statusConditionMet = false;
-		}
-
 		boolean result = (netReward > minRewardValue || finalWave.getWave() >= minWave);
 
-		log.info("CurrentAttempt has {}; waveNumber and rewardsValue conditions have {}been met; {}broadcasting run", hasSucceeded ? "succeeded" : "failed", result ? "" : "not ", statusConditionMet&&result ? "" : "not ");
+		log.debug("CurrentAttempt has {}; waveNumber and rewardsValue conditions have {}been met; {}broadcasting run", hasSucceeded ? "succeeded" : "failed", result ? "" : "not ", statusConditionMet&&result ? "" : "not ");
 		return statusConditionMet && result;
 	}
+
+//	/**
+//	 * Return true if a screenshot is to be attached, given configurations and the final state.
+//	 */
+//	private boolean shouldBroadcastScreenshot(ColosseumWaveDTO finalWave)
+//	{
+//		WaveStatus status = WaveStatus.fromString(finalWave.getStatus());
+//		switch (status) {
+//			case COMPLETED:
+//				return broadcastCompletedTrial && broadcastScreenshot.isScreenshotOnSuccess();
+//			case FAILED:
+//				return broadcastFailedTrial && broadcastScreenshot.isScreenshotOnFailure();
+//			case CANCELLED:
+//			case CLAIMED:
+//				return broadcastCancelledTrial && broadcastScreenshot.isScreenshotOnClaim();
+//			default:
+//				log.debug("Encountered a non-implemented status of {}", status);
+//				return false;
+//		}
+//	}
 
 	/**
 	 * Return the expected screenshotFile, given ColosseumAttemptDTO and its associated root.
@@ -222,7 +258,7 @@ public class ColosseumDiscordBroadcaster
 		String extension = screenshotFormat.getExtension();
 		File root = new File(COLOSSEUM_ATTEMPT_DIR, trialId);
 		File file = new File(root, String.format("wave-%02d%s.%s", waveNumber, affix, extension));
-		log.info("Identified broadcast screenshot file {}", file.getAbsolutePath());
+		log.debug("Identified broadcast screenshot file {}", file.getAbsolutePath());
 
 		return file;
 	}
@@ -234,6 +270,16 @@ public class ColosseumDiscordBroadcaster
 	{
 		JsonObject embed = new JsonObject();
 		embed.addProperty("title", "🏟️ **Colosseum Run by " + account + "**");
+		addFooter(embed, FOOTER_STANDARD);
+		return embed;
+	}
+
+	/**
+	 * Generate and return an embed with just the footer
+	 */
+	public static JsonObject generateMinimalEmbed()
+	{
+		JsonObject embed = new JsonObject();
 		addFooter(embed, FOOTER_STANDARD);
 		return embed;
 	}

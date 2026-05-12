@@ -90,7 +90,7 @@ public class EquipmentTracker
 	public void updateCurrentWeapon()
 	{
 		int weaponId = cachedEquipment[WEAPON_SLOT_INDEX];
-		log.info("Updating carried weapon from {} to {}", baseWeaponId, ItemVariationMapping.map(weaponId));
+		log.debug("Updating carried weapon from {} to {}", baseWeaponId, ItemVariationMapping.map(weaponId));
 		currentWeaponId = weaponId;
 		baseWeaponId = weaponId != -1 ? ItemVariationMapping.map(weaponId) : -1;
 
@@ -104,7 +104,7 @@ public class EquipmentTracker
 
 	private void updateCombatParameters()
 	{
-		log.info("Updating combat parameters...");
+		log.debug("Updating combat parameters...");
 		equippedWeaponType = client.getVarbitValue(COMBAT_WEAPON_CATEGORY);
 		attackStyleIndex = client.getVarpValue(COM_MODE);
 
@@ -159,7 +159,9 @@ public class EquipmentTracker
 		else attackSpeed = DEFAULT_ATTACK_SPEED;
 		canConsumeBloodFuryCharges = currentCombatType == CombatType.MELEE && hasBloodFury;
 
-		log.info("Updated combat parameters. weapon={} attackStyleIndex={} currentCombatType={} soundId={} equippedWeaponType={} attackSpeed={}", currentWeaponId, attackStyleIndex, currentCombatType.name(), attackStyleSoundId, equippedWeaponType, attackSpeed);
+		EquippedWeaponType weaponEnum = EquippedWeaponType.getByVarbitValue(equippedWeaponType);
+		String name = weaponEnum == null ? "Unknown" : weaponEnum.name();
+		log.debug("Updated combat parameters. enum={} weapon={} baseId={} attackStyleIndex={} currentCombatType={} soundId={} equippedWeaponType={} attackSpeed={}", name, currentWeaponId, baseWeaponId, attackStyleIndex, currentCombatType.name(), attackStyleSoundId, equippedWeaponType, attackSpeed);
 	}
 
 	private void syncEquipment()
@@ -229,7 +231,7 @@ public class EquipmentTracker
 	public void incrementBloodFuryCharge()
 	{
 		consumedBloodFuryCharges++;
-		log.info("Increased consumedBloodFuryCharges to {}", consumedBloodFuryCharges);
+		log.debug("Increased consumedBloodFuryCharges to {}", consumedBloodFuryCharges);
 	}
 
 	// --- Charge retrieval and reset logic ---

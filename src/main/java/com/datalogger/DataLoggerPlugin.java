@@ -25,10 +25,9 @@
 package com.datalogger;
 
 import static com.datalogger.constants.PluginConstants.CONFIG_GROUP;
-import com.datalogger.events.DataLoggerConfigChanged;
-import com.datalogger.services.CombatTracker;
-import com.datalogger.webhook.ColosseumDiscordBroadcaster;
+import static com.datalogger.constants.PluginConstants.PLUGIN_LOG_FILE;
 import com.datalogger.events.AccountSessionStarted;
+import com.datalogger.events.DataLoggerConfigChanged;
 import com.datalogger.loggers.ColosseumAttemptLogger;
 import com.datalogger.loggers.ColosseumTimelineLogger;
 import com.datalogger.loggers.GrandExchangeLogger;
@@ -38,21 +37,31 @@ import com.datalogger.models.enums.ConsumableItemGroup;
 import com.datalogger.models.enums.ItemCharge;
 import com.datalogger.services.AccountHashMapper;
 import com.datalogger.services.ColosseumScanner;
+import com.datalogger.services.CombatTracker;
 import com.datalogger.services.DiscordWebhookService;
 import com.datalogger.services.EquipmentTracker;
 import com.datalogger.services.FileIOService;
 import com.datalogger.services.GrandExchangeHistoryParser;
+import com.datalogger.services.InventoryStateManager;
 import com.datalogger.services.ItemVaultParser;
 import com.datalogger.services.SupplyTracker;
+import com.datalogger.services.itemvault.VaultManager;
 import com.datalogger.ui.DataLoggerPanel;
+import com.datalogger.webhook.ColosseumDiscordBroadcaster;
 import com.google.inject.Provides;
 import java.awt.image.BufferedImage;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import javax.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Actor;
+import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
 import net.runelite.api.WorldType;
+import net.runelite.api.events.ChatMessage;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
 import net.runelite.client.callback.ClientThread;
@@ -86,7 +95,9 @@ public class DataLoggerPlugin extends Plugin
 	@Inject private FileIOService fileIOService;
 	@Inject private DataLoggerPanel panel;
 	@Inject private ItemVaultLogger itemVaultLogger;
+	@Inject private InventoryStateManager inventoryStateManager;
 
+	@Inject private VaultManager vaultManager;
 	@Inject private ItemVaultParser itemVaultParser;
 	@Inject private GrandExchangeLogger geLogger;
 	@Inject private GrandExchangeHistoryParser grandExchangeHistoryParser;
@@ -119,12 +130,13 @@ public class DataLoggerPlugin extends Plugin
 	@Override
 	protected void startUp() throws Exception
 	{
-		log.info("Data Logger starting up...");
+		log.debug("Data Logger starting up...");
 		ItemCharge.setItemManager(itemManager);
 		ConsumableItemGroup.setItemManager(itemManager);
 		eventBus.register(accountHashMapper);
 		accountHashMapper.loadMappings();
 		eventBus.register(fileIOService);
+		eventBus.register(inventoryStateManager);
 		eventBus.register(itemVaultLogger);
 		eventBus.register(equipmentTracker);
 		eventBus.register(supplyTracker);
@@ -154,7 +166,7 @@ public class DataLoggerPlugin extends Plugin
 	@Override
 	protected void shutDown()
 	{
-		log.info("Data Logger shutting down...");
+		log.debug("Data Logger shutting down...");
 
 		if (fileIOService != null) {
 			fileIOService.flushAll();
@@ -166,6 +178,7 @@ public class DataLoggerPlugin extends Plugin
 
 		eventBus.unregister(accountHashMapper);
 		eventBus.unregister(fileIOService);
+		eventBus.unregister(inventoryStateManager);
 		eventBus.unregister(itemVaultLogger);
 		eventBus.unregister(equipmentTracker);
 		eventBus.unregister(supplyTracker);
@@ -208,14 +221,29 @@ public class DataLoggerPlugin extends Plugin
 		}
 	}
 
+//	private void toggleItemVault(boolean enable)
+//	{
+//		if (enable && !isItemVaultRegistered) {
+//			eventBus.register(itemVaultParser);
+//			isItemVaultRegistered = true;
+//			log.debug("Item Vault tracking enabled.");
+//		} else if (!enable && isItemVaultRegistered) {
+//			eventBus.unregister(itemVaultParser);
+//			isItemVaultRegistered = false;
+//			log.debug("Item Vault tracking disabled.");
+//		}
+//	}
+
 	private void toggleItemVault(boolean enable)
 	{
 		if (enable && !isItemVaultRegistered) {
-			eventBus.register(itemVaultParser);
+			// THE UPGRADE: The Manager handles all parser registrations and mid-session syncs!
+			vaultManager.startUp();
 			isItemVaultRegistered = true;
 			log.debug("Item Vault tracking enabled.");
 		} else if (!enable && isItemVaultRegistered) {
-			eventBus.unregister(itemVaultParser);
+			// THE UPGRADE: The Manager unregisters all its parsers cleanly!
+			vaultManager.shutDown();
 			isItemVaultRegistered = false;
 			log.debug("Item Vault tracking disabled.");
 		}
@@ -297,14 +325,53 @@ public class DataLoggerPlugin extends Plugin
 	}
 
 	@Subscribe
+	public void onChatMessage(ChatMessage event)
+	{
+		ChatMessageType type = event.getType();
+
+		if (type != ChatMessageType.GAMEMESSAGE && type != ChatMessageType.MESBOX)
+		{
+			return;
+		}
+
+		String rawMessage = event.getMessage();
+
+		if (!rawMessage.toLowerCase().contains("charge"))
+		{
+			return;
+		}
+
+		String formattedLog = type.name() + ": " + rawMessage;
+
+		try
+		{
+			File parentDir = PLUGIN_LOG_FILE.getParentFile();
+			if (parentDir != null && !parentDir.exists())
+			{
+				parentDir.mkdirs();
+			}
+
+			try (BufferedWriter writer = new BufferedWriter(new FileWriter(PLUGIN_LOG_FILE, true)))
+			{
+				writer.write(formattedLog);
+				writer.newLine();
+			}
+		}
+		catch (IOException e)
+		{
+			log.error("Failed to dump charge message to file: {}", PLUGIN_LOG_FILE.getAbsolutePath(), e);
+		}
+	}
+
+	@Subscribe
 	public void onGameStateChanged(GameStateChanged event)
 	{
 		GameState gameState = event.getGameState();
 		if (gameState == GameState.LOGIN_SCREEN || gameState == GameState.HOPPING)
 		{
-			log.info("Player has logged out or is hopping. Resetting account parameters.");
+			log.debug("Player has logged out or is hopping. Resetting account parameters.");
 			sessionInitialized = false;
-			eventBus.post(new AccountSessionStarted("", -1, null, false));
+			eventBus.post(new AccountSessionStarted("-1", -1, null, false));
 			coloScanner.clearState();
 		}
 	}

@@ -28,16 +28,12 @@ package com.datalogger.models.enums;
 import static com.datalogger.models.enums.AttackType.MAGIC_TYPELESS;
 import static com.datalogger.models.enums.AttackType.MELEE_CRUSH;
 import static com.datalogger.models.enums.AttackType.MELEE_SLASH;
+import static com.datalogger.models.enums.AttackType.MELEE_STAB;
+import static com.datalogger.models.enums.AttackType.RANGED_HEAVY;
+import static com.datalogger.models.enums.AttackType.RANGED_LIGHT;
 import static com.datalogger.models.enums.AttackType.RANGED_NORMAL;
 import static com.datalogger.models.enums.AttackType.RANGED_TYPELESS;
-import static com.datalogger.models.enums.WeaponStyle.MELEE_ACCURATE;
-import static com.datalogger.models.enums.WeaponStyle.MELEE_AGGRESSIVE;
-import static com.datalogger.models.enums.WeaponStyle.MELEE_CONTROLLED;
-import static com.datalogger.models.enums.WeaponStyle.MELEE_DEFENSIVE;
-import static com.datalogger.models.enums.WeaponStyle.RANGED_ACCURATE;
-import static com.datalogger.models.enums.WeaponStyle.RANGED_LONGRANGE;
-import static com.datalogger.models.enums.WeaponStyle.RANGED_RAPID;
-import static com.datalogger.models.enums.WeaponStyle.SALAMANDER_MAGIC;
+import static com.datalogger.models.enums.WeaponStyle.*;
 import java.util.HashMap;
 import java.util.Map;
 import lombok.Getter;
@@ -56,103 +52,234 @@ public enum EquippedWeaponType
 		new Stance(MELEE_ACCURATE, MELEE_CRUSH),
 		new Stance(MELEE_AGGRESSIVE, MELEE_CRUSH),
 		null,
-		new Stance(MELEE_DEFENSIVE, MELEE_CRUSH)
+		new Stance(MELEE_DEFENSIVE, MELEE_CRUSH),
+		null
+	),
+	AXE(1,
+		new Stance(MELEE_ACCURATE, MELEE_SLASH),
+		new Stance(MELEE_AGGRESSIVE, MELEE_SLASH),
+		new Stance(MELEE_AGGRESSIVE, MELEE_CRUSH),
+		new Stance(MELEE_DEFENSIVE, MELEE_SLASH),
+		null
+	),
+	MAUL(2,
+		new Stance(MELEE_ACCURATE, MELEE_CRUSH),
+		new Stance(MELEE_AGGRESSIVE, MELEE_CRUSH),
+		null,
+		new Stance(MELEE_DEFENSIVE, MELEE_CRUSH),
+		null
 	),
 
 	BOW(3,
 		new Stance(RANGED_ACCURATE, RANGED_NORMAL),
 		new Stance(RANGED_RAPID, RANGED_NORMAL),
-		new Stance(RANGED_LONGRANGE, RANGED_NORMAL)
+		null,
+		new Stance(RANGED_LONGRANGE, RANGED_NORMAL),
+		null
 	),
 
-	WHIP(4,
+	CLAW(4,
 		new Stance(MELEE_ACCURATE, MELEE_SLASH),
-		new Stance(MELEE_CONTROLLED, MELEE_SLASH),
-		null, // No index 2
-		new Stance(MELEE_DEFENSIVE, MELEE_SLASH)
+		new Stance(MELEE_AGGRESSIVE, MELEE_SLASH),
+		new Stance(MELEE_CONTROLLED, MELEE_STAB),
+		new Stance(MELEE_DEFENSIVE, MELEE_SLASH),
+		null
 	),
 
-	TWO_HANDED_SWORD(5,
+	CROSSBOW(5,
+		new Stance(RANGED_ACCURATE, RANGED_HEAVY),
+		new Stance(RANGED_RAPID, RANGED_HEAVY),
+		null,
+		new Stance(RANGED_LONGRANGE, RANGED_HEAVY),
+		null
+	),
+
+	SALAMANDER(6,
+		new Stance(MELEE_AGGRESSIVE, MELEE_SLASH),
+		new Stance(RANGED_RAPID, RANGED_TYPELESS),
+		new Stance(SALAMANDER_MAGIC, MAGIC_TYPELESS),
+		null,
+		null
+	),
+
+	CHINCHOMPA(7,
+		new Stance(RANGED_ACCURATE, RANGED_HEAVY),
+		new Stance(RANGED_RAPID, RANGED_HEAVY),
+		null,
+		new Stance(RANGED_LONGRANGE, RANGED_HEAVY),
+		null
+	),
+
+	// Bazooka from Mourning's End Part I
+	FIXED_DEVICE(8,
+		new Stance(NO_COMBAT, AttackType.NO_COMBAT),
+		new Stance(MELEE_AGGRESSIVE, MELEE_CRUSH),
+		null,
+		null,
+		null
+	),
+
+	ONE_HANDED_SWORD(9,
+		new Stance(MELEE_ACCURATE, MELEE_SLASH),
+		new Stance(MELEE_AGGRESSIVE, MELEE_SLASH),
+		new Stance(MELEE_CONTROLLED, MELEE_STAB),
+		new Stance(MELEE_DEFENSIVE, MELEE_SLASH),
+		null
+	),
+
+	TWO_HANDED_SWORD(10,
 		new Stance(MELEE_ACCURATE, MELEE_SLASH),
 		new Stance(MELEE_AGGRESSIVE, MELEE_SLASH),
 		new Stance(MELEE_AGGRESSIVE, MELEE_CRUSH),
 		new Stance(MELEE_DEFENSIVE, MELEE_SLASH)
 	),
 
-	SALAMANDER(6,
-		new Stance(MELEE_AGGRESSIVE, MELEE_SLASH),
-		new Stance(RANGED_RAPID, RANGED_TYPELESS),
-		new Stance(SALAMANDER_MAGIC, MAGIC_TYPELESS)
+	PICKAXE(11,
+		new Stance(WeaponStyle.MELEE_ACCURATE, AttackType.MELEE_STAB),
+		new Stance(WeaponStyle.MELEE_AGGRESSIVE, AttackType.MELEE_STAB),
+		new Stance(WeaponStyle.MELEE_DEFENSIVE, AttackType.MELEE_CRUSH),
+		new Stance(WeaponStyle.MAGIC_DEFENSIVE_AUTOCAST, AttackType.MELEE_STAB)
 	),
 
-	// --- UNVERIFIED VARBITS (Commented Out) ---
-	// The stances and attack types below are mechanically 100% accurate to OSRS,
-	// but the exact integer for the EQUIPPED_WEAPON_TYPE varbit needs live verification.
+	HALBERD(12,
+		new Stance(MELEE_CONTROLLED, MELEE_STAB),
+		new Stance(MELEE_AGGRESSIVE, MELEE_SLASH),
+		null,
+		new Stance(MELEE_DEFENSIVE, MELEE_STAB)
+	),
 
-    /*
-    DAGGER(???, // Might be 7 or 9
-       new Stance(MELEE_ACCURATE, MELEE_STAB),
-       new Stance(MELEE_AGGRESSIVE, MELEE_STAB),
-       new Stance(MELEE_AGGRESSIVE, MELEE_SLASH),
-       new Stance(MELEE_DEFENSIVE, MELEE_STAB)
-    ),
-    */
+	BANNER(13,
+		new Stance(MELEE_ACCURATE, MELEE_CRUSH),
+		new Stance(MELEE_AGGRESSIVE, MELEE_CRUSH),
+		null,
+		new Stance(MELEE_DEFENSIVE, MELEE_CRUSH),
+		null
+	),
 
-    /*
-    MACE(???, // Likely 2, but needs verification
-       new Stance(MELEE_ACCURATE, MELEE_CRUSH),
-       new Stance(MELEE_AGGRESSIVE, MELEE_CRUSH),
-       new Stance(MELEE_CONTROLLED, MELEE_STAB), // The "Spike" style
-       new Stance(MELEE_DEFENSIVE, MELEE_CRUSH)
-    ),
-    */
+	SCYTHE_OF_VITUR(14,
+		new Stance(MELEE_ACCURATE, MELEE_SLASH),
+		new Stance(MELEE_AGGRESSIVE, MELEE_SLASH),
+		new Stance(MELEE_AGGRESSIVE, MELEE_CRUSH),
+		new Stance(MELEE_DEFENSIVE, MELEE_SLASH),
+		null
+	),
 
-    /*
-    SCYTHE_OF_VITUR(14, // Highly likely to be 14, but keeping it safe
-       new Stance(MELEE_ACCURATE, MELEE_SLASH),
-       new Stance(MELEE_AGGRESSIVE, MELEE_SLASH),
-       new Stance(MELEE_AGGRESSIVE, MELEE_CRUSH), // The "Jab" style
-       new Stance(MELEE_DEFENSIVE, MELEE_SLASH)
-    ),
-    */
+	SPEAR(15,
+		new Stance(MELEE_CONTROLLED, MELEE_STAB),
+		new Stance(MELEE_CONTROLLED, MELEE_SLASH),
+		new Stance(MELEE_CONTROLLED, MELEE_CRUSH),
+		new Stance(MELEE_DEFENSIVE, MELEE_STAB)
+	),
 
-    /*
-    POWERED_STAFF(???, // Tridents, Sanguinesti, Tumeken's Shadow
-       new Stance(MAGIC_ACCURATE, MAGIC),
-       new Stance(MAGIC_ACCURATE, MAGIC),
-       null, // No index 2 for powered staves
-       new Stance(MAGIC_LONGRANGE, MAGIC)
-    ),
-    */
+	MACE(16,
+		new Stance(MELEE_ACCURATE, MELEE_CRUSH),
+		new Stance(MELEE_AGGRESSIVE, MELEE_CRUSH),
+		new Stance(MELEE_CONTROLLED, MELEE_STAB),
+		new Stance(MELEE_DEFENSIVE, MELEE_CRUSH),
+		null
+	),
 
-	STAFF(18, // Often 17 or 18, needs live verification via Developer Tools
-	new Stance(WeaponStyle.MELEE_ACCURATE, AttackType.MELEE_CRUSH),    // Index 0: Bash
-       new Stance(WeaponStyle.MELEE_AGGRESSIVE, AttackType.MELEE_CRUSH),  // Index 1: Pound
-       new Stance(WeaponStyle.MELEE_DEFENSIVE, AttackType.MELEE_CRUSH),   // Index 2: Focus
+	DAGGER(17,
+		new Stance(MELEE_ACCURATE, MELEE_STAB),
+		new Stance(MELEE_AGGRESSIVE, MELEE_STAB),
+		new Stance(MELEE_AGGRESSIVE, MELEE_SLASH),
+		new Stance(MELEE_DEFENSIVE, MELEE_STAB)
+	),
 
-	// Index 3: "Spell" (Standard Autocast)
-       new Stance(WeaponStyle.MAGIC_AUTOCAST, MAGIC_TYPELESS),
+	STAFF(18,
+		new Stance(WeaponStyle.MELEE_ACCURATE, AttackType.MELEE_CRUSH),    // Index 0: Bash
+		new Stance(WeaponStyle.MELEE_AGGRESSIVE, AttackType.MELEE_CRUSH),  // Index 1: Pound
+		new Stance(WeaponStyle.MELEE_DEFENSIVE, AttackType.MELEE_CRUSH),   // Index 2: Focus
+		new Stance(WeaponStyle.MAGIC_AUTOCAST, MAGIC_TYPELESS),
+		new Stance(WeaponStyle.MAGIC_DEFENSIVE_AUTOCAST, MAGIC_TYPELESS)
+	),
 
-	// Index 4: Defensive Autocast
-       new Stance(WeaponStyle.MAGIC_DEFENSIVE_AUTOCAST, MAGIC_TYPELESS)
-    ),
+	THROWN(19,
+		new Stance(RANGED_ACCURATE, RANGED_LIGHT),
+		new Stance(RANGED_RAPID, RANGED_LIGHT),
+		null,
+		new Stance(RANGED_LONGRANGE, RANGED_LIGHT),
+		null
+	),
 
-    /*
-    CROSSBOW(???, // Usually its own interface separate from bows
-       new Stance(RANGED_ACCURATE, RANGED_NORMAL),
-       new Stance(RANGED_RAPID, RANGED_NORMAL),
-       null, // No index 2
-       new Stance(RANGED_LONGRANGE, RANGED_NORMAL)
-    ),
-    */
+	WHIP(20,
+		new Stance(MELEE_ACCURATE, MELEE_SLASH),
+		new Stance(MELEE_CONTROLLED, MELEE_SLASH),
+		null,
+		new Stance(MELEE_DEFENSIVE, MELEE_SLASH),
+		null
+	),
 
-    /*
-    CHINCHOMPA(???,
-       new Stance(RANGED_ACCURATE, RANGED_NORMAL), // Short fuse
-       new Stance(RANGED_RAPID, RANGED_NORMAL),    // Medium fuse
-       new Stance(RANGED_LONGRANGE, RANGED_NORMAL) // Long fuse
-    ),
-    */
+//	TO_DO_21(21,
+//		null,
+//		null,
+//		null,
+//		null,
+//		null
+//	),
+
+//	TO_DO_22(22,
+//		null,
+//		null,
+//		null,
+//		null,
+//		null
+//	),
+
+	GODSWORD(23,
+		new Stance(MELEE_ACCURATE, MELEE_SLASH),
+		new Stance(MELEE_AGGRESSIVE, MELEE_SLASH),
+		new Stance(MELEE_AGGRESSIVE, MELEE_CRUSH),
+		new Stance(MELEE_DEFENSIVE, MELEE_SLASH),
+		null
+	),
+
+	POWERED_STAFF(24,
+		new Stance(MAGIC_ACCURATE, MAGIC_TYPELESS),
+		new Stance(MAGIC_ACCURATE, MAGIC_TYPELESS),
+		null,
+		new Stance(MAGIC_LONGRANGE, MAGIC_TYPELESS),
+		null
+	),
+
+	CRYSTAL_HALBERD(26,
+		new Stance(MELEE_CONTROLLED, MELEE_STAB),
+		new Stance(MELEE_AGGRESSIVE, MELEE_SLASH),
+		null,
+		new Stance(MELEE_DEFENSIVE, MELEE_STAB),
+		null
+	),
+
+//	TO_DO_27(27,
+//		null,
+//		null,
+//		null,
+//		null,
+//		null
+//	),
+
+	DINHS_BULWARK(28,
+		new Stance(MELEE_ACCURATE, MELEE_STAB),
+		null,
+		null,
+		new Stance(NO_COMBAT, AttackType.NO_COMBAT)
+	),
+
+//	TO_DO_29(29,
+//		null,
+//		null,
+//		null,
+//		null,
+//		null
+//	),
+
+	KERIS_PARTISAN(30,
+		new Stance(MELEE_ACCURATE, MELEE_STAB),
+		new Stance(MELEE_AGGRESSIVE, MELEE_STAB),
+		new Stance(MELEE_AGGRESSIVE, MELEE_CRUSH),
+		new Stance(MELEE_DEFENSIVE, MELEE_STAB),
+		null
+	),
 	;
 
 	@Getter
