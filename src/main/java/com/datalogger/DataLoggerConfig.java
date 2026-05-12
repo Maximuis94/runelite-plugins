@@ -213,7 +213,7 @@ public interface DataLoggerConfig extends Config {
 	@ConfigItem(
 		keyName = "colosseumTag",
 		name = "Tag",
-		description = "A custom tag that will be assigned to logged entries (e.g. to distinguish between specific setups)",
+		description = "Custom tag(s) that will be assigned to logged entries and can be used as filter in the dataviewer. Separate multiple tags with '|'",
 		position = 4,
 		section = COLOSSEUM_SECTION
 	)

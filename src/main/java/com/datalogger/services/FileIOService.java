@@ -285,7 +285,6 @@ public class FileIOService
 	/**
 	 * Returns a File reference based on the input provided and the plugin configurations
 	 * @param type The data that is to be logged
-	 * @param account The account that the data relates to
 	 * @return File reference based on inputs provided and strategy selected
 	 */
 	public File getTargetFile(LogType type) {
@@ -321,7 +320,6 @@ public class FileIOService
 
 	/**
 	 * Parse the properties file associated with the given account hash
-	 * @param accountHash The account hash that indicates which file is to be parsed
 	 * @return The contents of the parsed properties file
 	 */
 	public Properties getAccountState() {
@@ -340,7 +338,6 @@ public class FileIOService
 
 	/**
 	 * Export properties associated with accountHash to its corresponding file
-	 * @param accountHash Account hash String
 	 * @param props Properties that are to be saved.
 	 */
 	public void saveAccountState(Properties props) {
@@ -1173,7 +1170,7 @@ public class FileIOService
 				return;
 			}
 
-			final String[] CSV_HEADER = "wave,status,attemptResult,accountName,tag,itemIds,itemNames,quantities,modifierChoice_I,modifierChoice_II,modifierChoice_III,chosenModifier,activeModifiers,timeTaken,damageTaken,speedBonus,damageBonus,modifierGlory,completionBonus,waveGlory,totalGlory,totalTimeTaken,serpentShamanSpawnX,serpentShamanSpawnY,javelinColossusSpawnAX,javelinColossusSpawnAY,javelinColossusSpawnBX,javelinColossusSpawnBY,manticoreSpawnAX,manticoreSpawnAY,manticoreSequenceA,manticoreSpawnBX,manticoreSpawnBY,manticoreSequenceB,shockwaveColossusSpawnAX,shockwaveColossusSpawnAY,shockwaveColossusSpawnBX,shockwaveColossusSpawnBY,jaguarWarriorReinfSpawnX,jaguarWarriorReinfSpawnY,serpentShamanReinfSpawnX,serpentShamanReinfSpawnY,minotaurReinfSpawnX,minotaurReinfSpawnY".split(",");
+			final String[] CSV_HEADER = "wave,status,attemptResult,accountName,tag,itemId,itemName,quantity,modifierChoice_I,modifierChoice_II,modifierChoice_III,chosenModifier,activeModifiers,timeTaken,damageTaken,speedBonus,damageBonus,modifierGlory,completionBonus,waveGlory,totalGlory,totalTimeTaken,serpentShamanSpawnX,serpentShamanSpawnY,javelinColossusSpawnAX,javelinColossusSpawnAY,javelinColossusSpawnBX,javelinColossusSpawnBY,manticoreSpawnAX,manticoreSpawnAY,manticoreSequenceA,manticoreSpawnBX,manticoreSpawnBY,manticoreSequenceB,shockwaveColossusSpawnAX,shockwaveColossusSpawnAY,shockwaveColossusSpawnBX,shockwaveColossusSpawnBY,jaguarWarriorReinfSpawnX,jaguarWarriorReinfSpawnY,serpentShamanReinfSpawnX,serpentShamanReinfSpawnY,minotaurReinfSpawnX,minotaurReinfSpawnY".split(",");
 
 			int masterAttemptResultIndex = java.util.Arrays.asList(CSV_HEADER).indexOf("attemptResult");
 			int nLogs = 0;
