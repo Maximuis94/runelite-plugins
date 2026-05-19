@@ -43,9 +43,17 @@ public interface DataLoggerConfig extends Config {
 	// --- Sections ---
 
 	@ConfigSection(
+		name = "Side bar panel",
+		description = "Configurations related to the sidebar panel",
+		position = 0,
+		closedByDefault = true
+	)
+	String SIDE_BAR_PANEL_SECTION = "sideBarPanelSection";
+
+	@ConfigSection(
 		name = "Item loggers",
 		description = "Settings for logging Grand Exchange activity",
-		position = 0,
+		position = 1,
 		closedByDefault = true
 	)
 	String ITEM_LOGGER_SECTION = "itemLogger";
@@ -53,7 +61,7 @@ public interface DataLoggerConfig extends Config {
 	@ConfigSection(
 		name = "Colosseum",
 		description = "Settings for Fortis Colosseum trial logging",
-		position = 1,
+		position = 2,
 	closedByDefault = true
 	)
 	String COLOSSEUM_SECTION = "colosseum";
@@ -61,7 +69,7 @@ public interface DataLoggerConfig extends Config {
 	@ConfigSection(
 		name = "Colosseum timeline logger",
 		description = "Settings related to Fortis Colosseum trial timeline logging",
-		position = 2,
+		position = 3,
 		closedByDefault = true
 	)
 	String COLOSSEUM_TIMELINE_SECTION = "colosseumTimeline";
@@ -69,7 +77,7 @@ public interface DataLoggerConfig extends Config {
 	@ConfigSection(
 		name = "Supply logger",
 		description = "Settings related to supply loggers",
-		position = 3,
+		position = 4,
 		closedByDefault = true
 	)
 	String SUPPLY_SECTION = "supplyLogger";
@@ -77,7 +85,7 @@ public interface DataLoggerConfig extends Config {
 	@ConfigSection(
 		name = "Screenshots",
 		description = "Settings for automatic screenshot capturing",
-		position = 4,
+		position = 5,
 		closedByDefault = true
 	)
 	String SCREENSHOT_SECTION = "screenshot";
@@ -85,7 +93,7 @@ public interface DataLoggerConfig extends Config {
 	@ConfigSection(
 		name = "Discord",
 		description = "Configurations related to Discord",
-		position = 5,
+		position = 6,
 		closedByDefault = true
 	)
 	String DISCORD_SECTION = "discord";
@@ -93,7 +101,7 @@ public interface DataLoggerConfig extends Config {
 	@ConfigSection(
 		name = "Discord pre-defined template",
 		description = "Configurations related to customizing pre-defined Discord template configurations",
-		position = 6,
+		position = 7,
 		closedByDefault = true
 	)
 	String PREDEFINED_TEMPLATE_DISCORD_SECTION = "predefinedTemplateDiscordSection";
@@ -101,10 +109,33 @@ public interface DataLoggerConfig extends Config {
 	@ConfigSection(
 		name = "Discord custom template",
 		description = "Configurations related to customizable Discord template configurations",
-		position = 7,
+		position = 8,
 		closedByDefault = true
 	)
 	String CUSTOM_TEMPLATE_DISCORD_SECTION = "customTemplateDiscordSection";
+
+	// --- Side Bar Items ---
+
+	@ConfigItem(
+		keyName = "showSideBarPanel",
+		name = "Show side bar panel",
+		description = "If enabled, show the sidebar.",
+		position = 0,
+		section = SIDE_BAR_PANEL_SECTION
+	)
+	default boolean showSideBarPanel() { return true; }
+
+	@ConfigItem(
+		keyName = "hideZeroPriceItems",
+		name = "Exclude 0 price items",
+		description = "If enabled, exclude items from the item viewer with a price of 0.",
+		position = 1,
+		section = SIDE_BAR_PANEL_SECTION
+	)
+	default boolean hideZeroPriceItems() { return true; }
+
+
+
 
 	// --- Grand Exchange Items ---
 

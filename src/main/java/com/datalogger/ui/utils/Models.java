@@ -25,47 +25,45 @@
 
 package com.datalogger.ui.utils;
 
-import java.awt.Color;
-import java.awt.Dimension;
-import java.awt.event.ActionListener;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
-import javax.swing.JButton;
-import javax.swing.border.EmptyBorder;
-import net.runelite.client.ui.ColorScheme;
+import lombok.Getter;
 
-public final class UIUtils {
+public class Models
+{
+	@Getter
+	public static class AccountItem
+	{
+		private final String name;
+		private final long hash;
 
-	private UIUtils() {}
-
-	/**
-	 * Creates a standard RuneLite-styled button.
-	 */
-	public static JButton createStyledButton(String text, ActionListener actionListener) {
-		JButton button = new JButton(text);
-		button.setFocusable(false);
-		button.setPreferredSize(new Dimension(0, 30));
-
-		button.setBackground(ColorScheme.DARKER_GRAY_COLOR);
-		button.setForeground(Color.WHITE);
-		button.setBorder(new EmptyBorder(5, 5, 5, 5));
-
-		button.addMouseListener(new MouseAdapter() {
-			@Override
-			public void mouseEntered(MouseEvent evt) {
-				button.setBackground(ColorScheme.DARKER_GRAY_HOVER_COLOR);
-			}
-
-			@Override
-			public void mouseExited(MouseEvent evt) {
-				button.setBackground(ColorScheme.DARKER_GRAY_COLOR);
-			}
-		});
-
-		if (actionListener != null) {
-			button.addActionListener(actionListener);
+		public AccountItem(String name, long hash)
+		{
+			this.name = name;
+			this.hash = hash;
 		}
 
-		return button;
+		@Override
+		public String toString()
+		{
+			return name;
+		}
+	}
+
+	@Getter
+	public static class VaultItem
+	{
+		private final String displayName;
+		private final String actualFileName;
+
+		public VaultItem(String displayName, String actualFileName)
+		{
+			this.displayName = displayName;
+			this.actualFileName = actualFileName;
+		}
+
+		@Override
+		public String toString()
+		{
+			return displayName;
+		}
 	}
 }

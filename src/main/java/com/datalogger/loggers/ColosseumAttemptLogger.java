@@ -570,7 +570,7 @@ public class ColosseumAttemptLogger extends AbstractLogger
 		if (colosseumDiscordBroadcaster.isEnabledDiscordBroadcasting())
 		{
 			log.debug("Broadcasting colosseum trial info...");
-			colosseumDiscordBroadcaster.broadcastToDiscord(dto);
+			colosseumDiscordBroadcaster.broadcastToDiscord(dto, false);
 		}
 
 		if (currentWave == 12 && bossWavePhaseTickCounts[0] != -1 && bossWavePhaseTickCounts[1] != -1)

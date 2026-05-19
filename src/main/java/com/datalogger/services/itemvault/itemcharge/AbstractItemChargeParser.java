@@ -189,6 +189,12 @@ public abstract class AbstractItemChargeParser extends AbstractVaultParser
 	}
 
 	@Override
+	public File getInternalVaultFile(long accountHash)
+	{
+		return fileIOService.getInternalVaultFile(getItemChargeType(), String.valueOf(accountHash));
+	}
+
+	@Override
 	public String getFilePrefix()
 	{
 		return getItemChargeType().fileNameString();

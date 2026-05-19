@@ -58,9 +58,9 @@ public final class ColosseumCustomDiscordFormatter
 	 * @param template The raw string from the user config (e.g., "Player <PLAYER> got <GLORY>!")
 	 * @return A JsonObject formatted for Discord.
 	 */
-	public static JsonObject buildPayload(ColosseumAttemptDTO dto, String template)
+	public static JsonObject buildPayload(ColosseumAttemptDTO dto, String template, boolean isTest)
 	{
-		JsonObject embed = generateBaseEmbed(dto.getAccount());
+		JsonObject embed = isTest ? generateTestEmbed(dto.getAccount()) : generateBaseEmbed(dto.getAccount());
 		int color = "COMPLETED".equals(dto.getResult()) ? 0x00FF00 : 0xFF0000;
 
 		embed.addProperty("color", color);

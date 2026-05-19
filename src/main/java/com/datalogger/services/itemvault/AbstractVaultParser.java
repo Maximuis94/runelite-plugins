@@ -109,6 +109,11 @@ public abstract class AbstractVaultParser implements VaultParser
 		return fileIOService.getInternalVaultFile(getVaultType());
 	}
 
+	public File getInternalVaultFile(long accountHash)
+	{
+		return fileIOService.getInternalVaultFile(getVaultType(), String.valueOf(accountHash));
+	}
+
 	protected void updateAccountHash(long accountHash, String accountName)
 	{
 		hasValidAccountHash = accountHash != -1;
@@ -185,7 +190,7 @@ public abstract class AbstractVaultParser implements VaultParser
 			.filter(item -> item.getItemId() > 0 && item.getQuantity() > 0)
 
 			.map(item -> new BankedItem(
-				getVaultType(),
+				getVaultLabel(),
 				accountHash,
 				accountName,
 				item.getItemId(),

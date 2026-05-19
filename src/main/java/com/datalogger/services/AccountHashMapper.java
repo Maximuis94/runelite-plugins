@@ -91,6 +91,7 @@ public class AccountHashMapper
 
 	public void loadMappings()
 	{
+		log.debug("Loading AccountHashMapper mappings...");
 		executor.submit(() -> {
 			Map<Long, String> diskMappings = fileIOService.loadAccountHashMappingsRaw();
 
@@ -131,5 +132,13 @@ public class AccountHashMapper
 	public List<Long> getAccountHashes()
 	{
 		return new ArrayList<>(hashToNameCache.keySet());
+	}
+
+	/**
+	 * Returns a list of all accountHashes registered
+	 */
+	public List<String> getAccountNames()
+	{
+		return new ArrayList<>(hashToNameCache.values());
 	}
 }

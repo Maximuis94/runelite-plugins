@@ -26,12 +26,14 @@ package com.datalogger.services.itemvault;
 
 import com.datalogger.constants.PluginConstants;
 import static com.datalogger.constants.PluginConstants.INTERNAL_VAULT_DIR;
+import com.datalogger.models.enums.VaultType;
 import com.datalogger.models.itemvault.BankedItem;
 import com.datalogger.models.itemvault.ValuedItemBundle;
 import com.datalogger.services.AccountHashMapper;
 import com.datalogger.services.FileIOService;
 import com.datalogger.services.itemvault.container.BankParser;
 import com.datalogger.services.itemvault.container.SeedVaultParser;
+import com.datalogger.services.itemvault.itemcharge.AbstractItemChargeParser;
 import com.datalogger.services.itemvault.itemcharge.AccursedSceptreParser;
 import com.datalogger.services.itemvault.itemcharge.CrawsBowParser;
 import com.datalogger.services.itemvault.itemcharge.EyeOfAyakParser;
@@ -66,9 +68,13 @@ import com.datalogger.services.itemvault.variable.VyreWellParser;
 import com.google.inject.Singleton;
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import javax.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.client.eventbus.EventBus;
@@ -122,6 +128,7 @@ public class VaultManager {
 	private static final File ITEM_VAULTS_MERGED_CSV = new File(PluginConstants.ITEM_VAULT_DIR, "item-vaults-merged.csv");
 
 	private List<VaultParser> activeParsers;
+	private List<VaultParser> itemChargeParsers;
 	private final List<BankedItem> masterList = new ArrayList<>();
 	private final List<ValuedItemBundle> mergedItemCounts = new ArrayList<>();
 
@@ -162,6 +169,10 @@ public class VaultManager {
 			toaPickaxeParser,
 			activeGrandExchangeOfferParser
 		);
+
+		itemChargeParsers = activeParsers.stream()
+			.filter(p -> p.getVaultType() == VaultType.ITEM_CHARGES)
+			.collect(Collectors.toList());
 	}
 
 	public void startUp() {
@@ -194,6 +205,7 @@ public class VaultManager {
 		aggregateAllOfflineVaultData();
 		fileIOService.writeVaultCsv(ITEM_VAULT_ALL_CSV, masterList, true);
 		fileIOService.writeVaultCsv(ITEM_VAULTS_MERGED_CSV, mergedItemCounts);
+		exportAllAggregatedItemCharges(itemChargeParsers);
 	}
 
 	private void aggregateAllOfflineVaultData() {
@@ -240,19 +252,20 @@ public class VaultManager {
 					try {
 						List<BankedItem> rawItems = matchedParser.parseOfflineFile(accountHash, vaultFile);
 						String vaultLabel = matchedParser.getVaultLabel();
-
 						for (BankedItem rawItem : rawItems) {
 							int id = rawItem.getItemId();
 							long qty = rawItem.getQuantity();
-
-							masterList.add(new BankedItem(
+							BankedItem item = new BankedItem(
 								vaultLabel,
 								accountHash,
 								accountName,
 								id,
 								rawItem.getItemName(),
 								qty
-							));
+							);
+
+							masterList.add(item);
+
 
 							aggregatedItemCounts.merge(id, qty, Long::sum);
 
@@ -281,5 +294,57 @@ public class VaultManager {
 				price
 			));
 		}
+	}
+
+	public void exportAllAggregatedItemCharges(List<VaultParser> vaultParsers)
+	{
+		File[] accountDirs = INTERNAL_VAULT_DIR.listFiles(File::isDirectory);
+		if (accountDirs == null)
+			return;
+
+		int n = accountDirs.length;
+		if (n == 0) return;
+
+		log.debug("Attempting to export item charge vaults for {} account{}", n, n == 1 ? "" : "s");
+		for (File accountDir : accountDirs)
+		{
+			long accountHash;
+			try
+			{
+				accountHash = Long.parseLong(accountDir.getName());
+				String accountName = accountHashMapper.getAccountName(accountHash);
+				fileIOService.exportAggregatedItemCharges(accountHash, accountName, vaultParsers);
+			}
+			catch (NumberFormatException e)
+			{
+				continue; // Skip any folders that aren't numeric account hashes
+			}
+		}
+	}
+
+	/**
+	 * Returns a list of VaultLabels that exist for the given accountHash in the internal directory
+	 */
+	public List<String> getExistingVaults(long accountHash)
+	{
+		String hashString = String.valueOf(accountHash);
+		File root = new File(INTERNAL_VAULT_DIR, hashString);
+		if (!root.exists()) return List.of();
+
+		String affix = "_" + hashString + ".json";
+		File[] jsonFiles = root.listFiles((dir, name) -> name.endsWith(affix));
+
+		if (jsonFiles == null) return List.of();
+
+		return Arrays.stream(jsonFiles)
+			.map(File::getName)
+			.map(name -> name.substring(0, name.length() - affix.length()))
+			.collect(Collectors.toList());
+
+	}
+
+	public void resetVault()
+	{
+
 	}
 }

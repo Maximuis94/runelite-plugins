@@ -128,9 +128,25 @@ public enum VaultType
 	/**
 	 * Return the internal json file associated with the given accountHash.
 	 */
+	public File getExternalCSVFile(String accountName)
+	{
+		return new File(ITEM_VAULT_DIR, fileNameString() + "_" + accountName + ".csv");
+	}
+
+	/**
+	 * Return the internal json file associated with the given accountHash.
+	 */
 	public File getExternalJSONFile(long accountHash)
 	{
 		return new File(ITEM_VAULT_DIR, fileNameString() + "_" + accountHash + ".json");
+	}
+
+	/**
+	 * Return the internal json file associated with the given accountHash.
+	 */
+	public File getExternalJSONFile(String accountName)
+	{
+		return new File(ITEM_VAULT_DIR, fileNameString() + "_" + accountName + ".json");
 	}
 
 //	/**

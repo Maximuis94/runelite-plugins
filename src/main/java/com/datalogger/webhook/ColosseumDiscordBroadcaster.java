@@ -104,33 +104,38 @@ public class ColosseumDiscordBroadcaster
 		minWave = config.broadcastWaveThreshold();
 	}
 
-	private JsonObject generatePayload(ColosseumAttemptDTO attemptDTO, ColosseumWebhookFormatter formatter, boolean attachScreenshot)
+	private JsonObject generatePayload(ColosseumAttemptDTO attemptDTO, ColosseumWebhookFormatter formatter, boolean attachScreenshot, boolean isTest)
 	{
 		if (formatter == null)
 		{
-			return attachScreenshot ? ColosseumScreenshotDiscordFormatter.buildPayload() : null;
+			return attachScreenshot ? ColosseumScreenshotDiscordFormatter.buildPayload(isTest) : null;
 		}
 
 		switch (formatter)
 		{
 			case CONCISE:
-				return ColosseumConciseDiscordFormatter.buildPayload(attemptDTO, config);
+				return ColosseumConciseDiscordFormatter.buildPayload(attemptDTO, config, isTest);
 			case CUSTOM:
-				return ColosseumCustomDiscordFormatter.buildPayload(attemptDTO, customTemplate);
+				return ColosseumCustomDiscordFormatter.buildPayload(attemptDTO, customTemplate, isTest);
 			case SCREENSHOT:
-				return ColosseumScreenshotDiscordFormatter.buildPayload();
+				return ColosseumScreenshotDiscordFormatter.buildPayload(isTest);
 			case DETAILED:
-				return ColosseumDetailedDiscordFormatter.buildPayload(attemptDTO, config);
+				return ColosseumDetailedDiscordFormatter.buildPayload(attemptDTO, config, isTest);
 			default:
 				log.debug("Unexpected state occurred for webhook format: {}", formatter);
 				return null;
 		}
 	}
 
+	private JsonObject generateCustomTestPayload(ColosseumAttemptDTO attemptDTO, boolean attachScreenshot, String customTemplate)
+	{
+		return ColosseumCustomDiscordFormatter.buildPayload(attemptDTO, customTemplate, true);
+	}
+
 	/**
 	 * Checks if the given data should be broadcast and if so, formats and sends it to the webhook.
 	 */
-	public void broadcastToDiscord(ColosseumAttemptDTO attemptDto)
+	public void broadcastToDiscord(ColosseumAttemptDTO attemptDto, boolean isTest)
 	{
 		List<ColosseumWaveDTO> waves = attemptDto.getWaves();
 		if (waves == null || waves.isEmpty())
@@ -170,10 +175,52 @@ public class ColosseumDiscordBroadcaster
 		boolean attachScreenshot = broadcastMode.isAttachScreenshot();
 		if (!shouldBroadcastAttempt(finalWave, attemptDto.getRewardsValue(), webhookFormatter != null || attachScreenshot)) return;
 
-		JsonObject payload = generatePayload(attemptDto, webhookFormatter, attachScreenshot);
+		JsonObject payload = generatePayload(attemptDto, webhookFormatter, attachScreenshot, isTest);
 
 		if (payload == null) return;
 		log.debug("Submitting {} payload to webhookUrl {}", webhookFormatter, webhookUrl);
+
+		if (attachScreenshot)
+		{
+			File screenshotFile = getBroadcastScreenshotFile(finalWave, attemptDto.getAttemptId());
+
+			if (webhookFormatter == ColosseumWebhookFormatter.SCREENSHOT && screenshotFile != null && screenshotFile.exists())
+			{
+				screenshotFile = ColosseumScreenshotDiscordFormatter.createProjectedScreenshotFile(screenshotFile, attemptDto, config);
+			}
+
+			discordWebhookService.queueWebhook(webhookUrl, payload, screenshotFile);
+		}
+		else
+		{
+			discordWebhookService.sendWebhook(webhookUrl, payload);
+		}
+	}
+
+	/**
+	 * Checks if the given data should be broadcast and if so, formats and sends it to the webhook.
+	 */
+	public void broadcastToDiscordDebug(ColosseumAttemptDTO attemptDto, ColosseumBroadcastMode broadcastMode)
+	{
+		List<ColosseumWaveDTO> waves = attemptDto.getWaves();
+		if (waves == null || waves.isEmpty())
+		{
+			log.debug("Did not broadcast trial-- there are no waves...");
+			return;
+		}
+
+		ColosseumWaveDTO finalWave = waves.get(waves.size() - 1);
+
+		ColosseumWebhookFormatter webhookFormatter = broadcastMode.getFormatter();
+		boolean attachScreenshot = broadcastMode.isAttachScreenshot();
+
+		JsonObject payload = generatePayload(attemptDto, webhookFormatter, attachScreenshot, true);
+
+		if (payload == null)
+		{
+			return;
+		}
+		log.debug("Submitting debug {} payload to webhookUrl {}", webhookFormatter, webhookUrl);
 
 		if (attachScreenshot)
 		{
@@ -229,7 +276,7 @@ public class ColosseumDiscordBroadcaster
 	/**
 	 * Return the expected screenshotFile, given ColosseumAttemptDTO and its associated root.
 	 */
-	private File getBroadcastScreenshotFile(ColosseumWaveDTO finalWave, String trialId)
+	public File getBroadcastScreenshotFile(ColosseumWaveDTO finalWave, String trialId)
 	{
 		WaveStatus waveStatus = WaveStatus.fromString(finalWave.getStatus());
 		if (waveStatus == null) return null;
@@ -255,7 +302,7 @@ public class ColosseumDiscordBroadcaster
 				return null;
 		}
 
-		String extension = screenshotFormat.getExtension();
+		String extension = config.screenshotFormat().getExtension();
 		File root = new File(COLOSSEUM_ATTEMPT_DIR, trialId);
 		File file = new File(root, String.format("wave-%02d%s.%s", waveNumber, affix, extension));
 		log.debug("Identified broadcast screenshot file {}", file.getAbsolutePath());
@@ -290,9 +337,19 @@ public class ColosseumDiscordBroadcaster
 	public static JsonObject generateTestEmbed(String account)
 	{
 		JsonObject embed = new JsonObject();
-		embed.addProperty("title", "🚧 Colosseum Run by " + account + " (**custom template test**)");
+		embed.addProperty("title", "🚧 Colosseum Run by " + account + " (**test**)");
 		addFooter(embed, FOOTER_TEST);
 		setColor(embed, TEST_COLOR);
+		return embed;
+	}
+
+	/**
+	 * Generate and return an embed with just the footer
+	 */
+	public static JsonObject generateMinimalTestEmbed()
+	{
+		JsonObject embed = new JsonObject();
+		addFooter(embed, FOOTER_TEST);
 		return embed;
 	}
 }

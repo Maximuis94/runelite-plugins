@@ -28,6 +28,7 @@ package com.datalogger.webhook;
 import com.datalogger.DataLoggerConfig;
 import com.datalogger.dto.ColosseumAttemptDTO;
 import static com.datalogger.webhook.ColosseumDiscordBroadcaster.generateBaseEmbed;
+import static com.datalogger.webhook.ColosseumDiscordBroadcaster.generateTestEmbed;
 import static com.datalogger.webhook.DiscordWebhookUtils.setColor;
 import static com.datalogger.webhook.DiscordWebhookUtils.wrapEmbedIntoPayload;
 import static com.datalogger.webhook.WebhookFormatUtils.formatActiveModifiers;
@@ -47,8 +48,8 @@ public final class ColosseumConciseDiscordFormatter {
 	/**
 	 * Builds a concise Discord payload containing only the final summary statistics.
 	 */
-	public static JsonObject buildPayload(ColosseumAttemptDTO dto, DataLoggerConfig config) {
-		JsonObject embed = generateBaseEmbed(dto.getAccount());
+	public static JsonObject buildPayload(ColosseumAttemptDTO dto, DataLoggerConfig config, boolean isTest) {
+		JsonObject embed = isTest ? generateTestEmbed(dto.getAccount()) : generateBaseEmbed(dto.getAccount());
 
 		setColor(embed, "COMPLETED".equals(dto.getResult()) ? 0x00FF00 : 0xFF0000);
 

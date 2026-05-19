@@ -30,6 +30,7 @@ import com.datalogger.dto.ColosseumAttemptDTO;
 import com.datalogger.dto.ColosseumWaveDTO;
 import com.datalogger.models.enums.WaveStatus;
 import static com.datalogger.webhook.ColosseumDiscordBroadcaster.generateBaseEmbed;
+import static com.datalogger.webhook.ColosseumDiscordBroadcaster.generateTestEmbed;
 import static com.datalogger.webhook.DiscordWebhookUtils.addField;
 import static com.datalogger.webhook.DiscordWebhookUtils.wrapEmbedIntoPayload;
 import static com.datalogger.webhook.WebhookFormatUtils.formatActiveModifiers;
@@ -54,8 +55,8 @@ public final class ColosseumDetailedDiscordFormatter
 	 * Builds a detailed Discord payload containing a wave-by-wave breakdown.
 	 */
 	@Nonnull
-	public static JsonObject buildPayload(@Nonnull ColosseumAttemptDTO dto, @Nonnull DataLoggerConfig config) {
-		JsonObject embed = generateBaseEmbed(dto.getAccount());
+	public static JsonObject buildPayload(@Nonnull ColosseumAttemptDTO dto, @Nonnull DataLoggerConfig config, boolean isTest) {
+		JsonObject embed = isTest ? generateTestEmbed(dto.getAccount()) : generateBaseEmbed(dto.getAccount());
 //		StringBuilder description = new StringBuilder();
 //
 //		List<String> topStats = new ArrayList<>();

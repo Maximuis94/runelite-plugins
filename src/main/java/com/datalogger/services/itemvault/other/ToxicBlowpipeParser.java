@@ -81,6 +81,11 @@ public class ToxicBlowpipeParser extends AbstractVaultParser
 	}
 
 	@Override
+	public String getVaultLabel() {
+		return ItemCharge.TOXIC_BLOWPIPE.name();
+	}
+
+	@Override
 	protected void loadSessionData(File cacheFile)
 	{
 		// Read the JSON file back as a List<BankedItem>
@@ -217,5 +222,10 @@ public class ToxicBlowpipeParser extends AbstractVaultParser
 	protected File getInternalVaultFile()
 	{
 		return fileIOService.getInternalVaultFile(ItemCharge.TOXIC_BLOWPIPE);
+	}
+
+	public File getInternalVaultFile(long accountHash)
+	{
+		return fileIOService.getInternalVaultFile(ItemCharge.TOXIC_BLOWPIPE, String.valueOf(accountHash));
 	}
 }

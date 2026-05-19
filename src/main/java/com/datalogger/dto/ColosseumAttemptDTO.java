@@ -54,6 +54,8 @@ public class ColosseumAttemptDTO {
 	private int totalGlory;
 	private double totalTime;
 
+	private String tag;
+
 	@Builder.Default
 	private List<String> activeModifiers = new ArrayList<>();
 

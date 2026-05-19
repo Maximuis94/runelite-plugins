@@ -258,7 +258,6 @@ public class ItemVaultLogger extends AbstractLogger
 	 */
 	public void exportAggregatedData()
 	{
-		// Wrap the export in an executor so the Heavy Disk IO from aggregateAllAccounts() runs safely in the background
 		executor.submit(() -> {
 			log.debug("Attempting to export aggregated vault data...");
 			List<BankedItem> items = aggregateAllAccounts();

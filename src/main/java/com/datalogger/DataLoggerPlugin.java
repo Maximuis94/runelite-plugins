@@ -47,6 +47,7 @@ import com.datalogger.services.ItemVaultParser;
 import com.datalogger.services.SupplyTracker;
 import com.datalogger.services.itemvault.VaultManager;
 import com.datalogger.ui.DataLoggerPanel;
+import com.datalogger.ui.modes.ItemsModePanel;
 import com.datalogger.webhook.ColosseumDiscordBroadcaster;
 import com.google.inject.Provides;
 import java.awt.image.BufferedImage;
@@ -55,6 +56,7 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import javax.inject.Inject;
+import javax.swing.SwingUtilities;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Actor;
 import net.runelite.api.ChatMessageType;
@@ -110,6 +112,7 @@ public class DataLoggerPlugin extends Plugin
 	@Inject private SupplyTracker supplyTracker;
 	@Inject private DiscordWebhookService discordWebhookService;
 	@Inject private CombatTracker combatTracker;
+	@Inject private ItemsModePanel itemsModePanel;
 
 	private NavigationButton navButton;
 	private boolean sessionInitialized = false;
@@ -150,16 +153,8 @@ public class DataLoggerPlugin extends Plugin
 		toggleColosseum(config.logColosseum());
 		toggleTimeline(config.logWaveTimeline());
 		toggleScreenshots(config.screenshotBetweenWaves());
+		toggleSidebar(config.showSideBarPanel());
 
-		final BufferedImage icon = ImageUtil.loadImageResource(getClass(), "icon.png");
-		navButton = NavigationButton.builder()
-			.tooltip("Data Logger Viewer")
-			.icon(icon)
-			.priority(5)
-			.panel(panel)
-			.build();
-
-		clientToolbar.addNavigation(navButton);
 		startUpComplete = true;
 	}
 
@@ -174,8 +169,6 @@ public class DataLoggerPlugin extends Plugin
 		ItemCharge.setItemManager(null);
 		ConsumableItemGroup.setItemManager(null);
 
-		clientToolbar.removeNavigation(navButton);
-
 		eventBus.unregister(accountHashMapper);
 		eventBus.unregister(fileIOService);
 		eventBus.unregister(inventoryStateManager);
@@ -185,6 +178,7 @@ public class DataLoggerPlugin extends Plugin
 		eventBus.unregister(discordWebhookService);
 		eventBus.unregister(combatTracker);
 
+		toggleSidebar(false);
 		toggleItemVault(false);
 		toggleGrandExchange(false);
 		toggleColosseum(false);
@@ -218,21 +212,33 @@ public class DataLoggerPlugin extends Plugin
 			case "screenshotBetweenWaves":
 				toggleScreenshots(config.screenshotBetweenWaves());
 				break;
+			case "showSideBarPanel":
+				toggleSidebar(config.showSideBarPanel());
+			case "hideZeroPriceItems":
+				log.debug("{}bling hiding 0 priced items", config.hideZeroPriceItems() ? "en" : "dis");
+				SwingUtilities.invokeLater(() -> itemsModePanel.applyFilters());
+
 		}
 	}
 
-//	private void toggleItemVault(boolean enable)
-//	{
-//		if (enable && !isItemVaultRegistered) {
-//			eventBus.register(itemVaultParser);
-//			isItemVaultRegistered = true;
-//			log.debug("Item Vault tracking enabled.");
-//		} else if (!enable && isItemVaultRegistered) {
-//			eventBus.unregister(itemVaultParser);
-//			isItemVaultRegistered = false;
-//			log.debug("Item Vault tracking disabled.");
-//		}
-//	}
+	private void toggleSidebar(boolean enable)
+	{
+		if (enable) {
+			log.debug("Enabling sidebar panel icon");
+			final BufferedImage icon = ImageUtil.loadImageResource(getClass(), "icon.png");
+			navButton = NavigationButton.builder()
+				.tooltip("Data Logger Viewer")
+				.icon(icon)
+				.priority(5)
+				.panel(panel)
+				.build();
+
+			clientToolbar.addNavigation(navButton);
+		} else {
+			log.debug("Disabling sidebar panel icon");
+			clientToolbar.removeNavigation(navButton);
+		}
+	}
 
 	private void toggleItemVault(boolean enable)
 	{

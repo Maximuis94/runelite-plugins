@@ -61,4 +61,6 @@ public interface VaultParser
 	 * Parse the cache file produced by the VaultParser and converts its contents to a List of BankedItem instances.
 	 */
 	List<BankedItem> parseOfflineFile(long accountHash, File vaultFile);
+
+	File getInternalVaultFile(long accountHash);
 }

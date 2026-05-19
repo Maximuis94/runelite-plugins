@@ -27,6 +27,7 @@ package com.datalogger.services;
 import com.datalogger.DataLoggerConfig;
 import com.datalogger.constants.PluginConstants;
 import static com.datalogger.constants.PluginConstants.INTERNAL_COLOSSEUM_ATTEMPT_HISTORY;
+import static com.datalogger.constants.PluginConstants.INTERNAL_VAULT_DIR;
 import com.datalogger.dto.ColosseumAttemptDTO;
 import com.datalogger.dto.ColosseumStateDTO;
 import com.datalogger.dto.TrackedSuppliesDTO;
@@ -41,11 +42,13 @@ import com.datalogger.models.colosseum.ColosseumWave;
 import com.datalogger.models.enums.ItemCharge;
 import com.datalogger.models.enums.ScreenshotFormat;
 import com.datalogger.models.enums.VaultType;
+import static com.datalogger.models.enums.VaultType.getInternalRoot;
 import com.datalogger.models.grandexchange.ActiveGeOffer;
 import com.datalogger.models.grandexchange.GeLedgerEntry;
 import com.datalogger.models.itemvault.BankedItem;
 import com.datalogger.models.itemvault.ValuedItemBundle;
 import com.datalogger.models.supplytracker.ValuedItemStack;
+import com.datalogger.services.itemvault.VaultParser;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -214,7 +217,7 @@ public class FileIOService
 		{
 			this.accountName = accountName;
 			this.accountHashString = accountHashString;
-			internalVaultRoot = VaultType.getInternalRoot(accountHashString);
+			internalVaultRoot = getInternalRoot(accountHashString);
 			hasValidAccountInfo = true;
 		}
 		else if (hasValidAccountInfo)
@@ -305,9 +308,26 @@ public class FileIOService
 	/**
 	 * Return the internal vault json file relevant for the account that is logged in associated with the given VaultType
 	 */
+	public File getInternalVaultFile(VaultType vaultType, String accountHashString)
+	{
+		File internalVaultRoot = getInternalRoot(accountHashString);
+		return new File(internalVaultRoot, vaultType.fileNameString() + "_" + accountHashString + ".json");
+	}
+
+	/**
+	 * Return the internal vault json file relevant for the account that is logged in associated with the given VaultType
+	 */
 	public File getInternalVaultFile(ItemCharge itemCharge)
 	{
 		return new File(internalVaultRoot, itemCharge.fileNameString() + "_" + accountHashString + ".json");
+	}
+
+	/**
+	 * Return the internal vault json file relevant for the account that is logged in associated with the given VaultType
+	 */
+	public File getInternalVaultFile(ItemCharge itemCharge, String accountHashString)
+	{
+		return new File(new File(INTERNAL_VAULT_DIR, accountHashString), itemCharge.fileNameString() + "_" + accountHashString + ".json");
 	}
 
 	/**
@@ -872,10 +892,11 @@ public class FileIOService
 				 PrintWriter out = new PrintWriter(bw)) {
 
 				if (includeMetadata) {
-					out.println("AccountName,Vault,ItemID,ItemName,Quantity");
+					out.println("AccountName,AccountHash,Source,ItemID,ItemName,Quantity");
 					for (BankedItem item : items) {
-						out.printf("%s,%s,%d,%s,%d%n",
+						out.printf("%s,%d,%s,%d,%s,%d%n",
 							item.getAccountName(),
+							item.getAccountHash(),
 							item.getVaultType(),
 							item.getItemId(),
 							item.getItemName(),
@@ -932,6 +953,46 @@ public class FileIOService
 		pendingWrites.add(future);
 	}
 
+	public void exportAggregatedItemCharges(long accountHash, String accountName, List<VaultParser> vaultParsers) {
+		executor.submit(() -> {
+			List<BankedItem> aggregatedCharges = new ArrayList<>();
+			for (VaultParser parser : vaultParsers) {
+				File vaultFile = parser.getInternalVaultFile(accountHash);
+
+				if (!vaultFile.exists())
+				{
+					continue;
+				}
+				log.debug("Exporting vault file {}", vaultFile);
+				List<BankedItem> parsedCharges = parser.parseOfflineFile(accountHash, vaultFile);
+				if (parsedCharges != null && !parsedCharges.isEmpty()) {
+					aggregatedCharges.addAll(parsedCharges);
+				}
+			}
+
+			if (aggregatedCharges.isEmpty()) {
+				log.debug("No item charges found to export for account {}", accountName);
+				return;
+			}
+			else
+			{
+				log.debug("A total of {} items found to export for account {}", aggregatedCharges.size(), accountName);
+			}
+
+			VaultType vaultType = VaultType.ITEM_CHARGES;
+
+			if (config.logItemVaultJSON()) {
+				File externalJson = vaultType.getExternalJSONFile(accountName);
+				saveJson(externalJson, aggregatedCharges);
+			}
+
+			if (config.logItemVaultCSV()) {
+				File csvFile = vaultType.getExternalCSVFile(accountName);
+				writeVaultCsv(csvFile, aggregatedCharges, true);
+			}
+		});
+	}
+
 	/**
 	 * Reads all vault JSON files from the disk.
 	 * Returns a Map where the key is the filename and the value is the array of raw items.
@@ -946,7 +1007,6 @@ public class FileIOService
 			return allData;
 		}
 
-		// 1. Iterate over Account Hash Subdirectories
 		File[] accountDirs = directory.listFiles(File::isDirectory);
 		if (accountDirs == null) return allData;
 
@@ -959,10 +1019,9 @@ public class FileIOService
 			}
 			catch (NumberFormatException e)
 			{
-				continue; // Skip any folders that aren't numeric account hashes
+				continue;
 			}
 
-			// 2. Iterate over Vault JSON files inside the account directory
 			File[] vaultFiles = accountDir.listFiles((dir, name) -> name.endsWith(".json"));
 			if (vaultFiles == null) continue;
 

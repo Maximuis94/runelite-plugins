@@ -30,7 +30,10 @@ import com.datalogger.dto.ColosseumAttemptDTO;
 import com.datalogger.dto.ColosseumWaveDTO;
 import com.datalogger.models.enums.WaveStatus;
 import com.datalogger.utils.ImageUtil;
+import static com.datalogger.webhook.ColosseumDiscordBroadcaster.generateBaseEmbed;
 import static com.datalogger.webhook.ColosseumDiscordBroadcaster.generateMinimalEmbed;
+import static com.datalogger.webhook.ColosseumDiscordBroadcaster.generateMinimalTestEmbed;
+import static com.datalogger.webhook.ColosseumDiscordBroadcaster.generateTestEmbed;
 import static com.datalogger.webhook.DiscordWebhookUtils.wrapEmbedIntoPayload;
 import static com.datalogger.webhook.WebhookFormatUtils.formatActiveModifiers;
 import static com.datalogger.webhook.WebhookFormatUtils.formatColosseumWaveLine;
@@ -72,8 +75,8 @@ public final class ColosseumScreenshotDiscordFormatter
 	 * Builds a minimal Discord payload with only the footer
 	 */
 	@Nonnull
-	public static JsonObject buildPayload() {
-		JsonObject embed = generateMinimalEmbed();
+	public static JsonObject buildPayload(boolean isTest) {
+		JsonObject embed = isTest ? generateMinimalTestEmbed() : generateMinimalEmbed();
 		return wrapEmbedIntoPayload(embed);
 	}
 
