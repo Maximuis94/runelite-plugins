@@ -111,6 +111,7 @@ public class DynamicLineOfSightPlugin extends Plugin
 	private int longRangeBonus = 0;
 
 	private boolean isInColosseum = false;
+	private int myopiaTier = 0;
 	private int myopiaReduction = 0;
 	private boolean isAffectedByMyopia = false;
 
@@ -186,8 +187,11 @@ public class DynamicLineOfSightPlugin extends Plugin
 						return;
 					}
 				}
-				if (isInColosseum)
+				if (myopiaTier > 0)
+				{
 					resetInColosseum();
+					updateCachedRange();
+				}
 			}
 		}
 	}
@@ -195,8 +199,9 @@ public class DynamicLineOfSightPlugin extends Plugin
 	private void resetInColosseum()
 	{
 		log.debug("Resetting Colosseum-related values");
+		myopiaTier = 0;
 		isInColosseum = false;
-		myopiaReduction = 0;
+		updateMyopiaReduction();
 	}
 
 	@Subscribe
@@ -233,6 +238,7 @@ public class DynamicLineOfSightPlugin extends Plugin
 
 		else if (vId == MYOPIA_VARBIT_ID)
 		{
+			myopiaTier = client.getVarbitValue(MYOPIA_VARBIT_ID);
 			isInColosseum = true;
 			updateMyopiaReduction();
 			updateCachedRange();
@@ -320,13 +326,6 @@ public class DynamicLineOfSightPlugin extends Plugin
 		attackStyleIndex = client.getVarpValue(ATTACK_STYLE_VARP_ID);
 
 		updateInColosseum();
-
-		// If true, plugin was activated during a trial
-		if (isInColosseum)
-		{
-			updateMyopiaReduction();
-		}
-
 		updateCachedRange();
 	}
 
@@ -338,17 +337,14 @@ public class DynamicLineOfSightPlugin extends Plugin
 		if (!isInColosseum)
 		{
 			log.debug("Player is not in Colosseum - updated myopiaReduction from {} to 0", myopiaReduction);
-			myopiaReduction = 0;
+			myopiaTier = 0;
 		}
-		else
+		int newValue = myopiaTier * 2;
+		if (newValue != myopiaReduction)
 		{
-			int newValue = client.getVarbitValue(MYOPIA_VARBIT_ID) * 2;
-			if (newValue != myopiaReduction)
-			{
-				log.debug("Updated myopiaReduction from {} to {}", myopiaReduction, newValue);
-				myopiaReduction = newValue;
-				overlay.setMyopiaReduction(myopiaReduction);
-			}
+			log.debug("Updated myopiaReduction from {} to {}", myopiaReduction, newValue);
+			myopiaReduction = newValue;
+			overlay.setMyopiaReduction(myopiaReduction);
 		}
 	}
 

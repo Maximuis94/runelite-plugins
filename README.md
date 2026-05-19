@@ -12,7 +12,8 @@ During Fortis Colosseum trials, the active Myopia tier will be factored into all
 Furthermore, a keybind may be defined to allow the player line of sight to be toggled on/off by pressing this keybind. 
 
 ### Virtual player line of sight
-If the virtual line of sight keybind is configured, the player lines of sight will be drawn as if the player is standing at the location of the cursor while the button is pressed (see video)
+If the virtual line of sight keybind is configured, the player lines of sight will be drawn as if the player is standing at the location of the cursor while the button is pressed;
+![example-virtual-los.png](images/example-virtual-los.png)</br>
 
 ## NPC line of sight
 For foes encountered in the TzHaar Fight Caves, the Inferno, TzHaar-Ket-Rak's challenges and Fortis Colosseum, the NPC line of sight can be drawn as well.<br>
@@ -20,18 +21,20 @@ If this option is enabled, hovering over an NPC will display its line of sight. 
 Additionally, a keybind can be set to make the line of sight only appear while the keybind is pressed. If this is not defined, the lines of sight will always be drawn while hovering over an NPC.
 
 ## Examples
-![debug-los-myopia2-example.png](images/debug-los-myopia2-example.png)
-_Example of various pre-defined lines of sight, with Myopia II active_
+![debug-los-myopia2-example.png](images/debug-los-myopia2-example.png)</br>
+_Example of various pre-defined lines of sight, with Myopia II active_</br></br>
 
 ![javelin-colossus-los-example.PNG](images/javelin-colossus-los-example.png)</br>
-_Example of the NPC line of sight of a Javelin colossus behind a pillar_
+_Example of the NPC line of sight of a Javelin colossus behind a pillar_</br></br>
 
-<video src="https://github.com/user-attachments/assets/dc9edb6f-4a21-46b2-8370-55847c3208a0" controls="controls" muted="muted" loop="loop" width="600"> </video>
+![example-dynamic-los-inferno-jal-ak-npc-los.png](images/example-dynamic-los-inferno-jal-ak-npc-los.png)</br>
+_Example in which the Jal-Ak line of sight is used to position oneself_</br></br>
 
-_Example of the line of sights drawn from both the player and the cursor with Myopia II active_
+![example-dynamic-los-inferno-nibbler-max-range.png](images/example-dynamic-los-inferno-nibbler-max-range.png)</br>
+_Example of how the player line of sight can be used to check if a nibbler is in range_</br></br>
 
-![corner-trap-example.png](images/corner-trap-example.png)
-_Example of how the virtual player Line of Sight could be used to identify corner traps at a distance_
+![corner-trap-example.png](images/corner-trap-example.png)</br>
+_Example of how the virtual player Line of Sight could be used to identify corner traps at a distance_</br></br>
 
-![debug-minimus-npc-los-15-range-example.png](images/debug-minimus-npc-los-15-range-example.png)
-_Fictitious example of the NPC line of sight, if Minimus were to have an attack range of 15_
+![debug-minimus-npc-los-15-range-example.png](images/debug-minimus-npc-los-15-range-example.png)</br>
+_Fictitious example of the NPC line of sight, if Minimus were to have an attack range of 15_</br></br>
