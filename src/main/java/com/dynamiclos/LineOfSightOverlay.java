@@ -68,6 +68,7 @@ public class LineOfSightOverlay extends Overlay {
 	private boolean hotkeyAlwaysHeld = false;
 	private Keybind virtualPlayerLosHotkey;
 
+	private boolean enabledVirtualNpcLos = false;
 	private Keybind virtualNpcLosHotkey;
 	private int virtualNpcSize;
 	private int virtualNpcMeleeRange;
@@ -301,6 +302,7 @@ public class LineOfSightOverlay extends Overlay {
 		otherNpcFillColor = config.otherNpcFillColor();
 		otherNpcLineWidth = (float) config.otherNpcLineWidth();
 
+		enabledVirtualNpcLos = config.enableVirtualNpcLos();
 		virtualNpcLosHotkey = config.virtualNpcLosHotkey();
 		virtualNpcSize = Math.max(1, config.virtualNpcSize());
 		virtualNpcMeleeRange = config.virtualNpcMeleeRange();
@@ -361,7 +363,7 @@ public class LineOfSightOverlay extends Overlay {
 				} catch (NumberFormatException e) {
 					npcLosDefinitionsByName.computeIfAbsent(identifier, k -> new ArrayList<>()).add(def);
 				}
-			} catch (NumberFormatException e) {	}
+			} catch (NumberFormatException e) { }
 		}
 	}
 
@@ -390,14 +392,13 @@ public class LineOfSightOverlay extends Overlay {
 		WorldArea playerArea = player.getWorldArea();
 		WorldPoint currentLocation = player.getWorldLocation();
 
-		boolean mutuallyExcludedPlayerLos;
+		boolean mutuallyExcludedPlayerLos = false;
 		if (drawNpcLos)
 		{
 			drawHoveredNpcLos(graphics, wv);
-			mutuallyExcludedPlayerLos = mutualExclusivePlayerNpcLos && lastHoveredNpc != null;
-		}
-		else {
-			mutuallyExcludedPlayerLos = false;
+			if (mutualExclusivePlayerNpcLos && lastHoveredNpc != null) {
+				mutuallyExcludedPlayerLos = true;
+			}
 		}
 
 		boolean isVirtualKeyValid = virtualPlayerLosHotkey != null && !virtualPlayerLosHotkey.equals(Keybind.NOT_SET);
@@ -410,12 +411,16 @@ public class LineOfSightOverlay extends Overlay {
 			}
 		}
 
-		boolean isVirtualNpcKeyValid = virtualNpcLosHotkey != null && !virtualNpcLosHotkey.equals(Keybind.NOT_SET);
+		boolean isVirtualNpcKeyValid = enabledVirtualNpcLos && virtualNpcLosHotkey != null && !virtualNpcLosHotkey.equals(Keybind.NOT_SET);
 		if (isVirtualNpcKeyValid && plugin.isVirtualNpcLosHotkeyHeld()) {
 			Tile hoveredTile = wv.getSelectedSceneTile();
 
 			if (hoveredTile != null && hoveredTile.getWorldLocation() != null) {
 				drawVirtualNpcLos(graphics, wv, hoveredTile.getWorldLocation());
+
+				if (mutualExclusivePlayerNpcLos) {
+					mutuallyExcludedPlayerLos = true;
+				}
 			}
 		}
 
