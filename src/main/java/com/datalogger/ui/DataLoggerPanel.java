@@ -25,6 +25,7 @@
 package com.datalogger.ui;
 
 import com.datalogger.models.enums.PanelViewMode;
+import com.datalogger.models.enums.UIScrollSpeed;
 import com.datalogger.ui.modes.ColosseumReviewModePanel;
 import com.datalogger.ui.modes.ColosseumStatisticsModePanel;
 import com.datalogger.ui.modes.ItemsManagerModePanel;
@@ -44,8 +45,10 @@ import javax.swing.JPanel;
 import javax.swing.JScrollBar;
 import javax.swing.JScrollPane;
 import javax.swing.Scrollable;
+import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
 
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.PluginPanel;
@@ -55,17 +58,33 @@ public class DataLoggerPanel extends PluginPanel {
 
 	private final CardLayout cardLayout;
 	private final JPanel cardContainer;
+	private JScrollBar scrollBar;
+
+	// Store references to your child panels so we can delegate updates to them
+	private final UtilitiesModePanel utilitiesPanel;
+	private final ColosseumStatisticsModePanel colosseumPanel;
+	// private final ColosseumReviewModePanel colosseumReviewPanel;
+	private final ItemsModePanel itemsPanel;
+	private final ItemsManagerModePanel itemsManagerPanel;
 
 	@Inject
 	public DataLoggerPanel(
 		UtilitiesModePanel utilitiesPanel,
 		ColosseumStatisticsModePanel colosseumPanel,
-//		ColosseumReviewModePanel colosseumReviewPanel,
+//     ColosseumReviewModePanel colosseumReviewPanel,
 		ItemsModePanel itemsPanel,
 		ItemsManagerModePanel itemsManagerPanel
 	)
 	{
 		super(false);
+
+		// Assign injected panels to class fields
+		this.utilitiesPanel = utilitiesPanel;
+		this.colosseumPanel = colosseumPanel;
+		// this.colosseumReviewPanel = colosseumReviewPanel;
+		this.itemsPanel = itemsPanel;
+		this.itemsManagerPanel = itemsManagerPanel;
+
 		this.setBorder(new EmptyBorder(10, 10, 10, 10));
 		this.setBackground(ColorScheme.DARK_GRAY_COLOR);
 		this.setLayout(new BorderLayout(0, 10));
@@ -82,7 +101,7 @@ public class DataLoggerPanel extends PluginPanel {
 		cardContainer.setBackground(ColorScheme.DARK_GRAY_COLOR);
 
 		cardContainer.add(colosseumPanel, PanelViewMode.COLOSSEUM_STATISTICS.name());
-//		cardContainer.add(colosseumReviewPanel, PanelViewMode.COLOSSEUM_REVIEW.name());
+//     cardContainer.add(colosseumReviewPanel, PanelViewMode.COLOSSEUM_REVIEW.name());
 		cardContainer.add(itemsPanel, PanelViewMode.ITEMS.name());
 		cardContainer.add(itemsManagerPanel, PanelViewMode.ITEMS_MANAGER.name());
 		cardContainer.add(utilitiesPanel, PanelViewMode.UTILITIES.name());
@@ -105,11 +124,44 @@ public class DataLoggerPanel extends PluginPanel {
 		scrollPane.setAlignmentX(Component.LEFT_ALIGNMENT);
 
 		// Set it such that it instantly scrolls to the top/bottom
-		JScrollBar scrollbar = scrollPane.getVerticalScrollBar();
-		scrollbar.setUnitIncrement(512);
+		this.scrollBar = scrollPane.getVerticalScrollBar();
+		this.scrollBar.setUnitIncrement(512);
 
 		add(topPanel, BorderLayout.NORTH);
 		add(scrollPane, BorderLayout.CENTER);
+	}
+
+	/**
+	 * Updates the scroll speed of the outer scroll bar
+	 */
+	public void setOuterScrollSpeed(UIScrollSpeed scrollSpeed)
+	{
+		SwingUtilities.invokeLater(() -> {
+			switch (scrollSpeed){
+				case LOW:
+					scrollBar.setUnitIncrement(32);
+					break;
+				case MEDIUM:
+					scrollBar.setUnitIncrement(128);
+					break;
+				case HIGH:
+					scrollBar.setUnitIncrement(512);
+					break;
+			}
+		});
+	}
+
+	/**
+	 * Updates the scroll speed of the inner scroll bars
+	 */
+	public void setInnerScrollSpeed(UIScrollSpeed scrollSpeed)
+	{
+		SwingUtilities.invokeLater(() -> {
+			itemsPanel.setScrollSpeed(scrollSpeed);
+			utilitiesPanel.setScrollSpeed(scrollSpeed);
+			itemsManagerPanel.setScrollSpeed(scrollSpeed);
+			colosseumPanel.setScrollSpeed(scrollSpeed);
+		});
 	}
 
 	/**

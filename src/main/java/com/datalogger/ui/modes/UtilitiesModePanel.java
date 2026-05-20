@@ -34,6 +34,7 @@ import com.datalogger.framework.LogType;
 import com.datalogger.loggers.ItemVaultLogger;
 import com.datalogger.models.enums.ColosseumBroadcastMode;
 import com.datalogger.models.enums.ColosseumWebhookFormatter;
+import com.datalogger.models.enums.UIScrollSpeed;
 import com.datalogger.services.DiscordWebhookService;
 import com.datalogger.services.FileIOService;
 import com.datalogger.services.itemvault.VaultManager;
@@ -65,6 +66,7 @@ import javax.swing.JComboBox;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.JScrollBar;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 import javax.swing.SwingUtilities;
@@ -87,6 +89,9 @@ public class UtilitiesModePanel extends JPanel {
 	private final ItemVaultLogger itemVaultLogger;
 
 	private Instant waitUntil;
+	private UIScrollSpeed scrollSpeed = UIScrollSpeed.MEDIUM;
+	protected JScrollBar scrollBar;
+
 
 	@Inject
 	public UtilitiesModePanel(ScheduledExecutorService executor, DiscordWebhookService discordWebhookService,
@@ -213,7 +218,10 @@ public class UtilitiesModePanel extends JPanel {
 		customFormatInput.setToolTipText("Edit custom formatting here to test changes before saving to config.");
 
 		JScrollPane scrollPane = Components.createScrollPane(customFormatInput);
-		scrollPane.setPreferredSize(new Dimension(0, 100)); // Constrain height
+		scrollPane.setPreferredSize(new Dimension(0, 100));
+		scrollBar = scrollPane.getVerticalScrollBar();
+		setScrollSpeed(scrollSpeed);
+
 		panel.add(scrollPane, BorderLayout.CENTER);
 
 		// 4. Test Button
@@ -306,5 +314,25 @@ public class UtilitiesModePanel extends JPanel {
 				log.error("Failed to read or parse the JSON file for Discord test.", ex);
 			}
 		});
+	}
+
+	/**
+	 * Set the scroll speed of the inner scrollbar of this panel to a value that corresponds with the given speed
+	 */
+	public void setScrollSpeed(UIScrollSpeed scrollSpeed)
+	{
+		this.scrollSpeed = scrollSpeed;
+		switch (scrollSpeed)
+		{
+			case LOW:
+				scrollBar.setUnitIncrement(8);
+				break;
+			case MEDIUM:
+				scrollBar.setUnitIncrement(16);
+				break;
+			case HIGH:
+				scrollBar.setUnitIncrement(32);
+				break;
+		}
 	}
 }

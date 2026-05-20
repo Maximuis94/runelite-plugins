@@ -214,9 +214,17 @@ public class DataLoggerPlugin extends Plugin
 				break;
 			case "showSideBarPanel":
 				toggleSidebar(config.showSideBarPanel());
+				break;
 			case "hideZeroPriceItems":
 				log.debug("{}bling hiding 0 priced items", config.hideZeroPriceItems() ? "en" : "dis");
 				SwingUtilities.invokeLater(() -> itemsModePanel.applyFilters());
+				break;
+			case "outerScrollSpeed":
+				panel.setOuterScrollSpeed(config.outerScrollSpeed());
+				break;
+			case "innerScrollSpeed":
+				panel.setInnerScrollSpeed(config.innerScrollSpeed());
+				break;
 
 		}
 	}
@@ -234,6 +242,8 @@ public class DataLoggerPlugin extends Plugin
 				.build();
 
 			clientToolbar.addNavigation(navButton);
+			panel.setOuterScrollSpeed(config.outerScrollSpeed());
+			panel.setInnerScrollSpeed(config.innerScrollSpeed());
 		} else {
 			log.debug("Disabling sidebar panel icon");
 			clientToolbar.removeNavigation(navButton);
@@ -243,12 +253,10 @@ public class DataLoggerPlugin extends Plugin
 	private void toggleItemVault(boolean enable)
 	{
 		if (enable && !isItemVaultRegistered) {
-			// THE UPGRADE: The Manager handles all parser registrations and mid-session syncs!
 			vaultManager.startUp();
 			isItemVaultRegistered = true;
 			log.debug("Item Vault tracking enabled.");
 		} else if (!enable && isItemVaultRegistered) {
-			// THE UPGRADE: The Manager unregisters all its parsers cleanly!
 			vaultManager.shutDown();
 			isItemVaultRegistered = false;
 			log.debug("Item Vault tracking disabled.");

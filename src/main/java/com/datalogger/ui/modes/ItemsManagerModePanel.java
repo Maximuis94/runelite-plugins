@@ -2,6 +2,7 @@ package com.datalogger.ui.modes;
 
 import static com.datalogger.constants.PluginConstants.INTERNAL_VAULT_DIR;
 import com.datalogger.constants.PluginConstants;
+import com.datalogger.models.enums.UIScrollSpeed;
 import com.datalogger.models.itemvault.BankedItem;
 import com.datalogger.services.AccountHashMapper;
 import com.datalogger.ui.utils.Components;
@@ -29,6 +30,7 @@ import javax.swing.JComboBox;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.JScrollBar;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.SwingConstants;
@@ -63,6 +65,9 @@ public class ItemsManagerModePanel extends JPanel
 	private final ItemManager itemManager;
 
 	private final ClientThread clientThread;
+
+	private UIScrollSpeed scrollSpeed = UIScrollSpeed.MEDIUM;
+	private JScrollBar scrollBar;
 
 	@Inject
 	public ItemsManagerModePanel(AccountHashMapper accountHashMapper, Gson gson, ScheduledExecutorService executor, ItemManager itemManager, ClientThread clientThread)
@@ -372,7 +377,8 @@ public class ItemsManagerModePanel extends JPanel
 
 			JScrollPane scrollPane = Components.createScrollPane(itemsTable);
 
-			scrollPane.getVerticalScrollBar().setUnitIncrement(16);
+			scrollBar = scrollPane.getVerticalScrollBar();
+			setScrollSpeed(scrollSpeed);
 
 			contentPanel.add(scrollPane, BorderLayout.CENTER);
 		}
@@ -395,6 +401,26 @@ public class ItemsManagerModePanel extends JPanel
 		}));
 
 		return new ImageIcon(image);
+	}
+
+	/**
+	 * Set the scroll speed of the inner scrollbar of this panel to a value that corresponds with the given speed
+	 */
+	public void setScrollSpeed(UIScrollSpeed scrollSpeed)
+	{
+		this.scrollSpeed = scrollSpeed;
+		switch (scrollSpeed)
+		{
+			case LOW:
+				scrollBar.setUnitIncrement(8);
+				break;
+			case MEDIUM:
+				scrollBar.setUnitIncrement(16);
+				break;
+			case HIGH:
+				scrollBar.setUnitIncrement(32);
+				break;
+		}
 	}
 
 	public class ItemIconCellRenderer extends DefaultTableCellRenderer

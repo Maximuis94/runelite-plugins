@@ -27,6 +27,7 @@ package com.datalogger.ui.modes;
 
 import com.datalogger.DataLoggerConfig;
 import com.datalogger.constants.PluginConstants;
+import com.datalogger.models.enums.UIScrollSpeed;
 import com.datalogger.models.itemvault.BankedItem;
 import com.datalogger.services.AccountHashMapper;
 import com.datalogger.ui.utils.Components;
@@ -55,6 +56,7 @@ import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.JScrollBar;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.JTextField;
@@ -98,6 +100,8 @@ public class ItemsModePanel extends JPanel
 	private final Map<Integer, Integer> itemPriceCache = new HashMap<>();
 
 	private ItemTable itemTableWrapper;
+	private JScrollBar scrollBar;
+	private UIScrollSpeed scrollSpeed = UIScrollSpeed.MEDIUM;
 
 	@Inject
 	public ItemsModePanel(AccountHashMapper accountHashMapper, Gson gson, ScheduledExecutorService executor, ItemManager itemManager, ClientThread clientThread, DataLoggerConfig config)
@@ -317,7 +321,8 @@ public class ItemsModePanel extends JPanel
 		customTable.setPreferredScrollableViewportSize(new Dimension(customTable.getPreferredSize().width, 36 * 15));
 
 		JScrollPane scrollPane = Components.createScrollPane(customTable);
-		scrollPane.getVerticalScrollBar().setUnitIncrement(16);
+		scrollBar = scrollPane.getVerticalScrollBar();
+		scrollBar.setUnitIncrement(16);
 
 		JPanel tableContainer = new JPanel(new BorderLayout());
 		tableContainer.setBackground(ColorScheme.DARK_GRAY_COLOR);
@@ -362,6 +367,25 @@ public class ItemsModePanel extends JPanel
 		});
 
 		applyFilters();
+	}
+
+	/**
+	 * Set the scroll speed of the inner scrollbar of this panel to a value that corresponds with the given speed
+	 */
+	public void setScrollSpeed(UIScrollSpeed scrollSpeed)
+	{
+		this.scrollSpeed = scrollSpeed;
+		switch (scrollSpeed){
+			case LOW:
+				scrollBar.setUnitIncrement(8);
+				break;
+			case MEDIUM:
+				scrollBar.setUnitIncrement(16);
+				break;
+			case HIGH:
+				scrollBar.setUnitIncrement(32);
+				break;
+		}
 	}
 
 	private void populateAccounts()
@@ -436,6 +460,10 @@ public class ItemsModePanel extends JPanel
 		long totalValue = 0;
 		boolean hideZeroPriceItems = config.hideZeroPriceItems();
 
+		// Track unique accounts and sources in current filtered view
+		Set<String> filteredAccounts = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+		Set<String> filteredSources = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+
 		for (VaultRecord record : rawVaultData)
 		{
 			int price = itemPriceCache.getOrDefault(record.itemId, 0);
@@ -486,6 +514,10 @@ public class ItemsModePanel extends JPanel
 				stat.addQuantity(record.quantity);
 				stat.addAccount(resolvedAccName);
 				stat.addSource(record.source);
+
+				// Add to our top-level unique sets
+				filteredAccounts.add(resolvedAccName);
+				filteredSources.add(record.source);
 			}
 		}
 
@@ -498,19 +530,19 @@ public class ItemsModePanel extends JPanel
 			totalValue += stat.getStackValue();
 		}
 
-		updateStatsUi(uniqueItems, totalQuantity, totalValue);
+		updateStatsUi(uniqueItems, totalQuantity, totalValue, filteredAccounts, filteredSources);
 		itemTableWrapper.updateData(dataModel);
 
 		contentPanel.revalidate();
 		contentPanel.repaint();
 	}
 
-	private void updateStatsUi(int uniqueItems, long totalQuantity, long totalValue)
+	private void updateStatsUi(int uniqueItems, long totalQuantity, long totalValue, Set<String> accounts, Set<String> sources)
 	{
 		statsContainer.removeAll();
 
-		// Changed to a 1x2 grid so the two remaining cards sit side-by-side
-		statsContainer.setLayout(new GridLayout(1, 2, 5, 5));
+		// Changed to a 2x2 grid so all four cards have enough space on the side panel
+		statsContainer.setLayout(new GridLayout(2, 2, 5, 5));
 
 		statsContainer.add(Components.createStatCard(
 			"Unique Items",
@@ -522,6 +554,20 @@ public class ItemsModePanel extends JPanel
 			"Est. Value",
 			QuantityFormatter.quantityToStackSize(totalValue) + " gp",
 			"Total estimated Grand Exchange value"
+		));
+
+		statsContainer.add(Components.createStatCard(
+			"Accounts",
+			String.valueOf(accounts.size()),
+			"<html>A total of " + accounts.size() + " accounts were found;<br>" +
+				(accounts.isEmpty() ? "None" : String.join("<br>", accounts)) + "</html>"
+		));
+
+		statsContainer.add(Components.createStatCard(
+			"Sources",
+			String.valueOf(sources.size()),
+			"<html>A total of " + accounts.size() + " sources were found;<br>" +
+				(sources.isEmpty() ? "None" : String.join("<br>", sources)) + "</html>"
 		));
 
 		statsContainer.revalidate();

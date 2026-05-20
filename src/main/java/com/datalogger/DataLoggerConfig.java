@@ -25,11 +25,10 @@
 package com.datalogger;
 
 import static com.datalogger.constants.PluginConstants.CONFIG_GROUP;
-import com.datalogger.models.enums.BroadcastColosseumScreenshotOption;
 import com.datalogger.models.enums.ColosseumBroadcastMode;
-import com.datalogger.models.enums.ColosseumWebhookFormatter;
 import com.datalogger.models.enums.ScreenshotFormat;
 import com.datalogger.models.enums.TimestampFormat;
+import com.datalogger.models.enums.UIScrollSpeed;
 import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
@@ -126,10 +125,28 @@ public interface DataLoggerConfig extends Config {
 	default boolean showSideBarPanel() { return true; }
 
 	@ConfigItem(
+		keyName = "outerScrollSpeed",
+		name = "Outer scroll speed",
+		description = "Tweaks the scroll speed of the outer scroll bar in the sidebar panel.",
+		position = 1,
+		section = SIDE_BAR_PANEL_SECTION
+	)
+	default UIScrollSpeed outerScrollSpeed() { return UIScrollSpeed.HIGH; }
+
+	@ConfigItem(
+		keyName = "innerScrollSpeed",
+		name = "Inner scroll speed",
+		description = "Tweaks the scroll speed of the inner scroll bar in the sidebar panel.",
+		position = 2,
+		section = SIDE_BAR_PANEL_SECTION
+	)
+	default UIScrollSpeed innerScrollSpeed() { return UIScrollSpeed.MEDIUM; }
+
+	@ConfigItem(
 		keyName = "hideZeroPriceItems",
 		name = "Exclude 0 price items",
 		description = "If enabled, exclude items from the item viewer with a price of 0.",
-		position = 1,
+		position = 3,
 		section = SIDE_BAR_PANEL_SECTION
 	)
 	default boolean hideZeroPriceItems() { return true; }

@@ -26,6 +26,7 @@
 package com.datalogger.ui.modes;
 
 import static com.datalogger.constants.PluginConstants.COLOSSEUM_ATTEMPT_DIR;
+import com.datalogger.models.enums.UIScrollSpeed;
 import static com.datalogger.ui.utils.Util.openDirectory;
 
 import com.datalogger.constants.PluginConstants;
@@ -137,6 +138,8 @@ public class ColosseumStatisticsModePanel extends JPanel
 	private final static Dimension SCROLLPANE_PREFERRED_SIZE = new Dimension(250, 800);
 	private final static Dimension SCROLLPANE_MAXIMUM_SIZE = new Dimension(Integer.MAX_VALUE, 800);
 	private final static String[] TRIAL_RESULTS = {"COMPLETED", "FAILED", "CANCELLED"};
+	private UIScrollSpeed scrollSpeed = UIScrollSpeed.MEDIUM;
+	private JScrollBar scrollBar;
 
 	private List<ColosseumAttemptDTO> cachedAttempts = null;
 	private AggregateStats currentStats = null; // Caches the latest filtered stats state
@@ -655,6 +658,8 @@ public class ColosseumStatisticsModePanel extends JPanel
 
 		scrollPane.setPreferredSize(SCROLLPANE_PREFERRED_SIZE);
 		scrollPane.setMaximumSize(SCROLLPANE_MAXIMUM_SIZE);
+		scrollBar = scrollPane.getVerticalScrollBar();
+		setScrollSpeed(scrollSpeed);
 
 		tableContainer.setLayout(new BoxLayout(tableContainer, BoxLayout.Y_AXIS));
 
@@ -714,6 +719,8 @@ public class ColosseumStatisticsModePanel extends JPanel
 		scrollPane.setMaximumSize(SCROLLPANE_MAXIMUM_SIZE);
 		tableContainer.setLayout(new BoxLayout(tableContainer, BoxLayout.Y_AXIS));
 		scrollPane.setAlignmentX(Component.LEFT_ALIGNMENT);
+		scrollBar = scrollPane.getVerticalScrollBar();
+		setScrollSpeed(scrollSpeed);
 
 		tableContainer.add(scrollPane);
 
@@ -784,8 +791,8 @@ public class ColosseumStatisticsModePanel extends JPanel
 		sortButtonHeader.setAlignmentX(Component.LEFT_ALIGNMENT);
 		scrollPane.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-		JScrollBar scrollBar = scrollPane.getVerticalScrollBar();
-		scrollBar.setUnitIncrement(176);
+		scrollBar = scrollPane.getVerticalScrollBar();
+		setScrollSpeed(scrollSpeed);
 
 		JLabel onClickInstructionLabel = new JLabel("Click an entry to open its directory");
 		tableContainer.add(onClickInstructionLabel);
@@ -901,6 +908,9 @@ public class ColosseumStatisticsModePanel extends JPanel
 		scrollPane.setPreferredSize(SCROLLPANE_PREFERRED_SIZE);
 		scrollPane.setMaximumSize(SCROLLPANE_MAXIMUM_SIZE);
 		scrollPane.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+		scrollBar = scrollPane.getVerticalScrollBar();
+		setScrollSpeed(scrollSpeed);
 
 		tableContainer.setLayout(new BoxLayout(tableContainer, BoxLayout.Y_AXIS));
 		tableContainer.add(scrollPane);
@@ -1648,13 +1658,32 @@ public class ColosseumStatisticsModePanel extends JPanel
 
 	private enum TableMode
 	{
-		HISTORY("History"),
-		MODIFIERS("Modifiers"),
-		REWARDS("Rewards"),
-		WAVES("Waves");
+		HISTORY("History", 88, 176, 352),
+		MODIFIERS("Modifiers", 21, 42, 84),
+		REWARDS("Rewards", 21, 42, 84),
+		WAVES("Waves", 104, 208, 416);
+
 		private final String name;
-		TableMode(String name) { this.name = name; }
-		@Override public String toString() { return name; }
+		@Getter
+		private final int lowScrollSpeed;
+		@Getter
+		private final int mediumScrollSpeed;
+		@Getter
+		private final int highScrollSpeed;
+
+		TableMode(String name, int lowScrollSpeed, int mediumScrollSpeed, int highScrollSpeed)
+		{
+			this.name = name;
+			this.lowScrollSpeed = lowScrollSpeed;
+			this.mediumScrollSpeed = mediumScrollSpeed;
+			this.highScrollSpeed = highScrollSpeed;
+		}
+
+		@Override
+		public String toString()
+		{
+			return name;
+		}
 	}
 
 	private void updateModifierTooltip(Set<String> requiredMods, Set<String> excludedMods)
@@ -1674,7 +1703,6 @@ public class ColosseumStatisticsModePanel extends JPanel
 			String modString = addTier(req);
 			String friendlyDescription = getFriendlyModifierDescription(modString, false);
 			log.debug("Req: {}", friendlyDescription);
-			if (friendlyDescription == null) continue;
 			tooltipBuilder.append("<span style='color: #a5a5a5;'>").append(friendlyDescription).append("</span><br>");
 		}
 
@@ -1685,7 +1713,6 @@ public class ColosseumStatisticsModePanel extends JPanel
 			String modString = addTier(exc);
 			String friendlyDescription = getFriendlyModifierDescription(modString, true);
 			log.debug("Exc: {}", friendlyDescription);
-			if (friendlyDescription == null) continue;
 			tooltipBuilder.append("<span style='color: #a5a5a5;'>").append(friendlyDescription).append("</span><br>");
 		}
 
@@ -1710,8 +1737,7 @@ public class ColosseumStatisticsModePanel extends JPanel
 	 */
 	private String getFriendlyModifierDescription(String state, boolean isExcluded)
 	{
-		// 1. Safely extract the tier and the base enum name
-		int tier = 1; // Default to 1 for un-suffixed single-tier modifiers like TOTEMIC
+		int tier = 1;
 		String base = state;
 
 		if (state.endsWith("_III")) {
@@ -1728,17 +1754,14 @@ public class ColosseumStatisticsModePanel extends JPanel
 			base = state.substring(0, state.length() - 2);
 		}
 
-		// 2. Resolve the base UI label (e.g., "Totemic", "Bees!", "Doom")
-		String baseUiLabel = base; // Fallback
+		String baseUiLabel = base;
 		for (ColosseumModifier m : ColosseumModifier.values()) {
-			// Check both raw names (TOTEMIC) and tier 1 names (BEES_I)
 			if (m.name().equals(base) || m.name().equals(base + "_I")) {
 				baseUiLabel = m.getUiLabel();
 				break;
 			}
 		}
 
-		// 3. Return the friendly formatted string
 		if (tier == 0)
 		{
 			if (isExcluded) {
@@ -1749,10 +1772,8 @@ public class ColosseumStatisticsModePanel extends JPanel
 		}
 		else
 		{
-			// Find exact in-game UI label for this specific tier
 			String exactUiLabel = state; // Fallback
 			for (ColosseumModifier m : ColosseumModifier.values()) {
-				// (tier == 1 && m.name().equals(base)) allows matching TOTEMIC to TOTEMIC
 				if (m.name().equals(state) || (tier == 1 && m.name().equals(base))) {
 					exactUiLabel = m.getUiLabel();
 					break;
@@ -1764,6 +1785,26 @@ public class ColosseumStatisticsModePanel extends JPanel
 			} else {
 				return "- " + exactUiLabel + " is active";
 			}
+		}
+	}
+
+	/**
+	 * Set the scroll speed of the inner scrollbar of this panel to a value that corresponds with the given speed
+	 */
+	public void setScrollSpeed(UIScrollSpeed scrollSpeed)
+	{
+		this.scrollSpeed = scrollSpeed;
+		switch (this.scrollSpeed)
+		{
+			case LOW:
+				scrollBar.setUnitIncrement(currentTableMode.getLowScrollSpeed());
+				break;
+			case MEDIUM:
+				scrollBar.setUnitIncrement(currentTableMode.getMediumScrollSpeed());
+				break;
+			case HIGH:
+				scrollBar.setUnitIncrement(currentTableMode.getHighScrollSpeed());
+				break;
 		}
 	}
 }
