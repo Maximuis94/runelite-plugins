@@ -30,8 +30,12 @@ import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics2D;
 import java.awt.Polygon;
+import java.util.ArrayList;
+import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import javax.inject.Inject;
 import net.runelite.api.Client;
@@ -51,7 +55,6 @@ import net.runelite.client.ui.overlay.Overlay;
 import net.runelite.client.ui.overlay.OverlayLayer;
 import net.runelite.client.ui.overlay.OverlayPosition;
 import net.runelite.client.ui.overlay.outline.ModelOutlineRenderer;
-import net.runelite.client.util.Text;
 
 public class LineOfSightOverlay extends Overlay {
 
@@ -64,6 +67,19 @@ public class LineOfSightOverlay extends Overlay {
 	private boolean mutualExclusivePlayerNpcLos = false;
 	private boolean hotkeyAlwaysHeld = false;
 	private Keybind virtualPlayerLosHotkey;
+
+	private Keybind virtualNpcLosHotkey;
+	private int virtualNpcSize;
+	private int virtualNpcMeleeRange;
+	private int virtualNpcRangedRange;
+	private int virtualNpcMagicRange;
+	private int virtualNpcOtherRange;
+	private Color virtualNpcOutlineColor;
+	private Color virtualNpcFillColor;
+	private float virtualNpcLineWidth;
+
+	private WorldPoint lastVirtualNpcLocation = null;
+	private final Map<CombatStyle, Set<WorldPoint>> cachedVirtualNpcTilesByStyle = new EnumMap<>(CombatStyle.class);
 
 	private int activeWeaponRange = 0;
 	private int myopiaReduction = 0;
@@ -89,7 +105,6 @@ public class LineOfSightOverlay extends Overlay {
 	private float maxRangeLineWidth;
 	private boolean enabledHighlightMaxRangeNpc;
 
-	// FIXED RANGES
 	private boolean enabledFixed1, enabledFixed1NpcHighlight;
 	private int fixed1Range;
 	private Color fixed1OutlineColor, fixed1FillColor;
@@ -115,13 +130,18 @@ public class LineOfSightOverlay extends Overlay {
 	private Color fixed5OutlineColor, fixed5FillColor;
 	private float fixed5LineWidth;
 
-	// NPC COLORS
 	private Color meleeNpcOutlineColor, meleeNpcFillColor;
-	private Color rangedNpcOutlineColor, rangedNpcFillColor;
-	private Color magicNpcOutlineColor, magicNpcFillColor;
-	private Color otherNpcOutlineColor, otherNpcFillColor;
+	private float meleeNpcLineWidth;
 
-	// CACHE STATE
+	private Color rangedNpcOutlineColor, rangedNpcFillColor;
+	private float rangedNpcLineWidth;
+
+	private Color magicNpcOutlineColor, magicNpcFillColor;
+	private float magicNpcLineWidth;
+
+	private Color otherNpcOutlineColor, otherNpcFillColor;
+	private float otherNpcLineWidth;
+
 	private WorldPoint lastPlayerLocation = null;
 	private int lastCalculatedActiveRange = -1;
 	private int lastCalculatedFixed1Range = -1;
@@ -130,7 +150,6 @@ public class LineOfSightOverlay extends Overlay {
 	private int lastCalculatedFixed4Range = -1;
 	private int lastCalculatedFixed5Range = -1;
 
-	// CACHE SETS
 	private final Set<WorldPoint> cachedActiveWeaponTiles = new HashSet<>();
 	private final Set<WorldPoint> cachedMaxRangeTiles = new HashSet<>();
 	private final Set<WorldPoint> cachedFixedRange1Tiles = new HashSet<>();
@@ -141,10 +160,22 @@ public class LineOfSightOverlay extends Overlay {
 
 	private NPC lastHoveredNpc = null;
 	private WorldPoint lastHoveredNpcLocation = null;
-	private final Set<WorldPoint> cachedHoveredNpcTiles = new HashSet<>();
 
-	private final Set<Integer> ignoredNpcIds = new HashSet<>();
-	private final Set<String> ignoredNpcNames = new HashSet<>();
+	private static class NpcLosDef {
+		int range;
+		CombatStyle style;
+		boolean diagonalMelee;
+
+		NpcLosDef(int range, CombatStyle style, boolean diagonalMelee) {
+			this.range = range;
+			this.style = style;
+			this.diagonalMelee = diagonalMelee;
+		}
+	}
+
+	private final Map<String, List<NpcLosDef>> npcLosDefinitionsByName = new HashMap<>();
+	private final Map<Integer, List<NpcLosDef>> npcLosDefinitionsById = new HashMap<>();
+	private final Map<CombatStyle, Set<WorldPoint>> cachedHoveredNpcTilesByStyle = new EnumMap<>(CombatStyle.class);
 
 	@Inject
 	public LineOfSightOverlay(Client client, DynamicLineOfSightConfig config, ModelOutlineRenderer modelOutlineRenderer, DynamicLineOfSightPlugin plugin) {
@@ -256,58 +287,82 @@ public class LineOfSightOverlay extends Overlay {
 
 		meleeNpcOutlineColor = config.meleeNpcOutlineColor();
 		meleeNpcFillColor = config.meleeNpcFillColor();
+		meleeNpcLineWidth = (float) config.meleeNpcLineWidth();
+
 		rangedNpcOutlineColor = config.rangedNpcOutlineColor();
 		rangedNpcFillColor = config.rangedNpcFillColor();
+		rangedNpcLineWidth = (float) config.rangedNpcLineWidth();
+
 		magicNpcOutlineColor = config.magicNpcOutlineColor();
 		magicNpcFillColor = config.magicNpcFillColor();
+		magicNpcLineWidth = (float) config.magicNpcLineWidth();
+
 		otherNpcOutlineColor = config.otherNpcOutlineColor();
 		otherNpcFillColor = config.otherNpcFillColor();
+		otherNpcLineWidth = (float) config.otherNpcLineWidth();
 
-		updateIgnoredNpcs();
+		virtualNpcLosHotkey = config.virtualNpcLosHotkey();
+		virtualNpcSize = Math.max(1, config.virtualNpcSize());
+		virtualNpcMeleeRange = config.virtualNpcMeleeRange();
+		virtualNpcRangedRange = config.virtualNpcRangedRange();
+		virtualNpcMagicRange = config.virtualNpcMagicRange();
+		virtualNpcOtherRange = config.virtualNpcOtherRange();
+		virtualNpcOutlineColor = config.virtualNpcOutlineColor();
+		virtualNpcFillColor = config.virtualNpcFillColor();
+		virtualNpcLineWidth = (float) config.virtualNpcLineWidth();
+		lastVirtualNpcLocation = null;
 
 		if (myopiaReduction > 0)
 			setMyopiaReduction(myopiaReduction);
 
 		updateHasAlteredAnyFixedRange();
+
+		parseNpcDefinitions();
 	}
 
-	/**
-	 * Parses the comma-separated config string into cached Sets for O(1) lookups.
-	 * Call this during startUp() and inside onConfigChanged().
-	 */
-	public void updateIgnoredNpcs() {
-		ignoredNpcIds.clear();
-		ignoredNpcNames.clear();
+	private void parseNpcDefinitions() {
+		npcLosDefinitionsByName.clear();
+		npcLosDefinitionsById.clear();
 
-		String configValue = config.ignoreNPCS();
-		if (configValue == null || configValue.trim().isEmpty()) {
-			return;
-		}
+		parseNpcConfigString(config.meleeNpcDefs(), CombatStyle.MELEE);
+		parseNpcConfigString(config.rangedNpcDefs(), CombatStyle.RANGED);
+		parseNpcConfigString(config.magicNpcDefs(), CombatStyle.MAGIC);
+		parseNpcConfigString(config.otherNpcDefs(), CombatStyle.OTHER);
+	}
 
-		List<String> entries = Text.fromCSV(configValue);
+	private void parseNpcConfigString(String configValue, CombatStyle style) {
+		if (configValue == null || configValue.trim().isEmpty()) return;
+
+		String normalizedConfig = configValue.replace("\r\n", "\n").replace(",", "\n");
+		String[] entries = normalizedConfig.split("\n");
+
 		for (String entry : entries) {
+			if (entry.trim().isEmpty()) continue;
+
+			String[] parts = entry.split("\\|");
+			if (parts.length != 2) continue;
+
+			String identifier = parts[0].trim().toLowerCase();
 			try {
-				ignoredNpcIds.add(Integer.parseInt(entry));
-			} catch (NumberFormatException e) {
-				ignoredNpcNames.add(entry.toLowerCase());
-			}
-		}
-	}
+				String rangeStr = parts[1].trim();
+				boolean diagonalMelee = false;
 
-	/**
-	 * Checks if the given NPC is in the ignore list.
-	 */
-	public boolean isNpcIgnored(NPC npc) {
-		if (npc == null) {
-			return true;
-		}
+				if (rangeStr.endsWith("*")) {
+					diagonalMelee = true;
+					rangeStr = rangeStr.substring(0, rangeStr.length() - 1);
+				}
 
-		if (ignoredNpcIds.contains(npc.getId())) {
-			return true;
-		}
+				int range = Integer.parseInt(rangeStr);
+				NpcLosDef def = new NpcLosDef(range, style, diagonalMelee);
 
-		String name = npc.getName();
-		return name != null && ignoredNpcNames.contains(name.toLowerCase());
+				try {
+					int id = Integer.parseInt(identifier);
+					npcLosDefinitionsById.computeIfAbsent(id, k -> new ArrayList<>()).add(def);
+				} catch (NumberFormatException e) {
+					npcLosDefinitionsByName.computeIfAbsent(identifier, k -> new ArrayList<>()).add(def);
+				}
+			} catch (NumberFormatException e) {	}
+		}
 	}
 
 	/**
@@ -355,6 +410,15 @@ public class LineOfSightOverlay extends Overlay {
 			}
 		}
 
+		boolean isVirtualNpcKeyValid = virtualNpcLosHotkey != null && !virtualNpcLosHotkey.equals(Keybind.NOT_SET);
+		if (isVirtualNpcKeyValid && plugin.isVirtualNpcLosHotkeyHeld()) {
+			Tile hoveredTile = wv.getSelectedSceneTile();
+
+			if (hoveredTile != null && hoveredTile.getWorldLocation() != null) {
+				drawVirtualNpcLos(graphics, wv, hoveredTile.getWorldLocation());
+			}
+		}
+
 		if (!currentLocation.equals(lastPlayerLocation) ||
 			activeWeaponRange != lastCalculatedActiveRange ||
 			hasAlteredAnyFixedRange) {
@@ -368,27 +432,27 @@ public class LineOfSightOverlay extends Overlay {
 			cachedFixedRange5Tiles.clear();
 
 			if (enabledActiveWeaponLos) {
-				cachedActiveWeaponTiles.addAll(calculateLineOfSightTiles(playerArea, wv, activeWeaponRange, false, isAffectedByMyopia));
+				cachedActiveWeaponTiles.addAll(calculateLineOfSightTiles(playerArea, wv, activeWeaponRange, false, isAffectedByMyopia, false));
 			}
 
 			if (enabledMaxRangeLos) {
-				cachedMaxRangeTiles.addAll(calculateLineOfSightTiles(playerArea, wv, 10, false, false));
+				cachedMaxRangeTiles.addAll(calculateLineOfSightTiles(playerArea, wv, 10, false, false, false));
 			}
 
 			if (enabledFixed1) {
-				cachedFixedRange1Tiles.addAll(calculateLineOfSightTiles(playerArea, wv, fixed1Range, false, isAffectedByMyopiaRange1));
+				cachedFixedRange1Tiles.addAll(calculateLineOfSightTiles(playerArea, wv, fixed1Range, false, isAffectedByMyopiaRange1, false));
 			}
 			if (enabledFixed2) {
-				cachedFixedRange2Tiles.addAll(calculateLineOfSightTiles(playerArea, wv, fixed2Range, false, isAffectedByMyopiaRange2));
+				cachedFixedRange2Tiles.addAll(calculateLineOfSightTiles(playerArea, wv, fixed2Range, false, isAffectedByMyopiaRange2, false));
 			}
 			if (enabledFixed3) {
-				cachedFixedRange3Tiles.addAll(calculateLineOfSightTiles(playerArea, wv, fixed3Range, false, isAffectedByMyopiaRange3));
+				cachedFixedRange3Tiles.addAll(calculateLineOfSightTiles(playerArea, wv, fixed3Range, false, isAffectedByMyopiaRange3, false));
 			}
 			if (enabledFixed4) {
-				cachedFixedRange4Tiles.addAll(calculateLineOfSightTiles(playerArea, wv, fixed4Range, false, isAffectedByMyopiaRange4));
+				cachedFixedRange4Tiles.addAll(calculateLineOfSightTiles(playerArea, wv, fixed4Range, false, isAffectedByMyopiaRange4, false));
 			}
 			if (enabledFixed5) {
-				cachedFixedRange5Tiles.addAll(calculateLineOfSightTiles(playerArea, wv, fixed5Range, false, isAffectedByMyopiaRange5));
+				cachedFixedRange5Tiles.addAll(calculateLineOfSightTiles(playerArea, wv, fixed5Range, false, isAffectedByMyopiaRange5, false));
 			}
 
 			lastPlayerLocation = currentLocation;
@@ -460,33 +524,83 @@ public class LineOfSightOverlay extends Overlay {
 		MenuEntry topEntry = menuEntries[menuEntries.length - 1];
 		NPC hoveredNpc = topEntry.getNpc();
 
-		if (hoveredNpc != null && !isNpcIgnored(hoveredNpc) && hoveredNpc.getWorldArea() != null) {
+		if (hoveredNpc != null && hoveredNpc.getWorldArea() != null) {
 			int npcId = hoveredNpc.getId();
+			String npcName = hoveredNpc.getName();
 
-			CombatStyle style = NpcLosConstants.getNpcCombatStyle(npcId);
-			if (style == null) return;
+			List<NpcLosDef> defs = npcLosDefinitionsById.get(npcId);
+			if (defs == null && npcName != null) {
+				defs = npcLosDefinitionsByName.get(npcName.toLowerCase());
+			}
 
-			Color outlineColor = getOutlineColorForStyle(style);
+			if (defs == null || defs.isEmpty()) return;
 
-			int attackRange = NpcLosConstants.getNpcAttackRange(npcId);
+			WorldPoint currentNpcLocation = hoveredNpc.getWorldLocation();
 
-			if (attackRange > 0) {
-				WorldPoint currentNpcLocation = hoveredNpc.getWorldLocation();
+			if (hoveredNpc != lastHoveredNpc || !currentNpcLocation.equals(lastHoveredNpcLocation)) {
+				cachedHoveredNpcTilesByStyle.clear();
 
-				if (hoveredNpc != lastHoveredNpc || !currentNpcLocation.equals(lastHoveredNpcLocation)) {
-					cachedHoveredNpcTiles.clear();
-					cachedHoveredNpcTiles.addAll(calculateLineOfSightTiles(hoveredNpc.getWorldArea(), wv, attackRange, true, false));
-
-					lastHoveredNpc = hoveredNpc;
-					lastHoveredNpcLocation = currentNpcLocation;
+				for (NpcLosDef def : defs) {
+					if (def.range >= 0) {
+						Set<WorldPoint> tiles = calculateLineOfSightTiles(hoveredNpc.getWorldArea(), wv, def.range, true, false, def.diagonalMelee);
+						cachedHoveredNpcTilesByStyle.computeIfAbsent(def.style, k -> new HashSet<>()).addAll(tiles);
+					}
 				}
 
+				lastHoveredNpc = hoveredNpc;
+				lastHoveredNpcLocation = currentNpcLocation;
+			}
+
+			for (Map.Entry<CombatStyle, Set<WorldPoint>> entry : cachedHoveredNpcTilesByStyle.entrySet()) {
+				CombatStyle style = entry.getKey();
+				Color outlineColor = getOutlineColorForStyle(style);
 				Color fillColor = getFillColorForStyle(style);
-				drawTilesArea(graphics, cachedHoveredNpcTiles, fillColor, outlineColor, 1.0f);
+				float lineWidth = getLineWidthForStyle(style);
+				drawTilesArea(graphics, entry.getValue(), fillColor, outlineColor, lineWidth);
 			}
 		} else {
 			lastHoveredNpc = null;
 		}
+	}
+
+	private void drawVirtualNpcLos(Graphics2D graphics, WorldView wv, WorldPoint cursorLocation) {
+		WorldArea virtualNpcArea = new WorldArea(cursorLocation, virtualNpcSize, virtualNpcSize);
+
+		if (!cursorLocation.equals(lastVirtualNpcLocation)) {
+			cachedVirtualNpcTilesByStyle.clear();
+
+			if (virtualNpcMeleeRange > 0) {
+				cachedVirtualNpcTilesByStyle.put(CombatStyle.MELEE, calculateLineOfSightTiles(virtualNpcArea, wv, virtualNpcMeleeRange, true, false, false));
+			}
+			if (virtualNpcRangedRange > 0) {
+				cachedVirtualNpcTilesByStyle.put(CombatStyle.RANGED, calculateLineOfSightTiles(virtualNpcArea, wv, virtualNpcRangedRange, true, false, false));
+			}
+			if (virtualNpcMagicRange > 0) {
+				cachedVirtualNpcTilesByStyle.put(CombatStyle.MAGIC, calculateLineOfSightTiles(virtualNpcArea, wv, virtualNpcMagicRange, true, false, false));
+			}
+			if (virtualNpcOtherRange > 0) {
+				cachedVirtualNpcTilesByStyle.put(CombatStyle.OTHER, calculateLineOfSightTiles(virtualNpcArea, wv, virtualNpcOtherRange, true, false, false));
+			}
+
+			lastVirtualNpcLocation = cursorLocation;
+		}
+
+		for (Map.Entry<CombatStyle, Set<WorldPoint>> entry : cachedVirtualNpcTilesByStyle.entrySet()) {
+			CombatStyle style = entry.getKey();
+			Color outlineColor = getOutlineColorForStyle(style);
+			Color fillColor = getFillColorForStyle(style);
+			float lineWidth = getLineWidthForStyle(style);
+			drawTilesArea(graphics, entry.getValue(), fillColor, outlineColor, lineWidth);
+		}
+
+		Set<WorldPoint> footprintTiles = new HashSet<>();
+		int z = cursorLocation.getPlane();
+		for (int x = 0; x < virtualNpcSize; x++) {
+			for (int y = 0; y < virtualNpcSize; y++) {
+				footprintTiles.add(new WorldPoint(cursorLocation.getX() + x, cursorLocation.getY() + y, z));
+			}
+		}
+		drawTilesArea(graphics, footprintTiles, virtualNpcFillColor, virtualNpcOutlineColor, virtualNpcLineWidth);
 	}
 
 	/**
@@ -512,6 +626,19 @@ public class LineOfSightOverlay extends Overlay {
 			case MAGIC: return magicNpcFillColor;
 			case OTHER: return otherNpcFillColor;
 			default: return null;
+		}
+	}
+
+	/**
+	 * Return the line width configured for the given CombatStyle
+	 */
+	private float getLineWidthForStyle(CombatStyle style) {
+		switch (style) {
+			case MELEE: return meleeNpcLineWidth;
+			case RANGED: return rangedNpcLineWidth;
+			case MAGIC: return magicNpcLineWidth;
+			case OTHER: return otherNpcLineWidth;
+			default: return 1.0f;
 		}
 	}
 
@@ -647,7 +774,7 @@ public class LineOfSightOverlay extends Overlay {
 	 * Calculates the line of sight area dynamically based on the size of the source entity
 	 * and returns the valid tiles.
 	 */
-	private Set<WorldPoint> calculateLineOfSightTiles(WorldArea sourceArea, WorldView wv, int range, boolean isNpc, boolean isAffectedByMyopia) {
+	private Set<WorldPoint> calculateLineOfSightTiles(WorldArea sourceArea, WorldView wv, int range, boolean isNpc, boolean isAffectedByMyopia, boolean diagonalMelee) {
 		Set<WorldPoint> tiles = new HashSet<>();
 		int z = sourceArea.getPlane();
 
@@ -677,7 +804,7 @@ public class LineOfSightOverlay extends Overlay {
 				WorldArea targetTile = new WorldArea(targetPoint, 1, 1);
 
 				boolean inRange;
-				if (range == 1 && !isAffectedByMyopia) {
+				if (range == 1 && !isAffectedByMyopia && !diagonalMelee) {
 					inRange = sourceArea.isInMeleeDistance(targetTile);
 				} else {
 					inRange = sourceArea.distanceTo(targetTile) <= range;

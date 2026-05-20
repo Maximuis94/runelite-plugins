@@ -39,25 +39,41 @@ import net.runelite.client.config.Range;
 public interface DynamicLineOfSightConfig extends Config
 {
 	@ConfigSection(
-		name = "General Settings",
-		description = "General settings and hotkeys that do not fit into a specific line of sight category",
+		name = "Toggles & Keybinds",
+		description = "Enable/disable specific components and configure their keybinds",
 		position = 0,
 		closedByDefault = true
 	)
-	String generalSection = "generalSection";
+	String togglesSection = "togglesSection";
 
 	@ConfigSection(
-		name = "NPC Colors",
-		description = "Section with various outline and fill colors to assign to particular NPC groups",
+		name = "NPC LoS Styling",
+		description = "Section with various outline, fill colors, and line widths to assign to particular NPC groups",
 		position = 1,
 		closedByDefault = true
 	)
-	String npcColorSection = "npcColorSection";
+	String npcStylingSection = "npcStylingSection";
+
+	@ConfigSection(
+		name = "Virtual NPC LoS",
+		description = "Settings for the Virtual NPC Line of Sight feature",
+		position = 2,
+		closedByDefault = true
+	)
+	String virtualNpcSection = "virtualNpcSection";
+
+	@ConfigSection(
+		name = "NPC LoS Definitions",
+		description = "Define NPCs and their attack ranges per style. Format: Name|Range or ID|Range, newline separated",
+		position = 3,
+		closedByDefault = true
+	)
+	String npcDefinitionsSection = "npcDefinitionsSection";
 
 	@ConfigSection(
 		name = "Active Weapon Range",
 		description = "Settings for the currently equipped weapon's line of sight",
-		position = 2,
+		position = 4,
 		closedByDefault = true
 	)
 	String activeWeaponSection = "activeWeaponSection";
@@ -65,7 +81,7 @@ public interface DynamicLineOfSightConfig extends Config
 	@ConfigSection(
 		name = "Max Attack Range",
 		description = "Settings for the maximum possible attack range (10 tiles), unaffected by Myopia.",
-		position = 3,
+		position = 5,
 		closedByDefault = true
 	)
 	String maxRangeSection = "maxRangeSection";
@@ -73,7 +89,7 @@ public interface DynamicLineOfSightConfig extends Config
 	@ConfigSection(
 		name = "Fixed Range 1",
 		description = "Settings for configurable fixed distance line of sight 1",
-		position = 4,
+		position = 6,
 		closedByDefault = true
 	)
 	String fixedRange1Section = "fixedRange1Section";
@@ -81,7 +97,7 @@ public interface DynamicLineOfSightConfig extends Config
 	@ConfigSection(
 		name = "Fixed Range 2",
 		description = "Settings for configurable fixed distance line of sight 2",
-		position = 5,
+		position = 7,
 		closedByDefault = true
 	)
 	String fixedRange2Section = "fixedRange2Section";
@@ -89,7 +105,7 @@ public interface DynamicLineOfSightConfig extends Config
 	@ConfigSection(
 		name = "Fixed Range 3",
 		description = "Settings for configurable fixed distance line of sight 3",
-		position = 6,
+		position = 8,
 		closedByDefault = true
 	)
 	String fixedRange3Section = "fixedRange3Section";
@@ -97,7 +113,7 @@ public interface DynamicLineOfSightConfig extends Config
 	@ConfigSection(
 		name = "Fixed Range 4",
 		description = "Settings for configurable fixed distance line of sight 4",
-		position = 7,
+		position = 9,
 		closedByDefault = true
 	)
 	String fixedRange4Section = "fixedRange4Section";
@@ -105,73 +121,154 @@ public interface DynamicLineOfSightConfig extends Config
 	@ConfigSection(
 		name = "Fixed Range 5",
 		description = "Settings for configurable fixed distance line of sight 5",
-		position = 8,
+		position = 10,
 		closedByDefault = true
 	)
 	String fixedRange5Section = "fixedRange5Section";
+
+	// =========================================
+	// TOGGLES & KEYBINDS
+	// =========================================
 
 	@ConfigItem(
 		keyName = "mutualExclusivePlayerNpcLos",
 		name = "Mutually exclusive player/NPC LoS",
 		description = "If checked, the player line of sight is hidden while the NPC line of sight is shown.",
 		position = 0,
-		section = generalSection
+		section = togglesSection
 	)
 	default boolean mutualExclusivePlayerNpcLos() { return true; }
 
 	@ConfigItem(
-		keyName = "enableNpcLos",
-		name = "Enable NPC LoS Hotkey",
-		description = "If checked, render the NPC line of sight below the cursor for Colosseum NPCs. If enabled, behaviour can be limited by setting a key.",
+		keyName = "togglePlayerLosHotkey",
+		name = "Toggle player LoS",
+		description = "Press this key to quickly enable/disable all player lines of sight",
 		position = 1,
-		section = generalSection
+		section = togglesSection
 	)
-	default boolean enableNpcLos() { return false; }
-
-	@ConfigItem(
-		keyName = "npcLosHotkey",
-		name = "Show NPC LoS Hotkey",
-		description = "Hold this key to show the line of sight of the hovered NPC while the key is pressed.",
-		position = 2,
-		section = generalSection
-	)
-	default Keybind npcLosHotkey() { return Keybind.NOT_SET; }
-
-	@ConfigItem(
-		keyName = "toggleNpcLosHotkey",
-		name = "Toggle NPC line of sight",
-		description = "Press this key to quickly enable/disable all NPC lines of sight",
-		position = 3,
-		section = generalSection
-	)
-	default Keybind toggleNpcLosHotkey() { return Keybind.NOT_SET; }
+	default Keybind togglePlayerLosHotkey() { return Keybind.NOT_SET; }
 
 	@ConfigItem(
 		keyName = "virtualPlayerLosHotkey",
 		name = "Virtual player LoS Hotkey",
 		description = "Hold this key to draw the player line of sight the tile underneath the cursor while the key is pressed.",
-		position = 4,
-		section = generalSection
+		position = 2,
+		section = togglesSection
 	)
 	default Keybind virtualPlayerLosHotkey() { return Keybind.NOT_SET; }
 
 	@ConfigItem(
-		keyName = "togglePlayerLosHotkey",
-		name = "Toggle player line of sight",
-		description = "Press this key to quickly enable/disable all player lines of sight",
-		position = 5,
-		section = generalSection
+		keyName = "enableNpcLos",
+		name = "Enable NPC LoS",
+		description = "If checked, allows rendering the NPC line of sight below the cursor for specified NPCs.",
+		position = 3,
+		section = togglesSection
 	)
-	default Keybind togglePlayerLosHotkey() { return Keybind.NOT_SET; }
+	default boolean enableNpcLos() { return false; }
 
 	@ConfigItem(
-		keyName = "ignoreNPCS",
-		name = "Ignore NPCs",
-		description = "NPC ids/names to ignore. Separate them with ','. E.g., 'Serpent shaman,Javelin Colossus'",
-		position = 6,
-		section = generalSection
+		keyName = "npcLosHotkey",
+		name = "NPC LoS Hotkey",
+		description = "Hold this key to show the line of sight of the hovered NPC while the key is pressed.",
+		position = 4,
+		section = togglesSection
 	)
-	default String ignoreNPCS() { return ""; }
+	default Keybind npcLosHotkey() { return Keybind.NOT_SET; }
+
+	@ConfigItem(
+		keyName = "toggleNpcLosHotkey",
+		name = "Toggle NPC LoS",
+		description = "Press this key to quickly enable/disable all NPC lines of sight",
+		position = 5,
+		section = togglesSection
+	)
+	default Keybind toggleNpcLosHotkey() { return Keybind.NOT_SET; }
+
+	@ConfigItem(
+		keyName = "enableVirtualNpcLos",
+		name = "Enable Virtual NPC LoS",
+		description = "If checked, allows drawing a virtual NPC line of sight at the cursor's location.",
+		position = 6,
+		section = togglesSection
+	)
+	default boolean enableVirtualNpcLos() { return false; }
+
+	@ConfigItem(
+		keyName = "virtualNpcLosHotkey",
+		name = "Virtual NPC LoS Hotkey",
+		description = "Hold this key to draw a virtual NPC's line of sight at the cursor's location.",
+		position = 7,
+		section = togglesSection
+	)
+	default Keybind virtualNpcLosHotkey() { return Keybind.NOT_SET; }
+
+	@ConfigItem(
+		keyName = "drawActiveWeaponRange",
+		name = "Enable active weapon LoS",
+		description = "Draws the outline of the line of sight based on your currently equipped weapon",
+		position = 8,
+		section = togglesSection
+	)
+	default boolean drawActiveWeaponRange() { return true; }
+
+	@ConfigItem(
+		keyName = "drawMaxAttackRange",
+		name = "Enable max range LoS",
+		description = "Draws an outline at the maximum possible attack range (10 tiles)",
+		position = 9,
+		section = togglesSection
+	)
+	default boolean drawMaxAttackRange() { return false; }
+
+	@ConfigItem(
+		keyName = "drawFixedRange1",
+		name = "Enable range 1 LoS",
+		description = "Enables or disables drawing line of sight using attack range 1 configs",
+		position = 10,
+		section = togglesSection
+	)
+	default boolean drawFixedRange1() { return false; }
+
+	@ConfigItem(
+		keyName = "drawFixedRange2",
+		name = "Enable range 2 LoS",
+		description = "Enables or disables drawing line of sight using attack range 2 configs",
+		position = 11,
+		section = togglesSection
+	)
+	default boolean drawFixedRange2() { return false; }
+
+	@ConfigItem(
+		keyName = "drawFixedRange3",
+		name = "Enable range 3 LoS",
+		description = "Enables or disables drawing line of sight using attack range 3 configs",
+		position = 12,
+		section = togglesSection
+	)
+	default boolean drawFixedRange3() { return false; }
+
+	@ConfigItem(
+		keyName = "drawFixedRange4",
+		name = "Enable range 4 LoS",
+		description = "Enables or disables drawing line of sight using attack range 4 configs",
+		position = 13,
+		section = togglesSection
+	)
+	default boolean drawFixedRange4() { return false; }
+
+	@ConfigItem(
+		keyName = "drawFixedRange5",
+		name = "Enable range 5 LoS",
+		description = "Enables or disables drawing line of sight using attack range 5 configs",
+		position = 14,
+		section = togglesSection
+	)
+	default boolean drawFixedRange5() { return false; }
+
+
+	// =========================================
+	// NPC LOS STYLING
+	// =========================================
 
 	@Alpha
 	@ConfigItem(
@@ -179,7 +276,7 @@ public interface DynamicLineOfSightConfig extends Config
 		name = "Melee outline color",
 		description = "The outline color for melee NPC lines of sight",
 		position = 0,
-		section = npcColorSection
+		section = npcStylingSection
 	)
 	default Color meleeNpcOutlineColor() { return DEFAULT_COLOR_MELEE_OUTLINE; }
 
@@ -189,17 +286,26 @@ public interface DynamicLineOfSightConfig extends Config
 		name = "Melee fill color",
 		description = "The fill color for melee NPC lines of sight",
 		position = 1,
-		section = npcColorSection
+		section = npcStylingSection
 	)
 	default Color meleeNpcFillColor() { return DEFAULT_COLOR_MELEE_FILL; }
+
+	@ConfigItem(
+		keyName = "meleeNpcLineWidth",
+		name = "Melee line width",
+		description = "The thickness of the outline for melee NPC lines of sight",
+		position = 2,
+		section = npcStylingSection
+	)
+	default double meleeNpcLineWidth() { return DEFAULT_LINE_WIDTH; }
 
 	@Alpha
 	@ConfigItem(
 		keyName = "rangedNpcOutlineColor",
 		name = "Ranged outline color",
 		description = "The outline color for ranged NPC lines of sight",
-		position = 2,
-		section = npcColorSection
+		position = 3,
+		section = npcStylingSection
 	)
 	default Color rangedNpcOutlineColor() { return DEFAULT_COLOR_RANGED_OUTLINE; }
 
@@ -208,18 +314,27 @@ public interface DynamicLineOfSightConfig extends Config
 		keyName = "rangedNpcFillColor",
 		name = "Ranged fill color",
 		description = "The fill color for ranged NPC lines of sight",
-		position = 3,
-		section = npcColorSection
+		position = 4,
+		section = npcStylingSection
 	)
 	default Color rangedNpcFillColor() { return DEFAULT_COLOR_RANGED_FILL; }
+
+	@ConfigItem(
+		keyName = "rangedNpcLineWidth",
+		name = "Ranged line width",
+		description = "The thickness of the outline for ranged NPC lines of sight",
+		position = 5,
+		section = npcStylingSection
+	)
+	default double rangedNpcLineWidth() { return DEFAULT_LINE_WIDTH; }
 
 	@Alpha
 	@ConfigItem(
 		keyName = "magicNpcOutlineColor",
 		name = "Magic outline color",
 		description = "The outline color for magic NPC lines of sight",
-		position = 4,
-		section = npcColorSection
+		position = 6,
+		section = npcStylingSection
 	)
 	default Color magicNpcOutlineColor() { return DEFAULT_COLOR_MAGIC_OUTLINE; }
 
@@ -228,18 +343,27 @@ public interface DynamicLineOfSightConfig extends Config
 		keyName = "magicNpcFillColor",
 		name = "Magic fill color",
 		description = "The fill color for magic NPC lines of sight",
-		position = 5,
-		section = npcColorSection
+		position = 7,
+		section = npcStylingSection
 	)
 	default Color magicNpcFillColor() { return DEFAULT_COLOR_MAGIC_FILL; }
+
+	@ConfigItem(
+		keyName = "magicNpcLineWidth",
+		name = "Magic line width",
+		description = "The thickness of the outline for magic NPC lines of sight",
+		position = 8,
+		section = npcStylingSection
+	)
+	default double magicNpcLineWidth() { return DEFAULT_LINE_WIDTH; }
 
 	@Alpha
 	@ConfigItem(
 		keyName = "otherNpcOutlineColor",
 		name = "Hybrid/typeless outline color",
 		description = "The outline color for hybrid/typeless NPC lines of sight",
-		position = 6,
-		section = npcColorSection
+		position = 9,
+		section = npcStylingSection
 	)
 	default Color otherNpcOutlineColor() { return DEFAULT_COLOR_OTHER_OUTLINE; }
 
@@ -248,10 +372,183 @@ public interface DynamicLineOfSightConfig extends Config
 		keyName = "otherNpcFillColor",
 		name = "Hybrid/typeless fill color",
 		description = "The fill color for hybrid/typeless NPC lines of sight",
-		position = 7,
-		section = npcColorSection
+		position = 10,
+		section = npcStylingSection
 	)
 	default Color otherNpcFillColor() { return DEFAULT_COLOR_OTHER_FILL; }
+
+	@ConfigItem(
+		keyName = "otherNpcLineWidth",
+		name = "Hybrid/typeless line width",
+		description = "The thickness of the outline for hybrid/typeless NPC lines of sight",
+		position = 11,
+		section = npcStylingSection
+	)
+	default double otherNpcLineWidth() { return DEFAULT_LINE_WIDTH; }
+
+
+	// =========================================
+	// VIRTUAL NPC LOS
+	// =========================================
+
+	@Range(min = 1)
+	@ConfigItem(
+		keyName = "virtualNpcSize",
+		name = "Virtual NPC Size",
+		description = "The tile size of the virtual NPC (e.g., 1 for 1x1, 2 for 2x2).",
+		position = 0,
+		section = virtualNpcSection
+	)
+	default int virtualNpcSize() { return 1; }
+
+	@Range(min = 0)
+	@ConfigItem(
+		keyName = "virtualNpcMeleeRange",
+		name = "Melee Attack Range",
+		description = "The melee attack range of the virtual NPC. 0 to disable.",
+		position = 1,
+		section = virtualNpcSection
+	)
+	default int virtualNpcMeleeRange() { return 0; }
+
+	@Range(min = 0)
+	@ConfigItem(
+		keyName = "virtualNpcRangedRange",
+		name = "Ranged Attack Range",
+		description = "The ranged attack range of the virtual NPC. 0 to disable.",
+		position = 2,
+		section = virtualNpcSection
+	)
+	default int virtualNpcRangedRange() { return 0; }
+
+	@Range(min = 0)
+	@ConfigItem(
+		keyName = "virtualNpcMagicRange",
+		name = "Magic Attack Range",
+		description = "The magic attack range of the virtual NPC. 0 to disable.",
+		position = 3,
+		section = virtualNpcSection
+	)
+	default int virtualNpcMagicRange() { return 0; }
+
+	@Range(min = 0)
+	@ConfigItem(
+		keyName = "virtualNpcOtherRange",
+		name = "Hybrid/Typeless Range",
+		description = "The hybrid/typeless attack range of the virtual NPC. 0 to disable.",
+		position = 4,
+		section = virtualNpcSection
+	)
+	default int virtualNpcOtherRange() { return 0; }
+
+	@Alpha
+	@ConfigItem(
+		keyName = "virtualNpcOutlineColor",
+		name = "Virtual NPC outline color",
+		description = "The outline color for the virtual NPC",
+		position = 5,
+		section = virtualNpcSection
+	)
+	default Color virtualNpcOutlineColor() { return DEFAULT_COLOR_OTHER_OUTLINE; }
+
+	@Alpha
+	@ConfigItem(
+		keyName = "virtualNpcFillColor",
+		name = "Virtual NPC fill color",
+		description = "The fill color for the virtual NPC",
+		position = 6,
+		section = virtualNpcSection
+	)
+	default Color virtualNpcFillColor() { return DEFAULT_COLOR_OTHER_FILL; }
+
+	@ConfigItem(
+		keyName = "virtualNpcLineWidth",
+		name = "Virtual NPC line width",
+		description = "The thickness of the outline for the virtual NPC",
+		position = 7,
+		section = virtualNpcSection
+	)
+	default double virtualNpcLineWidth() { return DEFAULT_LINE_WIDTH; }
+
+
+	// =========================================
+	// NPC LOS DEFINITIONS
+	// =========================================
+
+	@ConfigItem(
+		keyName = "meleeNpcDefs",
+		name = "Melee NPCs",
+		description = "Format: NPC_NAME|RANGE. Newline separated. Can also use NPC ID.",
+		position = 0,
+		section = npcDefinitionsSection
+	)
+	default String meleeNpcDefs() {
+		return "Jaguar warrior|1\n" +
+			"Minotaur|1\n" +
+			"Tz-Kih|1\n" +
+			"Tz-Kek|1\n" +
+			"Yt-MejKot|1\n" +
+			"Yt-HurKot|1\n" +
+			"Jal-Nib|1\n" +
+			"Jal-Ak|1*\n" +
+			"Jal-Akrek-Ket|1\n" +
+			"Jal-ImKot|1\n" +
+			"Jal-Yt-HurKot|1\n" +
+			"Tok-Xil|1*\n" +
+			"Ket-Zek|1*\n" +
+			"Jal-MejRah|1*\n" +
+			"Jal-Akrek-Xil|1*\n" +
+			"Jal-Xil|1*\n" +
+			"Jal-Akrek-Mej|1*\n" +
+			"JalTok-Jad|1*\n" +
+			"Jal-Zek|1*";
+	}
+
+	@ConfigItem(
+		keyName = "rangedNpcDefs",
+		name = "Ranged NPCs",
+		description = "Format: NPC_NAME|RANGE. Newline separated. Can also use NPC ID.",
+		position = 1,
+		section = npcDefinitionsSection
+	)
+	default String rangedNpcDefs() {
+		return "Javelin colossus|15\n" +
+			"Tok-Xil|15\n" +
+			"Jal-MejRah|4\n" +
+			"Jal-Akrek-Xil|15\n" +
+			"Jal-Xil|15";
+	}
+
+	@ConfigItem(
+		keyName = "magicNpcDefs",
+		name = "Magic NPCs",
+		description = "Format: NPC_NAME|RANGE. Newline separated. Can also use NPC ID.",
+		position = 2,
+		section = npcDefinitionsSection
+	)
+	default String magicNpcDefs() {
+		return "Serpent shaman|10\n" +
+			"Shockwave colossus|15\n" +
+			"Ket-Zek|15\n" +
+			"Jal-Akrek-Mej|15\n" +
+			"Jal-Zek|15";
+	}
+
+	@ConfigItem(
+		keyName = "otherNpcDefs",
+		name = "Hybrid/Typeless NPCs",
+		description = "Format: NPC_NAME|RANGE. Newline separated. Can also use NPC ID.",
+		position = 3,
+		section = npcDefinitionsSection
+	)
+	default String otherNpcDefs() {
+		return "Manticore|15\n" +
+			"Sol Heredit|1\n" +
+			"Healing totem|20\n" +
+			"TzTok-Jad|15\n" +
+			"Jal-Ak|15\n" +
+			"JalTok-Jad|15\n";
+	}
 
 
 	// =========================================
@@ -259,19 +556,10 @@ public interface DynamicLineOfSightConfig extends Config
 	// =========================================
 
 	@ConfigItem(
-		keyName = "drawActiveWeaponRange",
-		name = "Enable active weapon LoS",
-		description = "Draws the outline of the line of sight based on your currently equipped weapon",
-		position = 1,
-		section = activeWeaponSection
-	)
-	default boolean drawActiveWeaponRange() { return true; }
-
-	@ConfigItem(
 		keyName = "highlightAttackableEnemies",
 		name = "Highlight active weapon range enemies",
 		description = "If checked, enemies that can be directly attacked are given an outline",
-		position = 1,
+		position = 0,
 		section = activeWeaponSection
 	)
 	default boolean highlightAttackableEnemies() { return false; }
@@ -281,7 +569,7 @@ public interface DynamicLineOfSightConfig extends Config
 		keyName = "activeWeaponOutlineColor",
 		name = "Outline color",
 		description = "The color of the outline for the active weapon line of sight bubble",
-		position = 2,
+		position = 1,
 		section = activeWeaponSection
 	)
 	default Color activeWeaponOutlineColor() { return DEFAULT_COLOR_ACTIVE_WEAPON_OUTLINE; }
@@ -291,7 +579,7 @@ public interface DynamicLineOfSightConfig extends Config
 		keyName = "activeWeaponFillColor",
 		name = "Fill color",
 		description = "The fill color for the active weapon line of sight bubble",
-		position = 3,
+		position = 2,
 		section = activeWeaponSection
 	)
 	default Color activeWeaponFillColor() { return DEFAULT_COLOR_ACTIVE_WEAPON_FILL; }
@@ -300,7 +588,7 @@ public interface DynamicLineOfSightConfig extends Config
 		keyName = "activeWeaponLineWidth",
 		name = "Line width",
 		description = "The thickness of the outline for the active weapon range",
-		position = 6,
+		position = 3,
 		section = activeWeaponSection
 	)
 	default double activeWeaponLineWidth() { return DEFAULT_LINE_WIDTH; }
@@ -311,19 +599,10 @@ public interface DynamicLineOfSightConfig extends Config
 	// =========================================
 
 	@ConfigItem(
-		keyName = "drawMaxAttackRange",
-		name = "Enable max range LoS",
-		description = "Draws an outline at the maximum possible attack range (10 tiles)",
-		position = 1,
-		section = maxRangeSection
-	)
-	default boolean drawMaxAttackRange() { return false; }
-
-	@ConfigItem(
 		keyName = "highlightEnemiesWithinMaxRange",
 		name = "Highlight max range enemies",
 		description = "If checked, enemies within 10 tiles or less range are highlighted",
-		position = 2,
+		position = 0,
 		section = maxRangeSection
 	)
 	default boolean highlightEnemiesWithinMaxRange() { return false; }
@@ -333,7 +612,7 @@ public interface DynamicLineOfSightConfig extends Config
 		keyName = "maxRangeOutlineColor",
 		name = "Outline color",
 		description = "The color that is to be used for the outline of the max attack range",
-		position = 2,
+		position = 1,
 		section = maxRangeSection
 	)
 	default Color maxRangeOutlineColor() { return DEFAULT_COLOR_MAGIC_OUTLINE; }
@@ -343,7 +622,7 @@ public interface DynamicLineOfSightConfig extends Config
 		keyName = "maxRangeFillColor",
 		name = "Fill color",
 		description = "The fill color that is to be used for the outline of the max attack range",
-		position = 3,
+		position = 2,
 		section = maxRangeSection
 	)
 	default Color maxRangeFillColor() { return DEFAULT_COLOR_MAGIC_FILL; }
@@ -352,7 +631,7 @@ public interface DynamicLineOfSightConfig extends Config
 		keyName = "maxRangeLineWidth",
 		name = "Line width",
 		description = "The thickness of the outline for the max attack range",
-		position = 4,
+		position = 3,
 		section = maxRangeSection
 	)
 	default double maxRangeLineWidth() { return DEFAULT_LINE_WIDTH; }
@@ -363,19 +642,10 @@ public interface DynamicLineOfSightConfig extends Config
 	// =========================================
 
 	@ConfigItem(
-		keyName = "drawFixedRange1",
-		name = "Enable range 1 LoS",
-		description = "Enables or disables drawing line of sight using attack range 1 configs",
-		position = 1,
-		section = fixedRange1Section
-	)
-	default boolean drawFixedRange1() { return false; }
-
-	@ConfigItem(
 		keyName = "highlightEnemiesWithinFixedRange1",
 		name = "Highlight enemies in range",
 		description = "If checked, highlight enemies in attack range of the configured distance.",
-		position = 2,
+		position = 0,
 		section = fixedRange1Section
 	)
 	default boolean highlightEnemiesWithinFixedRange1() { return false; }
@@ -385,7 +655,7 @@ public interface DynamicLineOfSightConfig extends Config
 		keyName = "fixedRange1Distance",
 		name = "Attack range",
 		description = "The specific distance (in tiles) for this fixed line of sight",
-		position = 3,
+		position = 1,
 		section = fixedRange1Section
 	)
 	default int fixedRange1Distance() { return 5; }
@@ -395,7 +665,7 @@ public interface DynamicLineOfSightConfig extends Config
 		keyName = "fixedRange1OutlineColor",
 		name = "Outline color",
 		description = "The color of the outline for this fixed range. Setting alpha to 0 disables it.",
-		position = 4,
+		position = 2,
 		section = fixedRange1Section
 	)
 	default Color fixedRange1OutlineColor() { return PluginConstants.DEFAULT_COLOR_OTHER_OUTLINE; }
@@ -405,7 +675,7 @@ public interface DynamicLineOfSightConfig extends Config
 		keyName = "fixedRange1FillColor",
 		name = "Fill color",
 		description = "The fill color for this fixed range. Setting alpha to 0 disables it.",
-		position = 5,
+		position = 3,
 		section = fixedRange1Section
 	)
 	default Color fixedRange1FillColor() { return PluginConstants.DEFAULT_COLOR_OTHER_FILL; }
@@ -414,7 +684,7 @@ public interface DynamicLineOfSightConfig extends Config
 		keyName = "fixedRange1LineWidth",
 		name = "Line width",
 		description = "The thickness of the outline for this fixed range",
-		position = 6,
+		position = 4,
 		section = fixedRange1Section
 	)
 	default double fixedRange1LineWidth() { return DEFAULT_LINE_WIDTH; }
@@ -425,19 +695,10 @@ public interface DynamicLineOfSightConfig extends Config
 	// =========================================
 
 	@ConfigItem(
-		keyName = "drawFixedRange2",
-		name = "Enable range 2 LoS",
-		description = "Enables or disables drawing line of sight using attack range 2 configs",
-		position = 1,
-		section = fixedRange2Section
-	)
-	default boolean drawFixedRange2() { return false; }
-
-	@ConfigItem(
 		keyName = "highlightEnemiesWithinFixedRange2",
 		name = "Highlight enemies in range",
 		description = "If checked, highlight enemies in attack range of the configured distance.",
-		position = 2,
+		position = 0,
 		section = fixedRange2Section
 	)
 	default boolean highlightEnemiesWithinFixedRange2() { return false; }
@@ -447,7 +708,7 @@ public interface DynamicLineOfSightConfig extends Config
 		keyName = "fixedRange2Distance",
 		name = "Attack range",
 		description = "The specific distance (in tiles) for this fixed line of sight",
-		position = 3,
+		position = 1,
 		section = fixedRange2Section
 	)
 	default int fixedRange2Distance() { return 5; }
@@ -457,7 +718,7 @@ public interface DynamicLineOfSightConfig extends Config
 		keyName = "fixedRange2OutlineColor",
 		name = "Outline color",
 		description = "The color of the outline for this fixed range. Setting alpha to 0 disables it.",
-		position = 4,
+		position = 2,
 		section = fixedRange2Section
 	)
 	default Color fixedRange2OutlineColor() { return PluginConstants.DEFAULT_COLOR_OTHER_OUTLINE; }
@@ -467,7 +728,7 @@ public interface DynamicLineOfSightConfig extends Config
 		keyName = "fixedRange2FillColor",
 		name = "Fill color",
 		description = "The fill color for this fixed range. Setting alpha to 0 disables it.",
-		position = 5,
+		position = 3,
 		section = fixedRange2Section
 	)
 	default Color fixedRange2FillColor() { return PluginConstants.DEFAULT_COLOR_OTHER_FILL; }
@@ -476,7 +737,7 @@ public interface DynamicLineOfSightConfig extends Config
 		keyName = "fixedRange2LineWidth",
 		name = "Line width",
 		description = "The thickness of the outline for this fixed range",
-		position = 6,
+		position = 4,
 		section = fixedRange2Section
 	)
 	default double fixedRange2LineWidth() { return DEFAULT_LINE_WIDTH; }
@@ -487,19 +748,10 @@ public interface DynamicLineOfSightConfig extends Config
 	// =========================================
 
 	@ConfigItem(
-		keyName = "drawFixedRange3",
-		name = "Enable range 3 LoS",
-		description = "Enables or disables drawing line of sight using attack range 3 configs",
-		position = 1,
-		section = fixedRange3Section
-	)
-	default boolean drawFixedRange3() { return false; }
-
-	@ConfigItem(
 		keyName = "highlightEnemiesWithinFixedRange3",
 		name = "Highlight enemies in range",
 		description = "If checked, highlight enemies in attack range of the configured distance.",
-		position = 2,
+		position = 0,
 		section = fixedRange3Section
 	)
 	default boolean highlightEnemiesWithinFixedRange3() { return false; }
@@ -509,7 +761,7 @@ public interface DynamicLineOfSightConfig extends Config
 		keyName = "fixedRange3Distance",
 		name = "Attack range",
 		description = "The specific distance (in tiles) for this fixed line of sight",
-		position = 3,
+		position = 1,
 		section = fixedRange3Section
 	)
 	default int fixedRange3Distance() { return 5; }
@@ -519,7 +771,7 @@ public interface DynamicLineOfSightConfig extends Config
 		keyName = "fixedRange3OutlineColor",
 		name = "Outline color",
 		description = "The color of the outline for this fixed range. Setting alpha to 0 disables it.",
-		position = 4,
+		position = 2,
 		section = fixedRange3Section
 	)
 	default Color fixedRange3OutlineColor() { return PluginConstants.DEFAULT_COLOR_OTHER_OUTLINE; }
@@ -529,7 +781,7 @@ public interface DynamicLineOfSightConfig extends Config
 		keyName = "fixedRange3FillColor",
 		name = "Fill color",
 		description = "The fill color for this fixed range. Setting alpha to 0 disables it.",
-		position = 5,
+		position = 3,
 		section = fixedRange3Section
 	)
 	default Color fixedRange3FillColor() { return PluginConstants.DEFAULT_COLOR_OTHER_FILL; }
@@ -538,7 +790,7 @@ public interface DynamicLineOfSightConfig extends Config
 		keyName = "fixedRange3LineWidth",
 		name = "Line width",
 		description = "The thickness of the outline for this fixed range",
-		position = 6,
+		position = 4,
 		section = fixedRange3Section
 	)
 	default double fixedRange3LineWidth() { return DEFAULT_LINE_WIDTH; }
@@ -549,19 +801,10 @@ public interface DynamicLineOfSightConfig extends Config
 	// =========================================
 
 	@ConfigItem(
-		keyName = "drawFixedRange4",
-		name = "Enable range 4 LoS",
-		description = "Enables or disables drawing line of sight using attack range 4 configs",
-		position = 1,
-		section = fixedRange4Section
-	)
-	default boolean drawFixedRange4() { return false; }
-
-	@ConfigItem(
 		keyName = "highlightEnemiesWithinFixedRange4",
 		name = "Highlight enemies in range",
 		description = "If checked, highlight enemies in attack range of the configured distance.",
-		position = 2,
+		position = 0,
 		section = fixedRange4Section
 	)
 	default boolean highlightEnemiesWithinFixedRange4() { return false; }
@@ -571,7 +814,7 @@ public interface DynamicLineOfSightConfig extends Config
 		keyName = "fixedRange4Distance",
 		name = "Attack range",
 		description = "The specific distance (in tiles) for this fixed line of sight",
-		position = 3,
+		position = 1,
 		section = fixedRange4Section
 	)
 	default int fixedRange4Distance() { return 5; }
@@ -581,7 +824,7 @@ public interface DynamicLineOfSightConfig extends Config
 		keyName = "fixedRange4OutlineColor",
 		name = "Outline color",
 		description = "The color of the outline for this fixed range. Setting alpha to 0 disables it.",
-		position = 4,
+		position = 2,
 		section = fixedRange4Section
 	)
 	default Color fixedRange4OutlineColor() { return PluginConstants.DEFAULT_COLOR_OTHER_OUTLINE; }
@@ -591,7 +834,7 @@ public interface DynamicLineOfSightConfig extends Config
 		keyName = "fixedRange4FillColor",
 		name = "Fill color",
 		description = "The fill color for this fixed range. Setting alpha to 0 disables it.",
-		position = 5,
+		position = 3,
 		section = fixedRange4Section
 	)
 	default Color fixedRange4FillColor() { return PluginConstants.DEFAULT_COLOR_OTHER_FILL; }
@@ -600,7 +843,7 @@ public interface DynamicLineOfSightConfig extends Config
 		keyName = "fixedRange4LineWidth",
 		name = "Line width",
 		description = "The thickness of the outline for this fixed range",
-		position = 6,
+		position = 4,
 		section = fixedRange4Section
 	)
 	default double fixedRange4LineWidth() { return DEFAULT_LINE_WIDTH; }
@@ -611,19 +854,10 @@ public interface DynamicLineOfSightConfig extends Config
 	// =========================================
 
 	@ConfigItem(
-		keyName = "drawFixedRange5",
-		name = "Enable range 5 LoS",
-		description = "Enables or disables drawing line of sight using attack range 5 configs",
-		position = 1,
-		section = fixedRange5Section
-	)
-	default boolean drawFixedRange5() { return false; }
-
-	@ConfigItem(
 		keyName = "highlightEnemiesWithinFixedRange5",
 		name = "Highlight enemies in range",
 		description = "If checked, highlight enemies in attack range of the configured distance.",
-		position = 2,
+		position = 0,
 		section = fixedRange5Section
 	)
 	default boolean highlightEnemiesWithinFixedRange5() { return false; }
@@ -633,7 +867,7 @@ public interface DynamicLineOfSightConfig extends Config
 		keyName = "fixedRange5Distance",
 		name = "Attack range",
 		description = "The specific distance (in tiles) for this fixed line of sight",
-		position = 3,
+		position = 1,
 		section = fixedRange5Section
 	)
 	default int fixedRange5Distance() { return 5; }
@@ -643,7 +877,7 @@ public interface DynamicLineOfSightConfig extends Config
 		keyName = "fixedRange5OutlineColor",
 		name = "Outline color",
 		description = "The color of the outline for this fixed range. Setting alpha to 0 disables it.",
-		position = 4,
+		position = 2,
 		section = fixedRange5Section
 	)
 	default Color fixedRange5OutlineColor() { return PluginConstants.DEFAULT_COLOR_OTHER_OUTLINE; }
@@ -653,7 +887,7 @@ public interface DynamicLineOfSightConfig extends Config
 		keyName = "fixedRange5FillColor",
 		name = "Fill color",
 		description = "The fill color for this fixed range. Setting alpha to 0 disables it.",
-		position = 5,
+		position = 3,
 		section = fixedRange5Section
 	)
 	default Color fixedRange5FillColor() { return PluginConstants.DEFAULT_COLOR_OTHER_FILL; }
@@ -662,7 +896,7 @@ public interface DynamicLineOfSightConfig extends Config
 		keyName = "fixedRange5LineWidth",
 		name = "Line width",
 		description = "The thickness of the outline for this fixed range",
-		position = 6,
+		position = 4,
 		section = fixedRange5Section
 	)
 	default double fixedRange5LineWidth() { return DEFAULT_LINE_WIDTH; }
