@@ -59,7 +59,7 @@ import net.runelite.client.util.HotkeyListener;
 @Slf4j
 @PluginDescriptor(
 	name = "Dynamic line of sight",
-	description = "Adds customizable player Lines of Sight. Uses current weapon and Myopia tier. Adds NPC LoS for Colosseum, Inferno and Fight Caves.",
+	description = "Adds customizable player and NPC Lines of Sight. Uses current weapon and Myopia tier. NPC and player LoS can also be drawn under cursor.",
 	tags = {"combat","weapon", "attack", "range", "line", "sight", "los", "myopia", "fortis", "colosseum", "fight", "caves", "inferno", "safespot", "safe", "spot", "npc"}
 )
 public class DynamicLineOfSightPlugin extends Plugin
