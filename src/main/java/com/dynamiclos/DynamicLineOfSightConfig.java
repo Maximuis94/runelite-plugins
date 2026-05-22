@@ -488,20 +488,17 @@ public interface DynamicLineOfSightConfig extends Config
 			"Tz-Kih|1\n" +
 			"Tz-Kek|1\n" +
 			"Yt-MejKot|1\n" +
+			"Tok-Xil|1*\n" +
+			"Ket-Zek|1*\n" +
 			"Yt-HurKot|1\n" +
 			"Jal-Nib|1\n" +
 			"Jal-Ak|1*\n" +
 			"Jal-Akrek-Ket|1\n" +
 			"Jal-ImKot|1\n" +
 			"Jal-Yt-HurKot|1\n" +
-			"Tok-Xil|1*\n" +
-			"Ket-Zek|1*\n" +
-			"Jal-MejRah|1*\n" +
-			"Jal-Akrek-Xil|1*\n" +
 			"Jal-Xil|1*\n" +
-			"Jal-Akrek-Mej|1*\n" +
-			"JalTok-Jad|1*\n" +
-			"Jal-Zek|1*";
+			"Jal-Zek|1*\n" +
+			"JalTok-Jad|1*";
 	}
 
 	@ConfigItem(
@@ -547,7 +544,7 @@ public interface DynamicLineOfSightConfig extends Config
 			"Healing totem|20\n" +
 			"TzTok-Jad|15\n" +
 			"Jal-Ak|15\n" +
-			"JalTok-Jad|15\n";
+			"JalTok-Jad|15";
 	}
 
 
