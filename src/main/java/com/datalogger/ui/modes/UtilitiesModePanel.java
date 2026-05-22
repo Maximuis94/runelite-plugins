@@ -249,7 +249,7 @@ public class UtilitiesModePanel extends JPanel {
 			}
 
 		});
-
+		testBtn.setToolTipText("Click to submit a test using the configurations above. The header and footer will indicate it is a test submission.");
 		panel.add(testBtn, BorderLayout.SOUTH);
 
 		return panel;
