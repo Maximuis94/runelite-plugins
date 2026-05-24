@@ -62,4 +62,6 @@ public final class PluginConstants
 
 	// ID that is ignored in enum mapping creation
 	public static final int IGNORED_ENUM_ID = -1;
+
+	public static final int CURRENT_COLOSSEUM_TRIAL_LOG_VERSION = 1;
 }

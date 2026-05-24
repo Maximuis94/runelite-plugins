@@ -206,7 +206,7 @@ public class UtilitiesModePanel extends JPanel {
 		JPanel panel = Components.createTitledPanel("Data migration", new GridLayout(0, 1, 0, 5));
 
 		JButton convertBtn = createStyledButton("Migrate logs", e -> initiateColosseumTrialMigration());
-		convertBtn.setToolTipText("Select a V0 JSON file to convert to V1");
+		convertBtn.setToolTipText("Migrate logged Colosseum trials to a newer version, if possible.");
 		panel.add(convertBtn);
 
 		return panel;
@@ -261,7 +261,7 @@ public class UtilitiesModePanel extends JPanel {
 		customFormatInput.setToolTipText("Edit custom formatting here to test changes before saving to config.");
 
 		JScrollPane scrollPane = Components.createScrollPane(customFormatInput);
-		scrollPane.setPreferredSize(new Dimension(0, 100));
+		scrollPane.setPreferredSize(new Dimension(0, 250));
 		scrollBar = scrollPane.getVerticalScrollBar();
 		setScrollSpeed(scrollSpeed);
 

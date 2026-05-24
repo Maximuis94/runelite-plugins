@@ -25,6 +25,7 @@
 
 package com.datalogger.dto;
 
+import static com.datalogger.constants.PluginConstants.CURRENT_COLOSSEUM_TRIAL_LOG_VERSION;
 import com.datalogger.models.supplytracker.ValuedItemStack;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -37,7 +38,6 @@ import lombok.NonNull;
 @Data
 @Builder
 public class ColosseumAttemptDTO {
-	private static final int CURRENT_VERSION = 1;
 
 	@NonNull
 	private String attemptId;
@@ -65,5 +65,5 @@ public class ColosseumAttemptDTO {
 	private List<ColosseumWaveDTO> waves = new ArrayList<>();
 
 	@Builder.Default
-	private int version = CURRENT_VERSION;
+	private int version = CURRENT_COLOSSEUM_TRIAL_LOG_VERSION;
 }

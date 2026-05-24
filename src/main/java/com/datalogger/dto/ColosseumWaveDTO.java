@@ -25,6 +25,7 @@
 
 package com.datalogger.dto;
 
+import static com.datalogger.constants.PluginConstants.CURRENT_COLOSSEUM_TRIAL_LOG_VERSION;
 import com.datalogger.models.colosseum.ManticoreAttackSequence;
 import com.datalogger.models.itemvault.ItemBundle;
 import java.util.List;
@@ -85,4 +86,8 @@ public class ColosseumWaveDTO {
 
 	private Integer minotaurReinforcementsSpawnX;
 	private Integer minotaurReinforcementsSpawnY;
+
+
+	@Builder.Default
+	private int version = CURRENT_COLOSSEUM_TRIAL_LOG_VERSION;
 }
