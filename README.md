@@ -26,7 +26,11 @@ By default, all foes encountered in the TzHaar Fight Caves, the Inferno, TzHaar-
 Additionally, a keybind can be set to make the line of sight only appear while the keybind is pressed. If this is not defined, the lines of sight will always be drawn while hovering over configured NPCs.
 
 ### Virtual NPC line of sight
-Similar to the virtual player line of sight, a virtual NPC line of sight may also be drawn. Additionally, the virtual NPC line of sight may vary in its size. While drawing, its SW tile is positioned below the cursor while the bound keybind is pressed. Its outline can also be given a custom styling. An example of this is shown below.
+Similar to the virtual player line of sight, a virtual NPC line of sight may also be drawn. Additionally, the virtual NPC line of sight may vary in its size. While drawing, its SW tile is positioned below the cursor while the bound keybind is pressed. Its outline can also be given a custom styling. An example of this is shown below.<br>
+
+
+![example-virtual-npc-los.png](images/example-virtual-npc-los.png)</br>
+_Example of the virtual NPC line of sight that resembles a Javelin colossus behind a pillar_</br></br>
 
 ## Examples
 ![debug-los-myopia2-example.png](images/debug-los-myopia2-example.png)</br>
@@ -34,9 +38,6 @@ _Example of various pre-defined lines of sight, with Myopia II active_</br></br>
 
 ![javelin-colossus-los-example.PNG](images/javelin-colossus-los-example.png)</br>
 _Example of the NPC line of sight of a Javelin colossus behind a pillar_</br></br>
-
-![example-virtual-npc-los.png](images/example-virtual-npc-los.png)</br>
-_Example of the virtual NPC line of sight that resembles a Javelin colossus behind a pillar_</br></br>
 
 ![example-dynamic-los-inferno-jal-ak-npc-los.png](images/example-dynamic-los-inferno-jal-ak-npc-los.png)</br>
 _Example in which the Jal-Ak line of sight is used to position oneself safely out of its range_</br></br>

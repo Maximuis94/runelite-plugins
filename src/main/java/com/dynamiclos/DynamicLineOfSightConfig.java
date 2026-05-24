@@ -63,14 +63,6 @@ public interface DynamicLineOfSightConfig extends Config
 	String virtualNpcSection = "virtualNpcSection";
 
 	@ConfigSection(
-		name = "NPC LoS Definitions",
-		description = "Define NPCs and their attack ranges per style. Format: Name|Range or ID|Range, newline separated",
-		position = 3,
-		closedByDefault = true
-	)
-	String npcDefinitionsSection = "npcDefinitionsSection";
-
-	@ConfigSection(
 		name = "Active Weapon Range",
 		description = "Settings for the currently equipped weapon's line of sight",
 		position = 4,
@@ -212,62 +204,125 @@ public interface DynamicLineOfSightConfig extends Config
 	default boolean drawActiveWeaponRange() { return true; }
 
 	@ConfigItem(
+		keyName = "highlightAttackableEnemies",
+		name = "Highlight active weapon range enemies",
+		description = "If checked, enemies that can be directly attacked are given an outline",
+		position = 9,
+		section = togglesSection
+	)
+	default boolean highlightAttackableEnemies() { return false; }
+
+	@ConfigItem(
 		keyName = "drawMaxAttackRange",
 		name = "Enable max range LoS",
 		description = "Draws an outline at the maximum possible attack range (10 tiles)",
-		position = 9,
+		position = 10,
 		section = togglesSection
 	)
 	default boolean drawMaxAttackRange() { return false; }
 
 	@ConfigItem(
+		keyName = "highlightEnemiesWithinMaxRange",
+		name = "Highlight max range enemies",
+		description = "If checked, enemies within 10 tiles or less range are highlighted",
+		position = 11,
+		section = togglesSection
+	)
+	default boolean highlightEnemiesWithinMaxRange() { return false; }
+
+	@ConfigItem(
 		keyName = "drawFixedRange1",
 		name = "Enable range 1 LoS",
 		description = "Enables or disables drawing line of sight using attack range 1 configs",
-		position = 10,
+		position = 12,
 		section = togglesSection
 	)
 	default boolean drawFixedRange1() { return false; }
 
 	@ConfigItem(
+		keyName = "highlightEnemiesWithinFixedRange1",
+		name = "Highlight enemies in range 1",
+		description = "If checked, highlight enemies in attack range of the configured distance.",
+		position = 13,
+		section = togglesSection
+	)
+	default boolean highlightEnemiesWithinFixedRange1() { return false; }
+
+	@ConfigItem(
 		keyName = "drawFixedRange2",
 		name = "Enable range 2 LoS",
 		description = "Enables or disables drawing line of sight using attack range 2 configs",
-		position = 11,
+		position = 14,
 		section = togglesSection
 	)
 	default boolean drawFixedRange2() { return false; }
 
 	@ConfigItem(
+		keyName = "highlightEnemiesWithinFixedRange2",
+		name = "Highlight enemies in range 2",
+		description = "If checked, highlight enemies in attack range of the configured distance.",
+		position = 15,
+		section = togglesSection
+	)
+	default boolean highlightEnemiesWithinFixedRange2() { return false; }
+
+	@ConfigItem(
 		keyName = "drawFixedRange3",
 		name = "Enable range 3 LoS",
 		description = "Enables or disables drawing line of sight using attack range 3 configs",
-		position = 12,
+		position = 16,
 		section = togglesSection
 	)
 	default boolean drawFixedRange3() { return false; }
 
 	@ConfigItem(
+		keyName = "highlightEnemiesWithinFixedRange3",
+		name = "Highlight enemies in range 3",
+		description = "If checked, highlight enemies in attack range of the configured distance.",
+		position = 17,
+		section = togglesSection
+	)
+	default boolean highlightEnemiesWithinFixedRange3() { return false; }
+
+	@ConfigItem(
 		keyName = "drawFixedRange4",
 		name = "Enable range 4 LoS",
 		description = "Enables or disables drawing line of sight using attack range 4 configs",
-		position = 13,
+		position = 18,
 		section = togglesSection
 	)
 	default boolean drawFixedRange4() { return false; }
 
 	@ConfigItem(
+		keyName = "highlightEnemiesWithinFixedRange4",
+		name = "Highlight enemies in range 4",
+		description = "If checked, highlight enemies in attack range of the configured distance.",
+		position = 19,
+		section = togglesSection
+	)
+	default boolean highlightEnemiesWithinFixedRange4() { return false; }
+
+	@ConfigItem(
 		keyName = "drawFixedRange5",
 		name = "Enable range 5 LoS",
 		description = "Enables or disables drawing line of sight using attack range 5 configs",
-		position = 14,
+		position = 20,
 		section = togglesSection
 	)
 	default boolean drawFixedRange5() { return false; }
 
+	@ConfigItem(
+		keyName = "highlightEnemiesWithinFixedRange5",
+		name = "Highlight enemies in range 5",
+		description = "If checked, highlight enemies in attack range of the configured distance.",
+		position = 21,
+		section = togglesSection
+	)
+	default boolean highlightEnemiesWithinFixedRange5() { return false; }
+
 
 	// =========================================
-	// NPC LOS STYLING
+	// NPC LOS STYLING & DEFINITIONS
 	// =========================================
 
 	@Alpha
@@ -299,12 +354,38 @@ public interface DynamicLineOfSightConfig extends Config
 	)
 	default double meleeNpcLineWidth() { return DEFAULT_LINE_WIDTH; }
 
+	@ConfigItem(
+		keyName = "meleeNpcDefs",
+		name = "Melee NPCs",
+		description = "Format: NPC_NAME|RANGE. Newline separated. Can also use NPC ID.",
+		position = 3,
+		section = npcStylingSection
+	)
+	default String meleeNpcDefs() {
+		return "Jaguar warrior|1\n" +
+			"Minotaur|1\n" +
+			"Tz-Kih|1\n" +
+			"Tz-Kek|1\n" +
+			"Yt-MejKot|1\n" +
+			"Tok-Xil|1*\n" +
+			"Ket-Zek|1*\n" +
+			"Yt-HurKot|1\n" +
+			"Jal-Nib|1\n" +
+			"Jal-Ak|1*\n" +
+			"Jal-Akrek-Ket|1\n" +
+			"Jal-ImKot|1\n" +
+			"Jal-Yt-HurKot|1\n" +
+			"Jal-Xil|1*\n" +
+			"Jal-Zek|1*\n" +
+			"JalTok-Jad|1*";
+	}
+
 	@Alpha
 	@ConfigItem(
 		keyName = "rangedNpcOutlineColor",
 		name = "Ranged outline color",
 		description = "The outline color for ranged NPC lines of sight",
-		position = 3,
+		position = 4,
 		section = npcStylingSection
 	)
 	default Color rangedNpcOutlineColor() { return DEFAULT_COLOR_RANGED_OUTLINE; }
@@ -314,7 +395,7 @@ public interface DynamicLineOfSightConfig extends Config
 		keyName = "rangedNpcFillColor",
 		name = "Ranged fill color",
 		description = "The fill color for ranged NPC lines of sight",
-		position = 4,
+		position = 5,
 		section = npcStylingSection
 	)
 	default Color rangedNpcFillColor() { return DEFAULT_COLOR_RANGED_FILL; }
@@ -323,17 +404,32 @@ public interface DynamicLineOfSightConfig extends Config
 		keyName = "rangedNpcLineWidth",
 		name = "Ranged line width",
 		description = "The thickness of the outline for ranged NPC lines of sight",
-		position = 5,
+		position = 6,
 		section = npcStylingSection
 	)
 	default double rangedNpcLineWidth() { return DEFAULT_LINE_WIDTH; }
+
+	@ConfigItem(
+		keyName = "rangedNpcDefs",
+		name = "Ranged NPCs",
+		description = "Format: NPC_NAME|RANGE. Newline separated. Can also use NPC ID.",
+		position = 7,
+		section = npcStylingSection
+	)
+	default String rangedNpcDefs() {
+		return "Javelin colossus|15\n" +
+			"Tok-Xil|15\n" +
+			"Jal-MejRah|4\n" +
+			"Jal-Akrek-Xil|15\n" +
+			"Jal-Xil|15";
+	}
 
 	@Alpha
 	@ConfigItem(
 		keyName = "magicNpcOutlineColor",
 		name = "Magic outline color",
 		description = "The outline color for magic NPC lines of sight",
-		position = 6,
+		position = 8,
 		section = npcStylingSection
 	)
 	default Color magicNpcOutlineColor() { return DEFAULT_COLOR_MAGIC_OUTLINE; }
@@ -343,7 +439,7 @@ public interface DynamicLineOfSightConfig extends Config
 		keyName = "magicNpcFillColor",
 		name = "Magic fill color",
 		description = "The fill color for magic NPC lines of sight",
-		position = 7,
+		position = 9,
 		section = npcStylingSection
 	)
 	default Color magicNpcFillColor() { return DEFAULT_COLOR_MAGIC_FILL; }
@@ -352,17 +448,32 @@ public interface DynamicLineOfSightConfig extends Config
 		keyName = "magicNpcLineWidth",
 		name = "Magic line width",
 		description = "The thickness of the outline for magic NPC lines of sight",
-		position = 8,
+		position = 10,
 		section = npcStylingSection
 	)
 	default double magicNpcLineWidth() { return DEFAULT_LINE_WIDTH; }
 
+	@ConfigItem(
+		keyName = "magicNpcDefs",
+		name = "Magic NPCs",
+		description = "Format: NPC_NAME|RANGE. Newline separated. Can also use NPC ID.",
+		position = 11,
+		section = npcStylingSection
+	)
+	default String magicNpcDefs() {
+		return "Serpent shaman|10\n" +
+			"Shockwave colossus|15\n" +
+			"Ket-Zek|15\n" +
+			"Jal-Akrek-Mej|15\n" +
+			"Jal-Zek|15";
+	}
+
 	@Alpha
 	@ConfigItem(
 		keyName = "otherNpcOutlineColor",
-		name = "Hybrid/typeless outline color",
+		name = "Hybrid outline color",
 		description = "The outline color for hybrid/typeless NPC lines of sight",
-		position = 9,
+		position = 12,
 		section = npcStylingSection
 	)
 	default Color otherNpcOutlineColor() { return DEFAULT_COLOR_OTHER_OUTLINE; }
@@ -370,21 +481,37 @@ public interface DynamicLineOfSightConfig extends Config
 	@Alpha
 	@ConfigItem(
 		keyName = "otherNpcFillColor",
-		name = "Hybrid/typeless fill color",
+		name = "Hybrid fill color",
 		description = "The fill color for hybrid/typeless NPC lines of sight",
-		position = 10,
+		position = 13,
 		section = npcStylingSection
 	)
 	default Color otherNpcFillColor() { return DEFAULT_COLOR_OTHER_FILL; }
 
 	@ConfigItem(
 		keyName = "otherNpcLineWidth",
-		name = "Hybrid/typeless line width",
+		name = "Hybrid line width",
 		description = "The thickness of the outline for hybrid/typeless NPC lines of sight",
-		position = 11,
+		position = 14,
 		section = npcStylingSection
 	)
 	default double otherNpcLineWidth() { return DEFAULT_LINE_WIDTH; }
+
+	@ConfigItem(
+		keyName = "otherNpcDefs",
+		name = "Hybrid/Typeless NPCs",
+		description = "Format: NPC_NAME|RANGE. Newline separated. Can also use NPC ID.",
+		position = 15,
+		section = npcStylingSection
+	)
+	default String otherNpcDefs() {
+		return "Manticore|15\n" +
+			"Sol Heredit|1\n" +
+			"Healing totem|20\n" +
+			"TzTok-Jad|15\n" +
+			"Jal-Ak|15\n" +
+			"JalTok-Jad|15";
+	}
 
 
 	// =========================================
@@ -472,94 +599,8 @@ public interface DynamicLineOfSightConfig extends Config
 
 
 	// =========================================
-	// NPC LOS DEFINITIONS
-	// =========================================
-
-	@ConfigItem(
-		keyName = "meleeNpcDefs",
-		name = "Melee NPCs",
-		description = "Format: NPC_NAME|RANGE. Newline separated. Can also use NPC ID.",
-		position = 0,
-		section = npcDefinitionsSection
-	)
-	default String meleeNpcDefs() {
-		return "Jaguar warrior|1\n" +
-			"Minotaur|1\n" +
-			"Tz-Kih|1\n" +
-			"Tz-Kek|1\n" +
-			"Yt-MejKot|1\n" +
-			"Tok-Xil|1*\n" +
-			"Ket-Zek|1*\n" +
-			"Yt-HurKot|1\n" +
-			"Jal-Nib|1\n" +
-			"Jal-Ak|1*\n" +
-			"Jal-Akrek-Ket|1\n" +
-			"Jal-ImKot|1\n" +
-			"Jal-Yt-HurKot|1\n" +
-			"Jal-Xil|1*\n" +
-			"Jal-Zek|1*\n" +
-			"JalTok-Jad|1*";
-	}
-
-	@ConfigItem(
-		keyName = "rangedNpcDefs",
-		name = "Ranged NPCs",
-		description = "Format: NPC_NAME|RANGE. Newline separated. Can also use NPC ID.",
-		position = 1,
-		section = npcDefinitionsSection
-	)
-	default String rangedNpcDefs() {
-		return "Javelin colossus|15\n" +
-			"Tok-Xil|15\n" +
-			"Jal-MejRah|4\n" +
-			"Jal-Akrek-Xil|15\n" +
-			"Jal-Xil|15";
-	}
-
-	@ConfigItem(
-		keyName = "magicNpcDefs",
-		name = "Magic NPCs",
-		description = "Format: NPC_NAME|RANGE. Newline separated. Can also use NPC ID.",
-		position = 2,
-		section = npcDefinitionsSection
-	)
-	default String magicNpcDefs() {
-		return "Serpent shaman|10\n" +
-			"Shockwave colossus|15\n" +
-			"Ket-Zek|15\n" +
-			"Jal-Akrek-Mej|15\n" +
-			"Jal-Zek|15";
-	}
-
-	@ConfigItem(
-		keyName = "otherNpcDefs",
-		name = "Hybrid/Typeless NPCs",
-		description = "Format: NPC_NAME|RANGE. Newline separated. Can also use NPC ID.",
-		position = 3,
-		section = npcDefinitionsSection
-	)
-	default String otherNpcDefs() {
-		return "Manticore|15\n" +
-			"Sol Heredit|1\n" +
-			"Healing totem|20\n" +
-			"TzTok-Jad|15\n" +
-			"Jal-Ak|15\n" +
-			"JalTok-Jad|15";
-	}
-
-
-	// =========================================
 	// ACTIVE WEAPON RANGE ITEMS
 	// =========================================
-
-	@ConfigItem(
-		keyName = "highlightAttackableEnemies",
-		name = "Highlight active weapon range enemies",
-		description = "If checked, enemies that can be directly attacked are given an outline",
-		position = 0,
-		section = activeWeaponSection
-	)
-	default boolean highlightAttackableEnemies() { return false; }
 
 	@Alpha
 	@ConfigItem(
@@ -595,15 +636,6 @@ public interface DynamicLineOfSightConfig extends Config
 	// MAX ATTACK RANGE ITEMS
 	// =========================================
 
-	@ConfigItem(
-		keyName = "highlightEnemiesWithinMaxRange",
-		name = "Highlight max range enemies",
-		description = "If checked, enemies within 10 tiles or less range are highlighted",
-		position = 0,
-		section = maxRangeSection
-	)
-	default boolean highlightEnemiesWithinMaxRange() { return false; }
-
 	@Alpha
 	@ConfigItem(
 		keyName = "maxRangeOutlineColor",
@@ -637,15 +669,6 @@ public interface DynamicLineOfSightConfig extends Config
 	// =========================================
 	// FIXED RANGE 1 ITEMS
 	// =========================================
-
-	@ConfigItem(
-		keyName = "highlightEnemiesWithinFixedRange1",
-		name = "Highlight enemies in range",
-		description = "If checked, highlight enemies in attack range of the configured distance.",
-		position = 0,
-		section = fixedRange1Section
-	)
-	default boolean highlightEnemiesWithinFixedRange1() { return false; }
 
 	@Range(min = 1)
 	@ConfigItem(
@@ -691,15 +714,6 @@ public interface DynamicLineOfSightConfig extends Config
 	// FIXED RANGE 2 ITEMS
 	// =========================================
 
-	@ConfigItem(
-		keyName = "highlightEnemiesWithinFixedRange2",
-		name = "Highlight enemies in range",
-		description = "If checked, highlight enemies in attack range of the configured distance.",
-		position = 0,
-		section = fixedRange2Section
-	)
-	default boolean highlightEnemiesWithinFixedRange2() { return false; }
-
 	@Range(min = 1)
 	@ConfigItem(
 		keyName = "fixedRange2Distance",
@@ -743,15 +757,6 @@ public interface DynamicLineOfSightConfig extends Config
 	// =========================================
 	// FIXED RANGE 3 ITEMS
 	// =========================================
-
-	@ConfigItem(
-		keyName = "highlightEnemiesWithinFixedRange3",
-		name = "Highlight enemies in range",
-		description = "If checked, highlight enemies in attack range of the configured distance.",
-		position = 0,
-		section = fixedRange3Section
-	)
-	default boolean highlightEnemiesWithinFixedRange3() { return false; }
 
 	@Range(min = 1)
 	@ConfigItem(
@@ -797,15 +802,6 @@ public interface DynamicLineOfSightConfig extends Config
 	// FIXED RANGE 4 ITEMS
 	// =========================================
 
-	@ConfigItem(
-		keyName = "highlightEnemiesWithinFixedRange4",
-		name = "Highlight enemies in range",
-		description = "If checked, highlight enemies in attack range of the configured distance.",
-		position = 0,
-		section = fixedRange4Section
-	)
-	default boolean highlightEnemiesWithinFixedRange4() { return false; }
-
 	@Range(min = 1)
 	@ConfigItem(
 		keyName = "fixedRange4Distance",
@@ -849,15 +845,6 @@ public interface DynamicLineOfSightConfig extends Config
 	// =========================================
 	// FIXED RANGE 5 ITEMS
 	// =========================================
-
-	@ConfigItem(
-		keyName = "highlightEnemiesWithinFixedRange5",
-		name = "Highlight enemies in range",
-		description = "If checked, highlight enemies in attack range of the configured distance.",
-		position = 0,
-		section = fixedRange5Section
-	)
-	default boolean highlightEnemiesWithinFixedRange5() { return false; }
 
 	@Range(min = 1)
 	@ConfigItem(
