@@ -338,6 +338,45 @@ public class DataLoggerPlugin extends Plugin
 		}
 	}
 
+//	@Subscribe
+//	public void onChatMessage(ChatMessage event)
+//	{
+//		ChatMessageType type = event.getType();
+//
+//		if (type != ChatMessageType.GAMEMESSAGE && type != ChatMessageType.MESBOX)
+//		{
+//			return;
+//		}
+//
+//		String rawMessage = event.getMessage();
+//
+//		if (!rawMessage.toLowerCase().contains("charge"))
+//		{
+//			return;
+//		}
+//
+//		String formattedLog = type.name() + ": " + rawMessage;
+//
+//		try
+//		{
+//			File parentDir = PLUGIN_LOG_FILE.getParentFile();
+//			if (parentDir != null && !parentDir.exists())
+//			{
+//				parentDir.mkdirs();
+//			}
+//
+//			try (BufferedWriter writer = new BufferedWriter(new FileWriter(PLUGIN_LOG_FILE, true)))
+//			{
+//				writer.write(formattedLog);
+//				writer.newLine();
+//			}
+//		}
+//		catch (IOException e)
+//		{
+//			log.error("Failed to dump charge message to file: {}", PLUGIN_LOG_FILE.getAbsolutePath(), e);
+//		}
+//	}
+
 	@Subscribe
 	public void onGameStateChanged(GameStateChanged event)
 	{

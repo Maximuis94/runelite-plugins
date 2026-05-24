@@ -186,6 +186,7 @@ public enum ColosseumModifier {
 				continue;
 			}
 
+			// Use the existing NAME_LOOKUP map for O(1) lookup
 			ColosseumModifier mod = NAME_LOOKUP.get(modName.toUpperCase());
 			if (mod != null)
 			{

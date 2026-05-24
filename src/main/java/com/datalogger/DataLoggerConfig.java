@@ -213,6 +213,24 @@ public interface DataLoggerConfig extends Config {
 	)
 	default boolean logGrandExchange() { return true; }
 
+//	@ConfigItem(
+//		keyName = "logGrandExchangeCSV",
+//		name = "Log Grand Exchange (CSV)",
+//		description = "If enabled, Grand Exchange offers are added to a CSV log upon completion.",
+//		position = 1,
+//		section = GE_LOGGER_SECTION
+//	)
+//	default boolean logGrandExchangeCSV() { return true; }
+
+//	@ConfigItem(
+//		keyName = "logGrandExchangeJSON",
+//		name = "Log Grand Exchange (JSON)",
+//		description = "If enabled, a copy of the internal ledger JSON is created after updating it.",
+//		position = 2,
+//		section = GE_LOGGER_SECTION
+//	)
+//	default boolean logGrandExchangeJSON() { return true; }
+
 	@ConfigItem(
 		keyName = "geJsonFileStrategy",
 		name = "JSON File Strategy",
@@ -364,6 +382,15 @@ public interface DataLoggerConfig extends Config {
 		section = GE_LOGGER_SECTION
 	)
 	default boolean geIncludeExactTimestamp() { return true; }
+
+//	@ConfigItem(
+//		keyName = "geIncludeParseTime",
+//		name = "Include Parse Time",
+//		description = "Include the history parsing timestamp in the logged JSON entry.",
+//		position = 17,
+//		section = GE_LOGGER_SECTION
+//	)
+//	default boolean geIncludeParseTime() { return true; }
 
 	@ConfigItem(
 		keyName = "geIncludeOriginalOfferQuantity",

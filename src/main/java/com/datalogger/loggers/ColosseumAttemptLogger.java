@@ -921,6 +921,7 @@ public class ColosseumAttemptLogger extends AbstractLogger
 		return parsedTransitionUI != null ? parsedTransitionUI.getPotentialLoot() : null;
 	}
 
+	// Update the return type and stream collector
 	private List<String> getActiveModifiersList() {
 		if (activeModifiers.isEmpty()) {
 			return Collections.emptyList();
