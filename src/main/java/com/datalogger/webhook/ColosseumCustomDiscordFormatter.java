@@ -60,7 +60,7 @@ public final class ColosseumCustomDiscordFormatter
 	 */
 	public static JsonObject buildPayload(ColosseumAttemptDTO dto, String template, boolean isTest)
 	{
-		JsonObject embed = isTest ? generateTestEmbed(dto.getAccount()) : generateBaseEmbed(dto.getAccount());
+		JsonObject embed = isTest ? generateTestEmbed(dto.getAccountName()) : generateBaseEmbed(dto.getAccountName());
 		int color = "COMPLETED".equals(dto.getResult()) ? 0x00FF00 : 0xFF0000;
 
 		embed.addProperty("color", color);
@@ -77,7 +77,7 @@ public final class ColosseumCustomDiscordFormatter
 	 */
 	public static JsonObject buildTestPayload(ColosseumAttemptDTO dto, String template)
 	{
-		JsonObject embed = generateTestEmbed(dto.getAccount());
+		JsonObject embed = generateTestEmbed(dto.getAccountName());
 		embed.addProperty("description", resolveTemplate(template, dto));
 		return wrapEmbedIntoPayload(embed);
 	}
@@ -103,7 +103,7 @@ public final class ColosseumCustomDiscordFormatter
 
 		// Chain replacements for all supported tokens
 		String resolved = cleanTemplate
-			.replace("<PLAYER>", dto.getAccount())
+			.replace("<PLAYER>", dto.getAccountName())
 			.replace("<RESULT>", dto.getResult())
 			.replace("<WAVES>", String.valueOf(dto.getWaves().size()))
 			.replace("<TIME>", formatSeconds(lastWave != null ? lastWave.getTotalTimeTaken() : 0))

@@ -32,6 +32,8 @@ import static com.datalogger.constants.Item.InterfaceID.SEED_VAULT_GROUP_ID;
 import static com.datalogger.constants.PluginConstants.INTERNAL_VAULT_DIR;
 import static com.datalogger.constants.PluginConstants.ITEM_VAULT_DIR;
 import java.io.File;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import lombok.Getter;
 import net.runelite.api.events.WidgetLoaded;
 
@@ -51,7 +53,8 @@ public enum VaultType
 	POH_COSTUME_ROOM(-1, -1),
 	FARMING_TOOLS(-1, -1),
 	TOA_PICKAXE(-1, -1),
-	COFFER(-1, -1)
+	COFFER(-1, -1),
+	CARRIED_ITEMS(-1, -1)
 
 
 	;
@@ -65,6 +68,8 @@ public enum VaultType
 		this.childId = childId;
 		this.groupId = groupId;
 	}
+
+	private static final Map<String, File> EXTERNAL_FILE_CACHE = new ConcurrentHashMap<>();
 
 	/**
 	 * The name of the VaultType, lowercased and with hyphens instead of underscores.
@@ -118,35 +123,49 @@ public enum VaultType
 	}
 
 	/**
-	 * Return the internal json file associated with the given accountHash.
+	 * Return the external CSV file associated with the given accountHash.
 	 */
 	public File getExternalCSVFile(long accountHash)
 	{
-		return new File(ITEM_VAULT_DIR, fileNameString() + "_" + accountHash + ".csv");
+		return getCachedFile(String.valueOf(accountHash), ".csv");
 	}
 
 	/**
-	 * Return the internal json file associated with the given accountHash.
+	 * Return the external CSV file associated with the given accountName.
 	 */
 	public File getExternalCSVFile(String accountName)
 	{
-		return new File(ITEM_VAULT_DIR, fileNameString() + "_" + accountName + ".csv");
+		return getCachedFile(accountName.toLowerCase(), ".csv");
 	}
 
 	/**
-	 * Return the internal json file associated with the given accountHash.
+	 * Return the external JSON file associated with the given accountHash.
 	 */
 	public File getExternalJSONFile(long accountHash)
 	{
-		return new File(ITEM_VAULT_DIR, fileNameString() + "_" + accountHash + ".json");
+		return getCachedFile(String.valueOf(accountHash), ".json");
 	}
 
 	/**
-	 * Return the internal json file associated with the given accountHash.
+	 * Return the external JSON file associated with the given accountName.
 	 */
 	public File getExternalJSONFile(String accountName)
 	{
-		return new File(ITEM_VAULT_DIR, fileNameString() + "_" + accountName + ".json");
+		return getCachedFile(accountName.toLowerCase(), ".json");
+	}
+
+	/**
+	 * Helper method to build and cache the external file paths.
+	 * Formats the path as: ITEM_VAULT_DIR / accountIdentifier / [vaultType]_[accountIdentifier][extension]
+	 */
+	private File getCachedFile(String accountIdentifier, String extension)
+	{
+		String fileName = fileNameString() + "_" + accountIdentifier + extension;
+		String cacheKey = this.name() + "_" + accountIdentifier + extension;
+		return EXTERNAL_FILE_CACHE.computeIfAbsent(cacheKey, key -> {
+			File accountDir = new File(ITEM_VAULT_DIR, accountIdentifier);
+			return new File(accountDir, fileName);
+		});
 	}
 
 //	/**

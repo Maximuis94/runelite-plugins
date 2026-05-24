@@ -56,7 +56,7 @@ public final class ColosseumDetailedDiscordFormatter
 	 */
 	@Nonnull
 	public static JsonObject buildPayload(@Nonnull ColosseumAttemptDTO dto, @Nonnull DataLoggerConfig config, boolean isTest) {
-		JsonObject embed = isTest ? generateTestEmbed(dto.getAccount()) : generateBaseEmbed(dto.getAccount());
+		JsonObject embed = isTest ? generateTestEmbed(dto.getAccountName()) : generateBaseEmbed(dto.getAccountName());
 //		StringBuilder description = new StringBuilder();
 //
 //		List<String> topStats = new ArrayList<>();

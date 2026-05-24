@@ -369,7 +369,6 @@ public class SupplyTracker
 		parseInitialItemContainers();
 		equipmentTracker.resetAttackCount();
 		log.debug("Starting tracking of supplies");
-		validateTrackingAudio();
 	}
 
 	/**
@@ -392,7 +391,7 @@ public class SupplyTracker
 			log.debug("Supplies is null...");
 		}
 
-		restoreMutedSoundEffects();
+//		restoreMutedSoundEffects();
 	}
 
 
@@ -454,59 +453,5 @@ public class SupplyTracker
 		}
 
 		return new TrackedSupplies(consumedItems, consumedDoses, consumedCharges, namedItems, namedDoses, namedCharges, totalValue[0]);
-	}
-
-	/**
-	 * Check if sound effects are muted. Set it to lowest value possible and inform the user, or just inform the user,
-	 * depending on plugin configurations.
-	 * Only act if there actually is a weapon with charges.
-	 * Minimize method calls to avoid harassing the user. Additionally, restrict game messages sent based on previous
-	 * warning timestamp.
-	 */
-	private void validateTrackingAudio()
-	{
-		Preferences prefs = client.getPreferences();
-		if (prefs == null || !hasWeaponWithCharges) return;
-
-		Instant curTimestamp = Instant.now();
-		if (nextUnmuteTimestamp != null && curTimestamp.isBefore(nextUnmuteTimestamp)) return;
-
-
-		if (prefs.getSoundEffectVolume() == 0)
-		{
-			nextUnmuteTimestamp = curTimestamp.plusSeconds(UNMUTE_COOLDOWN_SECONDS);
-			if (config.disableSoundEffectMute())
-			{
-				prefs.setSoundEffectVolume(1);
-				hasUnmutedAudio = true;
-				client.addChatMessage(ChatMessageType.GAMEMESSAGE, "",
-					"<col=ef1020>Data logger: Sound was muted and unmuted by the data logger plugin it to the lowest value possible for more accurate weapon charge tracking.</col>", null);
-			}
-			else
-			{
-				client.addChatMessage(ChatMessageType.GAMEMESSAGE, "",
-					"<col=ef1020>Data logger: [WARNING] Sound Effects are muted! Weapon charges can be tracked much more accurately if sound effects are not completely muted.</col>", null);
-			}
-		}
-	}
-
-	/**
-	 * Mute audio if it was muted prior to automatically unmuting it, but only if the volume is at 1.
-	 */
-	private void restoreMutedSoundEffects()
-	{
-		if (hasUnmutedAudio)
-		{
-			Preferences prefs = client.getPreferences();
-			if (prefs == null) return;
-
-			if (prefs.getSoundEffectVolume() == 1)
-			{
-				prefs.setSoundEffectVolume(0);
-			}
-			hasUnmutedAudio = false;
-			log.debug("Muted the audio after unmuting it before initiating the tracking of supplies.");
-		}
-
 	}
 }

@@ -42,6 +42,7 @@ public abstract class AbstractLogger implements Loggable {
 	@Inject protected DataLoggerConfig config;
 
 	// Currently active account
+	private boolean onRelevantGameMode = false;
 	private String accountName = "unknown";
 	private String accountHashString = "-1";
 	private long accountHashLong = -1;
@@ -68,16 +69,24 @@ public abstract class AbstractLogger implements Loggable {
 	}
 
 	/**
+	 * Returns true if the current session is on a temporary game mode like leagues
+	 */
+	protected boolean isOnRelevantGameMode()
+	{
+		return onRelevantGameMode;
+	}
+
+	/**
 	 * Centralized write method that every sub-logger will use.
 	 * It automatically resolves the target file based on the logger type.
 	 */
-	protected void logRow(String csvRow) {
+	protected void logRow(String csvRow, File csvFile) {
 		if (!isEnabled() || accountName.equals("unknown")) {
 			return;
 		}
 
-		File logFile = fileIOService.getTargetFile(getLogType());
-		fileIOService.atomicWrite(logFile, getCsvHeader(), csvRow);
+//		File logFile = fileIOService.getTargetFile(getLogType());
+		fileIOService.atomicWrite(csvFile, getCsvHeader(), csvRow);
 	}
 
 	/**
@@ -89,6 +98,7 @@ public abstract class AbstractLogger implements Loggable {
 		accountName = event.getAccountName();
 		accountHashString = event.getAccountHashString();
 		accountHashLong = event.getAccountHash();
+		onRelevantGameMode = event.isOnRelevantGameWorld();
 
 		log.debug("[{}] Session initialized for {} ({})", getLogType(), accountName, accountHashString);
 

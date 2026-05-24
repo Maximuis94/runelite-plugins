@@ -34,9 +34,12 @@ import static com.datalogger.constants.Item.Values.TAX_MULTIPLIER;
 import com.datalogger.events.DataLoggerConfigChanged;
 import com.datalogger.framework.AbstractLogger;
 import com.datalogger.framework.LogType;
+import com.datalogger.models.enums.ExchangeLoggerCsvFileStrategy;
+import com.datalogger.models.enums.ExchangeLoggerJsonFileStrategy;
 import com.datalogger.models.grandexchange.ActiveGeOffer;
 import com.datalogger.models.grandexchange.GeLedgerEntry;
 import com.datalogger.services.GrandExchangeHistoryParser;
+import java.io.File;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
@@ -55,6 +58,7 @@ import net.runelite.api.widgets.Widget;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.game.ItemManager;
+import com.google.gson.JsonObject;
 
 @Slf4j
 @Singleton
@@ -69,12 +73,30 @@ public class GrandExchangeLogger extends AbstractLogger
 
 	private ActiveGeOffer[] currentActiveOffers = new ActiveGeOffer[8];
 
-//	private List<GeLedgerEntry> internalLedger;
-
 	private final String[] lastLoggedFingerprints = new String[8];
 
 	private boolean loggerIsEnabled = false;
 	private boolean collectionScriptRunning = false;
+
+	// GE Logging Config Toggles
+	private boolean geIncludeItemId = true;
+	private boolean geIncludeItemName = true;
+	private boolean geIncludeIsBuy = true;
+	private boolean geIncludeQuantity = true;
+	private boolean geIncludePrice = true;
+	private boolean geIncludeValue = true;
+	private boolean geIncludeTax = true;
+	private boolean geIncludeAccountName = true;
+	private boolean geIncludeAccountHash = true;
+	private boolean geIncludeGeSlot = true;
+	private boolean geIncludeIsCancelled = true;
+	private boolean geIncludeOfferCreationTime = true;
+	private boolean geIncludeExactTimestamp = true;
+	private boolean geIncludeOriginalOfferQuantity = true;
+	private boolean geIncludeOriginalOfferPrice = true;
+
+	private ExchangeLoggerJsonFileStrategy jsonFileNamingStrategy = null;
+	private ExchangeLoggerCsvFileStrategy csvFileNamingStrategy = null;
 
 	@Override
 	public LogType getLogType() { return LogType.GRAND_EXCHANGE; }
@@ -83,7 +105,7 @@ public class GrandExchangeLogger extends AbstractLogger
 	public String getCsvHeader() { return CSV_HEADER; }
 
 	@Override
-	public boolean isEnabled() { return config.logGrandExchange(); }
+	public boolean isEnabled() { return loggerIsEnabled; }
 
 	private Long lastParsedHistory = null;
 	private final int HISTORY_PARSE_COOLDOWN_MS = 120000;
@@ -94,7 +116,8 @@ public class GrandExchangeLogger extends AbstractLogger
 	@Override
 	public void setup()
 	{
-		loggerIsEnabled = config.logGrandExchange();
+		loggerIsEnabled = config.logGrandExchange() && isOnRelevantGameMode();
+		updateConfigurations();
 		if (!loggerIsEnabled)
 			return;
 
@@ -112,6 +135,8 @@ public class GrandExchangeLogger extends AbstractLogger
 		}
 		initialScan();
 	}
+
+
 
 	private boolean isGrandExchangeSubmissionScript(int scriptId)
 	{
@@ -168,6 +193,8 @@ public class GrandExchangeLogger extends AbstractLogger
 
 	@Subscribe
 	public void onGrandExchangeOfferChanged(GrandExchangeOfferChanged event) {
+		if (!loggerIsEnabled) return;
+
 		String hash = getAccountHashString();
 		if (hash.equals("-1")) return;
 
@@ -181,7 +208,7 @@ public class GrandExchangeLogger extends AbstractLogger
 	@Subscribe
 	public void onWidgetLoaded(WidgetLoaded event)
 	{
-		if (!config.logGrandExchange()) return;
+		if (!loggerIsEnabled) return;
 
 		if (event.getGroupId() == GE_GROUP_ID)
 		{
@@ -195,12 +222,12 @@ public class GrandExchangeLogger extends AbstractLogger
 	@Subscribe
 	public void onDataLoggerConfigChanged(DataLoggerConfigChanged event)
 	{
-		if (!loggerIsEnabled && config.logGrandExchange())
+		loggerIsEnabled = config.logGrandExchange() && isOnRelevantGameMode();
+		if (loggerIsEnabled)
 		{
 			setup();
 		}
 
-		loggerIsEnabled = config.logGrandExchange();
 	}
 
 	private void historyUI()
@@ -218,6 +245,8 @@ public class GrandExchangeLogger extends AbstractLogger
 	 * Maintains the 8-slot array of active GE offers and saves to disk on change.
 	 */
 	private void updateActiveOfferState(int slot, GrandExchangeOffer offer) {
+		if (!loggerIsEnabled) return;
+
 		if (offer.getState() == GrandExchangeOfferState.EMPTY) {
 			currentActiveOffers[slot] = null;
 		} else {
@@ -248,7 +277,7 @@ public class GrandExchangeLogger extends AbstractLogger
 	}
 
 	public boolean handleOffer(int slot, GrandExchangeOffer offer) {
-		if (!isEnabled()) return false;
+		if (!loggerIsEnabled) return false;
 
 		if (offer.getState() == GrandExchangeOfferState.EMPTY) {
 			clearSlotMemory(slot);
@@ -280,6 +309,8 @@ public class GrandExchangeLogger extends AbstractLogger
 	}
 
 	public void initialScan() {
+		if (!isOnRelevantGameMode()) return;
+
 		GrandExchangeOffer[] offers = client.getGrandExchangeOffers();
 		if (offers == null) return;
 
@@ -360,6 +391,8 @@ public class GrandExchangeLogger extends AbstractLogger
 	 */
 	private void logFinalTrade(int slot, GrandExchangeOffer offer, String createdTs, long accountHash)
 	{
+		if (!loggerIsEnabled) return;
+
 		String currentAccountName = getAccountName();
 		int quantity = offer.getQuantitySold();
 
@@ -377,7 +410,7 @@ public class GrandExchangeLogger extends AbstractLogger
 
 		GeLedgerEntry.GeLedgerEntryBuilder builder = GeLedgerEntry.builder()
 			.itemId(offer.getItemId())
-			.itemName(itemManager.getItemComposition(offer.getItemId()).getName())
+			.itemName(itemManager.getItemComposition(offer.getItemId()).getMembersName())
 			.isBuy(isBuy)
 			.quantity(quantity)
 			.price(price)
@@ -392,7 +425,6 @@ public class GrandExchangeLogger extends AbstractLogger
 			.originalOfferQuantity(offer.getTotalQuantity())
 			.originalOfferPrice(offer.getPrice());
 
-		Instant creationInstant = null;
 		if (createdTs != null && !createdTs.isEmpty())
 		{
 			try
@@ -406,14 +438,85 @@ public class GrandExchangeLogger extends AbstractLogger
 		}
 
 		GeLedgerEntry ledgerEntry = builder.build();
-		List<GeLedgerEntry> internalLedger = fileIOService.loadInternalGeLedger(getAccountHashString());
-		internalLedger.add(ledgerEntry);
-		fileIOService.saveInternalGeLedger(internalLedger);
+		fileIOService.extendInternalGeLedger(ledgerEntry);
 
-		if (config.logGrandExchangeCSV())
+		if (csvFileNamingStrategy != ExchangeLoggerCsvFileStrategy.NONE)
 		{
 			String row = formatCsvRow(ledgerEntry);
-			logRow(row);
+			logRow(row, csvFileNamingStrategy.getCsvFile(ledgerEntry.getAccountName()));
+		}
+
+		if (jsonFileNamingStrategy != ExchangeLoggerJsonFileStrategy.NONE)
+		{
+			File jsonFile = jsonFileNamingStrategy.getJsonFile(ledgerEntry.getAccountName());
+			if (jsonFile != null)
+			{
+				JsonObject jsonObject = new JsonObject();
+
+				if (geIncludeItemId)
+				{
+					jsonObject.addProperty("itemId", ledgerEntry.getItemId());
+				}
+				if (geIncludeItemName)
+				{
+					jsonObject.addProperty("itemName", ledgerEntry.getItemName());
+				}
+				if (geIncludeIsBuy)
+				{
+					jsonObject.addProperty("isBuy", ledgerEntry.isBuy());
+				}
+				if (geIncludeQuantity)
+				{
+					jsonObject.addProperty("quantity", ledgerEntry.getQuantity());
+				}
+				if (geIncludePrice)
+				{
+					jsonObject.addProperty("price", ledgerEntry.getPrice());
+				}
+				if (geIncludeValue)
+				{
+					jsonObject.addProperty("value", ledgerEntry.getValue());
+				}
+				if (geIncludeTax)
+				{
+					jsonObject.addProperty("tax", ledgerEntry.getTax());
+				}
+				if (geIncludeAccountName)
+				{
+					jsonObject.addProperty("accountName", ledgerEntry.getAccountName());
+				}
+				if (geIncludeAccountHash)
+				{
+					jsonObject.addProperty("accountHash", ledgerEntry.getAccountHash());
+				}
+				if (geIncludeGeSlot)
+				{
+					jsonObject.addProperty("geSlot", ledgerEntry.getGeSlot());
+				}
+				if (geIncludeIsCancelled)
+				{
+					jsonObject.addProperty("isCancelled", ledgerEntry.isCancelled());
+				}
+				if (geIncludeOfferCreationTime)
+				{
+					jsonObject.addProperty("offerCreationTime", ledgerEntry.getOfferCreationTime());
+				}
+				if (geIncludeExactTimestamp)
+				{
+					jsonObject.addProperty("exactTimestamp", ledgerEntry.getExactTimestamp());
+				}
+				if (geIncludeOriginalOfferQuantity)
+				{
+					jsonObject.addProperty("originalOfferQuantity", ledgerEntry.getOriginalOfferQuantity());
+				}
+				if (geIncludeOriginalOfferPrice)
+				{
+					jsonObject.addProperty("originalOfferPrice", ledgerEntry.getOriginalOfferPrice());
+				}
+
+				fileIOService.appendGeJsonLog(jsonFile, jsonObject, jsonFileNamingStrategy);
+			}
+
 		}
 	}
 
@@ -513,7 +616,24 @@ public class GrandExchangeLogger extends AbstractLogger
 	 */
 	private void updateConfigurations()
 	{
-		loggerIsEnabled = config.logGrandExchange();
+		loggerIsEnabled = config.logGrandExchange() && isOnRelevantGameMode();
+		jsonFileNamingStrategy = config.geJsonFileStrategy();
+		csvFileNamingStrategy = config.geCsvFileStrategy();
+		geIncludeItemId = config.geIncludeItemId();
+		geIncludeItemName = config.geIncludeItemName();
+		geIncludeIsBuy = config.geIncludeIsBuy();
+		geIncludeQuantity = config.geIncludeQuantity();
+		geIncludePrice = config.geIncludePrice();
+		geIncludeValue = config.geIncludeValue();
+		geIncludeTax = config.geIncludeTax();
+		geIncludeAccountName = config.geIncludeAccountName();
+		geIncludeAccountHash = config.geIncludeAccountHash();
+		geIncludeGeSlot = config.geIncludeGeSlot();
+		geIncludeIsCancelled = config.geIncludeIsCancelled();
+		geIncludeOfferCreationTime = config.geIncludeOfferCreationTime();
+		geIncludeExactTimestamp = config.geIncludeExactTimestamp();
+		geIncludeOriginalOfferQuantity = config.geIncludeOriginalOfferQuantity();
+		geIncludeOriginalOfferPrice = config.geIncludeOriginalOfferPrice();
 	}
 
 	/**

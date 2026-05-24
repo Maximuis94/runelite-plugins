@@ -26,7 +26,7 @@ package com.datalogger.services;
 
 import com.datalogger.DataLoggerConfig;
 import com.datalogger.constants.PluginConstants;
-import static com.datalogger.constants.PluginConstants.INTERNAL_COLOSSEUM_ATTEMPT_HISTORY;
+import static com.datalogger.constants.PluginConstants.INTERNAL_COLOSSEUM_TRIAL_HISTORY;
 import static com.datalogger.constants.PluginConstants.INTERNAL_VAULT_DIR;
 import com.datalogger.dto.ColosseumAttemptDTO;
 import com.datalogger.dto.ColosseumStateDTO;
@@ -39,6 +39,7 @@ import com.datalogger.framework.LogType;
 import com.datalogger.models.colosseum.ColosseumAttempt;
 import com.datalogger.models.colosseum.ColosseumState;
 import com.datalogger.models.colosseum.ColosseumWave;
+import com.datalogger.models.enums.ExchangeLoggerJsonFileStrategy;
 import com.datalogger.models.enums.ItemCharge;
 import com.datalogger.models.enums.ScreenshotFormat;
 import com.datalogger.models.enums.VaultType;
@@ -123,8 +124,8 @@ public class FileIOService
 
 	private final DataLoggerConfig config;
 	private final EventBus eventBus;
-	private boolean logGrandExchangeJson;
 
+	private boolean isTemporaryGameMode = false;
 	private String accountName = "";
 	private String accountHashString = "";
 	@Getter
@@ -138,6 +139,8 @@ public class FileIOService
 	private String attemptRoot;
 	private File attemptRootFile;
 	private String startTime;
+
+	private static final Map<String, File> INTERNAL_LEDGER_CACHE = new ConcurrentHashMap<>();
 
 	private final int MAX_BACKLOG_ROWS = 5000;
 	private final int MAX_FLUSH_TIME_MS = 3000;
@@ -197,7 +200,7 @@ public class FileIOService
 	@Subscribe
 	public void onAccountSessionStarted(AccountSessionStarted event)
 	{
-		updateAccountInfo(event.getAccountName(), event.getAccountHashString());
+		updateAccountInfo(event.getAccountName(), event.getAccountHashString(), event.isOnRelevantGameWorld());
 	}
 
 	private boolean isValidAccountString(String accountString)
@@ -209,7 +212,7 @@ public class FileIOService
 	 * Update account info with the given accountName and accountHash Strings. If either one is not valid, indicate this
 	 * via the hasValidAccountInfo flag, but keep the previous name and/or hash cached.
 	 */
-	private void updateAccountInfo(String accountName, String accountHashString)
+	private void updateAccountInfo(String accountName, String accountHashString, boolean isTemporaryGameMode)
 	{
 		boolean isValidName = isValidAccountString(accountName);
 		boolean isValidHash = isValidAccountString(accountHashString);
@@ -219,6 +222,7 @@ public class FileIOService
 			this.accountHashString = accountHashString;
 			internalVaultRoot = getInternalRoot(accountHashString);
 			hasValidAccountInfo = true;
+			this.isTemporaryGameMode = isTemporaryGameMode;
 		}
 		else if (hasValidAccountInfo)
 		{
@@ -232,7 +236,6 @@ public class FileIOService
 	 */
 	private void updateConfigFlags()
 	{
-		logGrandExchangeJson = config.logGrandExchangeJSON();
 	}
 
 
@@ -503,12 +506,12 @@ public class FileIOService
 
 	public void logColosseumAttempt(ColosseumAttemptDTO attemptDto, File attemptLogJsonFile) {
 		Future<?> futureInternal = executor.submit(() -> {
-			ensureDirectoryExists(INTERNAL_COLOSSEUM_ATTEMPT_HISTORY.getParentFile());
+			ensureDirectoryExists(INTERNAL_COLOSSEUM_TRIAL_HISTORY.getParentFile());
 
 			Gson flatGson = new Gson();
 			String jsonLine = flatGson.toJson(attemptDto);
 
-			try (FileWriter fw = new FileWriter(INTERNAL_COLOSSEUM_ATTEMPT_HISTORY, true);
+			try (FileWriter fw = new FileWriter(INTERNAL_COLOSSEUM_TRIAL_HISTORY, true);
 				 BufferedWriter bw = new BufferedWriter(fw);
 				 PrintWriter out = new PrintWriter(bw)) {
 
@@ -600,6 +603,89 @@ public class FileIOService
 		}
 	}
 
+	/**
+	 * Helper method to seamlessly convert an existing JSON array file to a JSON Lines file.
+	 */
+	private void migrateLedgerToJsonl(File oldFile, File newFile)
+	{
+		log.info("Migrating internal GE ledger from JSON array to JSON Lines for: {}", oldFile.getName());
+		try
+		{
+			if (oldFile.length() > 0)
+			{
+				try (FileReader reader = new FileReader(oldFile);
+					 FileWriter fw = new FileWriter(newFile, true);
+					 BufferedWriter bw = new BufferedWriter(fw))
+				{
+					// Parse the old array
+					JsonArray array = gson.fromJson(reader, JsonArray.class);
+					if (array != null)
+					{
+						// Write each element as a new line
+						for (JsonElement element : array)
+						{
+							bw.write(gson.toJson(element));
+							bw.newLine();
+						}
+					}
+				}
+			}
+
+			if (oldFile.delete())
+			{
+				log.info("Successfully migrated and deleted old JSON ledger.");
+			}
+			else
+			{
+				log.warn("Migration succeeded, but failed to delete old file: {}", oldFile.getAbsolutePath());
+			}
+		}
+		catch (Exception e)
+		{
+			log.error("Failed to migrate internal GE ledger. New entries will still be appended to .jsonl.", e);
+		}
+	}
+
+	/**
+	 * Adds entry to the internal GE ledger
+	 */
+	public void extendInternalGeLedger(GeLedgerEntry entry)
+	{
+		if (!isTemporaryGameMode) return;
+		String accountHash = String.valueOf(entry.getAccountHash());
+
+		// 1. Fetch or create the cached File object
+		File jsonlFile = INTERNAL_LEDGER_CACHE.computeIfAbsent(accountHash, hash -> {
+			// Ensure the directory exists
+			File dir = INTERNAL_GE_DIR; // Update this path if needed
+			if (!dir.exists())
+			{
+				dir.mkdirs();
+			}
+			return new File(dir, hash + ".jsonl");
+		});
+
+		// 2. One-time Migration check: If the old .json file exists, migrate it to .jsonl
+		// (Assume PluginConstants.INTERNAL_GE_DIR is used for both)
+		File oldJsonFile = new File(INTERNAL_GE_DIR, accountHash + ".json");
+		if (oldJsonFile.exists())
+		{
+			migrateLedgerToJsonl(oldJsonFile, jsonlFile);
+		}
+
+		// 3. Append the new entry (O(1) time complexity, virtually zero memory footprint)
+		try (FileWriter fw = new FileWriter(jsonlFile, true);
+			 BufferedWriter bw = new BufferedWriter(fw))
+		{
+			bw.write(gson.toJson(entry));
+			bw.newLine();
+		}
+		catch (IOException e)
+		{
+			log.error("Failed to append to internal GE ledger (.jsonl): {}", jsonlFile.getAbsolutePath(), e);
+		}
+	}
+
 	public List<GeLedgerEntry> loadInternalGeLedger(String accountHash) {
 		if (accountHash == null || accountHash.isEmpty()) {
 			return new ArrayList<>();
@@ -660,23 +746,6 @@ public class FileIOService
 
 					log.debug("Successfully saved internal GE ledger for account hash: {}", accountHashString);
 
-					if (logGrandExchangeJson)
-					{
-						try
-						{
-							ensureDirectoryExists(copyTo.getParentFile());
-							Files.copy(
-								finalFile.toPath(),
-								copyTo.toPath(),
-								StandardCopyOption.REPLACE_EXISTING
-							);
-						}
-						catch (Exception ignored)
-						{
-							log.debug("Failed to copy the json to the grand-exchange directory.");
-						}
-					}
-
 				} catch (Exception e) {
 					log.error("Failed to save internal GE ledger for account hash: {}", accountHashString, e);
 					if (tempFile.exists()) {
@@ -686,6 +755,49 @@ public class FileIOService
 			}
 		});
 		pendingWrites.add(future);
+	}
+
+	/**
+	 * Appends a Grand Exchange JSON object to the specified file based on the logging strategy.
+	 */
+	public void appendGeJsonLog(File file, JsonObject newEntry, ExchangeLoggerJsonFileStrategy strategy)
+	{
+		if (!file.getParentFile().exists())
+		{
+			file.getParentFile().mkdirs();
+		}
+
+		if (strategy == ExchangeLoggerJsonFileStrategy.JSONLINE)
+		{
+			try (FileWriter fw = new FileWriter(file, true);
+				 BufferedWriter bw = new BufferedWriter(fw))
+			{
+				bw.write(gson.toJson(newEntry));
+				bw.newLine();
+			}
+			catch (IOException e) { log.error("Failed to append to GE JSONL", e); }
+		}
+		else
+		{
+			JsonArray array = new JsonArray();
+
+			if (file.exists() && file.length() > 0)
+			{
+				try (FileReader reader = new FileReader(file))
+				{
+					array = gson.fromJson(reader, JsonArray.class);
+				}
+				catch (Exception e) {  }
+			}
+
+			array.add(newEntry);
+
+			try (FileWriter fw = new FileWriter(file))
+			{
+				gson.toJson(array, fw);
+			}
+			catch (IOException e) { }
+		}
 	}
 
 	/**
@@ -740,12 +852,12 @@ public class FileIOService
 			if (!ensureDirectoryExists(INTERNAL_ACTIVE_OFFERS_DIR)) {
 				return;
 			}
-
 			File finalFile = new File(INTERNAL_ACTIVE_OFFERS_DIR, accountHash + ".json");
 			File tempFile = new File(INTERNAL_ACTIVE_OFFERS_DIR, accountHash + ".tmp");
 
-			File publicJsonFile = new File(PluginConstants.ITEM_VAULT_DIR, "active-offers_" + accountHash + ".json");
-			File publicCsvFile = new File(PluginConstants.ITEM_VAULT_DIR, "active-offers_" + accountHash + ".csv");
+			File root = new File(PluginConstants.ITEM_VAULT_DIR, accountName);
+			File publicJsonFile = new File(root, "active-offers_" + accountName + ".json");
+			File publicCsvFile = new File(root, "active-offers_" + accountName + ".csv");
 
 			Object lock = accountLocks.computeIfAbsent(accountHash, k -> new Object());
 
@@ -1137,13 +1249,13 @@ public class FileIOService
 	 */
 	private void mergeAllWaveLogsJson() {
 		Future<?> future = executor.submit(() -> {
-			if (!PluginConstants.COLOSSEUM_ATTEMPT_DIR.exists() || !PluginConstants.COLOSSEUM_ATTEMPT_DIR.isDirectory()) {
+			if (!PluginConstants.COLOSSEUM_TRIALS_DIR.exists() || !PluginConstants.COLOSSEUM_TRIALS_DIR.isDirectory()) {
 				log.debug("Colosseum root directory does not exist. Skipping merge.");
 				return;
 			}
 			log.debug("Attempting to merge all Colosseum wave json logs into {}", COLOSSEUM_WAVE_LOG_MERGED_JSON);
 
-			File[] attemptDirs = PluginConstants.COLOSSEUM_ATTEMPT_DIR.listFiles(File::isDirectory);
+			File[] attemptDirs = PluginConstants.COLOSSEUM_TRIALS_DIR.listFiles(File::isDirectory);
 			if (attemptDirs == null || attemptDirs.length == 0) {
 				return;
 			}
@@ -1220,7 +1332,7 @@ public class FileIOService
 			}
 			log.debug("Attempting to merge all Colosseum wave csv logs...");
 
-			File[] attemptDirs = PluginConstants.COLOSSEUM_ATTEMPT_DIR.listFiles(File::isDirectory);
+			File[] attemptDirs = PluginConstants.COLOSSEUM_TRIALS_DIR.listFiles(File::isDirectory);
 			if (attemptDirs == null || attemptDirs.length == 0) {
 				return;
 			}

@@ -37,11 +37,13 @@ import lombok.NonNull;
 @Data
 @Builder
 public class ColosseumAttemptDTO {
+	private static final int CURRENT_VERSION = 1;
+
 	@NonNull
 	private String attemptId;
 	private long timestamp;
 	@NonNull
-	private String account;
+	private String accountName;
 	@NonNull
 	private String result;
 	private int rewardsValue;
@@ -61,4 +63,7 @@ public class ColosseumAttemptDTO {
 
 	@Builder.Default
 	private List<ColosseumWaveDTO> waves = new ArrayList<>();
+
+	@Builder.Default
+	private int version = CURRENT_VERSION;
 }

@@ -40,7 +40,7 @@ public final class PluginConstants
 	public static final File COLOSSEUM_SCREENSHOT_DIR = new File(COLOSSEUM_ROOT_DIR, "screenshot");
 	public static final File COLOSSEUM_LOG_DIR = new File(COLOSSEUM_ROOT_DIR, "log");
 	public static final File COLOSSEUM_TIMELINE_DIR = new File(COLOSSEUM_ROOT_DIR, "timeline");
-	public static final File COLOSSEUM_ATTEMPT_DIR = new File(COLOSSEUM_ROOT_DIR, "attempt");
+	public static final File COLOSSEUM_TRIALS_DIR = new File(COLOSSEUM_ROOT_DIR, "trials");
 	public static final File ITEM_VAULT_DIR = new File(PLUGIN_ROOT, "item-vault");
 	public static final File GRAND_EXCHANGE_DIR = new File(PLUGIN_ROOT, "grand-exchange");
 	public static final File GRAND_EXCHANGE_ACTIVE_OFFERS_DIR = new File(GRAND_EXCHANGE_DIR, "active-offers");
@@ -48,8 +48,7 @@ public final class PluginConstants
 	public static final File INTERNAL_VAULT_DIR = new File(INTERNAL_ROOT_DIR, "item-vault");
 	public static final File INTERNAL_ITEM_CHARGE_DIR = new File(INTERNAL_ROOT_DIR, "item-charges");
 	public static final File INTERNAL_COLOSSEUM_DIR = new File(INTERNAL_ROOT_DIR, "colosseum");
-	public static final File INTERNAL_COLOSSEUM_ATTEMPT_HISTORY = new File(INTERNAL_COLOSSEUM_DIR, "attempt-history.jsonl");
-	public static final File PLUGIN_LOG_FILE = new File(INTERNAL_ROOT_DIR, "debug.log");
+	public static final File INTERNAL_COLOSSEUM_TRIAL_HISTORY = new File(INTERNAL_COLOSSEUM_DIR, "trial-history.jsonl");
 
 	private PluginConstants() {}
 

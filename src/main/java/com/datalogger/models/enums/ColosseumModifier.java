@@ -26,6 +26,7 @@
 package com.datalogger.models.enums;
 
 import com.google.common.collect.ImmutableMap;
+import java.util.List;
 import lombok.Getter;
 import lombok.NonNull;
 
@@ -166,23 +167,26 @@ public enum ColosseumModifier {
 	/**
 	 * Calculates the total baseline glory value from a pipe-delimited string of modifier names.
 	 */
-	public static int calculateTotalGlory(String activeModifiersStr)
+	/**
+	 * Calculates the total baseline glory value from a list of modifier names.
+	 */
+	public static int calculateTotalGlory(List<String> activeModifiers)
 	{
-		if (activeModifiersStr == null || activeModifiersStr.trim().isEmpty())
+		if (activeModifiers == null || activeModifiers.isEmpty())
 		{
 			return 0;
 		}
 
 		int totalGlory = 0;
 
-		String[] tokens = activeModifiersStr.split("\\|");
-
-		for (String token : tokens)
+		for (String modName : activeModifiers)
 		{
-			String cleanedToken = token.trim().toUpperCase();
-			if (cleanedToken.isEmpty()) continue;
+			if (modName == null || modName.isEmpty())
+			{
+				continue;
+			}
 
-			ColosseumModifier mod = NAME_LOOKUP.get(cleanedToken);
+			ColosseumModifier mod = NAME_LOOKUP.get(modName.toUpperCase());
 			if (mod != null)
 			{
 				totalGlory += mod.getGlory();

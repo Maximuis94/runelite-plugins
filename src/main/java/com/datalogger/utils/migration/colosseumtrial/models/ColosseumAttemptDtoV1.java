@@ -43,7 +43,8 @@ public class ColosseumAttemptDtoV1 {
 	private String attemptId;
 	private long timestamp;
 	@NonNull
-	private String account;
+	private String accountName;
+	private String tag;
 	@NonNull
 	private String result;
 	private int rewardsValue;
@@ -56,11 +57,12 @@ public class ColosseumAttemptDtoV1 {
 	private int totalGlory;
 	private double totalTime;
 
-	private String tag;
-
 	@Builder.Default
 	private List<String> activeModifiers = new ArrayList<>();
 
 	@Builder.Default
-	private List<ColosseumWaveDTO> waves = new ArrayList<>();
+	private List<ColosseumWaveDtoV1> waves = new ArrayList<>();
+
+	@Builder.Default
+	private int version = 1;
 }

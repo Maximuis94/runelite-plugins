@@ -25,7 +25,7 @@
 
 package com.datalogger.ui.modes;
 
-import static com.datalogger.constants.PluginConstants.COLOSSEUM_ATTEMPT_DIR;
+import static com.datalogger.constants.PluginConstants.COLOSSEUM_TRIALS_DIR;
 import com.datalogger.models.enums.UIScrollSpeed;
 import static com.datalogger.ui.utils.Util.openDirectory;
 
@@ -369,7 +369,7 @@ public class ColosseumStatisticsModePanel extends JPanel
 
 		executor.submit(() -> {
 			List<ColosseumAttemptDTO> loadedData = new ArrayList<>();
-			File historyFile = PluginConstants.INTERNAL_COLOSSEUM_ATTEMPT_HISTORY;
+			File historyFile = PluginConstants.INTERNAL_COLOSSEUM_TRIAL_HISTORY;
 
 			if (historyFile.exists())
 			{
@@ -1049,7 +1049,7 @@ public class ColosseumStatisticsModePanel extends JPanel
 		DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.systemDefault());
 		String formattedDate = formatter.format(Instant.ofEpochMilli(timestamp));
 
-		String accName = attempt.getAccount();
+		String accName = attempt.getAccountName();
 		JLabel dateLabel = new JLabel(String.format("%s | %s", accName, formattedDate));
 		dateLabel.setForeground(Color.WHITE);
 
@@ -1125,7 +1125,7 @@ public class ColosseumStatisticsModePanel extends JPanel
 
 		card.add(centerPanel, BorderLayout.CENTER);
 
-		File attemptDir = new File(COLOSSEUM_ATTEMPT_DIR, attempt.getAttemptId());
+		File attemptDir = new File(COLOSSEUM_TRIALS_DIR, attempt.getAttemptId());
 
 		card.addMouseListener(new MouseAdapter() {
 			@Override
@@ -1794,6 +1794,7 @@ public class ColosseumStatisticsModePanel extends JPanel
 	public void setScrollSpeed(UIScrollSpeed scrollSpeed)
 	{
 		this.scrollSpeed = scrollSpeed;
+		if (scrollBar == null) return;
 		switch (this.scrollSpeed)
 		{
 			case LOW:

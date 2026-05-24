@@ -26,7 +26,7 @@
 package com.datalogger.models.colosseum;
 
 import static com.datalogger.constants.Colosseum.COLOSSEUM_TRIAL_TIMESTAMP_FORMATTER;
-import static com.datalogger.constants.PluginConstants.COLOSSEUM_ATTEMPT_DIR;
+import static com.datalogger.constants.PluginConstants.COLOSSEUM_TRIALS_DIR;
 import com.datalogger.dto.ColosseumAttemptDTO;
 import com.datalogger.models.enums.ColosseumModifier;
 import com.datalogger.models.enums.WaveStatus;
@@ -50,7 +50,7 @@ public class ColosseumAttempt
 {
 	private final long id;
 
-	private final String account;
+	private final String accountName;
 
 	private final int startTick;
 
@@ -97,11 +97,11 @@ public class ColosseumAttempt
 			.format(COLOSSEUM_TRIAL_TIMESTAMP_FORMATTER);
 		waves = new ArrayList<>();
 		finalStatus = WaveStatus.FAILED;
-		account = accountName == null ? "N/A" : accountName;
+		this.accountName = accountName == null ? "N/A" : accountName;
 		totalTimeTaken = .0;
 
-		attemptId = String.format("%s_%s", account, startTime);
-		attemptRoot = new File(COLOSSEUM_ATTEMPT_DIR, attemptId);
+		attemptId = String.format("%s_%s", this.accountName, startTime);
+		attemptRoot = new File(COLOSSEUM_TRIALS_DIR, attemptId);
 		waveLogJsonFile =  new File(attemptRoot, attemptId+"_wave-log.json");
 		waveLogCsvFile =  new File(attemptRoot, attemptId+"_wave-log.csv");
 		supplyFileName = attemptId + "_supply-log";
@@ -142,7 +142,7 @@ public class ColosseumAttempt
 		return ColosseumAttemptDTO.builder()
 			.attemptId(attemptId)
 			.timestamp(id)
-			.account(account)
+			.accountName(accountName)
 			.result(finalStatus != null ? finalStatus.name() : "UNKNOWN")
 			.rewardsValue(totalRewardsValue)
 			.rewards(namedRewards)

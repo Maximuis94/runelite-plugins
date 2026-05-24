@@ -45,7 +45,7 @@ public class ColosseumWaveDTO {
 
 	private List<String> modifierChoices;
 	private String chosenModifier;
-	private String activeModifiers;
+	private List<String> activeModifiers;
 
 	private double timeTaken;
 	private int speedBonus;

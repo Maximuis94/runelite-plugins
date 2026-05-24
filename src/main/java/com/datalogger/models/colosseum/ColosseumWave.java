@@ -31,6 +31,7 @@ import com.datalogger.models.enums.WaveStatus;
 import com.datalogger.models.itemvault.ItemBundle;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 import lombok.Builder;
@@ -60,7 +61,7 @@ public class ColosseumWave implements DataRow
 	@Singular
 	private List<ColosseumModifier> modifierChoices;
 
-	private String activeModifiers;
+	private List<String> activeModifiers;
 
 	private ColosseumModifier chosenModifier;
 
@@ -109,7 +110,7 @@ public class ColosseumWave implements DataRow
 				.map(ColosseumModifier::name)
 				.collect(Collectors.toList()) : new java.util.ArrayList<>())
 			.chosenModifier(chosenModifier != null ? chosenModifier.name() : null)
-			.activeModifiers(activeModifiers != null ? activeModifiers : "")
+			.activeModifiers(activeModifiers != null ? activeModifiers : Collections.emptyList())
 			.timeTaken(timeTaken)
 			.totalTimeTaken(BigDecimal.valueOf(totalTimeTaken).setScale(1, RoundingMode.HALF_UP).doubleValue())
 			.speedBonus(speedBonus)
@@ -169,7 +170,7 @@ public class ColosseumWave implements DataRow
 		String mod1 = modifierChoices != null && !modifierChoices.isEmpty() && modifierChoices.get(0) != null ? modifierChoices.get(0).name() : "";
 		String mod2 = modifierChoices != null && modifierChoices.size() > 1 && modifierChoices.get(1) != null ? modifierChoices.get(1).name() : "";
 		String mod3 = modifierChoices != null && modifierChoices.size() > 2 && modifierChoices.get(2) != null ? modifierChoices.get(2).name() : "";
-		String activeModifiersString = String.join("|", activeModifiers);
+		String activeModifiersString = activeModifiers != null ? String.join("|", activeModifiers) : "";
 		return String.join(",",
 			String.valueOf(wave),
 			modStatus,

@@ -55,6 +55,7 @@ import com.datalogger.services.itemvault.itemcharge.ViggorasChainmaceParser;
 import com.datalogger.services.itemvault.itemcharge.WarpedSceptreParser;
 import com.datalogger.services.itemvault.itemcharge.WebweaverBowParser;
 import com.datalogger.services.itemvault.other.ActiveGrandExchangeOfferParser;
+import com.datalogger.services.itemvault.other.CarriedItemsParser;
 import com.datalogger.services.itemvault.other.POHCostumeRoomParser;
 import com.datalogger.services.itemvault.other.StashUnitParser;
 import com.datalogger.services.itemvault.other.ToxicBlowpipeParser;
@@ -77,6 +78,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import javax.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
+import net.runelite.client.callback.ClientThread;
 import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.game.ItemManager;
 
@@ -87,6 +89,7 @@ public class VaultManager {
 	@Inject private FileIOService fileIOService;
 	@Inject private AccountHashMapper accountHashMapper;
 	@Inject private ItemManager itemManager;
+	@Inject private ClientThread clientThread;
 
 	@Inject private BankParser bankParser;
 	@Inject private SeedVaultParser seedVaultParser;
@@ -121,6 +124,7 @@ public class VaultManager {
 	@Inject private FarmingToolsParser farmingToolsParser;
 	@Inject private ToaPickaxeParser toaPickaxeParser;
 	@Inject private ActiveGrandExchangeOfferParser activeGrandExchangeOfferParser;
+	@Inject private CarriedItemsParser carriedItemsParser;
 
 	private static final File ITEM_VAULT_ALL_JSON = new File(PluginConstants.ITEM_VAULT_DIR, "item-vaults-all.json");
 	private static final File ITEM_VAULT_ALL_CSV = new File(PluginConstants.ITEM_VAULT_DIR, "item-vaults-all.csv");
@@ -167,7 +171,8 @@ public class VaultManager {
 			pohCostumeRoomParser,
 			farmingToolsParser,
 			toaPickaxeParser,
-			activeGrandExchangeOfferParser
+			activeGrandExchangeOfferParser,
+			carriedItemsParser
 		);
 
 		itemChargeParsers = activeParsers.stream()
@@ -202,10 +207,13 @@ public class VaultManager {
 	 */
 	public void writeMergedCsvFile()
 	{
-		aggregateAllOfflineVaultData();
-		fileIOService.writeVaultCsv(ITEM_VAULT_ALL_CSV, masterList, true);
-		fileIOService.writeVaultCsv(ITEM_VAULTS_MERGED_CSV, mergedItemCounts);
-		exportAllAggregatedItemCharges(itemChargeParsers);
+		clientThread.invokeLater(() ->
+		{
+			aggregateAllOfflineVaultData();
+			fileIOService.writeVaultCsv(ITEM_VAULT_ALL_CSV, masterList, true);
+			fileIOService.writeVaultCsv(ITEM_VAULTS_MERGED_CSV, mergedItemCounts);
+			exportAllAggregatedItemCharges(itemChargeParsers);
+		});
 	}
 
 	private void aggregateAllOfflineVaultData() {
@@ -278,6 +286,7 @@ public class VaultManager {
 		}
 
 		mergedItemCounts.clear();
+
 		for (Map.Entry<Integer, Long> entry : aggregatedItemCounts.entrySet()) {
 			int id = entry.getKey();
 			long totalQty = entry.getValue();

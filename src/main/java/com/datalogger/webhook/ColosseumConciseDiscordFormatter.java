@@ -49,7 +49,7 @@ public final class ColosseumConciseDiscordFormatter {
 	 * Builds a concise Discord payload containing only the final summary statistics.
 	 */
 	public static JsonObject buildPayload(ColosseumAttemptDTO dto, DataLoggerConfig config, boolean isTest) {
-		JsonObject embed = isTest ? generateTestEmbed(dto.getAccount()) : generateBaseEmbed(dto.getAccount());
+		JsonObject embed = isTest ? generateTestEmbed(dto.getAccountName()) : generateBaseEmbed(dto.getAccountName());
 
 		setColor(embed, "COMPLETED".equals(dto.getResult()) ? 0x00FF00 : 0xFF0000);
 

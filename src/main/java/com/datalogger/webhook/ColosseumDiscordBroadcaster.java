@@ -26,7 +26,7 @@
 package com.datalogger.webhook;
 
 import com.datalogger.DataLoggerConfig;
-import static com.datalogger.constants.PluginConstants.COLOSSEUM_ATTEMPT_DIR;
+import static com.datalogger.constants.PluginConstants.COLOSSEUM_TRIALS_DIR;
 import com.datalogger.dto.ColosseumAttemptDTO;
 import com.datalogger.dto.ColosseumWaveDTO;
 import com.datalogger.events.DataLoggerConfigChanged;
@@ -303,7 +303,7 @@ public class ColosseumDiscordBroadcaster
 		}
 
 		String extension = config.screenshotFormat().getExtension();
-		File root = new File(COLOSSEUM_ATTEMPT_DIR, trialId);
+		File root = new File(COLOSSEUM_TRIALS_DIR, trialId);
 		File file = new File(root, String.format("wave-%02d%s.%s", waveNumber, affix, extension));
 		log.debug("Identified broadcast screenshot file {}", file.getAbsolutePath());
 

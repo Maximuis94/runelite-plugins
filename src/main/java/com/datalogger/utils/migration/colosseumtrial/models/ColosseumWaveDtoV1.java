@@ -46,7 +46,7 @@ public class ColosseumWaveDtoV1
 
 	private List<String> modifierChoices;
 	private String chosenModifier;
-	private String activeModifiers;
+	private List<String> activeModifiers;
 
 	private double timeTaken;
 	private int speedBonus;
@@ -86,4 +86,7 @@ public class ColosseumWaveDtoV1
 
 	private Integer minotaurReinforcementsSpawnX;
 	private Integer minotaurReinforcementsSpawnY;
+
+	@Builder.Default
+	private int version = 1;
 }

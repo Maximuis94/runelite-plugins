@@ -25,7 +25,6 @@
 package com.datalogger;
 
 import static com.datalogger.constants.PluginConstants.CONFIG_GROUP;
-import static com.datalogger.constants.PluginConstants.PLUGIN_LOG_FILE;
 import com.datalogger.events.AccountSessionStarted;
 import com.datalogger.events.DataLoggerConfigChanged;
 import com.datalogger.loggers.ColosseumAttemptLogger;
@@ -55,6 +54,7 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.EnumSet;
 import javax.inject.Inject;
 import javax.swing.SwingUtilities;
 import lombok.extern.slf4j.Slf4j;
@@ -339,45 +339,6 @@ public class DataLoggerPlugin extends Plugin
 	}
 
 	@Subscribe
-	public void onChatMessage(ChatMessage event)
-	{
-		ChatMessageType type = event.getType();
-
-		if (type != ChatMessageType.GAMEMESSAGE && type != ChatMessageType.MESBOX)
-		{
-			return;
-		}
-
-		String rawMessage = event.getMessage();
-
-		if (!rawMessage.toLowerCase().contains("charge"))
-		{
-			return;
-		}
-
-		String formattedLog = type.name() + ": " + rawMessage;
-
-		try
-		{
-			File parentDir = PLUGIN_LOG_FILE.getParentFile();
-			if (parentDir != null && !parentDir.exists())
-			{
-				parentDir.mkdirs();
-			}
-
-			try (BufferedWriter writer = new BufferedWriter(new FileWriter(PLUGIN_LOG_FILE, true)))
-			{
-				writer.write(formattedLog);
-				writer.newLine();
-			}
-		}
-		catch (IOException e)
-		{
-			log.error("Failed to dump charge message to file: {}", PLUGIN_LOG_FILE.getAbsolutePath(), e);
-		}
-	}
-
-	@Subscribe
 	public void onGameStateChanged(GameStateChanged event)
 	{
 		GameState gameState = event.getGameState();
@@ -385,7 +346,7 @@ public class DataLoggerPlugin extends Plugin
 		{
 			log.debug("Player has logged out or is hopping. Resetting account parameters.");
 			sessionInitialized = false;
-			eventBus.post(new AccountSessionStarted("-1", -1, null, false));
+			eventBus.post(new AccountSessionStarted("-1", -1, null, false, false));
 			coloScanner.clearState();
 		}
 	}
@@ -406,9 +367,19 @@ public class DataLoggerPlugin extends Plugin
 				String hashString = String.valueOf(currentHash);
 				String accountName = client.getLocalPlayer().getName();
 				boolean isMembers = client.getWorldType().contains(WorldType.MEMBERS);
+				EnumSet<WorldType> worldTypes = client.getWorldType();
+				boolean isRelevantWorld = !(
+					worldTypes.contains(WorldType.SEASONAL) ||
+						worldTypes.contains(WorldType.BETA_WORLD) ||
+						worldTypes.contains(WorldType.NOSAVE_MODE) ||
+						worldTypes.contains(WorldType.TOURNAMENT_WORLD) ||
+						worldTypes.contains(WorldType.PVP_ARENA) ||
+						worldTypes.contains(WorldType.QUEST_SPEEDRUNNING) ||
+						worldTypes.contains(WorldType.FRESH_START_WORLD)
+				);
 
-				log.debug("Loaded new session data. accountHash={} accountName={} isMembers={}", hashString, accountName, isMembers);
-				eventBus.post(new AccountSessionStarted(hashString, currentHash, accountName, isMembers));
+				log.debug("Loaded new session data. accountHash={} accountName={} isMembers={} isRelevantWorld={}", hashString, accountName, isMembers, isRelevantWorld);
+				eventBus.post(new AccountSessionStarted(hashString, currentHash, accountName, isMembers, isRelevantWorld));
 			}
 		}
 	}

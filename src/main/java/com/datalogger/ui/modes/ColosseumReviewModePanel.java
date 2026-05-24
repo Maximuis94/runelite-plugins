@@ -25,8 +25,8 @@
 
 package com.datalogger.ui.modes;
 
-import static com.datalogger.constants.PluginConstants.COLOSSEUM_ATTEMPT_DIR;
-import static com.datalogger.constants.PluginConstants.INTERNAL_COLOSSEUM_ATTEMPT_HISTORY;
+import static com.datalogger.constants.PluginConstants.COLOSSEUM_TRIALS_DIR;
+import static com.datalogger.constants.PluginConstants.INTERNAL_COLOSSEUM_TRIAL_HISTORY;
 import com.datalogger.dto.ColosseumAttemptDTO;
 import com.datalogger.models.enums.ColosseumModifier;
 import static com.datalogger.ui.utils.Components.createStyledButton;
@@ -253,9 +253,9 @@ public class ColosseumReviewModePanel extends JPanel
 		executor.submit(() -> {
 			List<ColosseumAttemptDTO> attempts = new ArrayList<>();
 
-			if (INTERNAL_COLOSSEUM_ATTEMPT_HISTORY.exists())
+			if (INTERNAL_COLOSSEUM_TRIAL_HISTORY.exists())
 			{
-				try (BufferedReader reader = new BufferedReader(new FileReader(INTERNAL_COLOSSEUM_ATTEMPT_HISTORY)))
+				try (BufferedReader reader = new BufferedReader(new FileReader(INTERNAL_COLOSSEUM_TRIAL_HISTORY)))
 				{
 					String line;
 					while ((line = reader.readLine()) != null)
@@ -333,7 +333,7 @@ public class ColosseumReviewModePanel extends JPanel
 		DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
 			.withZone(ZoneId.systemDefault());
 		String formattedDate = formatter.format(Instant.ofEpochMilli(timestamp));
-		JLabel dateLabel = new JLabel(String.format("%s | %s", attempt.getAccount(), formattedDate));
+		JLabel dateLabel = new JLabel(String.format("%s | %s", attempt.getAccountName(), formattedDate));
 		dateLabel.setForeground(Color.WHITE);
 		String status = attempt.getResult();
 		JLabel wavesLabel = new JLabel(String.format("Waves: %s | Status: %s", waves, status));
@@ -415,7 +415,7 @@ public class ColosseumReviewModePanel extends JPanel
 
 		card.add(centerPanel, BorderLayout.CENTER);
 
-		File attemptDir = new File(COLOSSEUM_ATTEMPT_DIR, attempt.getAttemptId());
+		File attemptDir = new File(COLOSSEUM_TRIALS_DIR, attempt.getAttemptId());
 
 		// Unified MouseListener for hovers and clicking
 		card.addMouseListener(new java.awt.event.MouseAdapter() {

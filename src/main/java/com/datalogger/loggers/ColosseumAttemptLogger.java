@@ -76,6 +76,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -712,7 +713,7 @@ public class ColosseumAttemptLogger extends AbstractLogger
 			.tag(entryTag)
 			.earnedLoot(getPotentialLoot())
 			.lootValue(value)
-			.activeModifiers(getActiveModifiersString())
+			.activeModifiers(getActiveModifiersList())
 			.modifierChoices(parsedTransitionUI != null ? parsedTransitionUI.getModifierChoices() : new ArrayList<>())
 			.startTick(waveStartTick)
 			.endTick(waveEndTick)
@@ -918,6 +919,30 @@ public class ColosseumAttemptLogger extends AbstractLogger
 	private ItemBundle getPotentialLoot()
 	{
 		return parsedTransitionUI != null ? parsedTransitionUI.getPotentialLoot() : null;
+	}
+
+	private List<String> getActiveModifiersList() {
+		if (activeModifiers.isEmpty()) {
+			return Collections.emptyList();
+		}
+
+		Map<Integer, ColosseumModifier> highestTierMap = new LinkedHashMap<>();
+		for (String modName : activeModifiers) {
+			if (modName == null || modName.trim().isEmpty()) {
+				continue;
+			}
+			try {
+				ColosseumModifier modifier = ColosseumModifier.valueOf(modName);
+				highestTierMap.put(modifier.getId(), modifier);
+			} catch (IllegalArgumentException e) {
+				log.debug("Unknown modifier {} detected", modName);
+			}
+		}
+
+		// Return a list instead of Collectors.joining("|")
+		return highestTierMap.values().stream()
+			.map(ColosseumModifier::name)
+			.collect(Collectors.toList());
 	}
 
 	/**

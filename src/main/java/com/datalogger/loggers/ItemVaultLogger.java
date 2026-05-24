@@ -241,13 +241,13 @@ public class ItemVaultLogger extends AbstractLogger
 
 			if (config.logItemVaultJSON())
 			{
-				File externalJson = vaultType.getExternalJSONFile(accountHash);
+				File externalJson = vaultType.getExternalJSONFile(accountName);
 				fileIOService.saveJson(externalJson, slimItems);
 			}
 
 			if (config.logItemVaultCSV())
 			{
-				File csvFile = vaultType.getExternalCSVFile(accountHash);
+				File csvFile = vaultType.getExternalCSVFile(accountName);
 				fileIOService.writeVaultCsv(csvFile, items, false);
 			}
 		});

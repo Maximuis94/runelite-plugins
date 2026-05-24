@@ -26,6 +26,8 @@ package com.datalogger;
 
 import static com.datalogger.constants.PluginConstants.CONFIG_GROUP;
 import com.datalogger.models.enums.ColosseumBroadcastMode;
+import com.datalogger.models.enums.ExchangeLoggerCsvFileStrategy;
+import com.datalogger.models.enums.ExchangeLoggerJsonFileStrategy;
 import com.datalogger.models.enums.ScreenshotFormat;
 import com.datalogger.models.enums.TimestampFormat;
 import com.datalogger.models.enums.UIScrollSpeed;
@@ -58,9 +60,17 @@ public interface DataLoggerConfig extends Config {
 	String ITEM_LOGGER_SECTION = "itemLogger";
 
 	@ConfigSection(
+		name = "Grand Exchange",
+		description = "Settings related to the Grand Exchange",
+		position = 2,
+		closedByDefault = true
+	)
+	String GE_LOGGER_SECTION = "geLogger";
+
+	@ConfigSection(
 		name = "Colosseum",
 		description = "Settings for Fortis Colosseum trial logging",
-		position = 2,
+		position = 3,
 	closedByDefault = true
 	)
 	String COLOSSEUM_SECTION = "colosseum";
@@ -68,7 +78,7 @@ public interface DataLoggerConfig extends Config {
 	@ConfigSection(
 		name = "Colosseum timeline logger",
 		description = "Settings related to Fortis Colosseum trial timeline logging",
-		position = 3,
+		position = 4,
 		closedByDefault = true
 	)
 	String COLOSSEUM_TIMELINE_SECTION = "colosseumTimeline";
@@ -76,7 +86,7 @@ public interface DataLoggerConfig extends Config {
 	@ConfigSection(
 		name = "Supply logger",
 		description = "Settings related to supply loggers",
-		position = 4,
+		position = 5,
 		closedByDefault = true
 	)
 	String SUPPLY_SECTION = "supplyLogger";
@@ -84,7 +94,7 @@ public interface DataLoggerConfig extends Config {
 	@ConfigSection(
 		name = "Screenshots",
 		description = "Settings for automatic screenshot capturing",
-		position = 5,
+		position = 6,
 		closedByDefault = true
 	)
 	String SCREENSHOT_SECTION = "screenshot";
@@ -92,7 +102,7 @@ public interface DataLoggerConfig extends Config {
 	@ConfigSection(
 		name = "Discord",
 		description = "Configurations related to Discord",
-		position = 6,
+		position = 7,
 		closedByDefault = true
 	)
 	String DISCORD_SECTION = "discord";
@@ -100,7 +110,7 @@ public interface DataLoggerConfig extends Config {
 	@ConfigSection(
 		name = "Discord pre-defined template",
 		description = "Configurations related to customizing pre-defined Discord template configurations",
-		position = 7,
+		position = 8,
 		closedByDefault = true
 	)
 	String PREDEFINED_TEMPLATE_DISCORD_SECTION = "predefinedTemplateDiscordSection";
@@ -108,7 +118,7 @@ public interface DataLoggerConfig extends Config {
 	@ConfigSection(
 		name = "Discord custom template",
 		description = "Configurations related to customizable Discord template configurations",
-		position = 8,
+		position = 9,
 		closedByDefault = true
 	)
 	String CUSTOM_TEMPLATE_DISCORD_SECTION = "customTemplateDiscordSection";
@@ -154,34 +164,7 @@ public interface DataLoggerConfig extends Config {
 
 
 
-	// --- Grand Exchange Items ---
-
-	@ConfigItem(
-		keyName = "logGrandExchange",
-		name = "Log Grand Exchange",
-		description = "If enabled, Grand Exchange offers are logged upon completion.",
-		position = 0,
-		section = ITEM_LOGGER_SECTION
-	)
-	default boolean logGrandExchange() { return true; }
-
-	@ConfigItem(
-		keyName = "logGrandExchangeCSV",
-		name = "Log Grand Exchange (CSV)",
-		description = "If enabled, Grand Exchange offers are added to a CSV log upon completion.",
-		position = 1,
-		section = ITEM_LOGGER_SECTION
-	)
-	default boolean logGrandExchangeCSV() { return true; }
-
-	@ConfigItem(
-		keyName = "logGrandExchangeJSON",
-		name = "Log Grand Exchange (JSON)",
-		description = "If enabled, a copy of the internal ledger JSON is created after updating it.",
-		position = 2,
-		section = ITEM_LOGGER_SECTION
-	)
-	default boolean logGrandExchangeJSON() { return true; }
+	// --- Item Logger ---
 
 	@ConfigItem(
 		keyName = "logItemVault",
@@ -218,6 +201,188 @@ public interface DataLoggerConfig extends Config {
 		section = ITEM_LOGGER_SECTION
 	)
 	default String skipItemVaultAccountList() { return ""; }
+
+	// --- Grand Exchange Items ---
+
+	@ConfigItem(
+		keyName = "logGrandExchange",
+		name = "Log Grand Exchange",
+		description = "If enabled, Grand Exchange offers are logged upon completion.",
+		position = 0,
+		section = GE_LOGGER_SECTION
+	)
+	default boolean logGrandExchange() { return true; }
+
+	@ConfigItem(
+		keyName = "geJsonFileStrategy",
+		name = "JSON File Strategy",
+		description = "Determines the file format and rotation for GE JSON logs, if any",
+		position = 1,
+		section = GE_LOGGER_SECTION
+	)
+	default ExchangeLoggerJsonFileStrategy geJsonFileStrategy()
+	{
+		return ExchangeLoggerJsonFileStrategy.JSON_SINGLE;
+	}
+
+	@ConfigItem(
+		keyName = "geCsvFileStrategy",
+		name = "CSV File Strategy",
+		description = "Determines the file format and rotation for GE CSV logs, if any",
+		position = 2,
+		section = GE_LOGGER_SECTION
+	)
+	default ExchangeLoggerCsvFileStrategy geCsvFileStrategy()
+	{
+		return ExchangeLoggerCsvFileStrategy.NONE;
+	}
+
+	// --- Grand Exchange Entry Value Toggles ---
+
+	@ConfigItem(
+		keyName = "geIncludeItemId",
+		name = "Include Item ID",
+		description = "Include the item's ID in the logged JSON entry.",
+		position = 3,
+		section = GE_LOGGER_SECTION
+	)
+	default boolean geIncludeItemId() { return true; }
+
+	@ConfigItem(
+		keyName = "geIncludeItemName",
+		name = "Include Item Name",
+		description = "Include the item name in the logged JSON entry.",
+		position = 4,
+		section = GE_LOGGER_SECTION
+	)
+	default boolean geIncludeItemName() { return true; }
+
+	@ConfigItem(
+		keyName = "geIncludeIsBuy",
+		name = "Include Trade Type (Buy/Sell)",
+		description = "Include whether the offer was a buy or sell in the logged JSON entry.",
+		position = 5,
+		section = GE_LOGGER_SECTION
+	)
+	default boolean geIncludeIsBuy() { return true; }
+
+	@ConfigItem(
+		keyName = "geIncludeQuantity",
+		name = "Include Quantity",
+		description = "Include the traded quantity in the logged JSON entry.",
+		position = 6,
+		section = GE_LOGGER_SECTION
+	)
+	default boolean geIncludeQuantity() { return true; }
+
+	@ConfigItem(
+		keyName = "geIncludePrice",
+		name = "Include Price",
+		description = "Include the price per item in the logged JSON entry.",
+		position = 7,
+		section = GE_LOGGER_SECTION
+	)
+	default boolean geIncludePrice() { return true; }
+
+	@ConfigItem(
+		keyName = "geIncludeValue",
+		name = "Include Total Value",
+		description = "Include the total value (gp) in the logged JSON entry.",
+		position = 8,
+		section = GE_LOGGER_SECTION
+	)
+	default boolean geIncludeValue() { return true; }
+
+	@ConfigItem(
+		keyName = "geIncludeTax",
+		name = "Include Tax",
+		description = "Include the GE tax paid in the logged JSON entry.",
+		position = 9,
+		section = GE_LOGGER_SECTION
+	)
+	default boolean geIncludeTax() { return true; }
+
+	@ConfigItem(
+		keyName = "geIncludeAccountName",
+		name = "Include Account Name",
+		description = "Include the player's account name in the logged JSON entry.",
+		position = 10,
+		section = GE_LOGGER_SECTION
+	)
+	default boolean geIncludeAccountName() { return true; }
+
+	@ConfigItem(
+		keyName = "geIncludeAccountHash",
+		name = "Include Account Hash",
+		description = "Include the player's account hash in the logged JSON entry.",
+		position = 11,
+		section = GE_LOGGER_SECTION
+	)
+	default boolean geIncludeAccountHash() { return true; }
+
+	@ConfigItem(
+		keyName = "geIncludeGeSlot",
+		name = "Include GE Slot",
+		description = "Include the Grand Exchange slot index in the logged JSON entry.",
+		position = 12,
+		section = GE_LOGGER_SECTION
+	)
+	default boolean geIncludeGeSlot() { return true; }
+
+//	@ConfigItem(
+//		keyName = "geIncludeIsHistoryEntry",
+//		name = "Include Is History Entry",
+//		description = "Include whether the entry was parsed from GE history in the logged JSON entry.",
+//		position = 13,
+//		section = GE_LOGGER_SECTION
+//	)
+//	default boolean geIncludeIsHistoryEntry() { return true; }
+
+	@ConfigItem(
+		keyName = "geIncludeIsCancelled",
+		name = "Include Is Cancelled",
+		description = "Include whether the offer was cancelled in the logged JSON entry.",
+		position = 14,
+		section = GE_LOGGER_SECTION
+	)
+	default boolean geIncludeIsCancelled() { return true; }
+
+	@ConfigItem(
+		keyName = "geIncludeOfferCreationTime",
+		name = "Include Offer Creation Time",
+		description = "Include the offer creation timestamp in the logged JSON entry.",
+		position = 15,
+		section = GE_LOGGER_SECTION
+	)
+	default boolean geIncludeOfferCreationTime() { return true; }
+
+	@ConfigItem(
+		keyName = "geIncludeExactTimestamp",
+		name = "Include Exact Timestamp",
+		description = "Include the exact completion timestamp in the logged JSON entry.",
+		position = 16,
+		section = GE_LOGGER_SECTION
+	)
+	default boolean geIncludeExactTimestamp() { return true; }
+
+	@ConfigItem(
+		keyName = "geIncludeOriginalOfferQuantity",
+		name = "Include Original Offer Quantity",
+		description = "Include the originally offered quantity in the logged JSON entry.",
+		position = 18,
+		section = GE_LOGGER_SECTION
+	)
+	default boolean geIncludeOriginalOfferQuantity() { return true; }
+
+	@ConfigItem(
+		keyName = "geIncludeOriginalOfferPrice",
+		name = "Include Original Offer Price",
+		description = "Include the originally offered price in the logged JSON entry.",
+		position = 19,
+		section = GE_LOGGER_SECTION
+	)
+	default boolean geIncludeOriginalOfferPrice() { return true; }
+
 
 	// --- Colosseum Items ---
 
@@ -353,15 +518,6 @@ public interface DataLoggerConfig extends Config {
 	default boolean logBeamCrystal() { return false; }
 
 	// --- SupplyLogger Items ---
-
-	@ConfigItem(
-		keyName = "disableSoundEffectMute",
-		name = "Disable sound effect mute",
-		description = "Forces the sound effects volume to the lowest value possible rather than muting it. Unmuted sound effects benefit weapon charge tracking accuracy.",
-		position = 0,
-		section = SUPPLY_SECTION
-	)
-	default boolean disableSoundEffectMute() { return false; }
 
 	// --- Screenshot Items ---
 

@@ -67,7 +67,7 @@ public class ItemsManagerModePanel extends JPanel
 	private final ClientThread clientThread;
 
 	private UIScrollSpeed scrollSpeed = UIScrollSpeed.MEDIUM;
-	private JScrollBar scrollBar;
+	private JScrollBar scrollBar = null;
 
 	@Inject
 	public ItemsManagerModePanel(AccountHashMapper accountHashMapper, Gson gson, ScheduledExecutorService executor, ItemManager itemManager, ClientThread clientThread)
@@ -409,6 +409,7 @@ public class ItemsManagerModePanel extends JPanel
 	public void setScrollSpeed(UIScrollSpeed scrollSpeed)
 	{
 		this.scrollSpeed = scrollSpeed;
+		if (scrollBar ==  null) return;
 		switch (scrollSpeed)
 		{
 			case LOW:
