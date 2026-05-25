@@ -138,6 +138,9 @@ public class DynamicLineOfSightPlugin extends Plugin
 		overlayManager.remove(overlay);
 	}
 
+	/**
+	 * Return true if the given ConfigChanged event is relevant for this plugin
+	 */
 	private static boolean isPluginConfig(ConfigChanged event)
 	{
 		return event.getGroup().equals(PLUGIN_CONFIG_GROUP);

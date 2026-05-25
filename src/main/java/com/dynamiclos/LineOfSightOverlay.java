@@ -68,7 +68,6 @@ public class LineOfSightOverlay extends Overlay {
 	private boolean hotkeyAlwaysHeld = false;
 	private Keybind virtualPlayerLosHotkey;
 
-	private boolean enabledVirtualNpcLos = false;
 	private Keybind virtualNpcLosHotkey;
 	private int virtualNpcSize;
 	private int virtualNpcMeleeRange;
@@ -227,6 +226,9 @@ public class LineOfSightOverlay extends Overlay {
 		updateHasAlteredAnyFixedRange();
 	}
 
+	/**
+	 * Unpacks plugin configurations into their respective variables.
+	 */
 	public void parseConfigs() {
 		enabledNpcLos = config.enableNpcLos();
 		Keybind key = config.npcLosHotkey();
@@ -302,7 +304,6 @@ public class LineOfSightOverlay extends Overlay {
 		otherNpcFillColor = config.otherNpcFillColor();
 		otherNpcLineWidth = (float) config.otherNpcLineWidth();
 
-		enabledVirtualNpcLos = config.enableVirtualNpcLos();
 		virtualNpcLosHotkey = config.virtualNpcLosHotkey();
 		virtualNpcSize = Math.max(1, config.virtualNpcSize());
 		virtualNpcMeleeRange = config.virtualNpcMeleeRange();
@@ -332,6 +333,9 @@ public class LineOfSightOverlay extends Overlay {
 		parseNpcConfigString(config.otherNpcDefs(), CombatStyle.OTHER);
 	}
 
+	/**
+	 * Converts the NPC lines of sight definitions from the configurations into a mapping
+	 */
 	private void parseNpcConfigString(String configValue, CombatStyle style) {
 		if (configValue == null || configValue.trim().isEmpty()) return;
 
@@ -411,7 +415,7 @@ public class LineOfSightOverlay extends Overlay {
 			}
 		}
 
-		boolean isVirtualNpcKeyValid = enabledVirtualNpcLos && virtualNpcLosHotkey != null && !virtualNpcLosHotkey.equals(Keybind.NOT_SET);
+		boolean isVirtualNpcKeyValid = virtualNpcLosHotkey != null && !virtualNpcLosHotkey.equals(Keybind.NOT_SET);
 		if (isVirtualNpcKeyValid && plugin.isVirtualNpcLosHotkeyHeld()) {
 			Tile hoveredTile = wv.getSelectedSceneTile();
 

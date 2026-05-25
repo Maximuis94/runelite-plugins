@@ -47,70 +47,23 @@ public final class PluginConstants
 	public static final int DEFAULT_OUTLINE_ALPHA = 200;
 	public static final int DEFAULT_FILL_ALPHA = 15;
 
-	public static final Color DEFAULT_COLOR_MELEE = new Color(255, 0, 0);
+//	public static final Color DEFAULT_COLOR_MELEE = new Color(255, 0, 0);
 	public static final Color DEFAULT_COLOR_MELEE_OUTLINE = new Color(255, 0, 0, DEFAULT_OUTLINE_ALPHA);
 	public static final Color DEFAULT_COLOR_MELEE_FILL = new Color(255, 0, 0, DEFAULT_FILL_ALPHA);
 	
-	public static final Color DEFAULT_COLOR_RANGED = new Color(0, 255, 0);
+//	public static final Color DEFAULT_COLOR_RANGED = new Color(0, 255, 0);
 	public static final Color DEFAULT_COLOR_RANGED_OUTLINE = new Color(0, 255, 0, DEFAULT_OUTLINE_ALPHA);
 	public static final Color DEFAULT_COLOR_RANGED_FILL = new Color(0, 255, 0, DEFAULT_FILL_ALPHA);
 	
-	public static final Color DEFAULT_COLOR_MAGIC = new Color(0, 0, 255);
+//	public static final Color DEFAULT_COLOR_MAGIC = new Color(0, 0, 255);
 	public static final Color DEFAULT_COLOR_MAGIC_OUTLINE = new Color(0,0, 255, DEFAULT_OUTLINE_ALPHA);
 	public static final Color DEFAULT_COLOR_MAGIC_FILL = new Color(0, 0, 255, DEFAULT_FILL_ALPHA);
 
-	public static final Color DEFAULT_COLOR_OTHER = new Color(155, 0, 155);
+//	public static final Color DEFAULT_COLOR_OTHER = new Color(155, 0, 155);
 	public static final Color DEFAULT_COLOR_OTHER_OUTLINE = new Color(155, 0, 155, DEFAULT_OUTLINE_ALPHA);
 	public static final Color DEFAULT_COLOR_OTHER_FILL = new Color(155, 0, 155, DEFAULT_FILL_ALPHA);
 
-	public static final Color DEFAULT_COLOR_ACTIVE_WEAPON = new Color(255, 0, 125);
+//	public static final Color DEFAULT_COLOR_ACTIVE_WEAPON = new Color(255, 0, 125);
 	public static final Color DEFAULT_COLOR_ACTIVE_WEAPON_OUTLINE = new Color(255, 0, 125, DEFAULT_OUTLINE_ALPHA);
 	public static final Color DEFAULT_COLOR_ACTIVE_WEAPON_FILL = new Color(255, 0, 125, DEFAULT_FILL_ALPHA);
-
-	public static final int TZ_KIH_A_ID = NpcID.TZHAAR_FIGHTCAVE_SWARM_1A;
-	public static final int TZ_KIH_B_ID = NpcID.TZHAAR_FIGHTCAVE_SWARM_1B;
-	public static final int TZ_KEK_A_ID = NpcID.TZHAAR_FIGHTCAVE_SWARM_2A;
-	public static final int TZ_KEK_B_ID = NpcID.TZHAAR_FIGHTCAVE_SWARM_2B;
-	public static final int TZ_KEK_SPAWN_ID = NpcID.TZHAAR_FIGHTCAVE_SWARM_2SPAWN;
-	public static final int TOK_XIL_A_ID = NpcID.TZHAAR_FIGHTCAVE_SWARM_3A;
-	public static final int TOK_XIL_B_ID = NpcID.TZHAAR_FIGHTCAVE_SWARM_3B;
-	public static final int YT_MEJKOT_A_ID = NpcID.TZHAAR_FIGHTCAVE_SWARM_4A;
-	public static final int YT_MEJKOT_B_ID = NpcID.TZHAAR_FIGHTCAVE_SWARM_4B;
-	public static final int KET_ZEK_A_ID = NpcID.TZHAAR_FIGHTCAVE_SWARM_5A;
-	public static final int KET_ZEK_B_ID = NpcID.TZHAAR_FIGHTCAVE_SWARM_5B;
-	public static final int TZTOK_JAD_ID = NpcID.TZHAAR_FIGHTCAVE_SWARM_BOSS;
-	public static final int YT_HURKOT_ID = NpcID.TZHAAR_FIGHTCAVE_SWARM_BOSS_CLERIC;
-
-	public static final int JAL_NIB_ID = NpcID.INFERNO_NIBBLER;
-	public static final int JAL_MEJ_RAH_ID = NpcID.INFERNO_CREATURE_HARPIE;
-	public static final int JAL_AK_ID = NpcID.INFERNO_CREATURE_SPLITTER;
-	public static final int JAL_AKREK_MEJ_ID = NpcID.INFERNO_CREATURE_SPLITTER_MAGE;
-	public static final int JAL_AKREK_XIL_ID = NpcID.INFERNO_CREATURE_SPLITTER_RANGE;
-	public static final int JAL_AKREK_KET_ID = NpcID.INFERNO_CREATURE_SPLITTER_MELEE;
-	public static final int JAL_IMKOT_ID = NpcID.INFERNO_CREATURE_MELEE;
-	public static final int JAL_XIL_ID = NpcID.INFERNO_CREATURE_RANGER;
-	public static final int JAL_ZEK_ID = NpcID.INFERNO_CREATURE_MAGER;
-	public static final int JALTOK_JAD_ID = NpcID.INFERNO_JAD;
-	public static final int JAL_YT_HURKOT_ID = NpcID.INFERNO_JAD_HEALER;
-	public static final int JALTOK_JAD_FINAL_ID = NpcID.INFERNO_JAD_FINALWAVE;
-	public static final int JAL_YT_HURKOT_FINAL_ID = NpcID.INFERNO_JAD_HEALER_FINALWAVE;
-	public static final int TZKAL_ZUK_ID = NpcID.INFERNO_TZKALZUK_PLACEHOLDER;
-	public static final int JAL_MEJJAK_ID = NpcID.INFERNO_ZUK_HEALER;
-
-	public static final int CHALLENGE_JALTOK_JAD_ID = NpcID.JAD_CHALLENGE_JAD;
-	public static final int CHALLENGE_YT_HURKOT_ID = NpcID.JAD_CHALLENGE_HEALER;
-
-	public static final int JAGUAR_WARRIOR_ID = NpcID.COLOSSEUM_JAGUAR_WARRIOR;
-	public static final int SERPENT_SHAMAN_ID = NpcID.COLOSSEUM_STANDARD_MAGER;
-	public static final int MINOTAUR_ID = NpcID.COLOSSEUM_MINOTAUR;
-	public static final int MINOTAUR_ROUTEFIND_ID = NpcID.COLOSSEUM_MINOTAUR_ROUTEFIND;
-	public static final int WARBANDER_RANGED_ID = NpcID.COLOSSEUM_WARBANDER_RANGED_FEMALE;
-	public static final int WARBANDER_MAGE_ID = NpcID.COLOSSEUM_WARBANDER_MAGE_MALE;
-	public static final int WARBANDER_MELEE_ID = NpcID.COLOSSEUM_WARBANDER_MELEE_MALE;
-	public static final int JAVELIN_COLOSSUS_ID = NpcID.COLOSSEUM_JAVELIN_COLOSSUS;
-	public static final int MANTICORE_ID = NpcID.COLOSSEUM_MANTICORE;
-	public static final int SHOCKWAVE_COLOSSUS_ID = NpcID.COLOSSEUM_SHOCKWAVE_COLOSSUS;
-	public static final int SOL_HEREDIT_ID = NpcID.COLOSSEUM_SOL_P1;
-	public static final int BEE_SWARM_ID = NpcID.COLOSSEUM_MODIFIER_BEES;
-	public static final int HEALING_TOTEM_ID = NpcID.COLOSSEUM_HEALING_TOTEM;
 }

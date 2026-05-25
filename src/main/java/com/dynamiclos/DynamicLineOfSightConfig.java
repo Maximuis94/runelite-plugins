@@ -40,14 +40,14 @@ public interface DynamicLineOfSightConfig extends Config
 {
 	@ConfigSection(
 		name = "Toggles & Keybinds",
-		description = "Enable/disable specific components and configure their keybinds",
+		description = "Enable/disable components by checking them and define virtual LoS keybinds.",
 		position = 0,
-		closedByDefault = true
+		closedByDefault = false
 	)
 	String togglesSection = "togglesSection";
 
 	@ConfigSection(
-		name = "NPC LoS Styling",
+		name = "NPC line of sight",
 		description = "Section with various outline, fill colors, and line widths to assign to particular NPC groups",
 		position = 1,
 		closedByDefault = true
@@ -55,7 +55,7 @@ public interface DynamicLineOfSightConfig extends Config
 	String npcStylingSection = "npcStylingSection";
 
 	@ConfigSection(
-		name = "Virtual NPC LoS",
+		name = "Virtual NPC line of sight",
 		description = "Settings for the Virtual NPC Line of Sight feature",
 		position = 2,
 		closedByDefault = true
@@ -118,81 +118,44 @@ public interface DynamicLineOfSightConfig extends Config
 	)
 	String fixedRange5Section = "fixedRange5Section";
 
+	@ConfigSection(
+		name = "Extra configurations",
+		description = "Very specific configurations for fine-tuning the plugin behaviour",
+		position = 11,
+		closedByDefault = true
+	)
+	String extraConfigurationsSection = "extraConfigurationsSection";
+
 	// =========================================
 	// TOGGLES & KEYBINDS
 	// =========================================
 
 	@ConfigItem(
-		keyName = "mutualExclusivePlayerNpcLos",
-		name = "Mutually exclusive player/NPC LoS",
-		description = "If checked, the player line of sight is hidden while the NPC line of sight is shown.",
-		position = 0,
-		section = togglesSection
-	)
-	default boolean mutualExclusivePlayerNpcLos() { return true; }
-
-	@ConfigItem(
-		keyName = "togglePlayerLosHotkey",
-		name = "Toggle player LoS",
-		description = "Press this key to quickly enable/disable all player lines of sight",
-		position = 1,
-		section = togglesSection
-	)
-	default Keybind togglePlayerLosHotkey() { return Keybind.NOT_SET; }
-
-	@ConfigItem(
 		keyName = "virtualPlayerLosHotkey",
 		name = "Virtual player LoS Hotkey",
-		description = "Hold this key to draw the player line of sight the tile underneath the cursor while the key is pressed.",
-		position = 2,
+		description = "If set, the player line of sight is drawn below the cursor while the keybind is pressed",
+		position = 0,
 		section = togglesSection
 	)
 	default Keybind virtualPlayerLosHotkey() { return Keybind.NOT_SET; }
 
 	@ConfigItem(
-		keyName = "enableNpcLos",
-		name = "Enable NPC LoS",
-		description = "If checked, allows rendering the NPC line of sight below the cursor for specified NPCs.",
-		position = 3,
-		section = togglesSection
-	)
-	default boolean enableNpcLos() { return false; }
-
-	@ConfigItem(
-		keyName = "npcLosHotkey",
-		name = "NPC LoS Hotkey",
-		description = "Hold this key to show the line of sight of the hovered NPC while the key is pressed.",
-		position = 4,
-		section = togglesSection
-	)
-	default Keybind npcLosHotkey() { return Keybind.NOT_SET; }
-
-	@ConfigItem(
-		keyName = "toggleNpcLosHotkey",
-		name = "Toggle NPC LoS",
-		description = "Press this key to quickly enable/disable all NPC lines of sight",
-		position = 5,
-		section = togglesSection
-	)
-	default Keybind toggleNpcLosHotkey() { return Keybind.NOT_SET; }
-
-	@ConfigItem(
-		keyName = "enableVirtualNpcLos",
-		name = "Enable Virtual NPC LoS",
-		description = "If checked, allows drawing a virtual NPC line of sight at the cursor's location.",
-		position = 6,
-		section = togglesSection
-	)
-	default boolean enableVirtualNpcLos() { return false; }
-
-	@ConfigItem(
 		keyName = "virtualNpcLosHotkey",
 		name = "Virtual NPC LoS Hotkey",
-		description = "Hold this key to draw a virtual NPC's line of sight at the cursor's location.",
-		position = 7,
+		description = "If set, the virtual NPC line of sight is drawn below the cursor while the keybind is pressed",
+		position = 1,
 		section = togglesSection
 	)
 	default Keybind virtualNpcLosHotkey() { return Keybind.NOT_SET; }
+
+	@ConfigItem(
+		keyName = "enableNpcLos",
+		name = "Enable NPC LoS",
+		description = "If checked, allows rendering the NPC line of sight below the cursor for specified NPCs.",
+		position = 2,
+		section = togglesSection
+	)
+	default boolean enableNpcLos() { return true; }
 
 	@ConfigItem(
 		keyName = "drawActiveWeaponRange",
@@ -219,7 +182,7 @@ public interface DynamicLineOfSightConfig extends Config
 		position = 10,
 		section = togglesSection
 	)
-	default boolean drawMaxAttackRange() { return false; }
+	default boolean drawMaxAttackRange() { return true; }
 
 	@ConfigItem(
 		keyName = "highlightEnemiesWithinMaxRange",
@@ -320,6 +283,15 @@ public interface DynamicLineOfSightConfig extends Config
 	)
 	default boolean highlightEnemiesWithinFixedRange5() { return false; }
 
+//	@ConfigItem(
+//		keyName = "enableVirtualNpcLos",
+//		name = "Enable Virtual NPC LoS",
+//		description = "If checked, allows drawing a virtual NPC line of sight at the cursor's location.",
+//		position = 25,
+//		section = togglesSection
+//	)
+//	default boolean enableVirtualNpcLos() { return false; }
+
 
 	// =========================================
 	// NPC LOS STYLING & DEFINITIONS
@@ -357,7 +329,7 @@ public interface DynamicLineOfSightConfig extends Config
 	@ConfigItem(
 		keyName = "meleeNpcDefs",
 		name = "Melee NPCs",
-		description = "Format: NPC_NAME|RANGE. Newline separated. Can also use NPC ID.",
+		description = "Format: <NPC_[NAME/ID]>|ATK_RANGE. Configures specific NPC atk ranges using melee color styling",
 		position = 3,
 		section = npcStylingSection
 	)
@@ -412,7 +384,7 @@ public interface DynamicLineOfSightConfig extends Config
 	@ConfigItem(
 		keyName = "rangedNpcDefs",
 		name = "Ranged NPCs",
-		description = "Format: NPC_NAME|RANGE. Newline separated. Can also use NPC ID.",
+		description = "Format: <NPC_[NAME/ID]>|ATK_RANGE. Configures specific NPC atk ranges using ranged color styling",
 		position = 7,
 		section = npcStylingSection
 	)
@@ -456,7 +428,7 @@ public interface DynamicLineOfSightConfig extends Config
 	@ConfigItem(
 		keyName = "magicNpcDefs",
 		name = "Magic NPCs",
-		description = "Format: NPC_NAME|RANGE. Newline separated. Can also use NPC ID.",
+		description = "Format: <NPC_[NAME/ID]>|ATK_RANGE. Configures specific NPC atk ranges using magic color styling",
 		position = 11,
 		section = npcStylingSection
 	)
@@ -500,12 +472,13 @@ public interface DynamicLineOfSightConfig extends Config
 	@ConfigItem(
 		keyName = "otherNpcDefs",
 		name = "Hybrid/Typeless NPCs",
-		description = "Format: NPC_NAME|RANGE. Newline separated. Can also use NPC ID.",
+		description = "Format: <NPC_[NAME/ID]>|ATK_RANGE. Configures specific NPC atk ranges using hybrid color styling",
 		position = 15,
 		section = npcStylingSection
 	)
 	default String otherNpcDefs() {
-		return "Manticore|15\n" +
+		return "Minotaur|5\n" +
+			"Manticore|15\n" +
 			"Sol Heredit|1\n" +
 			"Healing totem|20\n" +
 			"TzTok-Jad|15\n" +
@@ -526,7 +499,7 @@ public interface DynamicLineOfSightConfig extends Config
 		position = 0,
 		section = virtualNpcSection
 	)
-	default int virtualNpcSize() { return 1; }
+	default int virtualNpcSize() { return 3; }
 
 	@Range(min = 0)
 	@ConfigItem(
@@ -536,7 +509,7 @@ public interface DynamicLineOfSightConfig extends Config
 		position = 1,
 		section = virtualNpcSection
 	)
-	default int virtualNpcMeleeRange() { return 0; }
+	default int virtualNpcMeleeRange() { return 1; }
 
 	@Range(min = 0)
 	@ConfigItem(
@@ -546,7 +519,7 @@ public interface DynamicLineOfSightConfig extends Config
 		position = 2,
 		section = virtualNpcSection
 	)
-	default int virtualNpcRangedRange() { return 0; }
+	default int virtualNpcRangedRange() { return 4; }
 
 	@Range(min = 0)
 	@ConfigItem(
@@ -556,7 +529,7 @@ public interface DynamicLineOfSightConfig extends Config
 		position = 3,
 		section = virtualNpcSection
 	)
-	default int virtualNpcMagicRange() { return 0; }
+	default int virtualNpcMagicRange() { return 7; }
 
 	@Range(min = 0)
 	@ConfigItem(
@@ -566,7 +539,7 @@ public interface DynamicLineOfSightConfig extends Config
 		position = 4,
 		section = virtualNpcSection
 	)
-	default int virtualNpcOtherRange() { return 0; }
+	default int virtualNpcOtherRange() { return 10; }
 
 	@Alpha
 	@ConfigItem(
@@ -678,7 +651,7 @@ public interface DynamicLineOfSightConfig extends Config
 		position = 1,
 		section = fixedRange1Section
 	)
-	default int fixedRange1Distance() { return 5; }
+	default int fixedRange1Distance() { return 1; }
 
 	@Alpha
 	@ConfigItem(
@@ -722,7 +695,7 @@ public interface DynamicLineOfSightConfig extends Config
 		position = 1,
 		section = fixedRange2Section
 	)
-	default int fixedRange2Distance() { return 5; }
+	default int fixedRange2Distance() { return 2; }
 
 	@Alpha
 	@ConfigItem(
@@ -766,7 +739,7 @@ public interface DynamicLineOfSightConfig extends Config
 		position = 1,
 		section = fixedRange3Section
 	)
-	default int fixedRange3Distance() { return 5; }
+	default int fixedRange3Distance() { return 4; }
 
 	@Alpha
 	@ConfigItem(
@@ -810,7 +783,7 @@ public interface DynamicLineOfSightConfig extends Config
 		position = 1,
 		section = fixedRange4Section
 	)
-	default int fixedRange4Distance() { return 5; }
+	default int fixedRange4Distance() { return 6; }
 
 	@Alpha
 	@ConfigItem(
@@ -854,7 +827,7 @@ public interface DynamicLineOfSightConfig extends Config
 		position = 1,
 		section = fixedRange5Section
 	)
-	default int fixedRange5Distance() { return 5; }
+	default int fixedRange5Distance() { return 8; }
 
 	@Alpha
 	@ConfigItem(
@@ -884,4 +857,45 @@ public interface DynamicLineOfSightConfig extends Config
 		section = fixedRange5Section
 	)
 	default double fixedRange5LineWidth() { return DEFAULT_LINE_WIDTH; }
+
+
+	// =========================================
+	// EXTRA CONFIGURATIONS
+	// =========================================
+
+	@ConfigItem(
+		keyName = "mutualExclusivePlayerNpcLos",
+		name = "Mutually exclusive player/NPC LoS",
+		description = "If checked, the player line of sight is hidden while the NPC line of sight is shown.",
+		position = 0,
+		section = extraConfigurationsSection
+	)
+	default boolean mutualExclusivePlayerNpcLos() { return true; }
+
+	@ConfigItem(
+		keyName = "togglePlayerLosHotkey",
+		name = "Toggle player LoS",
+		description = "Press this key to quickly enable/disable all player-based lines of sight",
+		position = 1,
+		section = extraConfigurationsSection
+	)
+	default Keybind togglePlayerLosHotkey() { return Keybind.NOT_SET; }
+
+	@ConfigItem(
+		keyName = "toggleNpcLosHotkey",
+		name = "Toggle NPC LoS",
+		description = "Press this key to quickly enable/disable all NPC lines of sight",
+		position = 2,
+		section = extraConfigurationsSection
+	)
+	default Keybind toggleNpcLosHotkey() { return Keybind.NOT_SET; }
+
+	@ConfigItem(
+		keyName = "npcLosHotkey",
+		name = "NPC LoS Hotkey",
+		description = "If set, NPC lines of sight are only drawn while the button is pressed.",
+		position = 3,
+		section = extraConfigurationsSection
+	)
+	default Keybind npcLosHotkey() { return Keybind.NOT_SET; }
 }
