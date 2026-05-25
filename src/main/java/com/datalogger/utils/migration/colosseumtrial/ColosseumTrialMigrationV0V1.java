@@ -353,27 +353,21 @@ public class ColosseumTrialMigrationV0V1 implements DataMigration {
 		if (v0.getWaves() != null) {
 			for (ColosseumWaveDtoV0 waveV0 : v0.getWaves()) {
 
-				int waveLootValue = 0; // The missing variable!
+				int waveLootValue = 0;
 				ItemBundle singleLoot = null;
 
 				if (waveV0.getEarnedLoot() != null && !waveV0.getEarnedLoot().isEmpty()) {
 					if (waveV0.getWave() < 12) {
 						singleLoot = waveV0.getEarnedLoot().get(0);
-						aggregateReward(totalRewardsMap, singleLoot, priceCache);
-						waveLootValue = priceCache.getOrDefault(singleLoot.getItemId(), 0) * singleLoot.getQuantity();
 					} else {
 						singleLoot = waveV0.getEarnedLoot().get(1);
-						ItemBundle bundle;
-						if (waveV0.getWave() == 12) {
-							if (config.logQuiverAsSplinters())
-								bundle = DIZANAS_QUIVER_SWAPPED_REWARD;
-							else
-								bundle = DIZANAS_QUIVER_REWARD;
-							aggregateReward(totalRewardsMap, bundle, priceCache);
-						}
-						aggregateReward(totalRewardsMap, singleLoot, priceCache);
-						waveLootValue = priceCache.getOrDefault(singleLoot.getItemId(), 0) * singleLoot.getQuantity();
+						ItemBundle bundle = config.logQuiverAsSplinters() ?
+							DIZANAS_QUIVER_SWAPPED_REWARD :
+							DIZANAS_QUIVER_REWARD;
+						aggregateReward(totalRewardsMap, bundle, priceCache);
 					}
+					aggregateReward(totalRewardsMap, singleLoot, priceCache);
+					waveLootValue = priceCache.getOrDefault(singleLoot.getItemId(), 0) * singleLoot.getQuantity();
 				}
 
 				totalRewardsValue = totalRewardsMap.values().stream()
@@ -386,13 +380,12 @@ public class ColosseumTrialMigrationV0V1 implements DataMigration {
 					activeModsMap.put(baseMod, chosen);
 				}
 
-				// Pass it into convertWave
 				newWaves.add(convertWave(waveV0, new ArrayList<>(activeModsMap.values()), singleLoot, waveLootValue));
 			}
 
 			String account = v0.getWaves().isEmpty() ? "Unknown" : v0.getWaves().get(0).getAccountName();
-
-			String formattedTimestamp = Instant.ofEpochMilli(v0.getTimestamp())
+			long timestamp = v0.getTimestamp();
+			String formattedTimestamp = Instant.ofEpochMilli(timestamp)
 				.atZone(ZoneId.systemDefault())
 				.format(Colosseum.COLOSSEUM_TRIAL_TIMESTAMP_FORMATTER);
 
@@ -400,8 +393,8 @@ public class ColosseumTrialMigrationV0V1 implements DataMigration {
 
 			return ColosseumAttemptDtoV1.builder()
 				.attemptId(attemptId)
-				.timestamp(v0.getTimestamp())
-				.accountName(v0.getWaves().isEmpty() ? "Unknown" : v0.getWaves().get(0).getAccountName())
+				.timestamp(timestamp)
+				.accountName(account)
 				.result(v0.getResult())
 				.rewardsValue(totalRewardsValue)
 				.rewards(totalRewardsMap)

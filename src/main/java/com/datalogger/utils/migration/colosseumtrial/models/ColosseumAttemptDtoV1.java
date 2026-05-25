@@ -30,6 +30,7 @@ import com.datalogger.dto.TrackedSuppliesDTO;
 import com.datalogger.models.supplytracker.ValuedItemStack;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import lombok.Builder;
@@ -50,7 +51,7 @@ public class ColosseumAttemptDtoV1 {
 	private int rewardsValue;
 
 	@Builder.Default
-	private Map<String, ValuedItemStack> rewards = new HashMap<>();
+	private Map<String, ValuedItemStack> rewards = new LinkedHashMap<>();
 
 	private int consumedSupplyValue;
 	private TrackedSuppliesDTO consumedSupplies;

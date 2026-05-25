@@ -151,6 +151,12 @@ public class ColosseumStatisticsModePanel extends JPanel
 	private SortType currentHistorySortType = SortType.DATE;
 	private boolean isHistoryAscending = false;
 
+	// Detailed Wave Stat Toggles
+	private boolean showDetailedTime = true;
+	private boolean showDetailedWaveGlory = false;
+	private boolean showDetailedTotalGlory = false;
+	private boolean showDetailedRewards = false;
+
 	// Unified Stateful Text Fields
 	private final JTextField includeTagsInput;
 	private final JTextField excludeTagsInput;
@@ -353,6 +359,84 @@ public class ColosseumStatisticsModePanel extends JPanel
 		return mainPanel;
 	}
 
+	private JPanel buildDetailedStatsTogglePanel()
+	{
+		JPanel panel = Components.createTitledPanel("Detailed Wave Stats", new GridLayout(2, 2, 5, 5));
+
+		JButton timeBtn = createToggleButton("Time", showDetailedTime);
+		timeBtn.addActionListener(e -> {
+			showDetailedTime = !showDetailedTime;
+			if (showDetailedTime)
+			{
+				showDetailedRewards = false;
+				showDetailedTotalGlory = false;
+				showDetailedWaveGlory = false;
+			}
+			if (currentStats != null) buildWavesView(currentStats);
+		});
+
+		JButton waveGloryBtn = createToggleButton("Wave Glory", showDetailedWaveGlory);
+		waveGloryBtn.addActionListener(e -> {
+			showDetailedWaveGlory = !showDetailedWaveGlory;
+			if (showDetailedWaveGlory)
+			{
+				showDetailedRewards = false;
+				showDetailedTotalGlory = false;
+				showDetailedTime = false;
+			}
+			if (currentStats != null) buildWavesView(currentStats);
+		});
+
+		JButton totalGloryBtn = createToggleButton("Total Glory", showDetailedTotalGlory);
+		totalGloryBtn.addActionListener(e -> {
+			showDetailedTotalGlory = !showDetailedTotalGlory;
+
+			if (showDetailedTotalGlory)
+			{
+				showDetailedRewards = false;
+				showDetailedWaveGlory = false;
+				showDetailedTime = false;
+			}
+			if (currentStats != null) buildWavesView(currentStats);
+		});
+
+		JButton rewardBtn = createToggleButton("Reward Value", showDetailedRewards);
+		rewardBtn.addActionListener(e -> {
+			showDetailedRewards = !showDetailedRewards;
+
+			if (showDetailedRewards)
+			{
+				showDetailedTotalGlory = false;
+				showDetailedWaveGlory = false;
+				showDetailedTime = false;
+			}
+			if (currentStats != null) buildWavesView(currentStats);
+		});
+
+		panel.add(timeBtn);
+		panel.add(waveGloryBtn);
+		panel.add(totalGloryBtn);
+		panel.add(rewardBtn);
+
+		return panel;
+	}
+
+	private JButton createToggleButton(String text, boolean isActive)
+	{
+		JButton btn = new JButton(text);
+		btn.setFocusable(false);
+		btn.setFont(FontManager.getRunescapeSmallFont());
+		btn.setBorder(BorderFactory.createLineBorder(ColorScheme.DARKER_GRAY_COLOR, 1));
+		if (isActive) {
+			btn.setBackground(ColorScheme.DARKER_GRAY_HOVER_COLOR);
+			btn.setForeground(Color.WHITE);
+		} else {
+			btn.setBackground(ColorScheme.DARK_GRAY_COLOR);
+			btn.setForeground(Color.GRAY);
+		}
+		return btn;
+	}
+
 	/**
 	 * Load registered trial data by parsing the internal history json file
 	 */
@@ -398,9 +482,6 @@ public class ColosseumStatisticsModePanel extends JPanel
 		});
 	}
 
-	/**
-	 *
-	 */
 	private void recalculateStatsFromCache()
 	{
 		if (cachedAttempts == null) return;
@@ -438,12 +519,10 @@ public class ColosseumStatisticsModePanel extends JPanel
 					if (trimmed.startsWith("!")) {
 						String stripped = trimmed.substring(1).trim();
 						if (validStates.contains(stripped)) {
-							// FIX: Map tierless inputs to their _I internal equivalent
 							excludedMods.add(addTier(stripped));
 						}
 					} else {
 						if (validStates.contains(trimmed)) {
-							// FIX: Map tierless inputs to their _I internal equivalent
 							requiredMods.add(addTier(trimmed));
 						}
 					}
@@ -452,11 +531,12 @@ public class ColosseumStatisticsModePanel extends JPanel
 		}
 
 		updateModifierTooltip(requiredMods, excludedMods);
-
 		executor.submit(() -> {
+
 			AggregateStats stats = new AggregateStats();
 			for (ColosseumAttemptDTO attempt : cachedAttempts)
 			{
+				if (excludedTags.contains(attempt.getTag())) continue;
 				stats.processAttempt(attempt, activeWaves, activeResults, excludedTags, includedTags, requiredMods, excludedMods);
 			}
 			for (WaveStat wStat : stats.getWaveStats().values()) {
@@ -542,10 +622,17 @@ public class ColosseumStatisticsModePanel extends JPanel
 
 		activeModPanel.add(comboContainer, BorderLayout.NORTH);
 		activeModPanel.add(requiredModifiersInput, BorderLayout.CENTER);
-//		selectorsPanel.add(activeModPanel, BorderLayout.CENTER);
+
+		JPanel dynamicWrapper = new JPanel(new BorderLayout());
+		dynamicWrapper.setOpaque(false);
+		dynamicWrapper.add(activeModPanel, BorderLayout.CENTER);
+
+		if (currentTableMode == TableMode.WAVES) {
+			dynamicWrapper.add(buildDetailedStatsTogglePanel(), BorderLayout.SOUTH);
+		}
 
 		dynamicControlsPanel.add(selectorsPanel, BorderLayout.NORTH);
-		dynamicControlsPanel.add(activeModPanel, BorderLayout.CENTER);
+		dynamicControlsPanel.add(dynamicWrapper, BorderLayout.CENTER);
 
 		if (stats.getTotalAttempts() == 0)
 		{
@@ -936,12 +1023,10 @@ public class ColosseumStatisticsModePanel extends JPanel
 
 		// --- Core Counts & Percentages ---
 		int reached = waveStat.getTimesReached();
-
-		// Safely calculate percentages (avoiding division by zero just in case)
-		double completedPct = reached > 0 ? (waveStat.getTimesCompleted() / (double) reached) * 100.0 : 0.0;
+		double completedPct = waveStat.getCompletionRate();
+		double hitlessPct = waveStat.getHitlessRate();
 		double failedPct = reached > 0 ? (waveStat.getTimesFailed() / (double) reached) * 100.0 : 0.0;
 		double cancelledPct = reached > 0 ? (waveStat.getTimesCancelled() / (double) reached) * 100.0 : 0.0;
-		double hitlessPct = reached > 0 ? (waveStat.getHitlessRuns() / (double) reached) * 100.0 : 0.0;
 
 		JLabel reachedLabel = new JLabel("Times Reached: " + reached);
 		reachedLabel.setForeground(Color.LIGHT_GRAY);
@@ -958,29 +1043,6 @@ public class ColosseumStatisticsModePanel extends JPanel
 		JLabel hitlessLabel = new JLabel(String.format("Hitless Runs: %d (%.1f%%)", waveStat.getHitlessRuns(), hitlessPct));
 		hitlessLabel.setForeground(Color.WHITE);
 
-		double avgTime = waveStat.getTimeTaken().stream().mapToDouble(Double::doubleValue).average().orElse(0.0);
-		int m = (int) (avgTime / 60);
-		int s = (int) (avgTime % 60);
-		int ms = (int) Math.round((avgTime % 1) * 10);
-		if (ms == 10) { ms = 0; s++; if (s == 60) { s = 0; m++; } }
-		String formattedTime = String.format("%02d:%02d.%d", m, s, ms);
-		JLabel avgTimeLabel = new JLabel("Avg Time: " + formattedTime);
-		avgTimeLabel.setForeground(Color.WHITE);
-
-		// Glory
-		int avgModGlory = (int) waveStat.getModifierGlory().stream().mapToInt(Integer::intValue).average().orElse(0);
-		JLabel avgModGloryLabel = new JLabel("Avg Modifier Glory: " + avgModGlory);
-		avgModGloryLabel.setForeground(Color.WHITE);
-
-		int avgTotalGlory = (int) waveStat.getTotalGlory().stream().mapToInt(Integer::intValue).average().orElse(0);
-		JLabel avgTotalGloryLabel = new JLabel("Avg Total Glory: " + avgTotalGlory);
-		avgTotalGloryLabel.setForeground(Color.WHITE);
-
-		// Rewards
-		int avgReward = (int) waveStat.getRewardValue().stream().mapToInt(Integer::intValue).average().orElse(0);
-		JLabel avgRewardLabel = new JLabel("Avg Reward: " + QuantityFormatter.quantityToStackSize(avgReward));
-		avgRewardLabel.setForeground(Color.WHITE);
-
 		// --- Alignments ---
 		titleLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
 		reachedLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -988,10 +1050,6 @@ public class ColosseumStatisticsModePanel extends JPanel
 		failedLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
 		cancelledLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
 		hitlessLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
-		avgTimeLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
-		avgModGloryLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
-		avgTotalGloryLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
-		avgRewardLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
 
 		// --- Panel Assembly ---
 		JPanel centerPanel = new JPanel();
@@ -1011,19 +1069,87 @@ public class ColosseumStatisticsModePanel extends JPanel
 		centerPanel.add(Box.createVerticalStrut(2));
 		centerPanel.add(hitlessLabel);
 
-		centerPanel.add(Box.createVerticalStrut(6)); // Slightly larger gap to separate counts from averages
+		centerPanel.add(Box.createVerticalStrut(6));
 
-		centerPanel.add(avgTimeLabel);
-		centerPanel.add(Box.createVerticalStrut(2));
-		centerPanel.add(avgModGloryLabel);
-		centerPanel.add(Box.createVerticalStrut(2));
-		centerPanel.add(avgTotalGloryLabel);
-		centerPanel.add(Box.createVerticalStrut(2));
-		centerPanel.add(avgRewardLabel);
+		// Time Stats
+		if (showDetailedTime && !waveStat.getTimeTaken().isEmpty()) {
+			JLabel timeTitle = new JLabel("--- Time Breakdown ---");
+			timeTitle.setForeground(Color.LIGHT_GRAY);
+			centerPanel.add(timeTitle);
+			centerPanel.add(createDetailLabel("Min: " + formatTimeDetailed(waveStat.getMinTime())));
+			centerPanel.add(createDetailLabel("P05: " + formatTimeDetailed(waveStat.getP05Time())));
+			centerPanel.add(createDetailLabel("Q1: " + formatTimeDetailed(waveStat.getQ1Time())));
+			centerPanel.add(createDetailLabel("Median: " + formatTimeDetailed(waveStat.getMedianTime())));
+			centerPanel.add(createDetailLabel("Q3: " + formatTimeDetailed(waveStat.getQ3Time())));
+			centerPanel.add(createDetailLabel("P95: " + formatTimeDetailed(waveStat.getP95Time())));
+			centerPanel.add(createDetailLabel("Max: " + formatTimeDetailed(waveStat.getMaxTime())));
+			centerPanel.add(createDetailLabel("Avg: " + formatTimeDetailed(waveStat.getAverageTime())));
+			centerPanel.add(Box.createVerticalStrut(2));
+		}
+
+		// Wave Glory Stats
+		else if (showDetailedWaveGlory && !waveStat.getWaveGlory().isEmpty()) {
+			JLabel waveGloryTitle = new JLabel("--- Wave Glory Breakdown ---");
+			waveGloryTitle.setForeground(Color.LIGHT_GRAY);
+			centerPanel.add(waveGloryTitle);
+			centerPanel.add(createDetailLabel("Min: " + waveStat.getMinGlory()));
+			centerPanel.add(createDetailLabel("P05: " + waveStat.getP05Glory()));
+			centerPanel.add(createDetailLabel("Q1: " + waveStat.getQ1Glory()));
+			centerPanel.add(createDetailLabel("Median: " + waveStat.getMedianGlory()));
+			centerPanel.add(createDetailLabel("Q3: " + waveStat.getQ3Glory()));
+			centerPanel.add(createDetailLabel("P95: " + waveStat.getP95Glory()));
+			centerPanel.add(createDetailLabel("Max: " + waveStat.getMaxGlory()));
+			centerPanel.add(createDetailLabel("Avg: " + waveStat.getAverageGlory()));
+			centerPanel.add(Box.createVerticalStrut(2));
+		}
+		// Total Glory Stats
+		else if (showDetailedTotalGlory && !waveStat.getTotalGlory().isEmpty()) {
+			JLabel totalGloryTitle = new JLabel("--- Total Glory Breakdown ---");
+			totalGloryTitle.setForeground(Color.LIGHT_GRAY);
+			centerPanel.add(totalGloryTitle);
+			centerPanel.add(createDetailLabel("Min: " + waveStat.getMinTotalGlory()));
+			centerPanel.add(createDetailLabel("P05: " + waveStat.getP05TotalGlory()));
+			centerPanel.add(createDetailLabel("Q1: " + waveStat.getQ1TotalGlory()));
+			centerPanel.add(createDetailLabel("Median: " + waveStat.getMedianTotalGlory()));
+			centerPanel.add(createDetailLabel("Q3: " + waveStat.getQ3TotalGlory()));
+			centerPanel.add(createDetailLabel("P95: " + waveStat.getP95TotalGlory()));
+			centerPanel.add(createDetailLabel("Max: " + waveStat.getMaxTotalGlory()));
+			centerPanel.add(createDetailLabel("Avg: " + String.format("%d", (int)waveStat.getAverageTotalGlory())));
+			centerPanel.add(Box.createVerticalStrut(2));
+		}
+
+		// Reward Stats
+		else if (showDetailedRewards && !waveStat.getRewardValue().isEmpty()) {
+			JLabel rewardTitle = new JLabel("--- Reward Value Breakdown ---");
+			rewardTitle.setForeground(Color.LIGHT_GRAY);
+			centerPanel.add(rewardTitle);
+			centerPanel.add(createDetailLabel("Min: " + waveStat.getMinRewardValue()));
+			centerPanel.add(createDetailLabel("P05: " + waveStat.getP05RewardValue()));
+			centerPanel.add(createDetailLabel("Q1: " + waveStat.getQ1RewardValue()));
+			centerPanel.add(createDetailLabel("Median: " + waveStat.getMedianRewardValue()));
+			centerPanel.add(createDetailLabel("Q3: " + waveStat.getQ3RewardValue()));
+			centerPanel.add(createDetailLabel("P95: " + waveStat.getP95RewardValue()));
+			centerPanel.add(createDetailLabel("Max: " + waveStat.getMaxRewardValue()));
+			centerPanel.add(createDetailLabel("Avg: " + String.format("%d", waveStat.getAverageRewardValue())));
+			centerPanel.add(Box.createVerticalStrut(2));
+		}
 
 		card.add(centerPanel, BorderLayout.CENTER);
-
 		return marginWrapper;
+	}
+
+	private JLabel createDetailLabel(String text) {
+		JLabel label = new JLabel("  - " + text);
+		label.setForeground(Color.WHITE);
+		return label;
+	}
+
+	private String formatTimeDetailed(double time) {
+		int m = (int) (time / 60);
+		int s = (int) (time % 60);
+		int ms = (int) Math.round((time % 1) * 10);
+		if (ms == 10) { ms = 0; s++; if (s == 60) { s = 0; m++; } }
+		return String.format("%02d:%02d.%d", m, s, ms);
 	}
 
 	private JPanel buildAttemptCard(ColosseumAttemptDTO attempt)
@@ -1068,11 +1194,7 @@ public class ColosseumStatisticsModePanel extends JPanel
 		supplyValueLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
 
 		double timeTaken = attempt.getTotalTime();
-		int m = (int) (timeTaken / 60);
-		int s = (int) (timeTaken % 60);
-		int ms = (int) Math.round((timeTaken % 1) * 10);
-		if (ms == 10) { ms = 0; s++; if (s == 60) { s = 0; m++; } }
-		String formattedTime = String.format("%02d:%02d.%d", m, s, ms);
+		String formattedTime = formatTimeDetailed(timeTaken);
 
 		JLabel timeLabel = new JLabel(String.format("Time taken: %s", formattedTime));
 		timeLabel.setForeground(Color.WHITE);
@@ -1341,9 +1463,15 @@ public class ColosseumStatisticsModePanel extends JPanel
 		private final List<Double> timeTaken = new ArrayList<>();
 		private final List<Integer> modifierGlory = new ArrayList<>();
 		private final List<Integer> totalGlory = new ArrayList<>();
+		private final List<Integer> waveGlory = new ArrayList<>();
 		private final List<Integer> rewardValue = new ArrayList<>();
 
-		public WaveStat(int waveNumber) {
+		// NEW: Track damage and modifier preferences
+		private final List<Integer> damageTaken = new ArrayList<>();
+		private final Map<String, Integer> modifierPicks = new HashMap<>();
+
+		public WaveStat(int waveNumber)
+		{
 			this.waveNumber = waveNumber;
 		}
 
@@ -1366,19 +1494,47 @@ public class ColosseumStatisticsModePanel extends JPanel
 					case "COMPLETED":
 						incrementCompleted();
 						if (waveDTO.getDamageTaken() == 0)
+						{
 							incrementHitlessRuns();
+						}
 						break;
-					case "FAILED": incrementFailed(); break;
-					case "CANCELLED": incrementCancelled(); break;
+					case "FAILED":
+						incrementFailed();
+						break;
+					case "CANCELLED":
+						incrementCancelled();
+						break;
+				}
+			}
+			int lootValue = waveDTO.getLootValue();
+			if (lootValue > 0)
+			{
+				rewardValue.add(lootValue);
+			}
+			String status = waveDTO.getStatus();
+			if (status != null && status.equals("COMPLETED"))
+			{
+				double time = waveDTO.getTimeTaken();
+				if (time > 0)
+				{
+					timeTaken.add(time);
+				}
+				modifierGlory.add(ColosseumModifier.calculateTotalGlory(waveDTO.getActiveModifiers()));
+				totalGlory.add(waveDTO.getTotalGlory());
+
+				int glory = waveDTO.getWaveGlory();
+				if (glory > 0)
+				{
+					waveGlory.add(glory);
 				}
 			}
 
-			timeTaken.add(waveDTO.getTimeTaken());
-			modifierGlory.add(ColosseumModifier.calculateTotalGlory(waveDTO.getActiveModifiers()));
-			totalGlory.add(waveDTO.getTotalGlory());
+			damageTaken.add(waveDTO.getDamageTaken());
 
-			int lootValue = waveDTO.getLootValue();
-			if (lootValue > 0) rewardValue.add(lootValue);
+			if (waveDTO.getChosenModifier() != null && !waveDTO.getChosenModifier().isEmpty())
+			{
+				modifierPicks.merge(waveDTO.getChosenModifier(), 1, Integer::sum);
+			}
 		}
 
 		/**
@@ -1389,18 +1545,206 @@ public class ColosseumStatisticsModePanel extends JPanel
 		{
 			Collections.sort(timeTaken);
 			Collections.sort(modifierGlory);
+			Collections.sort(waveGlory);
 			Collections.sort(totalGlory);
 			Collections.sort(rewardValue);
+			Collections.sort(damageTaken);
 		}
 
-		public double getAverageTime() {
+		// --- Derived Metrics ---
+
+		public double getCompletionRate()
+		{
+			return timesReached == 0 ? 0 : ((double) timesCompleted / timesReached) * 100.0;
+		}
+
+		public double getHitlessRate()
+		{
+			return timesCompleted == 0 ? 0 : ((double) hitlessRuns / timesCompleted) * 100.0;
+		}
+
+		public String getMostPickedModifier()
+		{
+			if (modifierPicks.isEmpty()) return "None";
+			return Collections.max(modifierPicks.entrySet(), Map.Entry.comparingByValue()).getKey();
+		}
+
+		// --- Time Metrics (Safeguarded) ---
+
+		public double getMinTime() { return timeTaken.isEmpty() ? 0 : timeTaken.get(0); }
+		public double getMaxTime() { return timeTaken.isEmpty() ? 0 : timeTaken.get(timeTaken.size() - 1); }
+
+		public double getP05Time()
+		{
 			if (timeTaken.isEmpty()) return 0;
-			return timeTaken.stream().mapToDouble(Double::doubleValue).average().orElse(0);
+			return timeTaken.get(Math.max(0, (int) (timeTaken.size() * 0.05)));
 		}
 
-		public int getAverageRewardValue() {
+		public double getQ1Time()
+		{
+			if (timeTaken.isEmpty()) return 0;
+			return timeTaken.get(Math.min(timeTaken.size() - 1, (int) (timeTaken.size() * 0.25)));
+		}
+
+		public double getMedianTime()
+		{
+			if (timeTaken.isEmpty()) return 0;
+			return timeTaken.get(timeTaken.size() / 2);
+		}
+
+		public double getQ3Time()
+		{
+			if (timeTaken.isEmpty()) return 0;
+			return timeTaken.get(Math.min(timeTaken.size() - 1, (int) (timeTaken.size() * 0.75)));
+		}
+
+		public double getP95Time()
+		{
+			if (timeTaken.isEmpty()) return 0;
+			return timeTaken.get(Math.min(timeTaken.size() - 1, (int) (timeTaken.size() * 0.95)));
+		}
+
+		public double getAverageTime()
+		{
+			if (timeTaken.isEmpty()) return 0;
+			double sum = 0;
+			for (double time : timeTaken) sum += time;
+			return sum / timeTaken.size();
+		}
+
+		// --- Glory Metrics (Safeguarded & Type Fixed) ---
+
+		public int getMinGlory() { return waveGlory.isEmpty() ? 0 : waveGlory.get(0); }
+		public int getMaxGlory() { return waveGlory.isEmpty() ? 0 : waveGlory.get(waveGlory.size() - 1); }
+
+		public int getP05Glory()
+		{
+			if (waveGlory.isEmpty()) return 0;
+			return waveGlory.get(Math.max(0, (int) (waveGlory.size() * 0.05)));
+		}
+
+		public int getQ1Glory()
+		{
+			if (waveGlory.isEmpty()) return 0;
+			return waveGlory.get(Math.min(waveGlory.size() - 1, (int) (waveGlory.size() * 0.25)));
+		}
+
+		public int getMedianGlory()
+		{
+			if (waveGlory.isEmpty()) return 0;
+			return waveGlory.get(Math.min(waveGlory.size() - 1, (int) (waveGlory.size() * 0.5)));
+		}
+
+		public int getQ3Glory()
+		{
+			if (waveGlory.isEmpty()) return 0;
+			return waveGlory.get(Math.min(waveGlory.size() - 1, (int) (waveGlory.size() * 0.75)));
+		}
+
+		public int getP95Glory()
+		{
+			if (waveGlory.isEmpty()) return 0;
+			return waveGlory.get(Math.min(waveGlory.size() - 1, (int) (waveGlory.size() * 0.95)));
+		}
+
+		public double getAverageGlory()
+		{
+			if (waveGlory.isEmpty()) return 0;
+			double sum = 0;
+			for (int glory : waveGlory) sum += glory;
+			return sum / waveGlory.size();
+		}
+
+		public int getMinTotalGlory() { return totalGlory.isEmpty() ? 0 : totalGlory.get(0); }
+		public int getMaxTotalGlory() { return totalGlory.isEmpty() ? 0 : totalGlory.get(totalGlory.size() - 1); }
+
+		public int getP05TotalGlory()
+		{
+			if (totalGlory.isEmpty()) return 0;
+			return totalGlory.get(Math.max(0, (int) (totalGlory.size() * 0.05)));
+		}
+
+		public int getQ1TotalGlory()
+		{
+			if (totalGlory.isEmpty()) return 0;
+			return totalGlory.get(Math.max(0, (int) (totalGlory.size() * 0.25)));
+		}
+
+		public int getMedianTotalGlory()
+		{
+			if (totalGlory.isEmpty()) return 0;
+			return totalGlory.get(Math.max(0, (int) (totalGlory.size() * 0.5)));
+		}
+
+		public int getQ3TotalGlory()
+		{
+			if (totalGlory.isEmpty()) return 0;
+			return totalGlory.get(Math.max(0, (int) (totalGlory.size() * 0.75)));
+		}
+
+		public int getP95TotalGlory()
+		{
+			if (totalGlory.isEmpty()) return 0;
+			return totalGlory.get(Math.min(totalGlory.size() - 1, (int) (totalGlory.size() * 0.95)));
+		}
+
+		public double getAverageTotalGlory()
+		{
+			if (totalGlory.isEmpty()) return 0;
+			double sum = 0;
+			for (int glory : totalGlory) sum += glory;
+			return sum / totalGlory.size();
+		}
+
+		// --- Reward & Damage Metrics ---
+
+		public int getMinRewardValue() { return rewardValue.isEmpty() ? 0 : rewardValue.get(0); }
+		public int getMaxRewardValue() { return rewardValue.isEmpty() ? 0 : rewardValue.get(rewardValue.size() - 1); }
+
+		public int getP05RewardValue()
+		{
 			if (rewardValue.isEmpty()) return 0;
-			return (int) rewardValue.stream().mapToInt(Integer::intValue).average().orElse(0);
+			return rewardValue.get(Math.max(0, (int) (rewardValue.size() * 0.05)));
+		}
+
+		public int getQ1RewardValue()
+		{
+			if (rewardValue.isEmpty()) return 0;
+			return rewardValue.get(Math.max(0, (int) (rewardValue.size() * 0.25)));
+		}
+
+		public int getMedianRewardValue()
+		{
+			if (rewardValue.isEmpty()) return 0;
+			return rewardValue.get(Math.max(0, (int) (rewardValue.size() * 0.5)));
+		}
+
+		public int getQ3RewardValue()
+		{
+			if (rewardValue.isEmpty()) return 0;
+			return rewardValue.get(Math.max(0, (int) (rewardValue.size() * 0.75)));
+		}
+
+		public int getP95RewardValue()
+		{
+			if (rewardValue.isEmpty()) return 0;
+			return rewardValue.get(Math.min(rewardValue.size() - 1, (int) (rewardValue.size() * 0.95)));
+		}
+
+		public int getAverageRewardValue()
+		{
+			if (rewardValue.isEmpty()) return 0;
+			long sum = 0;
+			for (int val : rewardValue) sum += val;
+			return (int) (sum / rewardValue.size());
+		}
+
+		public double getAverageDamageTaken()
+		{
+			if (damageTaken.isEmpty()) return 0;
+			double sum = 0;
+			for (int dmg : damageTaken) sum += dmg;
+			return sum / damageTaken.size();
 		}
 	}
 
@@ -1507,6 +1851,7 @@ public class ColosseumStatisticsModePanel extends JPanel
 			{
 				int waveNumber = i + 1;
 				ColosseumWaveDTO wave = attempt.getWaves().get(i);
+				if (wave.getTag() != null && excludedTags.contains(wave.getTag())) continue;
 
 				Set<String> currentWaveStates = new HashSet<>();
 				for (String base : baseMaxTiers.keySet()) {
