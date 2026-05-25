@@ -225,7 +225,7 @@ public class GrandExchangeLogger extends AbstractLogger
 		loggerIsEnabled = config.logGrandExchange() && isOnRelevantGameMode();
 		if (loggerIsEnabled)
 		{
-			setup();
+			clientThread.invokeLater(this::setup);
 		}
 
 	}
