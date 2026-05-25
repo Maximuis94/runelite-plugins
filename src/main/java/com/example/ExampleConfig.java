@@ -1,10 +1,11 @@
 package com.example;
 
+import static com.example.ExamplePlugin.CONFIG_GROUP;
 import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
 
-@ConfigGroup("example")
+@ConfigGroup(CONFIG_GROUP)
 public interface ExampleConfig extends Config
 {
 	@ConfigItem(

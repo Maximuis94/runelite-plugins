@@ -18,6 +18,8 @@ import net.runelite.client.plugins.PluginDescriptor;
 )
 public class ExamplePlugin extends Plugin
 {
+	public static final String CONFIG_GROUP = "example";
+
 	@Inject
 	private Client client;
 
