@@ -114,14 +114,15 @@ public class VenatorPathFinderOverlay extends Overlay
 
 		MenuEntry topEntry = menuEntries[menuEntries.length - 1];
 		NPC hoveredNpc = topEntry.getNpc();
-		if (hoveredNpc == null || hoveredNpc.getCombatLevel() == 0 || hoveredNpc.isDead()) return null;
+
+		if (!isAttackable(hoveredNpc)) return null;
 
 		WorldView worldView = client.getTopLevelWorldView();
 
 		List<NPC> validNpcs = new ArrayList<>();
 		for (NPC npc : worldView.npcs())
 		{
-			if (npc != null && !npc.isDead() && npc.getCombatLevel() > 0 && npc != hoveredNpc)
+			if (npc != hoveredNpc && isAttackable(npc))
 			{
 				if (hoveredNpc.getWorldLocation().distanceTo(npc.getWorldLocation()) <= 15)
 				{
@@ -204,6 +205,11 @@ public class VenatorPathFinderOverlay extends Overlay
 		return canSend(sender, target) && canAccept(sender, target);
 	}
 
+	/**
+	 * Calculates the set of sender tiles for an NPC based on its physical size.
+	 * The Venator Bow's bounce logic requires evaluating specific tiles (Centre
+	 * and/or SW) within the NPC's area to determine if a projectile can be bounced off
+	 */
 	private List<Point> getSenderTiles(NPC sender)
 	{
 		int sSize = sender.getComposition().getSize();
@@ -227,7 +233,9 @@ public class VenatorPathFinderOverlay extends Overlay
 	}
 
 	/**
-	 * Returns true if sender is a valid sender for bouncing off a projectile to target
+	 * Determines if a sender NPC is capable of initiating a Venator Bow bounce to a target.
+	 * The bounce mechanics are based on the sender's size and the target's size,
+	 * requiring specific hitboxes (SW tile and/or Centre tile) to be within 2 tiles.
 	 */
 	private boolean canSend(NPC sender, NPC target)
 	{
@@ -241,20 +249,24 @@ public class VenatorPathFinderOverlay extends Overlay
 
 		for (Point sPoint : getSenderTiles(sender))
 		{
-			boolean passes = true;
+			boolean passes = false;
 			if (sSize % 2 != 0) {
-				passes = finds(sPoint, tSWPoint) || finds(sPoint, tCentre);
+				passes = tSize <= 2 ? finds(sPoint, tSWPoint) : finds(sPoint, tSWPoint) && finds(sPoint, tCentre);
 			} else if (sSize == 2) {
-				if (tSize <= 3) passes = finds(sPoint, tCentre);
-				else passes = finds(sPoint, tCentre) || finds(sPoint, tCentreSW);
+				passes = tSize <= 3 ? finds(sPoint, tCentre) : finds(sPoint, tCentre) && finds(sPoint, tCentreSW);
 			} else if (sSize == 4) {
-				passes = finds(sPoint, tSWPoint) || finds(sPoint, tCentreSW);
+				passes = finds(sPoint, tSWPoint) && finds(sPoint, tCentreSW);
 			}
 			if (passes) return true;
 		}
 		return false;
 	}
 
+	/**
+	 * Determines if a target NPC is capable of receiving a bounce from a sender.
+	 * This verifies the geometry requirements for the target to accept a projectile
+	 * based on its size relative to the sender.
+	 */
 	private boolean canAccept(NPC sender, NPC target)
 	{
 		int sSize = sender.getComposition().getSize();
@@ -267,17 +279,17 @@ public class VenatorPathFinderOverlay extends Overlay
 
 		for (Point sPoint : getSenderTiles(sender))
 		{
-			boolean passes = true;
+			boolean passes = false;
 			if (tSize == 1 || tSize == 2) {
 				passes = finds(sPoint, tSWPoint);
 			} else if (tSize == 3) {
-				if (sSize % 2 != 0) passes = finds(sPoint, tCentre) || finds(sPoint, tSWPoint);
+				if (sSize % 2 != 0) passes = finds(sPoint, tCentre) && finds(sPoint, tSWPoint);
 				else if (sSize == 2) passes = finds(sPoint, tCentre);
 				else if (sSize == 4) passes = finds(sPoint, tSWPoint);
-			} else if (tSize == 4 || tSize == 5) {
-				if (sSize % 2 != 0) passes = finds(sPoint, tCentre) || finds(sPoint, tSWPoint);
-				else if (sSize == 2) passes = finds(sPoint, tCentre) || finds(sPoint, tCentreSW);
-				else if (sSize == 4) passes = finds(sPoint, tSWPoint) || finds(sPoint, tCentreSW);
+			} else if (tSize >= 4) {
+				if (sSize % 2 != 0) passes = finds(sPoint, tCentre) && finds(sPoint, tSWPoint);
+				else if (sSize == 2) passes = finds(sPoint, tCentre) && finds(sPoint, tCentreSW);
+				else if (sSize == 4) passes = finds(sPoint, tSWPoint) && finds(sPoint, tCentreSW);
 			}
 			if (passes) return true;
 		}
@@ -290,5 +302,34 @@ public class VenatorPathFinderOverlay extends Overlay
 	private boolean finds(Point sender, Point target)
 	{
 		return Math.max(Math.abs(sender.x - target.x), Math.abs(sender.y - target.y)) <= 2;
+	}
+
+	/**
+	 * Return true if npc can be attacked
+	 */
+	private boolean isAttackable(NPC npc)
+	{
+		if (npc == null || npc.isDead())
+		{
+			return false;
+		}
+
+		if (npc.getCombatLevel() > 0)
+		{
+			return true;
+		}
+
+		if (npc.getComposition() != null && npc.getComposition().getActions() != null)
+		{
+			for (String action : npc.getComposition().getActions())
+			{
+				if ("Attack".equalsIgnoreCase(action))
+				{
+					return true;
+				}
+			}
+		}
+
+		return false;
 	}
 }
