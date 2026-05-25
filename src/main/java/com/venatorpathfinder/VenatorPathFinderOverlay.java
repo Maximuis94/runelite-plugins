@@ -243,21 +243,18 @@ public class VenatorPathFinderOverlay extends Overlay
 		{
 			boolean passes = true;
 			if (sSize % 2 != 0) {
-				passes = finds(sPoint, tSWPoint) && finds(sPoint, tCentre);
+				passes = finds(sPoint, tSWPoint) || finds(sPoint, tCentre);
 			} else if (sSize == 2) {
 				if (tSize <= 3) passes = finds(sPoint, tCentre);
-				else passes = finds(sPoint, tCentre) && finds(sPoint, tCentreSW);
+				else passes = finds(sPoint, tCentre) || finds(sPoint, tCentreSW);
 			} else if (sSize == 4) {
-				passes = finds(sPoint, tSWPoint) && finds(sPoint, tCentreSW);
+				passes = finds(sPoint, tSWPoint) || finds(sPoint, tCentreSW);
 			}
 			if (passes) return true;
 		}
 		return false;
 	}
 
-	/**
-	 * Returns true if target is a valid target for bouncing off a projectile from sender
-	 */
 	private boolean canAccept(NPC sender, NPC target)
 	{
 		int sSize = sender.getComposition().getSize();
@@ -274,13 +271,13 @@ public class VenatorPathFinderOverlay extends Overlay
 			if (tSize == 1 || tSize == 2) {
 				passes = finds(sPoint, tSWPoint);
 			} else if (tSize == 3) {
-				if (sSize % 2 != 0) passes = finds(sPoint, tCentre) && finds(sPoint, tSWPoint);
+				if (sSize % 2 != 0) passes = finds(sPoint, tCentre) || finds(sPoint, tSWPoint);
 				else if (sSize == 2) passes = finds(sPoint, tCentre);
 				else if (sSize == 4) passes = finds(sPoint, tSWPoint);
 			} else if (tSize == 4 || tSize == 5) {
-				if (sSize % 2 != 0) passes = finds(sPoint, tCentre) && finds(sPoint, tSWPoint);
-				else if (sSize == 2) passes = finds(sPoint, tCentre) && finds(sPoint, tCentreSW);
-				else if (sSize == 4) passes = finds(sPoint, tSWPoint) && finds(sPoint, tCentreSW);
+				if (sSize % 2 != 0) passes = finds(sPoint, tCentre) || finds(sPoint, tSWPoint);
+				else if (sSize == 2) passes = finds(sPoint, tCentre) || finds(sPoint, tCentreSW);
+				else if (sSize == 4) passes = finds(sPoint, tSWPoint) || finds(sPoint, tCentreSW);
 			}
 			if (passes) return true;
 		}
