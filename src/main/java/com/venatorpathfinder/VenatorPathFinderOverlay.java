@@ -256,7 +256,7 @@ public class VenatorPathFinderOverlay extends Overlay
 		{
 			boolean passes = false;
 			if (sSize % 2 != 0) {
-				passes = tSize <= 2 ? finds(sPoint, tSWPoint) : finds(sPoint, tSWPoint) && finds(sPoint, tCentre);
+				passes = finds(sPoint, tSWPoint) && finds(sPoint, tCentre);
 			} else if (sSize == 2) {
 				passes = tSize <= 3 ? finds(sPoint, tCentre) : finds(sPoint, tCentre) && finds(sPoint, tCentreSW);
 			} else if (sSize == 4) {
