@@ -122,7 +122,7 @@ public class VenatorPathFinderOverlay extends Overlay
 		List<NPC> validNpcs = new ArrayList<>();
 		for (NPC npc : worldView.npcs())
 		{
-			if (npc != hoveredNpc && isAttackable(npc))
+			if (isAttackable(npc))
 			{
 				if (hoveredNpc.getWorldLocation().distanceTo(npc.getWorldLocation()) <= 15)
 				{
@@ -137,6 +137,8 @@ public class VenatorPathFinderOverlay extends Overlay
 
 		for (NPC b1 : validNpcs)
 		{
+			if (b1 == hoveredNpc) continue;
+
 			if (canBounce(hoveredNpc, b1) && hasNpcLineOfSight(worldView, hoveredNpc.getWorldArea(), b1.getWorldArea()))
 			{
 				bounce1.add(b1);
@@ -149,18 +151,21 @@ public class VenatorPathFinderOverlay extends Overlay
 
 				for (NPC b2 : validNpcs)
 				{
-					if (b2 != b1 && canBounce(b1, b2) && hasNpcLineOfSight(worldView, b1.getWorldArea(), b2.getWorldArea()))
+					if (b2 == b1) continue;
+
+					if (canBounce(b1, b2) && hasNpcLineOfSight(worldView, b1.getWorldArea(), b2.getWorldArea()))
 					{
-						bounce2.add(b2);
+						if (b2 == hoveredNpc)
+						{
+							returnsToSender = true;
+						}
+						else
+						{
+							bounce2.add(b2);
+						}
 
 						if (drawOnlyOnePath) break;
 					}
-				}
-				if (drawOnlyOnePath && !bounce2.isEmpty()) break;
-
-				if (canBounce(b1, hoveredNpc) && hasNpcLineOfSight(worldView, b1.getWorldArea(), hoveredNpc.getWorldArea()))
-				{
-					returnsToSender = true;
 				}
 
 				if (drawOnlyOnePath) break;
