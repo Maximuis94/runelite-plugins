@@ -309,11 +309,13 @@ public class DataLoggerPlugin extends Plugin
 		boolean shouldEnable = enable && isColosseumRegistered;
 
 		if (shouldEnable && !isTimelineRegistered) {
+			timelineLogger.setEnabled(true);
 			eventBus.register(timelineLogger);
 			isTimelineRegistered = true;
 			log.debug("Colosseum Timeline tracking enabled.");
 		}
 		else if (!shouldEnable && isTimelineRegistered) {
+			timelineLogger.setEnabled(false);
 			eventBus.unregister(timelineLogger);
 			isTimelineRegistered = false;
 			log.debug("Colosseum Timeline tracking disabled.");

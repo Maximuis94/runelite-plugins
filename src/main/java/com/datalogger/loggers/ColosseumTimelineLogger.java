@@ -37,6 +37,7 @@ import java.util.ArrayList;
 import java.util.List;
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.events.GameTick;
 import net.runelite.client.eventbus.Subscribe;
@@ -55,6 +56,8 @@ public class ColosseumTimelineLogger {
 	@Inject private FileIOService fileIOService;
 	@Inject private DataLoggerConfig config;
 
+	@Setter
+	private boolean isEnabled;
 	private File root;
 	private String account;
 	private String attemptId;
@@ -80,7 +83,7 @@ public class ColosseumTimelineLogger {
 	 */
 	@Subscribe
 	public void onGameTick(GameTick event) {
-		if (!isRecording || !config.logWaveTimeline()) return;
+		if (!isRecording || !isEnabled) return;
 
 		states.add(scanner.scanCurrentState(currentWave, waveStartTick));
 	}
@@ -108,7 +111,7 @@ public class ColosseumTimelineLogger {
 
 	@Subscribe
 	public void onColosseumAttemptEnded(ColosseumAttemptEnded event) {
-		if (config.logWaveTimeline()) {
+		if (isEnabled) {
 			File outFile = new File(root, attemptId+"_timeline.json");
 			fileIOService.mergeTimelineFiles(outFile, event.getAttemptId());
 		}
