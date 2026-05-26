@@ -1,3 +1,28 @@
+/*
+ * Copyright (c) 2026, maximuis94 <https://github.com/maximuis94>
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright notice, this
+ *    list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ *    this list of conditions and the following disclaimer in the documentation
+ *    and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
+ * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
 package com.venatorpathfinder;
 
 import java.awt.Color;
@@ -45,6 +70,8 @@ public class VenatorPathFinderOverlay extends Overlay
 	private int outlineWidth;
 	private int outlineFeather;
 
+	private int plane = 0;
+
 	@Inject
 	private VenatorPathFinderOverlay(Client client, VenatorPathFinderConfig config, ModelOutlineRenderer modelOutlineRenderer)
 	{
@@ -56,27 +83,18 @@ public class VenatorPathFinderOverlay extends Overlay
 		parseConfigs();
 	}
 
-	/**
-	 * Updates multicombat status, if applicable
-	 */
 	public void setInMultiCombat(boolean inMultiCombat)
 	{
 		isInMultiCombat = inMultiCombat;
 		if (!ignoreMultiCombatCondition) updateShouldRenderPath();
 	}
 
-	/**
-	 * Updates Venator bow status, if applicable
-	 */
 	public void setHasEquippedVenatorBow(boolean equippedVenatorBow)
 	{
 		hasEquippedVenatorBow = equippedVenatorBow;
 		if (!ignoreVenatorBowCondition) updateShouldRenderPath();
 	}
 
-	/**
-	 * Loads configurations into class variables
-	 */
 	public void parseConfigs()
 	{
 		initialTargetOutline = config.initialColor();
@@ -93,9 +111,6 @@ public class VenatorPathFinderOverlay extends Overlay
 		updateShouldRenderPath();
 	}
 
-	/**
-	 * Updates the shouldRenderPath flag, which is derived from various other flags.
-	 */
 	private void updateShouldRenderPath()
 	{
 		shouldRenderPath = (ignoreMultiCombatCondition || isInMultiCombat) && (ignoreVenatorBowCondition || hasEquippedVenatorBow);
@@ -107,7 +122,12 @@ public class VenatorPathFinderOverlay extends Overlay
 		if (!shouldRenderPath) return null;
 
 		Player player = client.getLocalPlayer();
-		if (player == null || player.getWorldArea() == null) return null;
+		if (player == null) return null;
+
+		WorldArea playerArea = player.getWorldArea();
+		if (playerArea == null) return null;
+
+		plane = playerArea.getPlane();
 
 		MenuEntry[] menuEntries = client.getMenu().getMenuEntries();
 		if (menuEntries.length == 0 || client.isMenuOpen()) return null;
@@ -116,6 +136,8 @@ public class VenatorPathFinderOverlay extends Overlay
 		NPC hoveredNpc = topEntry.getNpc();
 
 		if (!isAttackable(hoveredNpc)) return null;
+
+		DeflectingNpc dHoveredNpc = new DeflectingNpc(hoveredNpc);
 
 		WorldView worldView = client.getTopLevelWorldView();
 
@@ -135,11 +157,21 @@ public class VenatorPathFinderOverlay extends Overlay
 		Set<NPC> bounce2 = new HashSet<>();
 		boolean returnsToSender = false;
 
-		for (NPC b1 : validNpcs)
+		List<NPC> b1Candidates = new ArrayList<>(validNpcs);
+		b1Candidates.sort(this::compareNpcsByCoordinate);
+
+		for (NPC b1 : b1Candidates)
 		{
 			if (b1 == hoveredNpc) continue;
 
-			if (canBounce(hoveredNpc, b1) && hasNpcLineOfSight(worldView, hoveredNpc.getWorldArea(), b1.getWorldArea()))
+			DeflectingNpc dB1 = new DeflectingNpc(b1);
+			List<Point> hoveredSenderTiles = dHoveredNpc.getSenderTiles();
+			if (hoveredSenderTiles.isEmpty())
+			{
+				continue;
+			}
+
+			if (canBounce(worldView, dHoveredNpc, dB1, hoveredSenderTiles) && hasNpcLineOfSight(worldView, hoveredNpc.getWorldArea(), b1.getWorldArea()))
 			{
 				bounce1.add(b1);
 
@@ -149,11 +181,21 @@ public class VenatorPathFinderOverlay extends Overlay
 					else continue;
 				}
 
-				for (NPC b2 : validNpcs)
+				List<Point> b1SenderTiles = dB1.getSenderTiles();
+				if (b1SenderTiles.isEmpty())
+				{
+					continue;
+				}
+
+				List<NPC> b2Candidates = new ArrayList<>(validNpcs);
+				b2Candidates.sort(this::compareNpcsByCoordinate);
+
+				for (NPC b2 : b2Candidates)
 				{
 					if (b2 == b1) continue;
+					DeflectingNpc dB2 = new DeflectingNpc(b2);
 
-					if (canBounce(b1, b2) && hasNpcLineOfSight(worldView, b1.getWorldArea(), b2.getWorldArea()))
+					if (canBounce(worldView, dB1, dB2, b1SenderTiles) && hasNpcLineOfSight(worldView, b1.getWorldArea(), b2.getWorldArea()))
 					{
 						if (b2 == hoveredNpc)
 						{
@@ -189,129 +231,118 @@ public class VenatorPathFinderOverlay extends Overlay
 		return null;
 	}
 
-	/**
-	 * Determines Line of Sight specifically between two NPCs by projecting from the target tile
-	 * back to the nearest tile of the source NPC.
-	 */
+	private int compareNpcsByCoordinate(NPC n1, NPC n2)
+	{
+		int x1 = n1.getWorldLocation().getX();
+		int x2 = n2.getWorldLocation().getX();
+		if (x1 != x2)
+		{
+			return Integer.compare(x2, x1);
+		}
+
+		int y1 = n1.getWorldLocation().getY();
+		int y2 = n2.getWorldLocation().getY();
+
+		return Integer.compare(y2, y1);
+	}
+
 	private boolean hasNpcLineOfSight(WorldView wv, WorldArea sourceArea, WorldArea targetArea)
 	{
 		int nearestX = Math.max(sourceArea.getX(), Math.min(targetArea.getX(), sourceArea.getX() + sourceArea.getWidth() - 1));
 		int nearestY = Math.max(sourceArea.getY(), Math.min(targetArea.getY(), sourceArea.getY() + sourceArea.getHeight() - 1));
-		WorldArea nearestSourceTile = new WorldArea(nearestX, nearestY, 1, 1, sourceArea.getPlane());
+		WorldArea nearestSourceTile = new WorldArea(nearestX, nearestY, 1, 1, plane);
 
 		return targetArea.hasLineOfSightTo(wv, nearestSourceTile);
 	}
 
 	/**
-	 * Returns true if both conditions for bouncing off a projectile from sender to target are met
+	 * Returns true if the geometry allows a projectile to bounce from sender to target.
+	 * Mirrors engine behavior by finding the FIRST geometrically valid tile and short-circuiting
+	 * the entire bounce check if that specific tile lacks Line of Sight.
 	 */
-	private boolean canBounce(NPC sender, NPC target)
+	private boolean canBounce(WorldView worldView, DeflectingNpc sender, DeflectingNpc target, List<Point> senderTiles)
 	{
-		return canSend(sender, target) && canAccept(sender, target);
+		for (Point s : senderTiles)
+		{
+			boolean geometryPasses = canSendGeometry(sender, target, s) && canAcceptGeometry(sender, target, s);
+
+			if (geometryPasses)
+			{
+				WorldArea simulatedPlayerArea = new WorldArea(s.x, s.y, 1, 1, plane);
+				Point tCenter = target.getCenterTile();
+
+				return simulatedPlayerArea.hasLineOfSightTo(worldView, new WorldPoint(tCenter.x, tCenter.y, plane));
+			}
+		}
+		return false;
 	}
 
 	/**
-	 * Calculates the set of sender tiles for an NPC based on its physical size.
-	 * The Venator Bow's bounce logic requires evaluating specific tiles (Centre
-	 * and/or SW) within the NPC's area to determine if a projectile can be bounced off
+	 * Determines if a sender NPC tile geometrically satisfies the requirements to initiate a bounce.
 	 */
-	private List<Point> getSenderTiles(NPC sender)
+	private boolean canSendGeometry(DeflectingNpc sender, DeflectingNpc target, Point s)
 	{
-		int sSize = sender.getComposition().getSize();
-		WorldPoint sw = sender.getWorldLocation();
-		List<Point> tiles = new ArrayList<>();
+		int sSize = sender.getSize();
+		int tSize = target.getSize();
+
+		int tSwX = target.getSwX();
+		int tSwY = target.getSwY();
+		int tCX = target.getCX();
+		int tCY = target.getCY();
+		int tCSwX = target.getCSwX();
+		int tCSwY = target.getCSwY();
 
 		if (sSize % 2 != 0) {
-			tiles.add(new Point(sw.getX() + sSize / 2, sw.getY() + sSize / 2));
+			return finds(s.x, s.y, tSwX, tSwY) && finds(s.x, s.y, tCX, tCY);
 		} else if (sSize == 2) {
-			tiles.add(new Point(sw.getX(), sw.getY()));
-			tiles.add(new Point(sw.getX() + 1, sw.getY()));
-			tiles.add(new Point(sw.getX(), sw.getY() + 1));
-			tiles.add(new Point(sw.getX() + 1, sw.getY() + 1));
+			return tSize <= 3 ?
+				finds(s.x, s.y, tCX, tCY) :
+				finds(s.x, s.y, tCX, tCY) && finds(s.x, s.y, tCSwX, tCSwY);
 		} else if (sSize == 4) {
-			tiles.add(new Point(sw.getX() + 1, sw.getY() + 1));
-			tiles.add(new Point(sw.getX() + 2, sw.getY() + 1));
-			tiles.add(new Point(sw.getX() + 1, sw.getY() + 2));
-			tiles.add(new Point(sw.getX() + 2, sw.getY() + 2));
-		}
-		return tiles;
-	}
-
-	/**
-	 * Determines if a sender NPC is capable of initiating a Venator Bow bounce to a target.
-	 * The bounce mechanics are based on the sender's size and the target's size,
-	 * requiring specific hitboxes (SW tile and/or Centre tile) to be within 2 tiles.
-	 */
-	private boolean canSend(NPC sender, NPC target)
-	{
-		int sSize = sender.getComposition().getSize();
-		int tSize = target.getComposition().getSize();
-		WorldPoint tSW = target.getWorldLocation();
-
-		Point tSWPoint = new Point(tSW.getX(), tSW.getY());
-		Point tCentre = new Point(tSW.getX() + tSize / 2, tSW.getY() + tSize / 2);
-		Point tCentreSW = new Point(tSW.getX() + (tSize / 2) - 1, tSW.getY() + (tSize / 2) - 1);
-
-		for (Point sPoint : getSenderTiles(sender))
-		{
-			boolean passes = false;
-			if (sSize % 2 != 0) {
-				passes = finds(sPoint, tSWPoint) && finds(sPoint, tCentre);
-			} else if (sSize == 2) {
-				passes = tSize <= 3 ? finds(sPoint, tCentre) : finds(sPoint, tCentre) && finds(sPoint, tCentreSW);
-			} else if (sSize == 4) {
-				passes = finds(sPoint, tSWPoint) && finds(sPoint, tCentreSW);
-			}
-			if (passes) return true;
+			return finds(s.x, s.y, tSwX, tSwY) && finds(s.x, s.y, tCSwX, tCSwY);
 		}
 		return false;
 	}
 
 	/**
-	 * Determines if a target NPC is capable of receiving a bounce from a sender.
-	 * This verifies the geometry requirements for the target to accept a projectile
-	 * based on its size relative to the sender.
+	 * Determines if a target NPC geometrically satisfies the requirements to accept a bounce.
 	 */
-	private boolean canAccept(NPC sender, NPC target)
+	private boolean canAcceptGeometry(DeflectingNpc sender, DeflectingNpc target, Point s)
 	{
-		int sSize = sender.getComposition().getSize();
-		int tSize = target.getComposition().getSize();
-		WorldPoint tSW = target.getWorldLocation();
+		int sSize = sender.getSize();
+		int tSize = target.getSize();
 
-		Point tSWPoint = new Point(tSW.getX(), tSW.getY());
-		Point tCentre = new Point(tSW.getX() + tSize / 2, tSW.getY() + tSize / 2);
-		Point tCentreSW = new Point(tSW.getX() + (tSize / 2) - 1, tSW.getY() + (tSize / 2) - 1);
+		int tSwX = target.getSwX();
+		int tSwY = target.getSwY();
+		int tCX = target.getCX();
+		int tCY = target.getCY();
+		int tCSwX = target.getCSwX();
+		int tCSwY = target.getCSwY();
 
-		for (Point sPoint : getSenderTiles(sender))
-		{
-			boolean passes = false;
-			if (tSize == 1 || tSize == 2) {
-				passes = finds(sPoint, tSWPoint);
-			} else if (tSize == 3) {
-				if (sSize % 2 != 0) passes = finds(sPoint, tCentre) && finds(sPoint, tSWPoint);
-				else if (sSize == 2) passes = finds(sPoint, tCentre);
-				else if (sSize == 4) passes = finds(sPoint, tSWPoint);
-			} else if (tSize >= 4) {
-				if (sSize % 2 != 0) passes = finds(sPoint, tCentre) && finds(sPoint, tSWPoint);
-				else if (sSize == 2) passes = finds(sPoint, tCentre) && finds(sPoint, tCentreSW);
-				else if (sSize == 4) passes = finds(sPoint, tSWPoint) && finds(sPoint, tCentreSW);
-			}
-			if (passes) return true;
+		if (tSize == 1 || tSize == 2) {
+			return finds(s.x, s.y, tSwX, tSwY);
+		} else if (tSize == 3) {
+			if (sSize % 2 != 0) return finds(s.x, s.y, tCX, tCY) && finds(s.x, s.y, tSwX, tSwY);
+			else if (sSize == 2) return finds(s.x, s.y, tCX, tCY);
+			else if (sSize == 4) return finds(s.x, s.y, tSwX, tSwY);
+		} else if (tSize == 4 || tSize == 5) {
+			if (sSize % 2 != 0) return finds(s.x, s.y, tCX, tCY) && finds(s.x, s.y, tSwX, tSwY);
+			else if (sSize == 2) return finds(s.x, s.y, tCX, tCY) && finds(s.x, s.y, tCSwX, tCSwY);
+			else if (sSize == 4) return finds(s.x, s.y, tSwX, tSwY) && finds(s.x, s.y, tCSwX, tCSwY);
+		} else {
+			log.warn("Found an unexpected NPC size of {}x{}", tSize, tSize);
 		}
 		return false;
 	}
 
 	/**
-	 * Returns true if the Chebyshev between sender and target is lesser than or equal to 2
+	 * Purely geometric distance check: Returns true if the Chebyshev distance is lesser than or equal to 2
 	 */
-	private boolean finds(Point sender, Point target)
+	private boolean finds(int sX, int sY, int tX, int tY)
 	{
-		return Math.max(Math.abs(sender.x - target.x), Math.abs(sender.y - target.y)) <= 2;
+		return Math.max(Math.abs(sX - tX), Math.abs(sY - tY)) <= 2;
 	}
 
-	/**
-	 * Return true if npc can be attacked
-	 */
 	private boolean isAttackable(NPC npc)
 	{
 		if (npc == null || npc.isDead())

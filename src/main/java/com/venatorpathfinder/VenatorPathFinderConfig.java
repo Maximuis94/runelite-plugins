@@ -97,7 +97,7 @@ public interface VenatorPathFinderConfig extends Config
 	@ConfigItem(
 		keyName = "drawOnlyOnePath",
 		name = "Draw at most one path",
-		description = "If set, draw at most one path.",
+		description = "If set, draw at most one path. Note that this is not necessarily the actual path.",
 		position = 7
 	)
 	default boolean drawOnlyOnePath() { return false; }
