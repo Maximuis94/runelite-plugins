@@ -25,6 +25,10 @@
 
 package com.datalogger.constants;
 
+import com.datalogger.models.itemvault.BankedItem;
+import com.google.gson.reflect.TypeToken;
+import java.lang.reflect.Type;
+import java.util.ArrayList;
 import static net.runelite.api.gameval.VarbitID.*;
 
 /**
@@ -59,7 +63,6 @@ public final class Item
 		public static final int MAX_ITEM_TAX = 5000000;
 		public static final int MAX_TAX_PRICE = (int) (MAX_ITEM_TAX / TAX_RATE);
 		public static final int MAX_TAXED_PRICE = MAX_TAX_PRICE - MAX_ITEM_TAX;
-
 	}
 
 	public static class Script
@@ -81,4 +84,6 @@ public final class Item
 
 	public static final int INVENTORY_CONTAINER_ID = 93;
 	public static final int EQUIPMENT_CONTAINER_ID = 94;
+
+	public static final Type CACHED_ITEM_DATA_TYPE = new TypeToken<ArrayList<BankedItem>>(){}.getType();
 }

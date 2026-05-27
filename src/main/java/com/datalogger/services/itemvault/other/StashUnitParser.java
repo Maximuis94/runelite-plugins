@@ -6,10 +6,10 @@
  * modification, are permitted provided that the following conditions are met:
  *
  * 1. Redistributions of source code must retain the above copyright notice, this
- *    list of conditions and the following disclaimer.
+ * list of conditions and the following disclaimer.
  * 2. Redistributions in binary form must reproduce the above copyright notice,
- *    this list of conditions and the following disclaimer in the documentation
- *    and/or other materials provided with the distribution.
+ * this list of conditions and the following disclaimer in the documentation
+ * and/or other materials provided with the distribution.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
@@ -25,9 +25,11 @@
 
 package com.datalogger.services.itemvault.other;
 
+import static com.datalogger.constants.PluginConstants.INTERNAL_STASH_DIR;
 import com.datalogger.models.enums.StashUnitData;
 import com.datalogger.models.enums.VaultType;
 import com.datalogger.models.itemvault.BankedItem;
+import com.datalogger.services.FileIOService;
 import com.datalogger.services.itemvault.AbstractVaultParser;
 import com.google.gson.reflect.TypeToken;
 import java.io.File;
@@ -66,6 +68,9 @@ public class StashUnitParser extends AbstractVaultParser
 	@Inject
 	private ItemManager itemManager;
 
+	@Inject
+	private FileIOService fileIOService;
+
 	@Data
 	@NoArgsConstructor
 	@AllArgsConstructor
@@ -77,6 +82,8 @@ public class StashUnitParser extends AbstractVaultParser
 	}
 
 	private final Map<Integer, List<StashItem>> stashStates = new HashMap<>();
+
+	private final static Type JSON_TYPE = new TypeToken<Map<Integer, List<StashItem>>>(){}.getType();
 
 	private List<Integer> previousInventory = new ArrayList<>();
 	private List<Integer> recentlyRemovedItems = new ArrayList<>();
@@ -90,23 +97,45 @@ public class StashUnitParser extends AbstractVaultParser
 		return VaultType.STASH_UNITS;
 	}
 
+	/**
+	 * Gets the specific tracker file used to maintain the ObjectId -> Items mapping.
+	 */
+	private File getTrackerFile()
+	{
+		if (vaultFile == null) return null;
+		return new File(INTERNAL_STASH_DIR, currentAccountHash + ".json");
+	}
+
 	@Override
 	protected void loadSessionData(File cacheFile)
 	{
-		Type type = new TypeToken<Map<Integer, List<StashItem>>>(){}.getType();
-		Map<Integer, List<StashItem>> loadedStates = fileIOService.readJson(cacheFile, type);
+		File trackerFile = getTrackerFile();
+		if (trackerFile == null) return;
 
-		if (loadedStates != null)
+		if (trackerFile.exists())
 		{
+			Map<Integer, List<StashItem>> loadedStates = fileIOService.readJson(trackerFile, JSON_TYPE);
 			stashStates.clear();
 			stashStates.putAll(loadedStates);
 		}
 	}
 
-	@Override
-	public void setupAccountHash()
+	/**
+	 * Persists the internal STASH mappings to the tracker file, then passes
+	 * the flattened list of BankedItems up to the central ItemVaultLogger.
+	 */
+	private void saveState()
 	{
-		super.setupAccountHash();
+		if (!hasValidAccountHash) return;
+
+		File trackerFile = getTrackerFile();
+		if (trackerFile != null)
+		{
+			fileIOService.writeJson(trackerFile, stashStates);
+		}
+
+		// Send the flattened list to the central sink
+		submitVault(parseVault());
 	}
 
 	@Subscribe
@@ -187,10 +216,6 @@ public class StashUnitParser extends AbstractVaultParser
 		}
 	}
 
-	/**
-	 * Extract STASH unit data provided when reading the notice board at Watson. Only add item fixed item sets if the
-	 * STASH unit is filled. If a STASH unit is empty, update the cached data if need be.
-	 */
 	private void parseWatsonNoticeBoard()
 	{
 		if (lastCheckedStashObjectId == -1) return;
@@ -242,7 +267,7 @@ public class StashUnitParser extends AbstractVaultParser
 	{
 		if (watsonSyncPending && hasValidAccountHash)
 		{
-			fileIOService.writeJson(vaultFile, stashStates);
+			saveState();
 			log.debug("Watson Noticeboard bulk sync saved to disk.");
 			watsonSyncPending = false;
 		}
@@ -351,7 +376,7 @@ public class StashUnitParser extends AbstractVaultParser
 
 			if (hasValidAccountHash)
 			{
-				fileIOService.writeJson(vaultFile, stashStates);
+				saveState();
 			}
 		}
 	}
@@ -372,44 +397,6 @@ public class StashUnitParser extends AbstractVaultParser
 					stashItem.getItemName(),
 					stashItem.getQuantity()
 				));
-			}
-		}
-
-		return items;
-	}
-
-	@Override
-	public List<BankedItem> parseOfflineFile(long accountHash, File vaultFile)
-	{
-		Type type = new TypeToken<Map<Integer, List<StashItem>>>(){}.getType();
-		Map<Integer, List<StashItem>> offlineStates = fileIOService.readJson(vaultFile, type);
-
-		if (offlineStates == null || offlineStates.isEmpty())
-		{
-			return new ArrayList<>();
-		}
-
-		List<BankedItem> items = new ArrayList<>();
-
-		String accountName = accountHashMapper.getAccountName(accountHash);
-
-		for (Map.Entry<Integer, List<StashItem>> entry : offlineStates.entrySet())
-		{
-			List<StashItem> savedItems = entry.getValue();
-
-			if (savedItems != null && !savedItems.isEmpty())
-			{
-				for (StashItem stashItem : savedItems)
-				{
-					items.add(new BankedItem(
-						getVaultType(),
-						accountHash,
-						accountName,
-						stashItem.getItemId(),
-						stashItem.getItemName(),
-						stashItem.getQuantity()
-					));
-				}
 			}
 		}
 

@@ -25,7 +25,6 @@
 
 package com.datalogger.services.itemvault.variable;
 
-import com.datalogger.loggers.ItemVaultLogger;
 import com.datalogger.models.itemvault.BankedItem;
 import com.datalogger.services.itemvault.AbstractVaultParser;
 import java.io.File;
@@ -48,7 +47,6 @@ import net.runelite.client.game.ItemManager;
 public abstract class AbstractVariableVaultParser extends AbstractVaultParser
 {
 	@Inject protected ItemManager itemManager;
-	@Inject protected ItemVaultLogger itemVaultLogger;
 
 	private boolean pendingLoginSync = false;
 	private int loginSyncTicks = 0;
@@ -101,17 +99,26 @@ public abstract class AbstractVariableVaultParser extends AbstractVaultParser
 		int varbitId = event.getVarbitId();
 		if (varbitId != -1 && getTrackedVarbitIds().contains(varbitId))
 		{
-			int varbitValue = currentVarbitValues.get(varbitId);
-			currentVarbitValues.put(varbitId, varbitValue);
-			log.debug("Updating varbitId {} to value {}", varbitId, varbitValue);
-			changed = true;
+			int varbitValue = currentVarbitValues.getOrDefault(varbitId, -1);
+			int newValue = client.getVarbitValue(varbitId);
+			if (varbitValue != newValue)
+			{
+				currentVarbitValues.put(varbitId, newValue);
+				log.debug("Updating varbitId {} to value {}", varbitId, newValue);
+				changed = true;
+			}
 		}
 
 		int varpId = event.getVarpId();
 		if (getTrackedVarpIds().contains(varpId))
 		{
-			currentVarpValues.put(varpId, client.getVarpValue(varpId));
-			changed = true;
+			int varpValue = currentVarpValues.getOrDefault(varpId, -1);
+			int newValue = client.getVarpValue(varpId);
+			if (varpValue != newValue)
+			{
+				currentVarpValues.put(varpId, newValue);
+				changed = true;
+			}
 		}
 
 		if (changed)
@@ -201,7 +208,7 @@ public abstract class AbstractVariableVaultParser extends AbstractVaultParser
 		if (parsedItems != null && !parsedItems.isEmpty())
 		{
 			log.debug("Parsed {} items for Variable Vault: {}", parsedItems.size(), getVaultType().name());
-			itemVaultLogger.logVault(currentAccountHash, currentAccountName, getVaultType(), parsedItems);
+			submitVault(parsedItems);
 		}
 	}
 }

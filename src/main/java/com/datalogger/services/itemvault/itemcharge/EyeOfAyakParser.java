@@ -142,7 +142,7 @@ public class EyeOfAyakParser extends AbstractItemChargeParser
 	@Override
 	protected void loadSessionData(File cacheFile)
 	{
-		List<BankedItem> loadedItems = fileIOService.readJson(cacheFile, BankedItem.LIST_TYPE);
+		List<BankedItem> loadedItems = itemVaultLogger.getVault(currentAccountHash, getItemChargeType());
 
 		if (loadedItems == null || loadedItems.isEmpty())
 		{
@@ -224,7 +224,7 @@ public class EyeOfAyakParser extends AbstractItemChargeParser
 		if (hasValidAccountHash && currentCharges >= 0)
 		{
 			List<BankedItem> itemsToSave = parseVault();
-			fileIOService.writeJson(vaultFile, itemsToSave);
+			submitVault(itemsToSave);
 		}
 	}
 }

@@ -44,6 +44,7 @@ import java.util.List;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import lombok.Data;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.ItemComposition;
@@ -66,6 +67,7 @@ public class GrandExchangeHistoryParser
 	private final Gson gson;
 	private final ClientThread clientThread;
 
+	@Setter
 	private boolean isEnabled = false;
 
 	private long accountHash = -1;
@@ -94,8 +96,6 @@ public class GrandExchangeHistoryParser
 		this.itemManager = itemManager;
 		this.gson = gson;
 		this.clientThread = clientThread;
-
-		isEnabled = config.logGrandExchange();
 	}
 
 	@Subscribe
@@ -134,8 +134,6 @@ public class GrandExchangeHistoryParser
 			clientThread.invokeLater(this::parseGeHistory);
 		}
 	}
-
-
 
 	/**
 	 * Return true if the GE history may be parsed again. Should be constrained to some degree to prevent

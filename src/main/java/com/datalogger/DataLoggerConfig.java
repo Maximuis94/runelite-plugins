@@ -53,7 +53,7 @@ public interface DataLoggerConfig extends Config {
 
 	@ConfigSection(
 		name = "Item loggers",
-		description = "Settings for logging Grand Exchange activity",
+		description = "Settings related to item loggers",
 		position = 1,
 		closedByDefault = true
 	)
@@ -61,7 +61,7 @@ public interface DataLoggerConfig extends Config {
 
 	@ConfigSection(
 		name = "Grand Exchange",
-		description = "Settings related to the Grand Exchange",
+		description = "Settings related to the Grand Exchange loggers",
 		position = 2,
 		closedByDefault = true
 	)
@@ -83,13 +83,13 @@ public interface DataLoggerConfig extends Config {
 	)
 	String COLOSSEUM_TIMELINE_SECTION = "colosseumTimeline";
 
-	@ConfigSection(
-		name = "Supply logger",
-		description = "Settings related to supply loggers",
-		position = 5,
-		closedByDefault = true
-	)
-	String SUPPLY_SECTION = "supplyLogger";
+//	@ConfigSection(
+//		name = "Supply logger",
+//		description = "Settings related to supply loggers",
+//		position = 5,
+//		closedByDefault = true
+//	)
+//	String SUPPLY_SECTION = "supplyLogger";
 
 	@ConfigSection(
 		name = "Screenshots",
@@ -161,15 +161,12 @@ public interface DataLoggerConfig extends Config {
 	)
 	default boolean hideZeroPriceItems() { return true; }
 
-
-
-
 	// --- Item Logger ---
 
 	@ConfigItem(
 		keyName = "logItemVault",
-		name = "Log Item vaults",
-		description = "If enabled, Item vaults (bank/seed vault) are parsed and saved when interacting with them.",
+		name = "Log item data",
+		description = "If enabled, item data is stored internally if data is accessible.",
 		position = 3,
 		section = ITEM_LOGGER_SECTION
 	)
@@ -177,8 +174,8 @@ public interface DataLoggerConfig extends Config {
 
 	@ConfigItem(
 		keyName = "logItemVaultCSV",
-		name = "Log Item Vaults (CSV)",
-		description = "If enabled, a copy of the internal (aggregated) vaults are created as CSV files.",
+		name = "Log item data (CSV)",
+		description = "If enabled, a copy of the internal (aggregated) item data is exported as CSV files.",
 		position = 4,
 		section = ITEM_LOGGER_SECTION
 	)
@@ -186,8 +183,8 @@ public interface DataLoggerConfig extends Config {
 
 	@ConfigItem(
 		keyName = "logItemVaultJSON",
-		name = "Log Item vaults (JSON)",
-		description = "If enabled, a copy of the internal (aggregated) vaults are created as JSON files.",
+		name = "Log item data (JSON)",
+		description = "If enabled, a copy of the internal (aggregated) item data is exported as JSON files.",
 		position = 5,
 		section = ITEM_LOGGER_SECTION
 	)
@@ -196,7 +193,7 @@ public interface DataLoggerConfig extends Config {
 	@ConfigItem(
 		keyName = "skipItemVaultAccountList",
 		name = "Exclude accounts",
-		description = "Accounts that should not be included by the Item Vault logger. Accounts should be separated using ','; e.g. ACCOUNT_NAME,OTHER_ACCOUNT_NAME",
+		description = "Accounts that should not be included by the Item data logger. Accounts should be separated using ','; e.g. ACCOUNT_NAME,OTHER_ACCOUNT_NAME",
 		position = 6,
 		section = ITEM_LOGGER_SECTION
 	)
@@ -212,24 +209,6 @@ public interface DataLoggerConfig extends Config {
 		section = GE_LOGGER_SECTION
 	)
 	default boolean logGrandExchange() { return true; }
-
-//	@ConfigItem(
-//		keyName = "logGrandExchangeCSV",
-//		name = "Log Grand Exchange (CSV)",
-//		description = "If enabled, Grand Exchange offers are added to a CSV log upon completion.",
-//		position = 1,
-//		section = GE_LOGGER_SECTION
-//	)
-//	default boolean logGrandExchangeCSV() { return true; }
-
-//	@ConfigItem(
-//		keyName = "logGrandExchangeJSON",
-//		name = "Log Grand Exchange (JSON)",
-//		description = "If enabled, a copy of the internal ledger JSON is created after updating it.",
-//		position = 2,
-//		section = GE_LOGGER_SECTION
-//	)
-//	default boolean logGrandExchangeJSON() { return true; }
 
 	@ConfigItem(
 		keyName = "geJsonFileStrategy",
@@ -347,15 +326,6 @@ public interface DataLoggerConfig extends Config {
 	)
 	default boolean geIncludeGeSlot() { return true; }
 
-//	@ConfigItem(
-//		keyName = "geIncludeIsHistoryEntry",
-//		name = "Include Is History Entry",
-//		description = "Include whether the entry was parsed from GE history in the logged JSON entry.",
-//		position = 13,
-//		section = GE_LOGGER_SECTION
-//	)
-//	default boolean geIncludeIsHistoryEntry() { return true; }
-
 	@ConfigItem(
 		keyName = "geIncludeIsCancelled",
 		name = "Include Is Cancelled",
@@ -382,15 +352,6 @@ public interface DataLoggerConfig extends Config {
 		section = GE_LOGGER_SECTION
 	)
 	default boolean geIncludeExactTimestamp() { return true; }
-
-//	@ConfigItem(
-//		keyName = "geIncludeParseTime",
-//		name = "Include Parse Time",
-//		description = "Include the history parsing timestamp in the logged JSON entry.",
-//		position = 17,
-//		section = GE_LOGGER_SECTION
-//	)
-//	default boolean geIncludeParseTime() { return true; }
 
 	@ConfigItem(
 		keyName = "geIncludeOriginalOfferQuantity",
@@ -713,6 +674,7 @@ public interface DataLoggerConfig extends Config {
 			"# Wave-specific: <1:MOD>, <12:TIME>, <6:STATUS>\n" +
 			"# Use 'Test with uploaded log' button in side panel to preview template!\n" +
 			"# See Custom Template Keywords section at https://runelite.net/plugin-hub/show/data-logger for a complete list of keywords\n" +
+			"# You can also quickly test various templates in the utilities section of the sidebar panel\n" +
 			"# --------------------\n" +
 			"**<PLAYER>** just finished a Colosseum run!\n" +
 			"**Result:** <RESULT>\n" +

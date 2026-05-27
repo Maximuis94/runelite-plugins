@@ -27,10 +27,8 @@ package com.datalogger.services.itemvault.other;
 
 import static com.datalogger.constants.Item.Values.N_GE_SLOTS;
 import com.datalogger.events.AccountSessionStarted;
-import com.datalogger.loggers.ItemVaultLogger;
 import com.datalogger.models.enums.VaultType;
 import com.datalogger.models.itemvault.BankedItem;
-import com.datalogger.models.itemvault.ItemBundle;
 import com.datalogger.services.itemvault.AbstractVaultParser;
 import java.io.File;
 import java.util.ArrayList;
@@ -42,9 +40,9 @@ import javax.inject.Singleton;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.GrandExchangeOffer;
 import net.runelite.api.GrandExchangeOfferState;
-import net.runelite.api.gameval.ItemID;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.GrandExchangeOfferChanged;
+import net.runelite.api.gameval.ItemID;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.game.ItemManager;
 
@@ -53,7 +51,6 @@ import net.runelite.client.game.ItemManager;
 public class ActiveGrandExchangeOfferParser extends AbstractVaultParser
 {
 	@Inject private ItemManager itemManager;
-	@Inject private ItemVaultLogger itemVaultLogger;
 
 	private final GrandExchangeOffer[] currentOffers = new GrandExchangeOffer[N_GE_SLOTS];
 	private List<BankedItem> currentVaultItems = new ArrayList<>();
@@ -69,10 +66,14 @@ public class ActiveGrandExchangeOfferParser extends AbstractVaultParser
 	@Override
 	protected void loadSessionData(File cacheFile)
 	{
-		List<BankedItem> loadedItems = fileIOService.readJson(cacheFile, ItemBundle.LIST_TYPE);
+		itemVaultLogger.loadAllVaultsIntoMemory();
+
+		List<BankedItem> loadedItems = itemVaultLogger.getVault(currentAccountHash, getVaultType());
+
 		if (loadedItems != null)
 		{
-			this.currentVaultItems = loadedItems;
+			currentVaultItems.clear();
+			currentVaultItems.addAll(loadedItems);
 		}
 	}
 
@@ -154,7 +155,7 @@ public class ActiveGrandExchangeOfferParser extends AbstractVaultParser
 //		{
 //			fileIOService.writeJson(vaultFile, currentVaultItems);
 //		}
-		saveSlimVaultCache(currentVaultItems);
+		submitVault(currentVaultItems);
 
 		log.debug("Parsed {} uncompleted items from Active GE Offers.", newItems.size());
 		itemVaultLogger.logVault(currentAccountHash, currentAccountName, getVaultType(), newItems);

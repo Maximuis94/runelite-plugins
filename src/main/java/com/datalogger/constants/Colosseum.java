@@ -155,7 +155,6 @@ public final class Colosseum
 		public static final String BOSS_WAVE_P4_MESSAGE = "Sol Heredit|You can't win!";
 		public static final String BOSS_WAVE_P5_MESSAGE = "Sol Heredit|Ralos guides my hand!";
 		public static final String BOSS_WAVE_P6_MESSAGE = "Sol Heredit|LET'S END THIS!";
-
 	}
 
 	/**
@@ -166,48 +165,6 @@ public final class Colosseum
 		public static final int POPULATE_INTERMISSION_UI_SCRIPT_ID = 4931;
 		public static final int POPULATE_REWARDS_CHEST_UI_SCRIPT_ID = 4929;
 	}
-
-	public static class LosLink
-	{
-
-		public static final String URL_PREFIX = "https://los.colosim.com/?";
-		public static final String WAVE_START_AFFIX = "_ws";
-		public static int LOS_LINK_CORRECTION_X = 16;
-		public static int LOS_LINK_CORRECTION_Y = 45;
-
-		public static final ImmutableSet<Integer> RELEVANT_NPC_IDS = ImmutableSet.of(
-			NpcID.COLOSSEUM_STANDARD_MAGER,
-			NpcID.COLOSSEUM_JAVELIN_COLOSSUS,
-			NpcID.COLOSSEUM_MANTICORE,
-			NpcID.COLOSSEUM_SHOCKWAVE_COLOSSUS,
-			NpcID.COLOSSEUM_JAGUAR_WARRIOR,
-			NpcID.COLOSSEUM_MINOTAUR
-		);
-
-		public static String SERPENT_SHAMAN_URL_ID = "1";
-		public static String MANTICORE_URL_ID = "4";
-		public static String SERPENT_SHAMAN_REINFORCEMENTS_URL_ID = "7";
-
-		// Commented out entries are defined based on additional state-specific values
-		public static final ImmutableMap<Integer, String> STATIC_NPC_URL_IDS = ImmutableMap.<Integer, String>builder()
-//			.put(NpcID.COLOSSEUM_STANDARD_MAGER, "1")
-			.put(NpcID.COLOSSEUM_JAVELIN_COLOSSUS, "2")
-			.put(NpcID.COLOSSEUM_JAGUAR_WARRIOR, "3")
-//			.put(NpcID.COLOSSEUM_MANTICORE, "4")
-			.put(NpcID.COLOSSEUM_MINOTAUR, "5")
-			.put(NpcID.COLOSSEUM_SHOCKWAVE_COLOSSUS, "6")
-//			.put(NpcID.COLOSSEUM_STANDARD_MAGER, "7") // Reinforcements
-			.build();
-	}
-	public static final ImmutableMap<String, String> STATIC_MANTICORE_AFFIXES = ImmutableMap.<String, String>builder()
-		.put("Unknown", "")
-		.put("RANGE-MAGIC-MELEE", "r")
-		.put("MAGIC-RANGE-MELEE", "m")
-		.put("MELEE-RANGE-MAGIC", "Mrm")
-		.put("MELEE-MAGIC-RANGE", "Mmr")
-		.put("RANGE-MELEE-MAGIC", "rMm")
-		.put("MAGIC-MELEE-RANGE", "mMr")
-		.build();
 
 	public static final DateTimeFormatter COLOSSEUM_TRIAL_TIMESTAMP_FORMATTER = DateTimeFormatter.ofPattern("yyMMdd_HHmmss").withZone(ZoneId.systemDefault());
 	public static final DateTimeFormatter COLOSSEUM_TIMELINE_HMS_FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss.S").withZone(ZoneId.systemDefault());

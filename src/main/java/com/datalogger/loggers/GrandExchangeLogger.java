@@ -239,7 +239,7 @@ public class GrandExchangeLogger extends AbstractLogger
 	@Subscribe
 	public void onDataLoggerConfigChanged(DataLoggerConfigChanged event)
 	{
-		loggerIsEnabled = config.logGrandExchange() && isOnPermanentWorld();
+//		loggerIsEnabled = config.logGrandExchange() && isOnPermanentWorld();
 		if (loggerIsEnabled)
 		{
 			clientThread.invokeLater(this::setup);
@@ -588,7 +588,7 @@ public class GrandExchangeLogger extends AbstractLogger
 	 */
 	private void updateConfigurations()
 	{
-		loggerIsEnabled = config.logGrandExchange() && isOnPermanentWorld();
+//		loggerIsEnabled = config.logGrandExchange() && isOnPermanentWorld();
 		jsonFileNamingStrategy = config.geJsonFileStrategy();
 		csvFileNamingStrategy = config.geCsvFileStrategy();
 		geIncludeItemId = config.geIncludeItemId();

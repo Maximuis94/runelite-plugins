@@ -22,74 +22,30 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
 package com.datalogger.services.itemvault;
 
-import com.datalogger.constants.PluginConstants;
-import static com.datalogger.constants.PluginConstants.INTERNAL_VAULT_DIR;
+import com.datalogger.loggers.ItemVaultLogger;
 import com.datalogger.models.enums.VaultType;
-import com.datalogger.models.itemvault.BankedItem;
-import com.datalogger.models.itemvault.ValuedItemBundle;
-import com.datalogger.services.AccountHashMapper;
-import com.datalogger.services.FileIOService;
 import com.datalogger.services.itemvault.container.BankParser;
 import com.datalogger.services.itemvault.container.SeedVaultParser;
-import com.datalogger.services.itemvault.itemcharge.AbstractItemChargeParser;
-import com.datalogger.services.itemvault.itemcharge.AccursedSceptreParser;
-import com.datalogger.services.itemvault.itemcharge.CrawsBowParser;
-import com.datalogger.services.itemvault.itemcharge.EyeOfAyakParser;
-import com.datalogger.services.itemvault.itemcharge.SanguinestiStaffParser;
-import com.datalogger.services.itemvault.itemcharge.ScytheOfViturParser;
-import com.datalogger.services.itemvault.itemcharge.ThammaronsSceptreParser;
-import com.datalogger.services.itemvault.itemcharge.TomeOfEarthParser;
-import com.datalogger.services.itemvault.itemcharge.TomeOfFireParser;
-import com.datalogger.services.itemvault.itemcharge.TomeOfWaterParser;
-import com.datalogger.services.itemvault.itemcharge.TonalzticsOfRalosParser;
-import com.datalogger.services.itemvault.itemcharge.TridentOfTheSeasEParser;
-import com.datalogger.services.itemvault.itemcharge.TridentOfTheSeasParser;
-import com.datalogger.services.itemvault.itemcharge.TridentOfTheSwampEParser;
-import com.datalogger.services.itemvault.itemcharge.TridentOfTheSwampParser;
-import com.datalogger.services.itemvault.itemcharge.TumekensShadowParser;
-import com.datalogger.services.itemvault.itemcharge.UrsineChainmaceParser;
-import com.datalogger.services.itemvault.itemcharge.VenatorBowParser;
-import com.datalogger.services.itemvault.itemcharge.ViggorasChainmaceParser;
-import com.datalogger.services.itemvault.itemcharge.WarpedSceptreParser;
-import com.datalogger.services.itemvault.itemcharge.WebweaverBowParser;
-import com.datalogger.services.itemvault.other.ActiveGrandExchangeOfferParser;
-import com.datalogger.services.itemvault.other.CarriedItemsParser;
-import com.datalogger.services.itemvault.other.POHCostumeRoomParser;
-import com.datalogger.services.itemvault.other.StashUnitParser;
-import com.datalogger.services.itemvault.other.ToxicBlowpipeParser;
-import com.datalogger.services.itemvault.variable.CofferParser;
-import com.datalogger.services.itemvault.variable.FarmingToolsParser;
-import com.datalogger.services.itemvault.variable.MasterScrollBookParser;
-import com.datalogger.services.itemvault.variable.QuiverParser;
-import com.datalogger.services.itemvault.variable.RunePouchParser;
-import com.datalogger.services.itemvault.variable.ToaPickaxeParser;
-import com.datalogger.services.itemvault.variable.VyreWellParser;
+import com.datalogger.services.itemvault.itemcharge.*;
+import com.datalogger.services.itemvault.other.*;
+import com.datalogger.services.itemvault.variable.*;
 import com.google.inject.Singleton;
-import java.io.File;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 import javax.inject.Inject;
+import lombok.Getter;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
-import net.runelite.client.callback.ClientThread;
 import net.runelite.client.eventbus.EventBus;
-import net.runelite.client.game.ItemManager;
 
 @Slf4j
 @Singleton
 public class VaultManager {
 	@Inject private EventBus eventBus;
-	@Inject private FileIOService fileIOService;
-	@Inject private AccountHashMapper accountHashMapper;
-	@Inject private ItemManager itemManager;
-	@Inject private ClientThread clientThread;
+	@Inject private ItemVaultLogger itemVaultLogger;
 
 	@Inject private BankParser bankParser;
 	@Inject private SeedVaultParser seedVaultParser;
@@ -126,53 +82,27 @@ public class VaultManager {
 	@Inject private ActiveGrandExchangeOfferParser activeGrandExchangeOfferParser;
 	@Inject private CarriedItemsParser carriedItemsParser;
 
-	private static final File ITEM_VAULT_ALL_JSON = new File(PluginConstants.ITEM_VAULT_DIR, "item-vaults-all.json");
-	private static final File ITEM_VAULT_ALL_CSV = new File(PluginConstants.ITEM_VAULT_DIR, "item-vaults-all.csv");
-	private static final File ITEM_VAULTS_MERGED_JSON = new File(PluginConstants.ITEM_VAULT_DIR, "item-vaults-merged.json");
-	private static final File ITEM_VAULTS_MERGED_CSV = new File(PluginConstants.ITEM_VAULT_DIR, "item-vaults-merged.csv");
-
+	@Setter
+	@Getter
+	private boolean isEnabled = false;
 	private List<VaultParser> activeParsers;
+	@Getter
 	private List<VaultParser> itemChargeParsers;
-	private final List<BankedItem> masterList = new ArrayList<>();
-	private final List<ValuedItemBundle> mergedItemCounts = new ArrayList<>();
 
 	@Inject
 	private void init() {
 		activeParsers = List.of(
-			bankParser,
-			seedVaultParser,
-			vyreWellParser,
-			runePouchParser,
-			cofferParser,
-			tridentOfTheSeasParser,
-			tridentOfTheSeasEParser,
-			tridentOfTheSwampParser,
-			tridentOfTheSwampEParser,
-			tumekensShadowParser,
-			scytheOfViturParser,
-			venatorBowParser,
-			eyeOfAyakParser,
-			sanguinestiStaffParser,
-			warpedSceptreParser,
-			viggorasChainmaceParser,
-			ursineChainmaceParser,
-			crawsBowParser,
-			webweaverBowParser,
-			thammaronsSceptreParser,
-			accursedSceptreParser,
-			tomeOfEarthParser,
-			tomeOfFireParser,
-			tomeOfWaterParser,
-			tonalzticsOfRalosParser,
-			toxicBlowpipeParser,
-			quiverParser,
-			masterScrollBookParser,
-			stashUnitParser,
-			pohCostumeRoomParser,
-			farmingToolsParser,
-			toaPickaxeParser,
-			activeGrandExchangeOfferParser,
-			carriedItemsParser
+			bankParser, seedVaultParser, vyreWellParser, runePouchParser,
+			cofferParser, tridentOfTheSeasParser, tridentOfTheSeasEParser,
+			tridentOfTheSwampParser, tridentOfTheSwampEParser, tumekensShadowParser,
+			scytheOfViturParser, venatorBowParser, eyeOfAyakParser,
+			sanguinestiStaffParser, warpedSceptreParser, viggorasChainmaceParser,
+			ursineChainmaceParser, crawsBowParser, webweaverBowParser,
+			thammaronsSceptreParser, accursedSceptreParser, tomeOfEarthParser,
+			tomeOfFireParser, tomeOfWaterParser, tonalzticsOfRalosParser,
+			toxicBlowpipeParser, quiverParser, masterScrollBookParser,
+			stashUnitParser, pohCostumeRoomParser, farmingToolsParser,
+			toaPickaxeParser, activeGrandExchangeOfferParser, carriedItemsParser
 		);
 
 		itemChargeParsers = activeParsers.stream()
@@ -181,11 +111,8 @@ public class VaultManager {
 	}
 
 	public void startUp() {
-		eventBus.register(fileIOService);
-
 		for (VaultParser parser : activeParsers) {
 			eventBus.register(parser);
-
 			if (parser instanceof AbstractVaultParser) {
 				((AbstractVaultParser) parser).setupAccountHash();
 			}
@@ -194,8 +121,6 @@ public class VaultManager {
 	}
 
 	public void shutDown() {
-		eventBus.unregister(fileIOService);
-
 		for (VaultParser parser : activeParsers) {
 			eventBus.unregister(parser);
 		}
@@ -203,157 +128,17 @@ public class VaultManager {
 	}
 
 	/**
-	 * Aggregate all vault data from the internal vault files. Generate aggregated and merged files.
+	 * Defers all aggregation and exporting logic exclusively to the Logger.
 	 */
 	public void writeMergedCsvFile()
 	{
-		clientThread.invokeLater(() ->
-		{
-			aggregateAllOfflineVaultData();
-			fileIOService.writeVaultCsv(ITEM_VAULT_ALL_CSV, masterList, true);
-			fileIOService.writeVaultCsv(ITEM_VAULTS_MERGED_CSV, mergedItemCounts);
-			exportAllAggregatedItemCharges(itemChargeParsers);
-		});
+		itemVaultLogger.exportAggregatedData(itemChargeParsers);
 	}
 
-	private void aggregateAllOfflineVaultData() {
-		masterList.clear();
-		Map<Integer, Long> aggregatedItemCounts = new HashMap<>();
-
-		if (!INTERNAL_VAULT_DIR.exists() || !INTERNAL_VAULT_DIR.isDirectory()) {
-			log.warn("Internal vault directory does not exist.");
-			return;
-		}
-
-		Map<String, VaultParser> parserMap = new HashMap<>();
-		for (VaultParser parser : activeParsers) {
-			parserMap.put(parser.getFilePrefix(), parser);
-		}
-
-		File[] hashDirectories = INTERNAL_VAULT_DIR.listFiles();
-		if (hashDirectories == null) return;
-
-		for (File accountDir : hashDirectories) {
-			if (!accountDir.isDirectory()) continue;
-
-			long accountHash;
-			try {
-				accountHash = Long.parseLong(accountDir.getName());
-			} catch (NumberFormatException e) {
-				continue;
-			}
-
-			File[] jsonFiles = accountDir.listFiles();
-			if (jsonFiles == null) continue;
-
-			String accountName = accountHashMapper.getAccountName(accountHash);
-			log.debug("Parsing vault files for account: {}", accountName);
-
-			for (File vaultFile : jsonFiles) {
-				if (!vaultFile.getName().endsWith(".json")) continue;
-
-				String prefix = vaultFile.getName().split("_")[0];
-				VaultParser matchedParser = parserMap.get(prefix);
-
-				if (matchedParser != null) {
-					log.debug("Parsing vault file {} of account {}", vaultFile.getName(), accountName);
-					try {
-						List<BankedItem> rawItems = matchedParser.parseOfflineFile(accountHash, vaultFile);
-						String vaultLabel = matchedParser.getVaultLabel();
-						for (BankedItem rawItem : rawItems) {
-							int id = rawItem.getItemId();
-							long qty = rawItem.getQuantity();
-							BankedItem item = new BankedItem(
-								vaultLabel,
-								accountHash,
-								accountName,
-								id,
-								rawItem.getItemName(),
-								qty
-							);
-
-							masterList.add(item);
-
-
-							aggregatedItemCounts.merge(id, qty, Long::sum);
-
-						}
-					} catch (Exception e) {
-						log.error("Failed to parse offline file: {}", vaultFile.getName(), e);
-					}
-				}
-			}
-		}
-
-		mergedItemCounts.clear();
-
-		for (Map.Entry<Integer, Long> entry : aggregatedItemCounts.entrySet()) {
-			int id = entry.getKey();
-			long totalQty = entry.getValue();
-			String name = itemManager.getItemComposition(id).getMembersName();
-			int gePrice = itemManager.getItemPrice(id);
-			int price = gePrice > 0 ? gePrice : itemManager.getItemComposition(id).getHaPrice();
-
-			if (price == 0) continue;
-
-			mergedItemCounts.add(new ValuedItemBundle(
-				id,
-				name,
-				totalQty,
-				price
-			));
-		}
-	}
-
-	public void exportAllAggregatedItemCharges(List<VaultParser> vaultParsers)
-	{
-		File[] accountDirs = INTERNAL_VAULT_DIR.listFiles(File::isDirectory);
-		if (accountDirs == null)
-			return;
-
-		int n = accountDirs.length;
-		if (n == 0) return;
-
-		log.debug("Attempting to export item charge vaults for {} account{}", n, n == 1 ? "" : "s");
-		for (File accountDir : accountDirs)
-		{
-			long accountHash;
-			try
-			{
-				accountHash = Long.parseLong(accountDir.getName());
-				String accountName = accountHashMapper.getAccountName(accountHash);
-				fileIOService.exportAggregatedItemCharges(accountHash, accountName, vaultParsers);
-			}
-			catch (NumberFormatException e)
-			{
-				continue; // Skip any folders that aren't numeric account hashes
-			}
-		}
-	}
-
-	/**
-	 * Returns a list of VaultLabels that exist for the given accountHash in the internal directory
-	 */
 	public List<String> getExistingVaults(long accountHash)
 	{
-		String hashString = String.valueOf(accountHash);
-		File root = new File(INTERNAL_VAULT_DIR, hashString);
-		if (!root.exists()) return List.of();
-
-		String affix = "_" + hashString + ".json";
-		File[] jsonFiles = root.listFiles((dir, name) -> name.endsWith(affix));
-
-		if (jsonFiles == null) return List.of();
-
-		return Arrays.stream(jsonFiles)
-			.map(File::getName)
-			.map(name -> name.substring(0, name.length() - affix.length()))
-			.collect(Collectors.toList());
-
+		return itemVaultLogger.getExistingVaults(accountHash);
 	}
 
-	public void resetVault()
-	{
-
-	}
+	public void resetVault() {}
 }

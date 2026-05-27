@@ -52,18 +52,8 @@ public class POHCostumeRoomParser extends AbstractVaultParser
 	@Inject
 	private ItemManager itemManager;
 
-	@Data
-	@NoArgsConstructor
-	@AllArgsConstructor
-	public static class CostumeItem
-	{
-		private int itemId;
-		private String itemName;
-		private int quantity;
-	}
-
 	private boolean pendingSave = false;
-	private final List<CostumeItem> storedItems = new ArrayList<>();
+	private final List<BankedItem> storedItems = new ArrayList<>();
 
 	@Override
 	public VaultType getVaultType()
@@ -71,15 +61,29 @@ public class POHCostumeRoomParser extends AbstractVaultParser
 		return VaultType.POH_COSTUME_ROOM;
 	}
 
+//	@Override
+//	protected void loadSessionData(File cacheFile)
+//	{
+//		Type type = new TypeToken<List<CostumeItem>>(){}.getType();
+//		List<CostumeItem> loadedData = fileIOService.readJson(cacheFile, type);
+//		if (loadedData != null)
+//		{
+//			storedItems.clear();
+//			storedItems.addAll(loadedData);
+//		}
+//	}
+
 	@Override
 	protected void loadSessionData(File cacheFile)
 	{
-		Type type = new TypeToken<List<CostumeItem>>(){}.getType();
-		List<CostumeItem> loadedData = fileIOService.readJson(cacheFile, type);
-		if (loadedData != null)
+		itemVaultLogger.loadAllVaultsIntoMemory();
+
+		List<BankedItem> loadedItems = itemVaultLogger.getVault(currentAccountHash, getVaultType());
+
+		if (loadedItems != null)
 		{
 			storedItems.clear();
-			storedItems.addAll(loadedData);
+			storedItems.addAll(loadedItems);
 		}
 	}
 
@@ -99,7 +103,7 @@ public class POHCostumeRoomParser extends AbstractVaultParser
 	{
 		if (pendingSave && hasValidAccountHash)
 		{
-			fileIOService.writeJson(vaultFile, storedItems);
+			submitVault(storedItems);
 			pendingSave = false;
 			log.debug("POH Costume Room batch sync saved to disk.");
 		}
@@ -153,7 +157,7 @@ public class POHCostumeRoomParser extends AbstractVaultParser
 		{
 			String itemName = itemManager.getItemComposition(itemId).getName();
 
-			storedItems.add(new CostumeItem(itemId, itemName, 1));
+			storedItems.add(new BankedItem(getVaultType(), currentAccountHash, currentAccountName, itemId, itemName, 1));
 
 			if (hasValidAccountHash)
 			{
@@ -165,42 +169,27 @@ public class POHCostumeRoomParser extends AbstractVaultParser
 	@Override
 	public List<BankedItem> parseVault()
 	{
-		List<BankedItem> items = new ArrayList<>();
-		for (CostumeItem item : storedItems)
-		{
-			items.add(new BankedItem(
-				getVaultType(),
-				currentAccountHash,
-				currentAccountName,
-				item.getItemId(),
-				item.getItemName(),
-				1L
-			));
-		}
-		return items;
+		return storedItems;
 	}
 
-	@Override
-	public List<BankedItem> parseOfflineFile(long accountHash, File vaultFile)
-	{
-		Type type = new TypeToken<List<CostumeItem>>(){}.getType();
-		List<CostumeItem> offlineData = fileIOService.readJson(vaultFile, type);
-
-		List<BankedItem> items = new ArrayList<>();
-		if (offlineData == null) return items;
-
-		String accountName = accountHashMapper.getAccountName(accountHash);
-		for (CostumeItem item : offlineData)
-		{
-			items.add(new BankedItem(getVaultType(), accountHash, accountName, item.getItemId(), item.getItemName(), 1L));
-		}
-//		for (List<CostumeItem> entryItems : offlineData.values())
-//		{
-//			for (CostumeItem item : offlineData.values())
-//			{
-//				items.add(new BankedItem(getVaultType(), accountHash, accountName, item.getItemId(), item.getItemName(), 1L));
-//			}
-//		}
-		return items;
-	}
+//	@Override
+//	public List<BankedItem> parseOfflineFile(long accountHash, File vaultFile)
+//	{
+//		Type type = new TypeToken<List<CostumeItem>>(){}.getType();
+//		List<BankedItem> offlineData = itemVaultLogger.getVault(currentAccountHash, getVaultType());
+//
+//		List<BankedItem> items = new ArrayList<>();
+//		if (offlineData == null) return items;
+//
+//		String accountName = accountHashMapper.getAccountName(accountHash);
+//		items.addAll(offlineData);
+////		for (List<CostumeItem> entryItems : offlineData.values())
+////		{
+////			for (CostumeItem item : offlineData.values())
+////			{
+////				items.add(new BankedItem(getVaultType(), accountHash, accountName, item.getItemId(), item.getItemName(), 1L));
+////			}
+////		}
+//		return items;
+//	}
 }

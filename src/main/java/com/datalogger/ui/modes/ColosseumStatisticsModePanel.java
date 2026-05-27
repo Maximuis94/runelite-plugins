@@ -359,55 +359,89 @@ public class ColosseumStatisticsModePanel extends JPanel
 		return mainPanel;
 	}
 
+	private void activateButton(JButton btn)
+	{
+		btn.setBackground(ColorScheme.DARKER_GRAY_HOVER_COLOR);
+		btn.setForeground(Color.WHITE);
+	}
+
+	private void deactivateButton(JButton btn)
+	{
+		btn.setBackground(ColorScheme.DARK_GRAY_COLOR);
+		btn.setForeground(Color.GRAY);
+	}
+
 	private JPanel buildDetailedStatsTogglePanel()
 	{
 		JPanel panel = Components.createTitledPanel("Detailed Wave Stats", new GridLayout(2, 2, 5, 5));
+//		JButton waveGloryBtn;
+//		JButton timeBtn;
+//		JButton rewardBtn;
+//		JButton totalGloryBtn;
 
 		JButton timeBtn = createToggleButton("Time", showDetailedTime);
+
+		JButton waveGloryBtn = createToggleButton("Wave Glory", showDetailedWaveGlory);
+
+		JButton totalGloryBtn = createToggleButton("Total Glory", showDetailedTotalGlory);
+
+		JButton rewardBtn = createToggleButton("Reward Value", showDetailedRewards);
+
+
 		timeBtn.addActionListener(e -> {
 			showDetailedTime = !showDetailedTime;
 			if (showDetailedTime)
 			{
+				deactivateButton(waveGloryBtn);
+				activateButton(timeBtn);
+				deactivateButton(rewardBtn);
+				deactivateButton(totalGloryBtn);
 				showDetailedRewards = false;
 				showDetailedTotalGlory = false;
 				showDetailedWaveGlory = false;
 			}
 			if (currentStats != null) buildWavesView(currentStats);
 		});
-
-		JButton waveGloryBtn = createToggleButton("Wave Glory", showDetailedWaveGlory);
-		waveGloryBtn.addActionListener(e -> {
-			showDetailedWaveGlory = !showDetailedWaveGlory;
-			if (showDetailedWaveGlory)
-			{
-				showDetailedRewards = false;
-				showDetailedTotalGlory = false;
-				showDetailedTime = false;
-			}
-			if (currentStats != null) buildWavesView(currentStats);
-		});
-
-		JButton totalGloryBtn = createToggleButton("Total Glory", showDetailedTotalGlory);
-		totalGloryBtn.addActionListener(e -> {
-			showDetailedTotalGlory = !showDetailedTotalGlory;
-
-			if (showDetailedTotalGlory)
-			{
-				showDetailedRewards = false;
-				showDetailedWaveGlory = false;
-				showDetailedTime = false;
-			}
-			if (currentStats != null) buildWavesView(currentStats);
-		});
-
-		JButton rewardBtn = createToggleButton("Reward Value", showDetailedRewards);
 		rewardBtn.addActionListener(e -> {
 			showDetailedRewards = !showDetailedRewards;
 
 			if (showDetailedRewards)
 			{
+				deactivateButton(waveGloryBtn);
+				deactivateButton(timeBtn);
+				activateButton(rewardBtn);
+				deactivateButton(totalGloryBtn);
 				showDetailedTotalGlory = false;
 				showDetailedWaveGlory = false;
+				showDetailedTime = false;
+			}
+			if (currentStats != null) buildWavesView(currentStats);
+		});
+		totalGloryBtn.addActionListener(e -> {
+			showDetailedTotalGlory = !showDetailedTotalGlory;
+
+			if (showDetailedTotalGlory)
+			{
+				deactivateButton(waveGloryBtn);
+				deactivateButton(timeBtn);
+				deactivateButton(rewardBtn);
+				activateButton(totalGloryBtn);
+				showDetailedRewards = false;
+				showDetailedWaveGlory = false;
+				showDetailedTime = false;
+			}
+			if (currentStats != null) buildWavesView(currentStats);
+		});
+		waveGloryBtn.addActionListener(e -> {
+			showDetailedWaveGlory = !showDetailedWaveGlory;
+			if (showDetailedWaveGlory)
+			{
+				activateButton(waveGloryBtn);
+				deactivateButton(timeBtn);
+				deactivateButton(rewardBtn);
+				deactivateButton(totalGloryBtn);
+				showDetailedRewards = false;
+				showDetailedTotalGlory = false;
 				showDetailedTime = false;
 			}
 			if (currentStats != null) buildWavesView(currentStats);
@@ -655,7 +689,7 @@ public class ColosseumStatisticsModePanel extends JPanel
 			statsContainer.add(Components.createStatCard("N trials", String.valueOf(stats.getTotalAttempts()), trialsTooltip.toString()));
 
 			double avgWave = stats.getTotalAttempts() > 0 ? (double) stats.getTotalWavesReached() / stats.getTotalAttempts() : 0;
-			statsContainer.add(Components.createStatCard("Avg Wave", String.format("%.1f", avgWave), null));
+			statsContainer.add(Components.createStatCard("Avg Wave", String.format("%d", (int) avgWave), null));
 
 			StringBuilder waveBreakdown = new StringBuilder("<html><body style='padding: 2px;'>");
 			waveBreakdown.append("<b style='color: white;'>Wave Breakdown:</b><br>");
@@ -1079,7 +1113,7 @@ public class ColosseumStatisticsModePanel extends JPanel
 			centerPanel.add(createDetailLabel("Min: " + formatTimeDetailed(waveStat.getMinTime())));
 			centerPanel.add(createDetailLabel("P05: " + formatTimeDetailed(waveStat.getP05Time())));
 			centerPanel.add(createDetailLabel("Q1: " + formatTimeDetailed(waveStat.getQ1Time())));
-			centerPanel.add(createDetailLabel("Median: " + formatTimeDetailed(waveStat.getMedianTime())));
+			centerPanel.add(createDetailLabel("Me: " + formatTimeDetailed(waveStat.getMedianTime())));
 			centerPanel.add(createDetailLabel("Q3: " + formatTimeDetailed(waveStat.getQ3Time())));
 			centerPanel.add(createDetailLabel("P95: " + formatTimeDetailed(waveStat.getP95Time())));
 			centerPanel.add(createDetailLabel("Max: " + formatTimeDetailed(waveStat.getMaxTime())));
@@ -1095,7 +1129,7 @@ public class ColosseumStatisticsModePanel extends JPanel
 			centerPanel.add(createDetailLabel("Min: " + waveStat.getMinGlory()));
 			centerPanel.add(createDetailLabel("P05: " + waveStat.getP05Glory()));
 			centerPanel.add(createDetailLabel("Q1: " + waveStat.getQ1Glory()));
-			centerPanel.add(createDetailLabel("Median: " + waveStat.getMedianGlory()));
+			centerPanel.add(createDetailLabel("Me: " + waveStat.getMedianGlory()));
 			centerPanel.add(createDetailLabel("Q3: " + waveStat.getQ3Glory()));
 			centerPanel.add(createDetailLabel("P95: " + waveStat.getP95Glory()));
 			centerPanel.add(createDetailLabel("Max: " + waveStat.getMaxGlory()));
@@ -1110,7 +1144,7 @@ public class ColosseumStatisticsModePanel extends JPanel
 			centerPanel.add(createDetailLabel("Min: " + waveStat.getMinTotalGlory()));
 			centerPanel.add(createDetailLabel("P05: " + waveStat.getP05TotalGlory()));
 			centerPanel.add(createDetailLabel("Q1: " + waveStat.getQ1TotalGlory()));
-			centerPanel.add(createDetailLabel("Median: " + waveStat.getMedianTotalGlory()));
+			centerPanel.add(createDetailLabel("Me: " + waveStat.getMedianTotalGlory()));
 			centerPanel.add(createDetailLabel("Q3: " + waveStat.getQ3TotalGlory()));
 			centerPanel.add(createDetailLabel("P95: " + waveStat.getP95TotalGlory()));
 			centerPanel.add(createDetailLabel("Max: " + waveStat.getMaxTotalGlory()));
@@ -1126,7 +1160,7 @@ public class ColosseumStatisticsModePanel extends JPanel
 			centerPanel.add(createDetailLabel("Min: " + waveStat.getMinRewardValue()));
 			centerPanel.add(createDetailLabel("P05: " + waveStat.getP05RewardValue()));
 			centerPanel.add(createDetailLabel("Q1: " + waveStat.getQ1RewardValue()));
-			centerPanel.add(createDetailLabel("Median: " + waveStat.getMedianRewardValue()));
+			centerPanel.add(createDetailLabel("Me: " + waveStat.getMedianRewardValue()));
 			centerPanel.add(createDetailLabel("Q3: " + waveStat.getQ3RewardValue()));
 			centerPanel.add(createDetailLabel("P95: " + waveStat.getP95RewardValue()));
 			centerPanel.add(createDetailLabel("Max: " + waveStat.getMaxRewardValue()));
@@ -1647,12 +1681,12 @@ public class ColosseumStatisticsModePanel extends JPanel
 			return waveGlory.get(Math.min(waveGlory.size() - 1, (int) (waveGlory.size() * 0.95)));
 		}
 
-		public double getAverageGlory()
+		public int getAverageGlory()
 		{
 			if (waveGlory.isEmpty()) return 0;
 			double sum = 0;
 			for (int glory : waveGlory) sum += glory;
-			return sum / waveGlory.size();
+			return (int) sum / waveGlory.size();
 		}
 
 		public int getMinTotalGlory() { return totalGlory.isEmpty() ? 0 : totalGlory.get(0); }
@@ -1688,12 +1722,12 @@ public class ColosseumStatisticsModePanel extends JPanel
 			return totalGlory.get(Math.min(totalGlory.size() - 1, (int) (totalGlory.size() * 0.95)));
 		}
 
-		public double getAverageTotalGlory()
+		public int getAverageTotalGlory()
 		{
 			if (totalGlory.isEmpty()) return 0;
 			double sum = 0;
 			for (int glory : totalGlory) sum += glory;
-			return sum / totalGlory.size();
+			return (int) sum / totalGlory.size();
 		}
 
 		// --- Reward & Damage Metrics ---

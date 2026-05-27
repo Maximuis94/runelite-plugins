@@ -26,6 +26,7 @@
 package com.datalogger.ui.modes;
 
 import com.datalogger.DataLoggerConfig;
+import static com.datalogger.constants.Item.CACHED_ITEM_DATA_TYPE;
 import com.datalogger.constants.PluginConstants;
 import com.datalogger.models.enums.UIScrollSpeed;
 import com.datalogger.models.itemvault.BankedItem;
@@ -34,14 +35,14 @@ import com.datalogger.ui.utils.Components;
 import com.datalogger.ui.utils.Models.AccountItem;
 import com.datalogger.ui.utils.table.ItemTable;
 import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonParser;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.GridLayout;
 import java.io.File;
 import java.io.FileReader;
-import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -83,6 +84,7 @@ public class ItemsModePanel extends JPanel
 	private final ItemManager itemManager;
 	private final ClientThread clientThread;
 	private final DataLoggerConfig config;
+	private static final JsonParser jsonParser = new JsonParser();
 
 	private final JComboBox<AccountItem> accountFilter;
 	private final JComboBox<String> sourceFilter;
@@ -241,14 +243,25 @@ public class ItemsModePanel extends JPanel
 
 								try (FileReader reader = new FileReader(vaultFile))
 								{
-									Type listType = new TypeToken<ArrayList<BankedItem>>(){}.getType();
-									List<BankedItem> parsed = gson.fromJson(reader, listType);
+									JsonElement element = jsonParser.parse(reader);
+
+									List<BankedItem> parsed = new ArrayList<>();
+
+									if (element.isJsonArray())
+									{
+										parsed = gson.fromJson(element, CACHED_ITEM_DATA_TYPE);
+									}
+									else if (element.isJsonObject())
+									{
+										BankedItem singleItem = gson.fromJson(element, BankedItem.class);
+										parsed.add(singleItem);
+									}
 
 									if (parsed != null)
 									{
 										for (BankedItem item : parsed)
 										{
-											if (item.getQuantity() > 0)
+											if (item != null && item.getQuantity() > 0)
 											{
 												VaultRecord vaultRecord = new VaultRecord(item.getItemId(), hash, sourceName, item.getQuantity());
 												tempRawData.add(vaultRecord);
@@ -256,6 +269,9 @@ public class ItemsModePanel extends JPanel
 											}
 										}
 									}
+								}
+								catch (IllegalStateException ex) {
+									log.warn("Failed to parse vaultFile {} - mismatch between expected and actual format...", vaultFile, ex);
 								}
 								catch (Exception ex) {
 									log.warn("Failed to parse vaultFile: {}", vaultFile, ex);

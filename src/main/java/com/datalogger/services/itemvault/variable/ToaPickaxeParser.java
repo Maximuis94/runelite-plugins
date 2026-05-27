@@ -111,7 +111,7 @@ public class ToaPickaxeParser extends AbstractVariableVaultParser
 			return;
 		}
 
-		List<BankedItem> loadedItems = fileIOService.readJson(cacheFile, BankedItem.LIST_TYPE);
+		List<BankedItem> loadedItems = itemVaultLogger.getVault(currentAccountHash, getVaultType());
 
 		if (loadedItems == null || loadedItems.isEmpty())
 		{

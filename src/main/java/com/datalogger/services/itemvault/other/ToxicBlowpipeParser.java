@@ -88,8 +88,7 @@ public class ToxicBlowpipeParser extends AbstractVaultParser
 	@Override
 	protected void loadSessionData(File cacheFile)
 	{
-		// Read the JSON file back as a List<BankedItem>
-		List<BankedItem> loadedItems = fileIOService.readJson(cacheFile, BankedItem.LIST_TYPE);
+		List<BankedItem> loadedItems = itemVaultLogger.getVault(currentAccountHash, ItemCharge.TOXIC_BLOWPIPE);
 
 		if (loadedItems != null)
 		{
@@ -157,7 +156,7 @@ public class ToxicBlowpipeParser extends AbstractVaultParser
 
 			// Save the List directly to the JSON file
 //			fileIOService.writeJson(vaultFile, items);
-			saveSlimVaultCache(items);
+			submitVault(items);
 			pendingSave = false;
 		}
 	}
@@ -221,11 +220,21 @@ public class ToxicBlowpipeParser extends AbstractVaultParser
 	@Override
 	protected File getInternalVaultFile()
 	{
-		return fileIOService.getInternalVaultFile(ItemCharge.TOXIC_BLOWPIPE);
+		return itemVaultLogger.getInternalVaultFile(ItemCharge.TOXIC_BLOWPIPE, String.valueOf(currentAccountHash));
 	}
 
+	@Override
 	public File getInternalVaultFile(long accountHash)
 	{
-		return fileIOService.getInternalVaultFile(ItemCharge.TOXIC_BLOWPIPE, String.valueOf(accountHash));
+		return itemVaultLogger.getInternalVaultFile(VaultType.ITEM_CHARGES, String.valueOf(accountHash));
+	}
+
+	@Override
+	protected void submitVault(List<BankedItem> items)
+	{
+		if (!hasValidAccountHash) return;
+
+		ensureAccountNameIsCached();
+		itemVaultLogger.logVault(currentAccountHash, currentAccountName, ItemCharge.TOXIC_BLOWPIPE, items);
 	}
 }

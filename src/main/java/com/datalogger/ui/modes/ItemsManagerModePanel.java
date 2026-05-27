@@ -1,5 +1,6 @@
 package com.datalogger.ui.modes;
 
+import static com.datalogger.constants.Item.CACHED_ITEM_DATA_TYPE;
 import static com.datalogger.constants.PluginConstants.INTERNAL_VAULT_DIR;
 import com.datalogger.constants.PluginConstants;
 import com.datalogger.models.enums.UIScrollSpeed;
@@ -301,8 +302,7 @@ public class ItemsManagerModePanel extends JPanel
 			File vaultFile = new File(PluginConstants.INTERNAL_VAULT_DIR, accountHash + File.separator + vaultFileName);
 			if (vaultFile.exists()) {
 				try (FileReader reader = new FileReader(vaultFile)) {
-					Type listType = new TypeToken<ArrayList<BankedItem>>(){}.getType();
-					List<BankedItem> parsedItems = gson.fromJson(reader, listType);
+					List<BankedItem> parsedItems = gson.fromJson(reader, CACHED_ITEM_DATA_TYPE);
 					if (parsedItems != null) items.addAll(parsedItems);
 				} catch (Exception ex) {
 					log.warn("Failed to parse vaultFile at '{}'", vaultFile.getAbsolutePath(), ex);

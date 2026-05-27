@@ -6,10 +6,10 @@
  * modification, are permitted provided that the following conditions are met:
  *
  * 1. Redistributions of source code must retain the above copyright notice, this
- *    list of conditions and the following disclaimer.
+ * list of conditions and the following disclaimer.
  * 2. Redistributions in binary form must reproduce the above copyright notice,
- *    this list of conditions and the following disclaimer in the documentation
- *    and/or other materials provided with the distribution.
+ * this list of conditions and the following disclaimer in the documentation
+ * and/or other materials provided with the distribution.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
@@ -27,15 +27,22 @@ package com.datalogger.loggers;
 
 import com.datalogger.DataLoggerConfig;
 import static com.datalogger.constants.PluginConstants.ITEM_VAULT_DIR;
+import static com.datalogger.constants.PluginConstants.INTERNAL_VAULT_DIR;
 import com.datalogger.events.DataLoggerConfigChanged;
 import com.datalogger.framework.AbstractLogger;
 import com.datalogger.framework.LogType;
+import com.datalogger.models.enums.ItemCharge;
 import com.datalogger.models.enums.VaultType;
 import com.datalogger.models.itemvault.BankedItem;
+import com.datalogger.models.itemvault.ValuedItemBundle;
 import com.datalogger.services.AccountHashMapper;
 import com.datalogger.services.FileIOService;
+import com.datalogger.services.itemvault.VaultParser;
+import com.google.gson.reflect.TypeToken;
 import java.io.File;
+import java.lang.reflect.Type;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -43,10 +50,13 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import lombok.extern.slf4j.Slf4j;
+import net.runelite.client.callback.ClientThread;
 import net.runelite.client.eventbus.Subscribe;
+import net.runelite.client.game.ItemManager;
 
 @Slf4j
 @Singleton
@@ -54,13 +64,16 @@ public class ItemVaultLogger extends AbstractLogger
 {
 	public static final File MERGED_ITEM_VAULT_JSON = new File(ITEM_VAULT_DIR, "merged-vaults.json");
 	public static final File MERGED_ITEM_VAULT_CSV = new File(ITEM_VAULT_DIR, "merged-vaults.csv");
+	public static final File ITEM_VAULTS_MERGED_GROUPED_CSV = new File(ITEM_VAULT_DIR, "item-vaults-merged-grouped.csv");
 
 	private final FileIOService fileIOService;
 	private final DataLoggerConfig config;
 	private final AccountHashMapper accountHashMapper;
 	private final ScheduledExecutorService executor;
+	private final ItemManager itemManager;
+	private final ClientThread clientThread;
 
-	private final Map<Long, Map<VaultType, List<BankedItem>>> vaultCache = new ConcurrentHashMap<>();
+	private final Map<Long, Map<String, List<BankedItem>>> vaultCache = new ConcurrentHashMap<>();
 	private Set<Long> ignoredAccountHashes = new HashSet<>();
 
 	@Inject
@@ -68,12 +81,16 @@ public class ItemVaultLogger extends AbstractLogger
 		FileIOService fileIOService,
 		DataLoggerConfig config,
 		AccountHashMapper accountHashMapper,
-		ScheduledExecutorService executor
+		ScheduledExecutorService executor,
+		ItemManager itemManager,
+		ClientThread clientThread
 	) {
 		this.fileIOService = fileIOService;
 		this.config = config;
 		this.accountHashMapper = accountHashMapper;
 		this.executor = executor;
+		this.itemManager = itemManager;
+		this.clientThread = clientThread;
 	}
 
 	@Subscribe
@@ -82,62 +99,69 @@ public class ItemVaultLogger extends AbstractLogger
 		updateIgnoredAccountHashes();
 	}
 
-	/**
-	 * Stores or updates the parsed items for a specific account and vault type in memory.
-	 */
+	public File getInternalVaultFile(VaultType vaultType, String accountHashString)
+	{
+		return fileIOService.getInternalVaultFile(vaultType, accountHashString);
+	}
+
+	public File getInternalVaultFile(ItemCharge itemCharge, String accountHashString)
+	{
+		return fileIOService.getInternalVaultFile(itemCharge, accountHashString);
+	}
+
 	public void updateVault(long accountHash, VaultType vaultType, List<BankedItem> items)
 	{
 		vaultCache.computeIfAbsent(accountHash, k -> new ConcurrentHashMap<>())
-			.put(vaultType, new ArrayList<>(items));
-
-		log.debug("ItemVaultLogger updated {} for account {}. Total tracked items in this vault: {}",
-			vaultType.name(), accountHash, items.size());
+			.put(vaultType.name(), new ArrayList<>(items));
+		log.debug("ItemVaultLogger ItemVault updated {} for account {}. Total tracked items in this vault: {}", vaultType.name(), accountHash, items.size());
 	}
 
-	/**
-	 * Retrieves the live in-memory vault for a specific account and vault type.
-	 */
+	public void updateVault(long accountHash, ItemCharge itemCharge, List<BankedItem> items)
+	{
+		vaultCache.computeIfAbsent(accountHash, k -> new ConcurrentHashMap<>())
+			.put(itemCharge.name(), new ArrayList<>(items));
+		log.debug("ItemVaultLogger ItemChargeVault updated {} for account {}. Total tracked items in this vault: {}", itemCharge.name(), accountHash, items.size());
+	}
+
 	public List<BankedItem> getVault(long accountHash, VaultType vaultType)
 	{
-		return vaultCache.getOrDefault(accountHash, new HashMap<>())
-			.getOrDefault(vaultType, new ArrayList<>());
+		return vaultCache.getOrDefault(accountHash, new HashMap<>()).getOrDefault(vaultType.name(), new ArrayList<>());
 	}
+
+	public List<BankedItem> getVault(long accountHash, ItemCharge itemCharge)
+	{
+		return vaultCache.getOrDefault(accountHash, new HashMap<>()).getOrDefault(itemCharge.name(), new ArrayList<>());
+	}
+
+//	public List<BankedItem> getStashVault(long accountHash, ItemCharge itemCharge)
+//	{
+//		Type type = new TypeToken<Map<Integer, List<BankedItem>>>(){}.getType();
+//		Map<Integer, List<BankedItem>> loadedStates = fileIOService.readJson(cacheFile, type);
+//	}
 
 	private boolean ignoreHash(long accountHash)
 	{
 		return ignoredAccountHashes.contains(accountHash);
 	}
 
-	/**
-	 * Compiles a flat, alphabetically sorted list of all items across ALL tracked accounts
-	 * currently loaded in memory, preserving specific account and vault metadata.
-	 */
 	public List<BankedItem> aggregateAllAccounts()
 	{
 		List<BankedItem> allItems = new ArrayList<>();
-
 		loadAllVaultsIntoMemory();
 
-		for (Map.Entry<Long, Map<VaultType, List<BankedItem>>> accountEntry : vaultCache.entrySet())
+		for (Map.Entry<Long, Map<String, List<BankedItem>>> accountEntry : vaultCache.entrySet())
 		{
 			long currentAccountHash = accountEntry.getKey();
+			if (ignoreHash(currentAccountHash)) continue;
 
-			if (ignoreHash(currentAccountHash))
-				continue;
-
-			for (Map.Entry<VaultType, List<BankedItem>> vaultEntry : accountEntry.getValue().entrySet())
+			for (Map.Entry<String, List<BankedItem>> vaultEntry : accountEntry.getValue().entrySet())
 			{
-				VaultType type = vaultEntry.getKey();
-
+				String type = vaultEntry.getKey();
 				for (BankedItem item : vaultEntry.getValue())
 				{
 					allItems.add(new BankedItem(
-						type,
-						currentAccountHash,
-						item.getAccountName(),
-						item.getItemId(),
-						item.getItemName(),
-						item.getQuantity()
+						type, currentAccountHash, item.getAccountName(),
+						item.getItemId(), item.getItemName(), item.getQuantity()
 					));
 				}
 			}
@@ -146,83 +170,52 @@ public class ItemVaultLogger extends AbstractLogger
 		return allItems;
 	}
 
-	/**
-	 * Finds the total quantity of a specific item across all accounts and vaults.
-	 */
 	public long getTotalItemQuantity(int itemId)
 	{
 		long total = 0;
-		for (Map<VaultType, List<BankedItem>> accountVaults : vaultCache.values())
+		for (Map<String, List<BankedItem>> accountVaults : vaultCache.values())
 		{
 			for (List<BankedItem> items : accountVaults.values())
 			{
 				for (BankedItem item : items)
 				{
-					if (item.getItemId() == itemId)
-					{
-						total += item.getQuantity();
-					}
+					if (item.getItemId() == itemId) total += item.getQuantity();
 				}
 			}
 		}
 		return total;
 	}
 
-	/**
-	 * Synchronously reads all saved vault JSON files from disk and populates the cache.
-	 */
 	public void loadAllVaultsIntoMemory()
 	{
-		Map<Long, Map<VaultType, List<BankedItem>>> diskData = fileIOService.readAllVaultFilesRaw();
+		Map<Long, Map<String, List<BankedItem>>> diskData = fileIOService.readAllVaultFilesRaw();
+		if (diskData.isEmpty()) return;
 
-		if (diskData.isEmpty()) {
-			log.debug("No saved vaults found to load into memory.");
-			return;
-		}
-
-		for (Map.Entry<Long, Map<VaultType, List<BankedItem>>> entry : diskData.entrySet())
+		for (Map.Entry<Long, Map<String, List<BankedItem>>> entry : diskData.entrySet())
 		{
 			long accountHash = entry.getKey();
 			String accountName = accountHashMapper.getAccountName(accountHash);
 
-			for (Map.Entry<VaultType, List<BankedItem>> vaultEntry : entry.getValue().entrySet())
+			for (Map.Entry<String, List<BankedItem>> vaultEntry : entry.getValue().entrySet())
 			{
-				VaultType type = vaultEntry.getKey();
+				String type = vaultEntry.getKey();
 				List<BankedItem> items = vaultEntry.getValue();
 
-				// Enforce proper metadata
-				List<BankedItem> enrichedItems = new ArrayList<>();
-				for (BankedItem item : items)
-				{
-					enrichedItems.add(new BankedItem(
-						type,
-						accountHash,
-						accountName,
-						item.getItemId(),
-						item.getItemName(),
-						item.getQuantity()
-					));
-				}
+				List<BankedItem> enrichedItems = items.stream().map(item -> new BankedItem(
+					type, accountHash, accountName, item.getItemId(), item.getItemName(), item.getQuantity()
+				)).collect(Collectors.toList());
 
-				vaultCache.computeIfAbsent(accountHash, k -> new ConcurrentHashMap<>())
-					.put(type, enrichedItems);
+				vaultCache.computeIfAbsent(accountHash, k -> new ConcurrentHashMap<>()).put(type, enrichedItems);
 			}
 		}
-
-		log.debug("Successfully loaded vault files into memory across {} accounts.", diskData.size());
 	}
 
 	/**
-	 * Receives parsed items from a VaultParser, updates the cache, and saves to disk.
+	 * Receives parsed items directly from VaultParsers, updates the cache, and saves to disk.
 	 */
 	public void logVault(long accountHash, String accountName, VaultType vaultType, List<BankedItem> items)
 	{
-		if (items == null || items.isEmpty()) return;
-
-		if (ignoredAccountHashes.contains(accountHash)) {
-			log.debug("Skipping vault log for {} because it is in the ignore list.", accountName);
-			return;
-		}
+		if (items == null || items.isEmpty() || ignoredAccountHashes.contains(accountHash)) return;
 
 		updateVault(accountHash, vaultType, items);
 
@@ -234,19 +227,16 @@ public class ItemVaultLogger extends AbstractLogger
 					map.put("itemName", item.getItemName());
 					map.put("quantity", item.getQuantity());
 					return map;
-				}).collect(java.util.stream.Collectors.toList());
+				}).collect(Collectors.toList());
 
-			File internalJson = fileIOService.getInternalVaultFile(vaultType);
-			fileIOService.saveJson(internalJson, slimItems);
+			File internalJson = fileIOService.getInternalVaultFile(vaultType, String.valueOf(accountHash));
+			fileIOService.writeJson(internalJson, slimItems);
 
-			if (config.logItemVaultJSON())
-			{
+			if (config.logItemVaultJSON()) {
 				File externalJson = vaultType.getExternalJSONFile(accountName);
-				fileIOService.saveJson(externalJson, slimItems);
+				fileIOService.writeJson(externalJson, slimItems);
 			}
-
-			if (config.logItemVaultCSV())
-			{
+			if (config.logItemVaultCSV()) {
 				File csvFile = vaultType.getExternalCSVFile(accountName);
 				fileIOService.writeVaultCsv(csvFile, items, false);
 			}
@@ -254,84 +244,149 @@ public class ItemVaultLogger extends AbstractLogger
 	}
 
 	/**
-	 * Exports the total aggregated wealth across ALL accounts to a single CSV and JSON file.
+	 * Receives parsed items directly from VaultParsers, updates the cache, and saves to disk.
 	 */
-	public void exportAggregatedData()
+	public void logVault(long accountHash, String accountName, ItemCharge itemCharge, List<BankedItem> items)
+	{
+		if (items == null || items.isEmpty() || ignoredAccountHashes.contains(accountHash)) return;
+
+		updateVault(accountHash, itemCharge, items);
+
+		executor.submit(() -> {
+			List<java.util.Map<String, Object>> slimItems = items.stream()
+				.map(item -> {
+					java.util.Map<String, Object> map = new java.util.LinkedHashMap<>();
+					map.put("itemId", item.getItemId());
+					map.put("itemName", item.getItemName());
+					map.put("quantity", item.getQuantity());
+					return map;
+				}).collect(Collectors.toList());
+
+			File internalJson = fileIOService.getInternalVaultFile(itemCharge, String.valueOf(accountHash));
+			fileIOService.writeJson(internalJson, slimItems);
+
+
+		});
+	}
+
+//	private void logItemChargesVault()
+//	{
+//		if (config.logItemVaultJSON()) {
+//			File externalJson = VaultType.ITEM_CHARGES.getExternalJSONFile(accountName);
+//			fileIOService.writeJson(externalJson, slimItems);
+//		}
+//		if (config.logItemVaultCSV()) {
+//			File csvFile = VaultType.ITEM_CHARGES.getExternalCSVFile(accountName);
+//			fileIOService.writeVaultCsv(csvFile, items, false);
+//		}
+//	}
+
+	/**
+	 * Formats and exports the merged item data across all Vaults and Accounts.
+	 * Bounces gracefully between threads to ensure the UI doesn't freeze while fetching Item GE Prices.
+	 */
+	public void exportAggregatedData(List<VaultParser> itemChargeParsers)
 	{
 		executor.submit(() -> {
 			log.debug("Attempting to export aggregated vault data...");
-			List<BankedItem> items = aggregateAllAccounts();
+			List<BankedItem> masterList = aggregateAllAccounts();
 
-			if (items == null || items.isEmpty()) {
+			if (masterList == null || masterList.isEmpty()) {
 				log.debug("No aggregated data found to export.");
 				return;
 			}
 
-			fileIOService.saveJson(MERGED_ITEM_VAULT_JSON, items);
-			fileIOService.writeVaultCsv(MERGED_ITEM_VAULT_CSV, items, true);
+			Map<Integer, Long> aggregatedItemCounts = new HashMap<>();
+			for (BankedItem item : masterList) {
+				aggregatedItemCounts.merge(item.getItemId(), item.getQuantity(), Long::sum);
+			}
 
-			log.debug("Successfully exported aggregated wealth summary for {} unique items.", items.size());
+			clientThread.invokeLater(() -> {
+				List<ValuedItemBundle> mergedItemCounts = new ArrayList<>();
+				for (Map.Entry<Integer, Long> entry : aggregatedItemCounts.entrySet()) {
+					int id = entry.getKey();
+					long totalQty = entry.getValue();
+					String name = itemManager.getItemComposition(id).getMembersName();
+					int gePrice = itemManager.getItemPrice(id);
+					int price = gePrice > 0 ? gePrice : itemManager.getItemComposition(id).getHaPrice();
+
+					if (price > 0) {
+						mergedItemCounts.add(new ValuedItemBundle(id, name, totalQty, price));
+					}
+				}
+
+				executor.submit(() -> {
+					fileIOService.writeJson(MERGED_ITEM_VAULT_JSON, masterList);
+					fileIOService.writeVaultCsv(MERGED_ITEM_VAULT_CSV, masterList, true);
+					fileIOService.writeVaultCsv(ITEM_VAULTS_MERGED_GROUPED_CSV, mergedItemCounts);
+
+					if (itemChargeParsers != null) {
+						fileIOService.exportAggregatedItemCharges(0, "Aggregated", itemChargeParsers);
+					}
+					log.debug("Successfully exported aggregated wealth summary for {} unique items.", masterList.size());
+				});
+			});
+
+
 		});
 	}
 
-	/**
-	 * Parses the skipItemVaultAccountList config entry and translates the account names
-	 * into a Set of Account Hashes to be ignored.
-	 */
+	public List<BankedItem> parseOfflineFile(long accountHash, File vaultFile, String vaultLabel)
+	{
+		BankedItem[] loadedItems = fileIOService.readJson(vaultFile, BankedItem[].class);
+		if (loadedItems == null || loadedItems.length == 0) return new ArrayList<>();
+
+		String accountName = accountHashMapper.getAccountName(accountHash);
+
+		return Arrays.stream(loadedItems)
+			.filter(item -> item.getItemId() > 0 && item.getQuantity() > 0)
+			.map(item -> new BankedItem(vaultLabel, accountHash, accountName, item.getItemId(), item.getItemName(), item.getQuantity()))
+			.collect(Collectors.toList());
+	}
+
+	public List<String> getExistingVaults(long accountHash)
+	{
+		String hashString = String.valueOf(accountHash);
+		File root = new File(INTERNAL_VAULT_DIR, hashString);
+		if (!root.exists()) return List.of();
+
+		String affix = "_" + hashString + ".json";
+		File[] jsonFiles = root.listFiles((dir, name) -> name.endsWith(affix));
+
+		if (jsonFiles == null) return List.of();
+
+		return Arrays.stream(jsonFiles)
+			.map(File::getName)
+			.map(name -> name.substring(0, name.length() - affix.length()))
+			.collect(Collectors.toList());
+	}
+
 	public void updateIgnoredAccountHashes()
 	{
 		Set<Long> ignoredHashes = new HashSet<>();
 		String skipListStr = config.skipItemVaultAccountList();
 
-		if (skipListStr == null || skipListStr.trim().isEmpty())
-		{
+		if (skipListStr == null || skipListStr.trim().isEmpty()) {
 			ignoredAccountHashes = ignoredHashes;
 			return;
 		}
 
-		String[] ignoredNames = skipListStr.split(",");
-
-		for (String name : ignoredNames)
-		{
+		for (String name : skipListStr.split(",")) {
 			String trimmedName = name.trim();
 			if (trimmedName.isEmpty()) continue;
 
 			long hash = accountHashMapper.getAccountHashByAccountName(trimmedName);
-
-			if (hash != -1L)
-			{
-				ignoredHashes.add(hash);
-			}
-			else
-			{
-				log.debug("Could not find an account hash for ignored account name: '{}'. " +
-					"It may be misspelled or hasn't been logged in yet.", trimmedName);
-			}
+			if (hash != -1L) ignoredHashes.add(hash);
 		}
 		ignoredAccountHashes = ignoredHashes;
 	}
 
 	@Override
-	public LogType getLogType()
-	{
-		return LogType.ITEM_VAULT;
-	}
+	public LogType getLogType() { return LogType.ITEM_VAULT; }
 
 	@Override
-	public String getCsvHeader()
-	{
-		return "";
-	}
+	public String getCsvHeader() { return ""; }
 
 	@Override
-	public boolean isEnabled()
-	{
-		return config.logItemVault();
-	}
-
-	@Override
-	public void setup()
-	{
-		super.setup();
-	}
+	public boolean isEnabled() { return config.logItemVault(); }
 }

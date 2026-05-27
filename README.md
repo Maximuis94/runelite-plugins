@@ -196,7 +196,7 @@ Each row of the merged list has the following attributes;
 #### Examples of item vault data
 
 ![example-item-vaults-all.png](images/example-item-vaults-all.png)</br>
-_Example of an excerpt from a combined item vaults csv file_
+_Example of an excerpt from a combined item csv file_
 
 
 The following data is logged as an item vault entry;

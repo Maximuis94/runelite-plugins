@@ -2,12 +2,9 @@ package com.datalogger.services.itemvault.other;
 
 import com.datalogger.models.enums.VaultType;
 import com.datalogger.models.itemvault.BankedItem;
-import com.datalogger.models.itemvault.ItemBundle;
 import com.datalogger.services.InventoryStateManager;
 import com.datalogger.services.itemvault.AbstractVaultParser;
-import com.google.gson.reflect.TypeToken;
 import java.io.File;
-import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -16,14 +13,13 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.GameState;
-import net.runelite.api.events.ItemContainerChanged;
-import net.runelite.api.events.MenuOptionClicked;
-import net.runelite.api.events.WidgetClosed;
-import net.runelite.api.gameval.InventoryID;
 import net.runelite.api.Item;
 import net.runelite.api.ItemContainer;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
+import net.runelite.api.events.ItemContainerChanged;
+import net.runelite.api.events.MenuOptionClicked;
+import net.runelite.api.gameval.InventoryID;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.game.ItemManager;
 
@@ -49,7 +45,6 @@ public class CarriedItemsParser extends AbstractVaultParser
 	@Override
 	public VaultType getVaultType()
 	{
-		// Note: You will need to add CARRIED_ITEMS to your VaultType enum!
 		return VaultType.CARRIED_ITEMS;
 	}
 
@@ -153,7 +148,7 @@ public class CarriedItemsParser extends AbstractVaultParser
 			));
 		}
 
-		saveSlimVaultCache(freshCarriedItems);
+		submitVault(freshCarriedItems);
 		hasUpdated = false;
 		nextUpdateTick = 0;
 	}
@@ -175,7 +170,10 @@ public class CarriedItemsParser extends AbstractVaultParser
 	@Override
 	protected void loadSessionData(File cacheFile)
 	{
-		List<BankedItem> loadedItems = fileIOService.readJson(cacheFile, ItemBundle.LIST_TYPE);
+		itemVaultLogger.loadAllVaultsIntoMemory();
+
+		List<BankedItem> loadedItems = itemVaultLogger.getVault(currentAccountHash, getVaultType());
+
 		if (loadedItems != null)
 		{
 			carriedItems.clear();

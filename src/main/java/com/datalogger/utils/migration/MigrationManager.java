@@ -25,32 +25,33 @@
 
 package com.datalogger.utils.migration;
 
+import com.datalogger.constants.PluginConstants;
 import static com.datalogger.constants.PluginConstants.COLOSSEUM_ROOT_DIR;
-
 import static com.datalogger.constants.PluginConstants.INTERNAL_COLOSSEUM_TRIAL_HISTORY;
+import com.datalogger.dto.ColosseumAttemptDTO;
+import com.datalogger.dto.ColosseumWaveDTO;
 import com.datalogger.utils.migration.colosseumtrial.ColosseumTrialMigrationCsvV0V1;
 import com.datalogger.utils.migration.colosseumtrial.ColosseumTrialMigrationV0V1;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import java.io.BufferedReader;
-import java.io.File;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.util.ArrayList;
-import java.util.List;
-import javax.inject.Inject;
-import javax.inject.Singleton;
-import lombok.extern.slf4j.Slf4j;
-import com.datalogger.dto.ColosseumAttemptDTO;
-import com.datalogger.dto.ColosseumWaveDTO;
-import com.datalogger.constants.PluginConstants;
-import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.stream.Collectors;
+import javax.inject.Inject;
+import javax.inject.Singleton;
+import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Singleton
@@ -59,6 +60,12 @@ public class MigrationManager
 	private final ColosseumTrialMigrationCsvV0V1 csvMigration;
 	private final ColosseumTrialMigrationV0V1 jsonMigration;
 	private final Gson gson;
+	private final static JsonParser jsonParser = new JsonParser();
+
+	@Getter
+	private boolean hasMigrated = false;
+
+	public static final long COLOSSEUM_TRIAL_MIGRATION_THRESHOLD = 1780000000000L;
 
 //	private File jsonFile = new File(COLOSSEUM_ROOT_DIR, "migration-test.jsonl");
 	private File jsonFile = INTERNAL_COLOSSEUM_TRIAL_HISTORY;
@@ -96,7 +103,7 @@ public class MigrationManager
 
 				try
 				{
-					JsonObject jsonObject = new JsonParser().parse(line).getAsJsonObject();
+					JsonObject jsonObject = jsonParser.parse(line).getAsJsonObject();
 					if (jsonObject.has("attemptId"))
 					{
 						trialIds.add(jsonObject.get("attemptId").getAsString());
@@ -116,12 +123,13 @@ public class MigrationManager
 		return trialIds;
 	}
 
-	public void migrateColosseumTrialsV0V1()
+	public int migrateColosseumTrialsV0V1()
 	{
 		if (!COLOSSEUM_ROOT_DIR.exists() || !COLOSSEUM_ROOT_DIR.isDirectory())
 		{
-			return;
+			return 0;
 		}
+		hasMigrated = true;
 
 		List<String> existingTrialIds = parseTrialIds();
 
@@ -129,9 +137,9 @@ public class MigrationManager
 		File[] directories = COLOSSEUM_ROOT_DIR.listFiles(File::isDirectory);
 		if (directories == null)
 		{
-			return;
+			return 0;
 		}
-
+		int nMigrated = 0;
 		for (File dir : directories)
 		{
 			File[] files = dir.listFiles(File::isFile);
@@ -157,6 +165,7 @@ public class MigrationManager
 					jsonMigration.migrate(file);
 
 					existingTrialIds.add(trialId);
+					nMigrated++;
 				}
 
 				// Test CSV Migration
@@ -173,11 +182,14 @@ public class MigrationManager
 					csvMigration.migrate(file);
 
 					existingTrialIds.add(trialId);
+					nMigrated++;
 				}
 			}
 		}
 
 		rebuildTrialDirectoriesFromMigration(jsonFile);
+		hasMigrated = true;
+		return nMigrated;
 	}
 
 	/**
@@ -340,5 +352,64 @@ public class MigrationManager
 
 	private String listOrEmpty(java.util.List<?> list) {
 		return (list != null && !list.isEmpty()) ? list.stream().map(Object::toString).collect(Collectors.joining("-")) : "";
+	}
+
+
+
+	/**
+	 * Returns true if dir follows the pattern of a logged Colosseum trial directory and if the timestamp suggests it is
+	 * a legacy trial.
+	 */
+	public boolean isMigrateableLoggedTrialDir(File dir)
+	{
+		String name = dir.getName();
+
+		if (!dir.isDirectory() || name.length() < 15)
+		{
+			return false;
+		}
+
+		try
+		{
+			int lastUnderscore = name.lastIndexOf('_');
+			int firstUnderscore = name.lastIndexOf('_', lastUnderscore - 1);
+
+			if (firstUnderscore == -1 || lastUnderscore == -1 || (lastUnderscore - firstUnderscore != 7))
+			{
+				return false;
+			}
+
+			for (int i = firstUnderscore + 1; i < lastUnderscore; i++)
+			{
+				if (!Character.isDigit(name.charAt(i)))
+				{
+					return false;
+				}
+			}
+
+			if (name.length() - (lastUnderscore + 1) != 6)
+			{
+				return false;
+			}
+
+			for (int i = lastUnderscore + 1; i < name.length(); i++)
+			{
+				if (!Character.isDigit(name.charAt(i)))
+				{
+					return false;
+				}
+			}
+			String dirName = dir.getName();
+			String timestampPart = dirName.substring(firstUnderscore + 1);
+
+			DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyMMdd_HHmmss");
+			LocalDateTime trialTime = LocalDateTime.parse(timestampPart, formatter);
+			long unix = trialTime.toEpochSecond(ZoneOffset.UTC);
+			return COLOSSEUM_TRIAL_MIGRATION_THRESHOLD > unix;
+		}
+		catch (Exception e)
+		{
+			return false;
+		}
 	}
 }

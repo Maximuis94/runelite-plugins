@@ -428,7 +428,9 @@ public class DataLoggerPlugin extends Plugin
 	 */
 	private void updateLoggerEnabledFlags()
 	{
-		geLogger.setLoggerIsEnabled(isPermanentWorld && config.logGrandExchange());
+		boolean geLoggingEnabled = isPermanentWorld && config.logGrandExchange();
+		geLogger.setLoggerIsEnabled(geLoggingEnabled);
+		grandExchangeHistoryParser.setEnabled(geLoggingEnabled);
 //		coloLogger.setEnabledLogging(config.logColosseum());
 	}
 }

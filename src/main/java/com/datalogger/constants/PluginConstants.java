@@ -37,16 +37,12 @@ public final class PluginConstants
 
 	public static final File PLUGIN_ROOT = new File(RuneLite.RUNELITE_DIR, "data-logger");
 	public static final File COLOSSEUM_ROOT_DIR = new File(PLUGIN_ROOT, "colosseum");
-	public static final File COLOSSEUM_SCREENSHOT_DIR = new File(COLOSSEUM_ROOT_DIR, "screenshot");
-	public static final File COLOSSEUM_LOG_DIR = new File(COLOSSEUM_ROOT_DIR, "log");
-	public static final File COLOSSEUM_TIMELINE_DIR = new File(COLOSSEUM_ROOT_DIR, "timeline");
 	public static final File COLOSSEUM_TRIALS_DIR = new File(COLOSSEUM_ROOT_DIR, "trials");
-	public static final File ITEM_VAULT_DIR = new File(PLUGIN_ROOT, "item-vault");
+	public static final File ITEM_VAULT_DIR = new File(PLUGIN_ROOT, "items");
 	public static final File GRAND_EXCHANGE_DIR = new File(PLUGIN_ROOT, "grand-exchange");
-	public static final File GRAND_EXCHANGE_ACTIVE_OFFERS_DIR = new File(GRAND_EXCHANGE_DIR, "active-offers");
 	public static final File INTERNAL_ROOT_DIR = new File(PLUGIN_ROOT, "internal");
-	public static final File INTERNAL_VAULT_DIR = new File(INTERNAL_ROOT_DIR, "item-vault");
-	public static final File INTERNAL_ITEM_CHARGE_DIR = new File(INTERNAL_ROOT_DIR, "item-charges");
+	public static final File INTERNAL_VAULT_DIR = new File(INTERNAL_ROOT_DIR, "items");
+	public static final File INTERNAL_STASH_DIR = new File(INTERNAL_ROOT_DIR, "stash-units");
 	public static final File INTERNAL_COLOSSEUM_DIR = new File(INTERNAL_ROOT_DIR, "colosseum");
 	public static final File INTERNAL_COLOSSEUM_TRIAL_HISTORY = new File(INTERNAL_COLOSSEUM_DIR, "trial-history.jsonl");
 
@@ -57,7 +53,6 @@ public final class PluginConstants
 	 * should be refreshed from the RuneLite ItemManager cache.
 	 */
 	public static final int ITEM_VALUE_UPDATE_FREQUENCY_SECONDS = 600;
-	public static final int UNMUTE_COOLDOWN_SECONDS = 600;
 	public static final int WEBHOOK_TEST_COOLDOWN_SECONDS_SUCCESS = 5;
 
 	// ID that is ignored in enum mapping creation

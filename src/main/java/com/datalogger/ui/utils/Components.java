@@ -40,6 +40,7 @@ import javax.annotation.Nonnull;
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JComponent;
+import javax.swing.JOptionPane;
 import javax.swing.JScrollBar;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
@@ -95,9 +96,21 @@ public final class Components
 	public static JButton createStyledButton(String text, @Nonnull ActionListener actionListener) {
 		JButton button = createStyledButton(text);
 		button.addActionListener(actionListener);
-
-
 		return button;
+	}
+
+	/**
+	 * Show a confirm dialog with the Strings provided. Value returned depends on what the user clicks.
+	 */
+	public static int showConfirmDialog(Component parent, String title, String message)
+	{
+		return JOptionPane.showConfirmDialog(
+			parent,
+			message,
+			title,
+			JOptionPane.YES_NO_OPTION,
+			JOptionPane.WARNING_MESSAGE
+		);
 	}
 
 	/**

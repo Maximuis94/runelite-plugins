@@ -25,7 +25,6 @@
 
 package com.datalogger.services.itemvault.container;
 
-import com.datalogger.loggers.ItemVaultLogger;
 import com.datalogger.models.itemvault.BankedItem;
 import com.datalogger.services.itemvault.AbstractVaultParser;
 import java.io.File;
@@ -44,7 +43,6 @@ import net.runelite.client.game.ItemManager;
 public abstract class AbstractContainerVaultParser extends AbstractVaultParser
 {
 	@Inject protected ItemManager itemManager;
-	@Inject protected ItemVaultLogger itemVaultLogger;
 
 	private boolean needsLogging = false;
 	protected List<BankedItem> currentContainerItems = new ArrayList<>();
@@ -53,17 +51,14 @@ public abstract class AbstractContainerVaultParser extends AbstractVaultParser
 	@Override
 	public List<BankedItem> parseVault()
 	{
-		if (!isEnabled)
-		{
-			return new ArrayList<>();
-		}
+		if (!isEnabled) return new ArrayList<>();
 		return currentContainerItems;
 	}
 
 	@Override
 	protected void loadSessionData(File cacheFile)
 	{
-		List<BankedItem> loadedItems = fileIOService.readJson(cacheFile, BankedItem.LIST_TYPE);
+		List<BankedItem> loadedItems = parseOfflineFile(currentAccountHash, cacheFile);
 
 		if (loadedItems != null)
 		{
@@ -91,9 +86,6 @@ public abstract class AbstractContainerVaultParser extends AbstractVaultParser
 		processVault();
 	}
 
-	/**
-	 * Hook allowing subclasses to reject a container state (e.g., filtered banks).
-	 */
 	protected boolean isValidStateToSave(ItemContainer container)
 	{
 		return true;
@@ -123,14 +115,10 @@ public abstract class AbstractContainerVaultParser extends AbstractVaultParser
 				item.getQuantity()
 			));
 		}
+
 		this.currentContainerItems = parsedItems;
-
-		if (hasValidAccountHash)
-		{
-			fileIOService.writeJson(vaultFile, currentContainerItems);
-		}
-
 		log.debug("Parsed {} items for {}", parsedItems.size(), getVaultType().name());
-		itemVaultLogger.logVault(currentAccountHash, currentAccountName, getVaultType(), parsedItems);
+
+		submitVault(parsedItems);
 	}
 }

@@ -101,7 +101,7 @@ public class RunePouchParser extends AbstractVariableVaultParser
 	@Override
 	protected void loadSessionData(File cacheFile)
 	{
-		List<BankedItem> loadedItems = fileIOService.readJson(cacheFile, BankedItem.LIST_TYPE);
+		List<BankedItem> loadedItems = itemVaultLogger.getVault(currentAccountHash, getVaultType());
 
 		if (loadedItems == null || loadedItems.isEmpty()) return;
 

@@ -223,8 +223,6 @@ public class EquipmentTracker
 		if (weaponChanged) updateCurrentWeapon();
 	}
 
-	// --- Methods invoked by CombatTracker to submit charge updates ---
-
 	public void addWeaponAttack(int baseWeaponId)
 	{
 		trackedAttacks.merge(baseWeaponId, 1, Integer::sum);
@@ -235,8 +233,6 @@ public class EquipmentTracker
 		consumedBloodFuryCharges++;
 		log.debug("Increased consumedBloodFuryCharges to {}", consumedBloodFuryCharges);
 	}
-
-	// --- Charge retrieval and reset logic ---
 
 	public int getAttackCount(int baseWeaponId)
 	{

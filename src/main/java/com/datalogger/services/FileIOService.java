@@ -1132,9 +1132,9 @@ public class FileIOService
 	 * Reads all vault JSON files from the disk.
 	 * Returns a Map where the key is the filename and the value is the array of raw items.
 	 */
-	public Map<Long, Map<VaultType, List<BankedItem>>> readAllVaultFilesRaw()
+	public Map<Long, Map<String, List<BankedItem>>> readAllVaultFilesRaw()
 	{
-		Map<Long, Map<VaultType, List<BankedItem>>> allData = new HashMap<>();
+		Map<Long, Map<String, List<BankedItem>>> allData = new HashMap<>();
 		File directory = PluginConstants.INTERNAL_VAULT_DIR;
 
 		if (!directory.exists() || !directory.isDirectory())
@@ -1160,18 +1160,27 @@ public class FileIOService
 			File[] vaultFiles = accountDir.listFiles((dir, name) -> name.endsWith(".json"));
 			if (vaultFiles == null) continue;
 
-			Map<VaultType, List<BankedItem>> accountVaults = new HashMap<>();
+			Map<String, List<BankedItem>> accountVaults = new HashMap<>();
 			for (File file : vaultFiles)
 			{
 				try (Reader reader = new FileReader(file))
 				{
-					String typeName = file.getName().replace(".json", "").toUpperCase().replace("-", "_");
-					VaultType vaultType = VaultType.valueOf(typeName);
+
+					String fileName = file.getName();
+					int underscoreIndex = fileName.indexOf('_');
+					String vaultTypeRaw;
+					if (underscoreIndex != -1) {
+						vaultTypeRaw = fileName.substring(0, underscoreIndex);
+					} else {
+						vaultTypeRaw = fileName.replaceFirst("\\.[^.]+$", "");
+					}
+					String typeName = vaultTypeRaw.toUpperCase().replace("-", "_");
+//					VaultType vaultType = VaultType.valueOf(typeName);
 
 					List<BankedItem> parsedItems = gson.fromJson(reader, BankedItem.LIST_TYPE);
 					if (parsedItems != null && !parsedItems.isEmpty())
 					{
-						accountVaults.put(vaultType, parsedItems);
+						accountVaults.put(typeName, parsedItems);
 					}
 				}
 				catch (Exception e)

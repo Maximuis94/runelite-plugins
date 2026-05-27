@@ -60,10 +60,8 @@ public class DataLoggerPanel extends PluginPanel {
 	private final JPanel cardContainer;
 	private JScrollBar scrollBar;
 
-	// Store references to your child panels so we can delegate updates to them
 	private final UtilitiesModePanel utilitiesPanel;
 	private final ColosseumStatisticsModePanel colosseumPanel;
-	// private final ColosseumReviewModePanel colosseumReviewPanel;
 	private final ItemsModePanel itemsPanel;
 	private final ItemsManagerModePanel itemsManagerPanel;
 
@@ -111,9 +109,27 @@ public class DataLoggerPanel extends PluginPanel {
 			{
 				PanelViewMode selectedMode = (PanelViewMode) e.getItem();
 				cardLayout.show(cardContainer, selectedMode.name());
-
 				cardContainer.revalidate();
 				cardContainer.repaint();
+				String tooltipText;
+				switch (selectedMode)
+				{
+					case COLOSSEUM_STATISTICS:
+						tooltipText = "Panel in which various statistics can be viewed based on logged trials";
+						break;
+					case ITEMS:
+						tooltipText = "Panel in which item data can be viewed";
+						break;
+					case ITEMS_MANAGER:
+						tooltipText = "Panel in which item data can be viewed and deleted. Deletion can clear data related to an item you no longer possess.";
+						break;
+					case UTILITIES:
+						tooltipText = "Panel with buttons to navigate to generated directories, test discord webhooks, manually export data or migrate data (if applicable).";
+						break;
+						default:
+							tooltipText = "";
+				}
+				viewSelector.setToolTipText(tooltipText);
 			}
 		});
 
