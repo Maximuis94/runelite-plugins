@@ -84,7 +84,7 @@ public class EquipmentTracker
 
 	private int attackStyleIndex = -1;
 	private int equippedWeaponType = -1;
-	private final int[] cachedEquipment = {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
+	private final int[] cachedEquipment = new int[14];
 	private final Map<Integer, Integer> trackedAttacks = new HashMap<>();
 
 	public void updateCurrentWeapon()
@@ -164,24 +164,6 @@ public class EquipmentTracker
 		log.debug("Updated combat parameters. enum={} weapon={} baseId={} attackStyleIndex={} currentCombatType={} soundId={} equippedWeaponType={} attackSpeed={}", name, currentWeaponId, baseWeaponId, attackStyleIndex, currentCombatType.name(), attackStyleSoundId, equippedWeaponType, attackSpeed);
 	}
 
-	private void syncEquipment()
-	{
-		if (client.getGameState() != GameState.LOGGED_IN) return;
-		ItemContainer equipment = client.getItemContainer(EQUIPMENT_CONTAINER_ID);
-		if (equipment == null) return;
-
-		Item[] currentItems = equipment.getItems();
-		int nItems = currentItems.length;
-
-		for (int slot = 0; slot < 14; slot++)
-		{
-			int itemId = (slot < nItems && currentItems[slot] != null) ? currentItems[slot].getId() : -1;
-			cachedEquipment[slot] = itemId;
-		}
-		hasBloodFury = (cachedEquipment[AMULET_SLOT_INDEX] == BLOOD_AMULET);
-		updateCurrentWeapon();
-	}
-
 	@Subscribe
 	public void onAccountSessionStarted(AccountSessionStarted event)
 	{
@@ -192,8 +174,20 @@ public class EquipmentTracker
 	@Subscribe
 	public void onVarbitChanged(VarbitChanged event)
 	{
-		if (event.getVarpId() == COM_MODE)
+		if (event.getVarpId() == COM_MODE || event.getVarbitId() == COMBAT_WEAPON_CATEGORY)
+		{
 			updateCombatParameters();
+		}
+	}
+
+	private void syncEquipment()
+	{
+		if (client.getGameState() != GameState.LOGGED_IN) return;
+		ItemContainer equipment = client.getItemContainer(EQUIPMENT_CONTAINER_ID);
+		if (equipment != null)
+		{
+			processEquipmentContainer(equipment);
+		}
 	}
 
 	@Subscribe
@@ -202,23 +196,31 @@ public class EquipmentTracker
 		if (event.getContainerId() == EQUIPMENT_CONTAINER_ID)
 		{
 			ItemContainer equipment = event.getItemContainer();
-			if (equipment == null) return;
-
-			boolean weaponChanged = false;
-			Item[] newItems = equipment.getItems();
-			int nItems = newItems.length;
-			for (int i = 0; i < 14; i++)
+			if (equipment != null)
 			{
-				int newId = (i < nItems && newItems[i] != null) ? newItems[i].getId() : -1;
-				if (cachedEquipment[i] != newId)
-				{
-					cachedEquipment[i] = newId;
-					if (i == WEAPON_SLOT_INDEX) weaponChanged = true;
-					else if (i == AMULET_SLOT_INDEX) hasBloodFury = newId == BLOOD_AMULET;
-				}
+				processEquipmentContainer(equipment);
 			}
-			if (weaponChanged) updateCurrentWeapon();
 		}
+	}
+
+	private void processEquipmentContainer(ItemContainer equipment)
+	{
+		boolean weaponChanged = false;
+		Item[] newItems = equipment.getItems();
+		int nItems = newItems.length;
+
+		for (int i = 0; i < 14; i++)
+		{
+			int newId = (i < nItems && newItems[i] != null) ? newItems[i].getId() : -1;
+			if (cachedEquipment[i] != newId)
+			{
+				cachedEquipment[i] = newId;
+				if (i == WEAPON_SLOT_INDEX) weaponChanged = true;
+				else if (i == AMULET_SLOT_INDEX) hasBloodFury = newId == BLOOD_AMULET;
+			}
+		}
+
+		if (weaponChanged) updateCurrentWeapon();
 	}
 
 	// --- Methods invoked by CombatTracker to submit charge updates ---
@@ -238,7 +240,12 @@ public class EquipmentTracker
 
 	public int getAttackCount(int baseWeaponId)
 	{
-		return trackedAttacks.getOrDefault(trackedAttacks.containsKey(baseWeaponId) ? baseWeaponId : ItemVariationMapping.map(baseWeaponId), 0);
+		Integer count = trackedAttacks.get(baseWeaponId);
+		if (count != null)
+		{
+			return count;
+		}
+		return trackedAttacks.getOrDefault(ItemVariationMapping.map(baseWeaponId), 0);
 	}
 
 	public int getAttackCount(ItemComposition itemComposition)

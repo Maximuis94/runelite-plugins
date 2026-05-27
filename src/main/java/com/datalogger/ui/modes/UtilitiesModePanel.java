@@ -34,11 +34,17 @@ import com.datalogger.framework.LogType;
 import com.datalogger.loggers.ItemVaultLogger;
 import com.datalogger.models.enums.ColosseumBroadcastMode;
 import com.datalogger.models.enums.ColosseumWebhookFormatter;
+import com.datalogger.models.enums.ExchangeLoggerCsvFileStrategy;
+import com.datalogger.models.enums.ExchangeLoggerJsonFileStrategy;
 import com.datalogger.models.enums.UIScrollSpeed;
+import com.datalogger.models.grandexchange.GeLedgerEntry;
 import com.datalogger.models.itemvault.ItemBundle;
 import com.datalogger.models.supplytracker.ValuedItemStack;
 import com.datalogger.services.DiscordWebhookService;
 import com.datalogger.services.FileIOService;
+import static com.datalogger.services.FileIOService.DEBUG_DIR;
+import static com.datalogger.services.FileIOService.INTERNAL_GE_HISTORY_DIR;
+import static com.datalogger.services.FileIOService.INTERNAL_GE_OFFERS_DIR;
 import com.datalogger.services.itemvault.VaultManager;
 import com.datalogger.ui.utils.Components;
 import static com.datalogger.ui.utils.Components.createStyledButton;
@@ -58,8 +64,10 @@ import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.GridLayout;
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.Reader;
 import java.time.Duration;
@@ -177,6 +185,10 @@ public class UtilitiesModePanel extends JPanel {
 		return panel;
 	}
 
+
+
+
+
 	private JButton exportAggregatedVaultButton()
 	{
 		JButton exportVaultSummary = createStyledButton("Export merged item data", e -> vaultManager.writeMergedCsvFile());
@@ -197,6 +209,10 @@ public class UtilitiesModePanel extends JPanel {
 
 		panel.add(exportAggregatedVaultButton());
 		panel.add(mergedColosseumWaveLogsButton());
+
+		JButton testGeExportBtn = createStyledButton("Test GE Strategy Exports", e -> testGrandExchangeExports());
+		testGeExportBtn.setToolTipText("Exports all internal GE logs to every CSV and JSON strategy format for testing.");
+		panel.add(testGeExportBtn);
 
 		return panel;
 	}
@@ -613,5 +629,161 @@ public class UtilitiesModePanel extends JPanel {
 				scrollBar.setUnitIncrement(32);
 				break;
 		}
+	}
+
+	private void testGrandExchangeExports()
+	{
+		File inputFile = new File(INTERNAL_GE_OFFERS_DIR, "1166583798855853255.jsonl");
+		log.debug("Attempting to export exchange logs...");
+		executor.submit(() -> {
+			if (!INTERNAL_GE_HISTORY_DIR.exists())
+			{
+				SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(this, "Internal GE History directory not found.", "Error", JOptionPane.ERROR_MESSAGE));
+				return;
+			}
+
+			// Note: You are reading a specific inputFile above, so this directory scan isn't strictly used anymore,
+			// but keeping it as a safety check is fine!
+			File[] internalFiles = INTERNAL_GE_HISTORY_DIR.listFiles((d, name) -> name.endsWith(".jsonl"));
+			if (internalFiles == null || internalFiles.length == 0)
+			{
+				SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(this, "No internal GE history files found to export.", "Warning", JOptionPane.WARNING_MESSAGE));
+				return;
+			}
+
+			int processedCount = 0;
+
+			// Assuming you implemented the generic readJsonlFile method in FileIOService previously
+			List<GeLedgerEntry> entries = fileIOService.readJsonlFile(inputFile, GeLedgerEntry.class);
+			if (entries == null)
+			{
+				SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(this, "No GE data found to export.", "Warning", JOptionPane.WARNING_MESSAGE));
+				return;
+			}
+
+			for (GeLedgerEntry entry : entries)
+			{
+				if (entry == null || entry.getAccountName() == null) continue;
+				processedCount++;
+
+				JsonObject jsonObject = buildGeJsonObject(entry);
+
+				// --- 1. EXPLICIT JSONL TEST (Bypassing the enum) ---
+
+
+				// --- 2. JSON ARRAY STRATEGIES ---
+				for (ExchangeLoggerJsonFileStrategy strategy : ExchangeLoggerJsonFileStrategy.values())
+				{
+					if (strategy == ExchangeLoggerJsonFileStrategy.NONE) continue;
+					if (strategy == ExchangeLoggerJsonFileStrategy.JSONLINE)
+					{
+						File jsonlTargetFile = new File(DEBUG_DIR, "exchange-offers-test.jsonl");
+						try (FileWriter fw = new FileWriter(jsonlTargetFile, true);
+							 BufferedWriter bw = new BufferedWriter(fw))
+						{
+							// JsonObject.toString() safely serializes into a single unbroken line
+							bw.write(jsonObject.toString());
+							bw.newLine();
+						}
+						catch (IOException ex)
+						{
+							log.error("Failed to write to explicit JSONL file for test: {}", jsonlTargetFile.getAbsolutePath(), ex);
+						}
+						continue;
+					}
+
+					File fileName = strategy.getJsonFile(entry.getAccountName());
+					if (fileName != null)
+					{
+						File targetFile = new File(DEBUG_DIR, fileName.getName());
+						fileIOService.appendGeJsonLog(targetFile, jsonObject);
+					}
+				}
+
+				// --- 3. CSV STRATEGIES ---
+				String csvRow = formatCsvRow(entry);
+				for (ExchangeLoggerCsvFileStrategy strategy : ExchangeLoggerCsvFileStrategy.values())
+				{
+					if (strategy == ExchangeLoggerCsvFileStrategy.NONE) continue;
+
+					File fileName = strategy.getCsvFile(entry.getAccountName());
+					if (fileName != null)
+					{
+						File targetFile = new File(DEBUG_DIR, fileName.getName());
+
+						try (FileWriter fw = new FileWriter(targetFile, true);
+							 BufferedWriter bw = new BufferedWriter(fw))
+						{
+							// Add header if file is brand new
+							if (targetFile.length() == 0) {
+								bw.write("ItemId,ItemName,OfferCreationTime,Timestamp,TradeType,Quantity,OfferQuantity,Price,OfferPrice,Value,Tax,AccountName,AccountHash,GeSlot,IsHistoryEntry,IsCancelled");
+								bw.newLine();
+							}
+							bw.write(csvRow);
+							bw.newLine();
+						}
+						catch (IOException ex)
+						{
+							log.error("Failed to write to CSV file for test: {}", targetFile.getAbsolutePath(), ex);
+						}
+					}
+				}
+			}
+
+			int finalCount = processedCount;
+			SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(this,
+				"GE Export Test Completed!\nProcessed " + finalCount + " entries to all formats (including manual JSONL).",
+				"Success", JOptionPane.INFORMATION_MESSAGE));
+		});
+	}
+
+	/**
+	 * Helper to convert a GeLedgerEntry into the CSV string format
+	 */
+	private String formatCsvRow(GeLedgerEntry entry)
+	{
+		String safeItemName = entry.getItemName() != null ? entry.getItemName() : "Unknown";
+		if (safeItemName.contains(",")) {
+			safeItemName = "\"" + safeItemName + "\"";
+		}
+
+		String creationTimeStr = entry.getOfferCreationTime() > 0 ? Instant.ofEpochMilli(entry.getOfferCreationTime()).toString() : "";
+		long mainTimeMillis = entry.getExactTimestamp() > 0 ? entry.getExactTimestamp() : entry.getParseTime();
+		String timeStr = mainTimeMillis > 0 ? Instant.ofEpochMilli(mainTimeMillis).toString() : "";
+		String tradeType = entry.isBuy() ? "BUY" : "SELL";
+
+		return String.join(",",
+			String.valueOf(entry.getItemId()), safeItemName, creationTimeStr, timeStr, tradeType,
+			String.valueOf(entry.getQuantity()), String.valueOf(entry.getOriginalOfferQuantity()),
+			String.valueOf(entry.getPrice()), String.valueOf(entry.getOriginalOfferPrice()),
+			String.valueOf(entry.getValue()), String.valueOf(entry.getTax()),
+			entry.getAccountName() != null ? entry.getAccountName() : "",
+			String.valueOf(entry.getAccountHash()), String.valueOf(entry.getGeSlot()),
+			String.valueOf(entry.isHistoryEntry()), String.valueOf(entry.isCancelled())
+		);
+	}
+
+	/**
+	 * Helper to convert a GeLedgerEntry into a JsonObject
+	 */
+	private JsonObject buildGeJsonObject(GeLedgerEntry entry)
+	{
+		JsonObject jsonObject = new JsonObject();
+		jsonObject.addProperty("itemId", entry.getItemId());
+		jsonObject.addProperty("itemName", entry.getItemName());
+		jsonObject.addProperty("isBuy", entry.isBuy());
+		jsonObject.addProperty("quantity", entry.getQuantity());
+		jsonObject.addProperty("price", entry.getPrice());
+		jsonObject.addProperty("value", entry.getValue());
+		jsonObject.addProperty("tax", entry.getTax());
+		jsonObject.addProperty("accountName", entry.getAccountName());
+		jsonObject.addProperty("accountHash", entry.getAccountHash());
+		jsonObject.addProperty("geSlot", entry.getGeSlot());
+		jsonObject.addProperty("isCancelled", entry.isCancelled());
+		jsonObject.addProperty("offerCreationTime", entry.getOfferCreationTime());
+		jsonObject.addProperty("exactTimestamp", entry.getExactTimestamp());
+		jsonObject.addProperty("originalOfferQuantity", entry.getOriginalOfferQuantity());
+		jsonObject.addProperty("originalOfferPrice", entry.getOriginalOfferPrice());
+		return jsonObject;
 	}
 }

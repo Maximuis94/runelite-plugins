@@ -39,5 +39,5 @@ public class AccountSessionStarted
 	private final long accountHash;
 	private final String accountName;
 	private final boolean onMembersWorld;
-	private final boolean onRelevantGameWorld;
+	private final boolean onPermanentWorld;
 }

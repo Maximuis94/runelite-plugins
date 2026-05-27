@@ -42,7 +42,7 @@ public abstract class AbstractLogger implements Loggable {
 	@Inject protected DataLoggerConfig config;
 
 	// Currently active account
-	private boolean onRelevantGameMode = false;
+	private boolean onPermanentWorld = false;
 	private String accountName = "unknown";
 	private String accountHashString = "-1";
 	private long accountHashLong = -1;
@@ -71,9 +71,9 @@ public abstract class AbstractLogger implements Loggable {
 	/**
 	 * Returns true if the current session is on a temporary game mode like leagues
 	 */
-	protected boolean isOnRelevantGameMode()
+	protected boolean isOnPermanentWorld()
 	{
-		return onRelevantGameMode;
+		return onPermanentWorld;
 	}
 
 	/**
@@ -98,7 +98,7 @@ public abstract class AbstractLogger implements Loggable {
 		accountName = event.getAccountName();
 		accountHashString = event.getAccountHashString();
 		accountHashLong = event.getAccountHash();
-		onRelevantGameMode = event.isOnRelevantGameWorld();
+		onPermanentWorld = event.isOnPermanentWorld();
 
 		log.debug("[{}] Session initialized for {} ({})", getLogType(), accountName, accountHashString);
 

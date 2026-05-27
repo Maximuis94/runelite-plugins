@@ -25,6 +25,11 @@
 
 package com.datalogger.services;
 
+import com.datalogger.models.itemvault.BankedItem;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import net.runelite.api.Client;
@@ -48,6 +53,7 @@ public class InventoryStateManager
 
 	private final int[] possessedBaseItems = new int[MAX_ITEMS];
 	private final int[] possessedItems = new int[MAX_ITEMS];
+	private final int[] itemQuantities = new int[MAX_ITEMS];
 
 	private int itemCount = 0;
 
@@ -88,6 +94,7 @@ public class InventoryStateManager
 				{
 					possessedItems[itemCount] = itemId;
 					possessedBaseItems[itemCount] = ItemVariationMapping.map(itemId);
+					itemQuantities[itemCount] = item.getQuantity();
 					itemCount++;
 				}
 			}
@@ -123,4 +130,22 @@ public class InventoryStateManager
 		}
 		return false;
 	}
+
+	/**
+	 * Returns an aggregated map of all currently carried item IDs and their total quantities.
+	 */
+	public Map<Integer, Long> getAggregatedCarriedItems()
+	{
+		Map<Integer, Long> aggregatedMap = new HashMap<>();
+		for (int i = 0; i < itemCount; i++)
+		{
+			int itemId = possessedItems[i];
+			long quantity = itemQuantities[i];
+
+			aggregatedMap.merge(itemId, quantity, Long::sum);
+		}
+		return aggregatedMap;
+	}
+
+
 }

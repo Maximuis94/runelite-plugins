@@ -69,18 +69,16 @@ public enum ExchangeLoggerJsonFileStrategy
 			case JSONLINE:
 				fileName = "exchange-offers.jsonl";
 				break;
-			case JSON_SINGLE:
-				fileName = "exchange-offers.json";
-				break;
 			case JSON_DAILY:
-				fileName = "exchange-offers-" + now.format(DAILY_FORMAT) + ".json";
+				fileName = "exchange-offers_" + now.format(DAILY_FORMAT) + ".json";
 				break;
 			case JSON_WEEKLY:
-				fileName = "exchange-offers-" + now.format(WEEKLY_FORMAT) + ".json";
+				fileName = "exchange-offers_" + now.format(WEEKLY_FORMAT) + ".json";
 				break;
 			case JSON_MONTHLY:
-				fileName = "exchange-offers-" + now.format(MONTHLY_FORMAT) + ".json";
+				fileName = "exchange-offers_" + now.format(MONTHLY_FORMAT) + ".json";
 				break;
+			case JSON_SINGLE:
 			default:
 				fileName = "exchange-offers.json";
 		}

@@ -66,13 +66,13 @@ public enum ExchangeLoggerCsvFileStrategy
 			case NONE:
 				return null;
 			case CSV_DAILY:
-				fileName = "exchange-offers_" + now.format(DAILY_FORMAT) + ".json";
+				fileName = "exchange-offers_" + now.format(DAILY_FORMAT) + ".csv";
 				break;
 			case CSV_WEEKLY:
-				fileName = "exchange-offers_" + now.format(WEEKLY_FORMAT) + ".json";
+				fileName = "exchange-offers_" + now.format(WEEKLY_FORMAT) + ".csv";
 				break;
 			case CSV_MONTHLY:
-				fileName = "exchange-offers_" + now.format(MONTHLY_FORMAT) + ".json";
+				fileName = "exchange-offers_" + now.format(MONTHLY_FORMAT) + ".csv";
 				break;
 			case CSV_SINGLE:
 			default:

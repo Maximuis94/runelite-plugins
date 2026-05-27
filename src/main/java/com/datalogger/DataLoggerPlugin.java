@@ -50,20 +50,14 @@ import com.datalogger.ui.modes.ItemsModePanel;
 import com.datalogger.webhook.ColosseumDiscordBroadcaster;
 import com.google.inject.Provides;
 import java.awt.image.BufferedImage;
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
 import java.util.EnumSet;
 import javax.inject.Inject;
 import javax.swing.SwingUtilities;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Actor;
-import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
 import net.runelite.api.WorldType;
-import net.runelite.api.events.ChatMessage;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
 import net.runelite.client.callback.ClientThread;
@@ -117,6 +111,7 @@ public class DataLoggerPlugin extends Plugin
 	private NavigationButton navButton;
 	private boolean sessionInitialized = false;
 	private boolean startUpComplete = false;
+	private boolean isPermanentWorld = false;
 
 	private boolean isItemVaultRegistered = false;
 	private boolean isGeRegistered = false;
@@ -193,8 +188,7 @@ public class DataLoggerPlugin extends Plugin
 	public void onConfigChanged(ConfigChanged event)
 	{
 		if (!event.getGroup().equals(CONFIG_GROUP)) return;
-
-		eventBus.post(new DataLoggerConfigChanged(event.getKey(), event.getOldValue(), event.getNewValue(), event));
+		updateLoggerEnabledFlags();
 		switch (event.getKey())
 		{
 			case "logItemVault":
@@ -225,8 +219,9 @@ public class DataLoggerPlugin extends Plugin
 			case "innerScrollSpeed":
 				panel.setInnerScrollSpeed(config.innerScrollSpeed());
 				break;
-
 		}
+
+		eventBus.post(new DataLoggerConfigChanged(event.getKey(), event.getOldValue(), event.getNewValue(), event));
 	}
 
 	private void toggleSidebar(boolean enable)
@@ -409,7 +404,9 @@ public class DataLoggerPlugin extends Plugin
 				String accountName = client.getLocalPlayer().getName();
 				boolean isMembers = client.getWorldType().contains(WorldType.MEMBERS);
 				EnumSet<WorldType> worldTypes = client.getWorldType();
-				boolean isRelevantWorld = !(
+
+				boolean oldValue = isPermanentWorld;
+				isPermanentWorld = !(
 					worldTypes.contains(WorldType.SEASONAL) ||
 						worldTypes.contains(WorldType.BETA_WORLD) ||
 						worldTypes.contains(WorldType.NOSAVE_MODE) ||
@@ -418,10 +415,20 @@ public class DataLoggerPlugin extends Plugin
 						worldTypes.contains(WorldType.QUEST_SPEEDRUNNING) ||
 						worldTypes.contains(WorldType.FRESH_START_WORLD)
 				);
+				if (oldValue != isPermanentWorld) updateLoggerEnabledFlags();
 
-				log.debug("Loaded new session data. accountHash={} accountName={} isMembers={} isRelevantWorld={}", hashString, accountName, isMembers, isRelevantWorld);
-				eventBus.post(new AccountSessionStarted(hashString, currentHash, accountName, isMembers, isRelevantWorld));
+				log.debug("Loaded new session data. accountHash={} accountName={} isMembers={} isPermanentWorld={}", hashString, accountName, isMembers, isPermanentWorld);
+				eventBus.post(new AccountSessionStarted(hashString, currentHash, accountName, isMembers, isPermanentWorld));
 			}
 		}
+	}
+
+	/**
+	 * Updates all enabled flags of loggers to ensure these flags are always updated first
+	 */
+	private void updateLoggerEnabledFlags()
+	{
+		geLogger.setLoggerIsEnabled(isPermanentWorld && config.logGrandExchange());
+//		coloLogger.setEnabledLogging(config.logColosseum());
 	}
 }

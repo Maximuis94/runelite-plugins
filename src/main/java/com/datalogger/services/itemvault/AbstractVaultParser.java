@@ -35,6 +35,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import javax.inject.Inject;
 import lombok.Value;
@@ -214,7 +215,7 @@ public abstract class AbstractVaultParser implements VaultParser
 	{
 		if (vaultFile == null || !hasValidAccountHash) return;
 
-		List<java.util.Map<String, Object>> slimItems = items.stream()
+		List<Map<String, Object>> slimItems = items.stream()
 			.map(item -> {
 				java.util.Map<String, Object> map = new java.util.LinkedHashMap<>();
 				map.put("itemId", item.getItemId());

@@ -39,7 +39,6 @@ import com.datalogger.framework.LogType;
 import com.datalogger.models.colosseum.ColosseumAttempt;
 import com.datalogger.models.colosseum.ColosseumState;
 import com.datalogger.models.colosseum.ColosseumWave;
-import com.datalogger.models.enums.ExchangeLoggerJsonFileStrategy;
 import com.datalogger.models.enums.ItemCharge;
 import com.datalogger.models.enums.ScreenshotFormat;
 import com.datalogger.models.enums.VaultType;
@@ -107,7 +106,10 @@ public class FileIOService
 	public static final File INTERNAL_ACTIVE_OFFERS_DIR = new File(PluginConstants.INTERNAL_ROOT_DIR, "active-offers");
 	public static final File GE_STATE_DIR = new File(PluginConstants.INTERNAL_ROOT_DIR, "state");
 	public static final File INTERNAL_TEMP_DIR = new File(PluginConstants.INTERNAL_ROOT_DIR, "temp");
-	public static final File INTERNAL_GE_DIR = new File(PluginConstants.INTERNAL_ROOT_DIR, "ge-history");
+	public static final File INTERNAL_GE_DIR = new File(PluginConstants.INTERNAL_ROOT_DIR, "grand-exchange");
+	public static final File INTERNAL_GE_OFFERS_DIR = new File(INTERNAL_GE_DIR, "completed");
+	public static final File INTERNAL_GE_HISTORY_DIR = new File(INTERNAL_GE_DIR, "history");
+	public static final File DEBUG_DIR = new File(PluginConstants.PLUGIN_ROOT, "debug");
 	public static final File COLOSSEUM_WAVE_LOG_MERGED_CSV = new File(PluginConstants.COLOSSEUM_ROOT_DIR, "colosseum-waves-merged.csv");
 	public static final File COLOSSEUM_WAVE_LOG_MERGED_JSON = new File(PluginConstants.COLOSSEUM_ROOT_DIR, "colosseum-waves-merged.json");
 	private final Gson gson;
@@ -200,7 +202,7 @@ public class FileIOService
 	@Subscribe
 	public void onAccountSessionStarted(AccountSessionStarted event)
 	{
-		updateAccountInfo(event.getAccountName(), event.getAccountHashString(), event.isOnRelevantGameWorld());
+		updateAccountInfo(event.getAccountName(), event.getAccountHashString(), event.isOnPermanentWorld());
 	}
 
 	private boolean isValidAccountString(String accountString)
@@ -654,10 +656,8 @@ public class FileIOService
 		if (!isTemporaryGameMode) return;
 		String accountHash = String.valueOf(entry.getAccountHash());
 
-		// 1. Fetch or create the cached File object
 		File jsonlFile = INTERNAL_LEDGER_CACHE.computeIfAbsent(accountHash, hash -> {
-			// Ensure the directory exists
-			File dir = INTERNAL_GE_DIR; // Update this path if needed
+			File dir = INTERNAL_GE_OFFERS_DIR;
 			if (!dir.exists())
 			{
 				dir.mkdirs();
@@ -665,15 +665,12 @@ public class FileIOService
 			return new File(dir, hash + ".jsonl");
 		});
 
-		// 2. One-time Migration check: If the old .json file exists, migrate it to .jsonl
-		// (Assume PluginConstants.INTERNAL_GE_DIR is used for both)
 		File oldJsonFile = new File(INTERNAL_GE_DIR, accountHash + ".json");
 		if (oldJsonFile.exists())
 		{
 			migrateLedgerToJsonl(oldJsonFile, jsonlFile);
 		}
 
-		// 3. Append the new entry (O(1) time complexity, virtually zero memory footprint)
 		try (FileWriter fw = new FileWriter(jsonlFile, true);
 			 BufferedWriter bw = new BufferedWriter(fw))
 		{
@@ -760,43 +757,69 @@ public class FileIOService
 	/**
 	 * Appends a Grand Exchange JSON object to the specified file based on the logging strategy.
 	 */
-	public void appendGeJsonLog(File file, JsonObject newEntry, ExchangeLoggerJsonFileStrategy strategy)
+	public synchronized void appendGeJsonLog(File file, JsonObject newEntry)
 	{
-		if (!file.getParentFile().exists())
+		File parent = file.getParentFile();
+		if (parent != null && !parent.exists())
 		{
-			file.getParentFile().mkdirs();
+			parent.mkdirs();
 		}
 
-		if (strategy == ExchangeLoggerJsonFileStrategy.JSONLINE)
-		{
-			try (FileWriter fw = new FileWriter(file, true);
-				 BufferedWriter bw = new BufferedWriter(fw))
-			{
-				bw.write(gson.toJson(newEntry));
-				bw.newLine();
-			}
-			catch (IOException e) { log.error("Failed to append to GE JSONL", e); }
-		}
-		else
-		{
-			JsonArray array = new JsonArray();
+		JsonArray array = new JsonArray();
 
-			if (file.exists() && file.length() > 0)
+		if (file.exists() && file.length() > 0)
+		{
+			try (FileReader reader = new FileReader(file))
 			{
-				try (FileReader reader = new FileReader(file))
+				JsonArray parsedArray = gson.fromJson(reader, JsonArray.class);
+
+				if (parsedArray != null)
 				{
-					array = gson.fromJson(reader, JsonArray.class);
+					array = parsedArray;
 				}
-				catch (Exception e) {  }
 			}
-
-			array.add(newEntry);
-
-			try (FileWriter fw = new FileWriter(file))
+			catch (Exception e)
 			{
-				gson.toJson(array, fw);
+				log.warn("Failed to read existing GE JSON Array at {}. Overwriting with a fresh array.", file.getAbsolutePath(), e);
 			}
-			catch (IOException e) { }
+		}
+
+		array.add(newEntry);
+
+		try (FileWriter fw = new FileWriter(file))
+		{
+			gson.toJson(array, fw);
+		}
+		catch (IOException e)
+		{
+			log.error("Failed to write GE JSON Array to {}", file.getAbsolutePath(), e);
+		}
+	}
+
+	/**
+	 * Appends a single JsonObject as a new line to a .jsonl file.
+	 * Highly efficient as it does not require reading the existing file into memory.
+	 */
+	public synchronized void appendJsonlLog(File file, JsonObject newEntry)
+	{
+		if (file == null || newEntry == null) return;
+
+		File parent = file.getParentFile();
+		if (parent != null && !parent.exists())
+		{
+			parent.mkdirs();
+		}
+
+		// The 'true' flag in FileWriter enables append mode
+		try (FileWriter fw = new FileWriter(file, true);
+			 BufferedWriter bw = new BufferedWriter(fw))
+		{
+			bw.write(newEntry.toString());
+			bw.newLine();
+		}
+		catch (IOException e)
+		{
+			log.error("Failed to append to JSONL file at {}", file.getAbsolutePath(), e);
 		}
 	}
 
@@ -1049,13 +1072,13 @@ public class FileIOService
 				 PrintWriter out = new PrintWriter(bw)) {
 
 				out.println("ItemID,ItemName,Quantity,Value");
-					for (ValuedItemBundle item : items) {
-						out.printf("%d,%s,%d,%d%n",
-							item.getItemId(),
-							item.getItemName(),
-							item.getQuantity(),
-							item.getValue());
-					}
+				for (ValuedItemBundle item : items) {
+					out.printf("%d,%s,%d,%d%n",
+						item.getItemId(),
+						item.getItemName(),
+						item.getQuantity(),
+						item.getValue());
+				}
 				log.debug("Successfully exported vault to CSV: {}", csvFile.getName());
 			} catch (Exception e) {
 				log.error("Failed to write vault contents to CSV: {}", csvFile.getName(), e);
@@ -1545,5 +1568,33 @@ public class FileIOService
 			log.error("Failed to read JSON from file: {}", file.getName(), e);
 			return null;
 		}
+	}
+
+	/**
+	 * Reads a JSON Lines (.jsonl) file and parses it into a list of the specified class.
+	 */
+	public <T> List<T> readJsonlFile(File file, Class<T> classOfT)
+	{
+		List<T> entries = new ArrayList<>();
+		if (file == null || !file.exists()) return entries;
+
+		try (BufferedReader reader = new BufferedReader(new FileReader(file)))
+		{
+			String line;
+			while ((line = reader.readLine()) != null)
+			{
+				T entry = gson.fromJson(line, classOfT);
+				if (entry != null)
+				{
+					entries.add(entry);
+				}
+			}
+		}
+		catch (Exception e)
+		{
+			log.error("Failed to read JSONL file: {}", file.getAbsolutePath(), e);
+		}
+
+		return entries;
 	}
 }

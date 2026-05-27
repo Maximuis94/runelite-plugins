@@ -3,6 +3,7 @@ package com.datalogger.services.itemvault.other;
 import com.datalogger.models.enums.VaultType;
 import com.datalogger.models.itemvault.BankedItem;
 import com.datalogger.models.itemvault.ItemBundle;
+import com.datalogger.services.InventoryStateManager;
 import com.datalogger.services.itemvault.AbstractVaultParser;
 import com.google.gson.reflect.TypeToken;
 import java.io.File;
@@ -32,6 +33,10 @@ public class CarriedItemsParser extends AbstractVaultParser
 {
 	@Inject
 	private ItemManager itemManager;
+
+	@Inject
+	private InventoryStateManager inventoryStateManager;
+
 	// Flag to delay the initial login parse by one tick to ensure containers are fully loaded
 	private boolean needsLoginUpdate = false;
 	private final List<BankedItem> carriedItems = new ArrayList<>();
@@ -112,34 +117,23 @@ public class CarriedItemsParser extends AbstractVaultParser
 //
 //		log.debug("Updating carried items = {}.", event.getGroupId());
 //		// WidgetID.LOGOUT_PANEL_ID is the group ID for the logout screen
-////		if (event.getGroupId() == 161)
-////		{
-////			log.debug("Logout panel closed. Saving carried items state.");
-////			processCarriedItems();
-////		}
+	////		if (event.getGroupId() == 161)
+	////		{
+	////			log.debug("Logout panel closed. Saving carried items state.");
+	////			processCarriedItems();
+	////		}
 //	}
 
 	private void updateAndProcessCarriedItems()
 	{
-		// 1. Use local variables instead of class-level fields to prevent state leakage
-		Map<Integer, Long> localCombinedItems = new HashMap<>();
-
-		ItemContainer inventory = client.getItemContainer(InventoryID.INV);
-		if (inventory != null && inventory.size() > 0) aggregateContainer(inventory, localCombinedItems);
-
-		ItemContainer equipment = client.getItemContainer(InventoryID.WORN);
-		if (equipment != null && equipment.size() > 0) aggregateContainer(equipment, localCombinedItems);
-
-		log.debug("Updated combined items. Combined size is {}.", localCombinedItems.size());
-
+		Map<Integer, Long> localCombinedItems = inventoryStateManager.getAggregatedCarriedItems();
+		log.debug("Fetched combined items from state manager. Combined size is {}.", localCombinedItems.size());
 		processCarriedItems(localCombinedItems);
 	}
 
 	private void processCarriedItems(Map<Integer, Long> combinedItemsMap)
 	{
 		log.debug("Processing carried items...");
-
-		// 2. Instantiate a FRESH list every time this method runs
 		List<BankedItem> freshCarriedItems = new ArrayList<>();
 
 		for (Map.Entry<Integer, Long> entry : combinedItemsMap.entrySet())
@@ -159,7 +153,6 @@ public class CarriedItemsParser extends AbstractVaultParser
 			));
 		}
 
-		// 3. Save the fresh list, which will overwrite the JSON cleanly without duplicates
 		saveSlimVaultCache(freshCarriedItems);
 		hasUpdated = false;
 		nextUpdateTick = 0;

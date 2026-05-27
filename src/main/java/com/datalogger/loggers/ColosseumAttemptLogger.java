@@ -84,6 +84,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
@@ -152,6 +153,7 @@ public class ColosseumAttemptLogger extends AbstractLogger
 
 	private final DataLoggerConfig config;
 
+	@Setter
 	private boolean enabledLogging;
 	private boolean enabledCsvLogging;
 	private boolean autoMergeWaveFiles;

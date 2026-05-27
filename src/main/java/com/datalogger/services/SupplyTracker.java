@@ -26,20 +26,15 @@
 package com.datalogger.services;
 
 import com.datalogger.DataLoggerConfig;
-import static com.datalogger.constants.Item.EQUIPMENT_CONTAINER_ID;
-import static com.datalogger.constants.Item.INVENTORY_CONTAINER_ID;
 import static com.datalogger.constants.Item.RUNE_POUCH_AMOUNT_VARBITS;
 import static com.datalogger.constants.Item.RUNE_POUCH_TYPE_VARBITS;
-import static com.datalogger.constants.PluginConstants.UNMUTE_COOLDOWN_SECONDS;
 import com.datalogger.dto.TrackedSuppliesDTO;
 import com.datalogger.models.enums.ConsumableItemGroup;
 import com.datalogger.models.enums.ItemCharge;
-import com.datalogger.models.enums.TrackedEquipment;
 import com.datalogger.models.supplytracker.SupplySnapshot;
 import com.datalogger.models.supplytracker.TrackedSupplies;
 import com.datalogger.models.supplytracker.ValuedItemStack;
 import java.io.File;
-import java.time.Instant;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -48,17 +43,12 @@ import javax.inject.Singleton;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
-import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
 import net.runelite.api.EnumComposition;
 import net.runelite.api.EnumID;
-import net.runelite.api.Item;
 import net.runelite.api.ItemComposition;
-import net.runelite.api.ItemContainer;
-import net.runelite.api.Preferences;
 import net.runelite.api.events.VarbitChanged;
 import static net.runelite.api.gameval.ItemID.BH_RUNE_POUCH;
-import static net.runelite.api.gameval.ItemID.BLOOD_AMULET;
 import static net.runelite.api.gameval.ItemID.DIVINE_RUNE_POUCH;
 import static net.runelite.api.gameval.ItemID.DIZANAS_QUIVER_BROKEN;
 import static net.runelite.api.gameval.ItemID.DIZANAS_QUIVER_INFINITE_BROKEN;
@@ -74,21 +64,14 @@ import net.runelite.client.game.ItemVariationMapping;
 public class SupplyTracker
 {
 	private final Client client;
-
 	private final ItemManager itemManager;
-
 	private final EquipmentTracker equipmentTracker;
-
+	private final InventoryStateManager inventoryStateManager;
 	private final FileIOService fileIOService;
-
 	private final DataLoggerConfig config;
 
 	@Setter
 	private String tag = null;
-
-	private Instant nextUnmuteTimestamp = null;
-	private boolean hasUnmutedAudio = false;
-	private boolean hasWeaponWithCharges = false;
 
 	@Getter
 	private boolean isTracking = false;
@@ -105,11 +88,12 @@ public class SupplyTracker
 	private final int RUNE_POUCH_SLOTS = RUNE_POUCH_TYPE_VARBITS.length;
 
 	@Inject
-	public SupplyTracker(Client client, ItemManager itemManager, EquipmentTracker equipmentTracker, FileIOService fileIOService, DataLoggerConfig config)
+	public SupplyTracker(Client client, ItemManager itemManager, EquipmentTracker equipmentTracker, InventoryStateManager inventoryStateManager, FileIOService fileIOService, DataLoggerConfig config)
 	{
 		this.client = client;
 		this.itemManager = itemManager;
 		this.equipmentTracker = equipmentTracker;
+		this.inventoryStateManager = inventoryStateManager;
 		this.fileIOService = fileIOService;
 		this.config = config;
 	}
@@ -152,27 +136,19 @@ public class SupplyTracker
 	}
 
 	/**
-	 * Parse the inventory items container and return the result as an itemId, quantity mapping.
+	 * Helper method to fetch the aggregated items from the InventoryStateManager and cast quantities to Integers.
 	 */
-	private Map<Integer, Integer> parseInventory()
+	private Map<Integer, Integer> getAggregatedItems()
 	{
-		Map<Integer, Integer> inventoryMap = new HashMap<>();
+		Map<Integer, Integer> aggregatedIntMap = new HashMap<>();
+		Map<Integer, Long> stateMap = inventoryStateManager.getAggregatedCarriedItems();
 
-		ItemContainer inventoryContainer = client.getItemContainer(INVENTORY_CONTAINER_ID);
-
-		if (inventoryContainer == null)
+		if (stateMap != null)
 		{
-			return inventoryMap;
+			stateMap.forEach((itemId, quantity) -> aggregatedIntMap.put(itemId, quantity.intValue()));
 		}
-		Item[] items = inventoryContainer.getItems();
 
-		for (Item item : items)
-		{
-			if (item == null || item.getId() == -1) continue;
-
-			inventoryMap.merge(item.getId(), item.getQuantity(), Integer::sum);
-		}
-		return inventoryMap;
+		return aggregatedIntMap;
 	}
 
 	/**
@@ -198,36 +174,9 @@ public class SupplyTracker
 
 				if (converted != null)
 				{
-					converted.forEach((group, nDoses) ->
-						output.merge(group, nDoses, Integer::sum)
-					);
+					converted.forEach((group, nDoses) -> output.merge(group, nDoses, Integer::sum));
 				}
 			}
-		}
-		return output;
-	}
-
-	/**
-	 * Parse the equipped items container and return the result as an itemId, quantity mapping.
-	 */
-	private Map<Integer, Integer> parseEquipment()
-	{
-		Map<Integer, Integer> output = new HashMap<>();
-
-		ItemContainer equipmentContainer = client.getItemContainer(EQUIPMENT_CONTAINER_ID);
-
-		if (equipmentContainer == null)
-		{
-			return output;
-		}
-		Item[] items = equipmentContainer.getItems();
-
-		for (Item item : items)
-		{
-			if (item == null || item.getId() == -1) continue;
-
-			int itemId = item.getId();
-			output.merge(itemId, item.getQuantity(), Integer::sum);
 		}
 		return output;
 	}
@@ -258,39 +207,27 @@ public class SupplyTracker
 	}
 
 	/**
-	 * Update the corresponding flags of the given base itemId.
+	 * Checks the current aggregated inventory to see if tracking needs to be enabled for special containers.
 	 */
-	private void updateItemFlag(int baseItemId)
+	private void updateSpecialContainers()
 	{
-		if (!hasWeaponWithCharges && TrackedEquipment.getByBaseId(baseItemId) != null && baseItemId != BLOOD_AMULET)
-		{
-			hasWeaponWithCharges = true;
-			log.debug("Detected a weapon that consumes charges");
-		}
-		else if (baseItemId == BH_RUNE_POUCH || baseItemId == DIVINE_RUNE_POUCH)
-		{
-			hasRunePouch = true;
-			log.debug("Enabled tracking of Rune pouch contents");
-		}
-		else if (baseItemId == DIZANAS_QUIVER_INFINITE_BROKEN   || baseItemId == SKILLCAPE_MAX_DIZANAS_BROKEN || baseItemId == DIZANAS_QUIVER_BROKEN)
-		{
-			hasQuiver = true;
-			initializeQuiver();
-		}
-	}
-
-	private void updateTrackAttackAnims()
-	{
-		hasWeaponWithCharges = false;
 		hasRunePouch = false;
 		hasQuiver = false;
 
 		for (Integer itemId : inventory.keySet())
 		{
-			updateItemFlag(ItemVariationMapping.map(itemId));
+			int baseId = ItemVariationMapping.map(itemId);
+			if (baseId == BH_RUNE_POUCH || baseId == DIVINE_RUNE_POUCH)
+			{
+				hasRunePouch = true;
+				log.debug("Enabled tracking of Rune pouch contents");
+			}
+			else if (baseId == DIZANAS_QUIVER_INFINITE_BROKEN || baseId == SKILLCAPE_MAX_DIZANAS_BROKEN || baseId == DIZANAS_QUIVER_BROKEN)
+			{
+				hasQuiver = true;
+				initializeQuiver();
+			}
 		}
-
-		updateItemFlag(equipmentTracker.getBaseWeaponId());
 	}
 
 	/**
@@ -299,17 +236,14 @@ public class SupplyTracker
 	 */
 	private void parseInitialItemContainers()
 	{
-		inventory = parseInventory();
-
+		inventory = getAggregatedItems();
 		doses = extractDoses(inventory);
 
-		inventory = mergeMaps(inventory, parseEquipment());
-
-		updateTrackAttackAnims();
+		updateSpecialContainers();
 
 		if (hasRunePouch)
 		{
-			inventory = mergeMaps(inventory, parseRunePouch());
+			inventory.putAll(parseRunePouch());
 		}
 
 		if (hasQuiver)
@@ -320,43 +254,26 @@ public class SupplyTracker
 		initialSupplies = new SupplySnapshot(inventory, doses);
 	}
 
-
 	/**
 	 * Parse and return the current contents of the inventory and its containers as a SupplySnapshot
 	 */
 	private SupplySnapshot getInventorySnapshot()
 	{
-		Map<Integer, Integer> inventory = parseInventory();
-
-		Map<ConsumableItemGroup, Integer> doses = extractDoses(inventory);
-
-		inventory = mergeMaps(inventory, parseEquipment());
+		Map<Integer, Integer> currentInventory = getAggregatedItems();
+		Map<ConsumableItemGroup, Integer> currentDoses = extractDoses(currentInventory);
 
 		if (hasRunePouch)
 		{
-			inventory = mergeMaps(inventory, parseRunePouch());
+			currentInventory.putAll(parseRunePouch());
 		}
 
 		if (hasQuiver)
 		{
 			log.debug("Adding quiver contents {}x {} into inventory", quiverItemQuantity, quiverItemComposition.getName());
-			inventory.merge(quiverItemId, quiverItemQuantity, Integer::sum);
+			currentInventory.merge(quiverItemId, quiverItemQuantity, Integer::sum);
 		}
 
-		return new SupplySnapshot(inventory, doses);
-	}
-
-
-	/**
-	 * Merge map1 into map2 and return the combined map.
-	 */
-	public Map<Integer, Integer> mergeMaps(Map<Integer, Integer> map1, Map<Integer, Integer> map2)
-	{
-		Map<Integer, Integer> combined = new HashMap<>(map1);
-		map2.forEach((composition, quantity) ->
-			combined.merge(composition, quantity, Integer::sum)
-		);
-		return combined;
+		return new SupplySnapshot(currentInventory, currentDoses);
 	}
 
 	/**
@@ -379,21 +296,18 @@ public class SupplyTracker
 	{
 		isTracking = false;
 		TrackedSupplies supplies = getConsumedItems();
+
 		if (supplies != null)
 		{
 			TrackedSuppliesDTO suppliesDTO = supplies.toDto(tag);
-			if (writeJson) fileIOService.exportToJson(new File(directory, fileName+".json"), suppliesDTO);
-			if (writeCsv) fileIOService.exportToCsv(new File(directory, fileName+".csv"), suppliesDTO);
+			if (writeJson) fileIOService.exportToJson(new File(directory, fileName + ".json"), suppliesDTO);
+			if (writeCsv) fileIOService.exportToCsv(new File(directory, fileName + ".csv"), suppliesDTO);
 		}
 		else
 		{
-
 			log.debug("Supplies is null...");
 		}
-
-//		restoreMutedSoundEffects();
 	}
-
 
 	/**
 	 * Compare the initial state with the current state and return the difference as a TrackedSupplies instance that
@@ -407,9 +321,13 @@ public class SupplyTracker
 		Map<ConsumableItemGroup, Integer> consumedDoses = new HashMap<>();
 		Map<Integer, Integer> consumedItems = new HashMap<>();
 		Map<String, ValuedItemStack> namedItems = new HashMap<>();
-		int[] totalValue = {0};
 
-		inventory.forEach((item, startQty) -> {
+		long totalValue = 0;
+
+		for (Map.Entry<Integer, Integer> entry : inventory.entrySet())
+		{
+			int item = entry.getKey();
+			int startQty = entry.getValue();
 			int endQty = snapshot.getInventory().getOrDefault(item, 0);
 			int diff = startQty - endQty;
 
@@ -418,15 +336,20 @@ public class SupplyTracker
 				ItemComposition itemComposition = itemManager.getItemComposition(item);
 				log.debug("Consumed item: {} x{}", itemComposition.getName(), diff);
 				consumedItems.put(item, diff);
+
 				int price = itemManager.getItemPrice(item);
-				int value = diff * (price > 0 ? price : itemComposition.getHaPrice());
-				totalValue[0] += value;
-				namedItems.put(itemComposition.getName(), new ValuedItemStack(diff, value));
+				long value = (long) diff * (price > 0 ? price : itemComposition.getHaPrice());
+				totalValue += value;
+
+				namedItems.put(itemComposition.getName(), new ValuedItemStack(diff, (int) value));
 			}
-		});
+		}
 
 		Map<String, ValuedItemStack> namedDoses = new HashMap<>();
-		doses.forEach((itemGroup, startQty) -> {
+		for (Map.Entry<ConsumableItemGroup, Integer> entry : doses.entrySet())
+		{
+			ConsumableItemGroup itemGroup = entry.getKey();
+			int startQty = entry.getValue();
 			int endQty = snapshot.getDoses().getOrDefault(itemGroup, 0);
 			int diff = startQty - endQty;
 
@@ -434,24 +357,29 @@ public class SupplyTracker
 			{
 				log.debug("Consumed dose: {} x{}", itemGroup.getBaseItemName(), diff);
 				consumedDoses.put(itemGroup, diff);
-				int value = itemGroup.getDoseValue() * diff;
-				totalValue[0] += value;
-				namedDoses.put(itemGroup.getBaseItemName(), new ValuedItemStack(diff, value));
+
+				long value = (long) itemGroup.getDoseValue() * diff;
+				totalValue += value;
+
+				namedDoses.put(itemGroup.getBaseItemName(), new ValuedItemStack(diff, (int) value));
 			}
-		});
+		}
 
 		Map<String, ValuedItemStack> namedCharges = new HashMap<>();
 		Map<ItemCharge, Integer> consumedCharges = equipmentTracker.getTrackedCharges();
+
 		if (consumedCharges != null)
 		{
-			consumedCharges.forEach((charge, qty) -> {
-				int value = charge.getChargeValue() * qty;
+			for (Map.Entry<ItemCharge, Integer> entry : consumedCharges.entrySet())
+			{
+				ItemCharge charge = entry.getKey();
+				int qty = entry.getValue();
+				long value = (long) charge.getChargeValue() * qty;
 
-				totalValue[0] += value; // Accumulate total
-				namedCharges.put(charge.getFormattedName(), new ValuedItemStack(qty, value));
-			});
+				totalValue += value;
+				namedCharges.put(charge.getFormattedName(), new ValuedItemStack(qty, (int) value));
+			}
 		}
-
-		return new TrackedSupplies(consumedItems, consumedDoses, consumedCharges, namedItems, namedDoses, namedCharges, totalValue[0]);
+		return new TrackedSupplies(consumedItems, consumedDoses, consumedCharges, namedItems, namedDoses, namedCharges, (int) totalValue);
 	}
 }
