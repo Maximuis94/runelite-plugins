@@ -33,6 +33,7 @@ import com.datalogger.loggers.GrandExchangeLogger;
 import com.datalogger.loggers.ItemVaultLogger;
 import com.datalogger.loggers.ScreenshotLogger;
 import com.datalogger.models.enums.ConsumableItemGroup;
+import com.datalogger.models.enums.GameMode;
 import com.datalogger.models.enums.ItemCharge;
 import com.datalogger.services.AccountHashMapper;
 import com.datalogger.services.ColosseumScanner;
@@ -75,8 +76,8 @@ import net.runelite.client.util.ImageUtil;
 @Slf4j
 @PluginDescriptor(
 	name = "Data Logger",
-	description = "Locally logs Fortis Colosseum trial data (+Discord webhook), storages, and GE offers as JSON/CSV files. Designed for multi-client usage.",
-	tags = {"logger", "data", "history", "screenshot", "tracker", "csv", "json", "ge", "grand exchange", "bank", "item", "fortis", "colosseum", "timeline", "discord", "local", "webhook"}
+	description = "Locally logs+views Colosseum trial data (+Discord webhook), item data, and GE offers as JSON/CSV files. Designed for multi-client usage.",
+	tags = {"logger", "data", "viewer", "history", "screenshot", "tracker", "csv", "json", "jsonl", "ge", "grand exchange", "bank", "item", "fortis", "colosseum", "timeline", "discord", "local", "webhook"}
 )
 public class DataLoggerPlugin extends Plugin
 {
@@ -111,7 +112,8 @@ public class DataLoggerPlugin extends Plugin
 	private NavigationButton navButton;
 	private boolean sessionInitialized = false;
 	private boolean startUpComplete = false;
-	private boolean isPermanentWorld = false;
+	private boolean isRegularWorld = false;
+	private GameMode gameMode = null;
 
 	private boolean isItemVaultRegistered = false;
 	private boolean isGeRegistered = false;
@@ -382,7 +384,7 @@ public class DataLoggerPlugin extends Plugin
 		{
 			log.debug("Player has logged out or is hopping. Resetting account parameters.");
 			sessionInitialized = false;
-			eventBus.post(new AccountSessionStarted("-1", -1, null, false, false));
+			eventBus.post(new AccountSessionStarted("-1", -1, null, false, isRegularWorld, null));
 			coloScanner.clearState();
 		}
 	}
@@ -403,24 +405,32 @@ public class DataLoggerPlugin extends Plugin
 				String hashString = String.valueOf(currentHash);
 				String accountName = client.getLocalPlayer().getName();
 				boolean isMembers = client.getWorldType().contains(WorldType.MEMBERS);
-				EnumSet<WorldType> worldTypes = client.getWorldType();
 
-				boolean oldValue = isPermanentWorld;
-				isPermanentWorld = !(
-					worldTypes.contains(WorldType.SEASONAL) ||
-						worldTypes.contains(WorldType.BETA_WORLD) ||
-						worldTypes.contains(WorldType.NOSAVE_MODE) ||
-						worldTypes.contains(WorldType.TOURNAMENT_WORLD) ||
-						worldTypes.contains(WorldType.PVP_ARENA) ||
-						worldTypes.contains(WorldType.QUEST_SPEEDRUNNING) ||
-						worldTypes.contains(WorldType.FRESH_START_WORLD)
-				);
-				if (oldValue != isPermanentWorld) updateLoggerEnabledFlags();
+				GameMode oldValue = gameMode;
+				gameMode = determineGameMode();
+				if (oldValue != gameMode) updateLoggerEnabledFlags();
 
-				log.debug("Loaded new session data. accountHash={} accountName={} isMembers={} isPermanentWorld={}", hashString, accountName, isMembers, isPermanentWorld);
-				eventBus.post(new AccountSessionStarted(hashString, currentHash, accountName, isMembers, isPermanentWorld));
+				log.debug("Loaded new session data. accountHash={} accountName={} isMembers={} gameMode={}", hashString, accountName, isMembers, gameMode);
+				eventBus.post(new AccountSessionStarted(hashString, currentHash, accountName, isMembers, gameMode == GameMode.REGULAR, gameMode));
 			}
 		}
+	}
+
+	/**
+	 * Return the GameMode that applies to the current world
+	 */
+	private GameMode determineGameMode()
+	{
+		EnumSet<WorldType> worldTypes = client.getWorldType();
+
+		if (worldTypes.contains(WorldType.SEASONAL)) {
+			return GameMode.LEAGUES;
+		} else if (worldTypes.contains(WorldType.DEADMAN)) {
+			return GameMode.DEADMAN;
+		} else if (worldTypes.contains(WorldType.NOSAVE_MODE) || worldTypes.contains(WorldType.TOURNAMENT_WORLD)) {
+			return GameMode.BETA;
+		}
+		return GameMode.REGULAR;
 	}
 
 	/**
@@ -428,7 +438,7 @@ public class DataLoggerPlugin extends Plugin
 	 */
 	private void updateLoggerEnabledFlags()
 	{
-		boolean geLoggingEnabled = isPermanentWorld && config.logGrandExchange();
+		boolean geLoggingEnabled = isRegularWorld && config.logGrandExchange();
 		geLogger.setLoggerIsEnabled(geLoggingEnabled);
 		grandExchangeHistoryParser.setEnabled(geLoggingEnabled);
 //		coloLogger.setEnabledLogging(config.logColosseum());

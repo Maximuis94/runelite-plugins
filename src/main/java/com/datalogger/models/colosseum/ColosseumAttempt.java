@@ -29,6 +29,7 @@ import static com.datalogger.constants.Colosseum.COLOSSEUM_TRIAL_TIMESTAMP_FORMA
 import static com.datalogger.constants.PluginConstants.COLOSSEUM_TRIALS_DIR;
 import com.datalogger.dto.ColosseumAttemptDTO;
 import com.datalogger.models.enums.ColosseumModifier;
+import com.datalogger.models.enums.GameMode;
 import com.datalogger.models.enums.WaveStatus;
 import com.datalogger.models.supplytracker.TrackedSupplies;
 import com.datalogger.models.supplytracker.ValuedItemStack;
@@ -59,6 +60,8 @@ public class ColosseumAttempt
 	@Setter
 	private WaveStatus finalStatus;
 
+	private final GameMode gameMode;
+
 	private final Map<Integer, ColosseumModifier> activeModifiers = new LinkedHashMap<>();
 
 	private int consumedSupplyValue;
@@ -87,7 +90,7 @@ public class ColosseumAttempt
 	private final String supplyFileName;
 
 
-	public ColosseumAttempt(int startTick, String accountName)
+	public ColosseumAttempt(int startTick, String accountName, GameMode gameMode)
 	{
 		long now = System.currentTimeMillis();
 		id = now - (now % 1000L);
@@ -98,6 +101,7 @@ public class ColosseumAttempt
 		waves = new ArrayList<>();
 		finalStatus = WaveStatus.FAILED;
 		this.accountName = accountName == null ? "N/A" : accountName;
+		this.gameMode = gameMode;
 		totalTimeTaken = .0;
 
 		attemptId = String.format("%s_%s", this.accountName, startTime);
@@ -143,6 +147,7 @@ public class ColosseumAttempt
 			.attemptId(attemptId)
 			.timestamp(id)
 			.accountName(accountName)
+			.gameMode(gameMode.name())
 			.result(finalStatus != null ? finalStatus.name() : "UNKNOWN")
 			.rewardsValue(totalRewardsValue)
 			.rewards(namedRewards)

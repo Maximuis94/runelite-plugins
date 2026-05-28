@@ -26,6 +26,7 @@
 package com.datalogger.dto;
 
 import static com.datalogger.constants.PluginConstants.CURRENT_COLOSSEUM_TRIAL_LOG_VERSION;
+import static com.datalogger.constants.PluginConstants.DEFAULT_GAMEMODE_DTO;
 import com.datalogger.models.supplytracker.ValuedItemStack;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -47,6 +48,9 @@ public class ColosseumAttemptDTO {
 	@NonNull
 	private String result;
 	private int rewardsValue;
+
+	@Builder.Default
+	private String gameMode = DEFAULT_GAMEMODE_DTO;
 
 	@Builder.Default
 	private Map<String, ValuedItemStack> rewards = new HashMap<>();

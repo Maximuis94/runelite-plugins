@@ -39,6 +39,7 @@ public class ColosseumWaveDtoV0
 	private String status;
 
 	private String accountName;
+
 	private String tag;
 
 	private List<ItemBundle> earnedLoot;

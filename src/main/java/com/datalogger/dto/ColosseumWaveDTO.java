@@ -26,6 +26,7 @@
 package com.datalogger.dto;
 
 import static com.datalogger.constants.PluginConstants.CURRENT_COLOSSEUM_TRIAL_LOG_VERSION;
+import static com.datalogger.constants.PluginConstants.DEFAULT_GAMEMODE_DTO;
 import com.datalogger.models.colosseum.ManticoreAttackSequence;
 import com.datalogger.models.itemvault.ItemBundle;
 import java.util.List;
@@ -43,6 +44,9 @@ public class ColosseumWaveDTO {
 
 	private ItemBundle earnedLoot;
 	private int lootValue;
+
+	@Builder.Default
+	private String gameMode = DEFAULT_GAMEMODE_DTO;
 
 	private List<String> modifierChoices;
 	private String chosenModifier;

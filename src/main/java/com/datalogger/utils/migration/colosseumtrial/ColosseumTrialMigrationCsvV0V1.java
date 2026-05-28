@@ -28,7 +28,7 @@ package com.datalogger.utils.migration.colosseumtrial;
 import com.datalogger.DataLoggerConfig;
 import static com.datalogger.constants.Colosseum.Item.DIZANAS_QUIVER_UNCHARGED_ID;
 import static com.datalogger.constants.Colosseum.Item.SUNFIRE_SPLINTERS_ID;
-import static com.datalogger.constants.PluginConstants.COLOSSEUM_ROOT_DIR;
+import static com.datalogger.constants.PluginConstants.DEFAULT_GAMEMODE_DTO;
 import static com.datalogger.constants.PluginConstants.INTERNAL_COLOSSEUM_TRIAL_HISTORY;
 import com.datalogger.models.colosseum.ManticoreAttackSequence;
 import com.datalogger.models.itemvault.ItemBundle;
@@ -60,19 +60,21 @@ import net.runelite.api.ItemComposition;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.game.ItemManager;
 
+/**
+ * Migrates CSV trial data from 1.1.0 to 1.2.0
+ */
 @Slf4j
 @Singleton
 public class ColosseumTrialMigrationCsvV0V1 implements DataMigration {
 	private final ItemManager itemManager;
-	private Gson gson;
+	private final Gson gson;
 	private final ClientThread clientThread;
 	private final DataLoggerConfig config;
 
 	@Getter
-	private File outFile = null;
+	private final File outFile = null;
 
-//	private File jsonlFile = new File(COLOSSEUM_ROOT_DIR, "migration-test.jsonl");
-	private File jsonlFile = INTERNAL_COLOSSEUM_TRIAL_HISTORY;
+	private final File jsonlFile = INTERNAL_COLOSSEUM_TRIAL_HISTORY;
 
 	@Inject
 	public ColosseumTrialMigrationCsvV0V1(ItemManager itemManager, Gson gson, ClientThread clientThread, DataLoggerConfig config) {
@@ -123,12 +125,15 @@ public class ColosseumTrialMigrationCsvV0V1 implements DataMigration {
 			List<ColosseumWaveDtoV1> waveDtos = new ArrayList<>();
 			Map<String, String> activeModsMap = new LinkedHashMap<>();
 			String result = "";
-
+			String tag = "";
 			for (int i = 1; i < lines.size(); i++) {
 				String[] cols = lines.get(i).split(",", -1);
 				if (cols.length < oldHeaders.length) continue;
 
-				Function<String, String> getCol = (name) -> cols[headerMap.getOrDefault(name, 0)];
+				Function<String, String> getCol = (name) -> {
+					Integer idx = headerMap.get(name);
+					return (idx != null && idx < cols.length) ? cols[idx] : null;
+				};
 
 				String[] ids = getCol.apply("itemIds").split("\\|");
 				String[] names = getCol.apply("itemNames").split("\\|");
@@ -155,12 +160,13 @@ public class ColosseumTrialMigrationCsvV0V1 implements DataMigration {
 						return null;
 					}
 				};
-
+				tag = getCol.apply("tag");
 				ColosseumWaveDtoV1 waveDto = ColosseumWaveDtoV1.builder()
 					.wave(Integer.parseInt(getCol.apply("wave")))
 					.status(getCol.apply("status"))
 					.accountName(getCol.apply("accountName"))
-					.tag(getCol.apply("tag"))
+					.tag(tag)
+					.gameMode(DEFAULT_GAMEMODE_DTO)
 					.earnedLoot(earnedLoot)
 					.chosenModifier(chosen)
 					.completionBonus(Integer.parseInt(getCol.apply("completionBonus")))
@@ -237,7 +243,7 @@ public class ColosseumTrialMigrationCsvV0V1 implements DataMigration {
 
 			final int finalWaveTotalGlory = totalGlory;
 			final double finalWaveTotalTimeTaken = totalTime;
-
+			final String finalTag = tag;
 			clientThread.invokeLater(() -> {
 				Map<String, ValuedItemStack> rewardsMap = generateNamedRewardsMap(aggregatedRewards);
 
@@ -253,6 +259,8 @@ public class ColosseumTrialMigrationCsvV0V1 implements DataMigration {
 					.attemptId(fileName)
 					.timestamp(timestamp)
 					.accountName(nameParts[0])
+					.gameMode(DEFAULT_GAMEMODE_DTO)
+					.tag(finalTag)
 					.rewardsValue(rewardsMap.values().stream()
 						.mapToInt(ValuedItemStack::getTotalValueInGp)
 						.sum())

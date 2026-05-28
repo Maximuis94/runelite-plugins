@@ -41,6 +41,8 @@ public class ColosseumWaveDtoV1
 	private String accountName;
 	private String tag;
 
+	private String gameMode;
+
 	private ItemBundle earnedLoot;
 	private int lootValue;
 

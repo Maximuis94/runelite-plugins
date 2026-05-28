@@ -26,6 +26,7 @@ package com.datalogger.framework;
 
 import com.datalogger.DataLoggerConfig;
 import com.datalogger.events.AccountSessionStarted;
+import com.datalogger.models.enums.GameMode;
 import com.datalogger.services.FileIOService;
 import java.io.File;
 import javax.inject.Inject;
@@ -42,7 +43,8 @@ public abstract class AbstractLogger implements Loggable {
 	@Inject protected DataLoggerConfig config;
 
 	// Currently active account
-	private boolean onPermanentWorld = false;
+	private boolean onRegularWorld = false;
+	private GameMode gameMode = null;
 	private String accountName = "unknown";
 	private String accountHashString = "-1";
 	private long accountHashLong = -1;
@@ -71,9 +73,17 @@ public abstract class AbstractLogger implements Loggable {
 	/**
 	 * Returns true if the current session is on a temporary game mode like leagues
 	 */
-	protected boolean isOnPermanentWorld()
+	protected boolean isOnRegularWorld()
 	{
-		return onPermanentWorld;
+		return onRegularWorld;
+	}
+
+	/**
+	 * Return the GameMode of the current world
+	 */
+	protected GameMode getGameMode()
+	{
+		return gameMode;
 	}
 
 	/**
@@ -98,7 +108,8 @@ public abstract class AbstractLogger implements Loggable {
 		accountName = event.getAccountName();
 		accountHashString = event.getAccountHashString();
 		accountHashLong = event.getAccountHash();
-		onPermanentWorld = event.isOnPermanentWorld();
+		onRegularWorld = event.isOnRegularWorld();
+		gameMode = event.getGameMode();
 
 		log.debug("[{}] Session initialized for {} ({})", getLogType(), accountName, accountHashString);
 

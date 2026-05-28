@@ -25,16 +25,15 @@
 
 package com.datalogger.ui.modes;
 
-import static com.datalogger.constants.PluginConstants.COLOSSEUM_TRIALS_DIR;
-import com.datalogger.models.enums.UIScrollSpeed;
-import static com.datalogger.ui.utils.Util.openDirectory;
-
 import com.datalogger.constants.PluginConstants;
+import static com.datalogger.constants.PluginConstants.COLOSSEUM_TRIALS_DIR;
 import com.datalogger.dto.ColosseumAttemptDTO;
 import com.datalogger.dto.ColosseumWaveDTO;
 import com.datalogger.models.enums.ColosseumModifier;
+import com.datalogger.models.enums.UIScrollSpeed;
 import com.datalogger.models.itemvault.ItemBundle;
 import com.datalogger.ui.utils.Components;
+import static com.datalogger.ui.utils.Util.openDirectory;
 import com.datalogger.ui.utils.table.ColosseumModifierTable;
 import com.google.gson.Gson;
 import java.awt.BorderLayout;
@@ -183,7 +182,6 @@ public class ColosseumStatisticsModePanel extends JPanel
 			"If set, exclude waves that have any of the tags specified.<br>" +
 			"Multiple tags can be set by separating each tag with ',', e.g. TAG_A,TAG_B</body></html>";
 		excludeTagsInput = Components.createStatefulTextField(text -> recalculateStatsFromCache(), excludeTooltip);
-
 		requiredModifiersInput = Components.createStatefulTextField(text -> recalculateStatsFromCache(), BASE_MODIFIER_TOOLTIP + "</body></html>");
 
 		statsContainer = new JPanel(new GridLayout(0, 2, 5, 5));
@@ -779,6 +777,8 @@ public class ColosseumStatisticsModePanel extends JPanel
 
 		scrollPane.setPreferredSize(SCROLLPANE_PREFERRED_SIZE);
 		scrollPane.setMaximumSize(SCROLLPANE_MAXIMUM_SIZE);
+//		scrollPane.setPreferredSize(SCROLLPANE_NO_OUTER_SCROLLBAR_SIZE);
+//		scrollPane.setMaximumSize(SCROLLPANE_NO_OUTER_SCROLLBAR_SIZE);
 		scrollBar = scrollPane.getVerticalScrollBar();
 		setScrollSpeed(scrollSpeed);
 
@@ -1110,14 +1110,14 @@ public class ColosseumStatisticsModePanel extends JPanel
 			JLabel timeTitle = new JLabel("--- Time Breakdown ---");
 			timeTitle.setForeground(Color.LIGHT_GRAY);
 			centerPanel.add(timeTitle);
-			centerPanel.add(createDetailLabel("Min: " + formatTimeDetailed(waveStat.getMinTime())));
-			centerPanel.add(createDetailLabel("P05: " + formatTimeDetailed(waveStat.getP05Time())));
-			centerPanel.add(createDetailLabel("Q1: " + formatTimeDetailed(waveStat.getQ1Time())));
-			centerPanel.add(createDetailLabel("Me: " + formatTimeDetailed(waveStat.getMedianTime())));
-			centerPanel.add(createDetailLabel("Q3: " + formatTimeDetailed(waveStat.getQ3Time())));
-			centerPanel.add(createDetailLabel("P95: " + formatTimeDetailed(waveStat.getP95Time())));
-			centerPanel.add(createDetailLabel("Max: " + formatTimeDetailed(waveStat.getMaxTime())));
 			centerPanel.add(createDetailLabel("Avg: " + formatTimeDetailed(waveStat.getAverageTime())));
+			centerPanel.add(createDetailLabel("Min: " + formatTimeDetailed(waveStat.getMinTime())));
+			centerPanel.add(createDetailLabel("5%: " + formatTimeDetailed(waveStat.getP05Time())));
+			centerPanel.add(createDetailLabel("Q1: " + formatTimeDetailed(waveStat.getQ1Time())));
+			centerPanel.add(createDetailLabel("Med: " + formatTimeDetailed(waveStat.getMedianTime())));
+			centerPanel.add(createDetailLabel("Q3: " + formatTimeDetailed(waveStat.getQ3Time())));
+			centerPanel.add(createDetailLabel("95%: " + formatTimeDetailed(waveStat.getP95Time())));
+			centerPanel.add(createDetailLabel("Max: " + formatTimeDetailed(waveStat.getMaxTime())));
 			centerPanel.add(Box.createVerticalStrut(2));
 		}
 
@@ -1126,14 +1126,14 @@ public class ColosseumStatisticsModePanel extends JPanel
 			JLabel waveGloryTitle = new JLabel("--- Wave Glory Breakdown ---");
 			waveGloryTitle.setForeground(Color.LIGHT_GRAY);
 			centerPanel.add(waveGloryTitle);
-			centerPanel.add(createDetailLabel("Min: " + waveStat.getMinGlory()));
-			centerPanel.add(createDetailLabel("P05: " + waveStat.getP05Glory()));
-			centerPanel.add(createDetailLabel("Q1: " + waveStat.getQ1Glory()));
-			centerPanel.add(createDetailLabel("Me: " + waveStat.getMedianGlory()));
-			centerPanel.add(createDetailLabel("Q3: " + waveStat.getQ3Glory()));
-			centerPanel.add(createDetailLabel("P95: " + waveStat.getP95Glory()));
-			centerPanel.add(createDetailLabel("Max: " + waveStat.getMaxGlory()));
 			centerPanel.add(createDetailLabel("Avg: " + waveStat.getAverageGlory()));
+			centerPanel.add(createDetailLabel("Min: " + waveStat.getMinGlory()));
+			centerPanel.add(createDetailLabel("5%: " + waveStat.getP05Glory()));
+			centerPanel.add(createDetailLabel("Q1: " + waveStat.getQ1Glory()));
+			centerPanel.add(createDetailLabel("Med: " + waveStat.getMedianGlory()));
+			centerPanel.add(createDetailLabel("Q3: " + waveStat.getQ3Glory()));
+			centerPanel.add(createDetailLabel("95%: " + waveStat.getP95Glory()));
+			centerPanel.add(createDetailLabel("Max: " + waveStat.getMaxGlory()));
 			centerPanel.add(Box.createVerticalStrut(2));
 		}
 		// Total Glory Stats
@@ -1141,14 +1141,14 @@ public class ColosseumStatisticsModePanel extends JPanel
 			JLabel totalGloryTitle = new JLabel("--- Total Glory Breakdown ---");
 			totalGloryTitle.setForeground(Color.LIGHT_GRAY);
 			centerPanel.add(totalGloryTitle);
+			centerPanel.add(createDetailLabel("Avg: " + String.format("%d", waveStat.getAverageTotalGlory())));
 			centerPanel.add(createDetailLabel("Min: " + waveStat.getMinTotalGlory()));
-			centerPanel.add(createDetailLabel("P05: " + waveStat.getP05TotalGlory()));
+			centerPanel.add(createDetailLabel("5%: " + waveStat.getP05TotalGlory()));
 			centerPanel.add(createDetailLabel("Q1: " + waveStat.getQ1TotalGlory()));
-			centerPanel.add(createDetailLabel("Me: " + waveStat.getMedianTotalGlory()));
+			centerPanel.add(createDetailLabel("Med: " + waveStat.getMedianTotalGlory()));
 			centerPanel.add(createDetailLabel("Q3: " + waveStat.getQ3TotalGlory()));
-			centerPanel.add(createDetailLabel("P95: " + waveStat.getP95TotalGlory()));
+			centerPanel.add(createDetailLabel("95%: " + waveStat.getP95TotalGlory()));
 			centerPanel.add(createDetailLabel("Max: " + waveStat.getMaxTotalGlory()));
-			centerPanel.add(createDetailLabel("Avg: " + String.format("%d", (int)waveStat.getAverageTotalGlory())));
 			centerPanel.add(Box.createVerticalStrut(2));
 		}
 
@@ -1157,14 +1157,14 @@ public class ColosseumStatisticsModePanel extends JPanel
 			JLabel rewardTitle = new JLabel("--- Reward Value Breakdown ---");
 			rewardTitle.setForeground(Color.LIGHT_GRAY);
 			centerPanel.add(rewardTitle);
-			centerPanel.add(createDetailLabel("Min: " + waveStat.getMinRewardValue()));
-			centerPanel.add(createDetailLabel("P05: " + waveStat.getP05RewardValue()));
-			centerPanel.add(createDetailLabel("Q1: " + waveStat.getQ1RewardValue()));
-			centerPanel.add(createDetailLabel("Me: " + waveStat.getMedianRewardValue()));
-			centerPanel.add(createDetailLabel("Q3: " + waveStat.getQ3RewardValue()));
-			centerPanel.add(createDetailLabel("P95: " + waveStat.getP95RewardValue()));
-			centerPanel.add(createDetailLabel("Max: " + waveStat.getMaxRewardValue()));
-			centerPanel.add(createDetailLabel("Avg: " + String.format("%d", waveStat.getAverageRewardValue())));
+			centerPanel.add(createDetailLabel("Avg: " + formatGp(waveStat.getAverageRewardValue())));
+			centerPanel.add(createDetailLabel("Min: " + formatGp(waveStat.getMinRewardValue())));
+			centerPanel.add(createDetailLabel("5%: " + formatGp(waveStat.getP05RewardValue())));
+			centerPanel.add(createDetailLabel("Q1: " + formatGp(waveStat.getQ1RewardValue())));
+			centerPanel.add(createDetailLabel("Med: " + formatGp(waveStat.getMedianRewardValue())));
+			centerPanel.add(createDetailLabel("Q3: " + formatGp(waveStat.getQ3RewardValue())));
+			centerPanel.add(createDetailLabel("95%: " + formatGp(waveStat.getP95RewardValue())));
+			centerPanel.add(createDetailLabel("Max: " + formatGp(waveStat.getMaxRewardValue())));
 			centerPanel.add(Box.createVerticalStrut(2));
 		}
 
@@ -1484,6 +1484,11 @@ public class ColosseumStatisticsModePanel extends JPanel
 		}
 	}
 
+	private static String formatGp(int gp)
+	{
+		return QuantityFormatter.quantityToStackSize(gp) + " gp";
+	}
+
 	@Getter
 	public static class WaveStat
 	{
@@ -1731,7 +1736,6 @@ public class ColosseumStatisticsModePanel extends JPanel
 		}
 
 		// --- Reward & Damage Metrics ---
-
 		public int getMinRewardValue() { return rewardValue.isEmpty() ? 0 : rewardValue.get(0); }
 		public int getMaxRewardValue() { return rewardValue.isEmpty() ? 0 : rewardValue.get(rewardValue.size() - 1); }
 

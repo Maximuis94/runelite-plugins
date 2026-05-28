@@ -488,7 +488,7 @@ public class ColosseumAttemptLogger extends AbstractLogger
 			.atZone(ZoneId.systemDefault())
 			.format(COLOSSEUM_TRIAL_TIMESTAMP_FORMATTER);
 		totalTimeTaken = .0;
-		currentAttempt = new ColosseumAttempt(attemptStartTick, getAccountName());
+		currentAttempt = new ColosseumAttempt(attemptStartTick, getAccountName(), getGameMode());
 		finalStatus = null;
 		activeTrial = true;
 		waitingForIntermission = true;
@@ -713,6 +713,7 @@ public class ColosseumAttemptLogger extends AbstractLogger
 		return ColosseumWave.builder()
 			.accountName(entryAccount)
 			.tag(entryTag)
+			.gameMode(getGameMode())
 			.earnedLoot(getPotentialLoot())
 			.lootValue(value)
 			.activeModifiers(getActiveModifiersList())

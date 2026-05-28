@@ -24,6 +24,7 @@
  */
 package com.datalogger.ui;
 
+import com.datalogger.DataLoggerConfig;
 import com.datalogger.models.enums.PanelViewMode;
 import com.datalogger.models.enums.UIScrollSpeed;
 import com.datalogger.ui.modes.ColosseumReviewModePanel;
@@ -39,6 +40,7 @@ import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Rectangle;
 import java.awt.event.ItemEvent;
+import java.util.function.BooleanSupplier;
 import javax.inject.Inject;
 import javax.swing.JComboBox;
 import javax.swing.JPanel;
@@ -50,6 +52,7 @@ import javax.swing.border.EmptyBorder;
 
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import net.runelite.client.config.ConfigManager;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.PluginPanel;
 
@@ -58,7 +61,8 @@ public class DataLoggerPanel extends PluginPanel {
 
 	private final CardLayout cardLayout;
 	private final JPanel cardContainer;
-	private JScrollBar scrollBar;
+	private final JScrollPane scrollPane;
+	private final JScrollBar scrollBar;
 
 	private final UtilitiesModePanel utilitiesPanel;
 	private final ColosseumStatisticsModePanel colosseumPanel;
@@ -71,7 +75,8 @@ public class DataLoggerPanel extends PluginPanel {
 		ColosseumStatisticsModePanel colosseumPanel,
 //     ColosseumReviewModePanel colosseumReviewPanel,
 		ItemsModePanel itemsPanel,
-		ItemsManagerModePanel itemsManagerPanel
+		ItemsManagerModePanel itemsManagerPanel,
+		DataLoggerConfig config
 	)
 	{
 		super(false);
@@ -95,7 +100,7 @@ public class DataLoggerPanel extends PluginPanel {
 
 		cardLayout = new VisibleCardLayout();
 
-		cardContainer = new ScrollableCardContainer(cardLayout);
+		cardContainer = new ScrollableCardContainer(cardLayout, () -> !config.allowOuterScrollbar());
 		cardContainer.setBackground(ColorScheme.DARK_GRAY_COLOR);
 
 		cardContainer.add(colosseumPanel, PanelViewMode.COLOSSEUM_STATISTICS.name());
@@ -103,6 +108,9 @@ public class DataLoggerPanel extends PluginPanel {
 		cardContainer.add(itemsPanel, PanelViewMode.ITEMS.name());
 		cardContainer.add(itemsManagerPanel, PanelViewMode.ITEMS_MANAGER.name());
 		cardContainer.add(utilitiesPanel, PanelViewMode.UTILITIES.name());
+
+//		cardContainer.setMaximumSize(new Dimension(cardContainer.getWidth(), 1500));
+//		cardContainer.setPreferredSize(new Dimension(cardContainer.getWidth(), 1500));
 
 		viewSelector.addItemListener(e -> {
 			if (e.getStateChange() == ItemEvent.SELECTED)
@@ -133,8 +141,9 @@ public class DataLoggerPanel extends PluginPanel {
 			}
 		});
 
-		JScrollPane scrollPane = wrapWithRuneLiteScrollbar(cardContainer);
+		scrollPane = wrapWithRuneLiteScrollbar(cardContainer);
 		scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+//		scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_NEVER);
 		scrollPane.setPreferredSize(new Dimension(250, 1500));
 		scrollPane.setMaximumSize(new Dimension(250, 1500));
 		scrollPane.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -187,8 +196,10 @@ public class DataLoggerPanel extends PluginPanel {
 	 */
 	private static class ScrollableCardContainer extends JPanel implements Scrollable
 	{
-		public ScrollableCardContainer(CardLayout layout) {
+		private final BooleanSupplier forceFitToScreen;
+		public ScrollableCardContainer(CardLayout layout, BooleanSupplier forceFitToScreen) {
 			super(layout);
+			this.forceFitToScreen = forceFitToScreen;
 		}
 
 		@Override
@@ -213,7 +224,9 @@ public class DataLoggerPanel extends PluginPanel {
 
 		@Override
 		public boolean getScrollableTracksViewportHeight() {
-			return false;
+			// If this returns true, Swing forces the panel to be exactly the height
+			// of the visible screen space, completely eliminating the vertical scrollbar.
+			return forceFitToScreen.getAsBoolean();
 		}
 	}
 
@@ -236,5 +249,10 @@ public class DataLoggerPanel extends PluginPanel {
 			}
 			return super.preferredLayoutSize(parent);
 		}
+	}
+
+	public void updateOuterScrollbar()
+	{
+
 	}
 }

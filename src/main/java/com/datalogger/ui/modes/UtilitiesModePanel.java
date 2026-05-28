@@ -29,6 +29,7 @@ import com.datalogger.DataLoggerConfig;
 import com.datalogger.constants.PluginConstants;
 import static com.datalogger.constants.PluginConstants.COLOSSEUM_ROOT_DIR;
 import static com.datalogger.constants.PluginConstants.COLOSSEUM_TRIALS_DIR;
+import static com.datalogger.constants.PluginConstants.CONFIG_GROUP;
 import static com.datalogger.constants.PluginConstants.GRAND_EXCHANGE_DIR;
 import static com.datalogger.constants.PluginConstants.ITEM_VAULT_DIR;
 import static com.datalogger.constants.PluginConstants.WEBHOOK_TEST_COOLDOWN_SECONDS_SUCCESS;
@@ -48,8 +49,6 @@ import static com.datalogger.ui.utils.Components.createStyledButton;
 import static com.datalogger.ui.utils.Components.showConfirmDialog;
 import static com.datalogger.ui.utils.Util.openDirectory;
 import com.datalogger.utils.migration.MigrationManager;
-import com.datalogger.utils.migration.colosseumtrial.ColosseumTrialMigrationCsvV0V1;
-import com.datalogger.utils.migration.colosseumtrial.ColosseumTrialMigrationV0V1;
 import com.datalogger.webhook.ColosseumCustomDiscordFormatter;
 import com.datalogger.webhook.ColosseumDiscordBroadcaster;
 import com.google.gson.Gson;
@@ -81,8 +80,7 @@ import javax.swing.JTextArea;
 import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
 import lombok.extern.slf4j.Slf4j;
-import net.runelite.client.callback.ClientThread;
-import net.runelite.client.game.ItemManager;
+import net.runelite.client.config.ConfigManager;
 import net.runelite.client.ui.ColorScheme;
 
 @Slf4j
@@ -94,16 +92,12 @@ public class UtilitiesModePanel extends JPanel
 	private final ColosseumDiscordBroadcaster colosseumDiscordBroadcaster;
 	private final Gson gson;
 	private final DataLoggerConfig config;
+	private final ConfigManager configManager;
 	private final VaultManager vaultManager;
-	private final ClientThread clientThread;
 	private final FileIOService fileIOService;
 	private final ItemVaultLogger itemVaultLogger;
-	private final ItemManager itemManager;
-	private final ColosseumTrialMigrationV0V1 colosseumMigration;
-	private final ColosseumTrialMigrationCsvV0V1 colosseumCsvMigration;
 	private final MigrationManager migrationManager;
 	private final GrandExchangeExportService geExportService;
-	private boolean allowColosseumMigration = false;
 
 	private Instant waitUntil;
 	private UIScrollSpeed scrollSpeed = UIScrollSpeed.MEDIUM;
@@ -112,24 +106,20 @@ public class UtilitiesModePanel extends JPanel
 	@Inject
 	public UtilitiesModePanel(ScheduledExecutorService executor, DiscordWebhookService discordWebhookService,
 							  ColosseumDiscordBroadcaster colosseumDiscordBroadcaster, Gson gson,
-							  DataLoggerConfig config, VaultManager vaultManager, ClientThread clientThread,
-							  FileIOService fileIOService, ItemVaultLogger itemVaultLogger, ItemManager itemManager,
-							  ColosseumTrialMigrationV0V1 colosseumMigration, ColosseumTrialMigrationCsvV0V1 colosseumCsvMigration,
+							  DataLoggerConfig config, ConfigManager configManager, VaultManager vaultManager,
+							  FileIOService fileIOService, ItemVaultLogger itemVaultLogger,
 							  MigrationManager migrationManager, GrandExchangeExportService geExportService)
 	{
 		this.executor = executor;
 		this.discordWebhookService = discordWebhookService;
 		this.colosseumDiscordBroadcaster = colosseumDiscordBroadcaster;
-		this.colosseumMigration = colosseumMigration;
-		this.colosseumCsvMigration = colosseumCsvMigration;
+		this.configManager = configManager;
 		this.migrationManager = migrationManager;
 		this.gson = gson;
 		this.config = config;
 		this.vaultManager = vaultManager;
-		this.clientThread = clientThread;
 		this.fileIOService = fileIOService;
 		this.itemVaultLogger = itemVaultLogger;
-		this.itemManager = itemManager;
 		this.geExportService = geExportService;
 		setLayout(new BorderLayout());
 		setBackground(ColorScheme.DARK_GRAY_COLOR);
@@ -343,15 +333,16 @@ public class UtilitiesModePanel extends JPanel
 		customFormatInput.setBorder(new EmptyBorder(5, 5, 5, 5));
 		customFormatInput.setToolTipText("Edit custom formatting here to test changes before saving to config.");
 
-		JScrollPane scrollPane = Components.createScrollPane(customFormatInput);
-		scrollPane.setPreferredSize(new Dimension(0, 250));
+		JPanel inputPanel = new JPanel(new BorderLayout(0, 5));
+		inputPanel.setBackground(ColorScheme.DARK_GRAY_COLOR);
+		JScrollPane scrollPane = Components.wrapWithRuneLiteScrollbar(customFormatInput);
+		scrollPane.setPreferredSize(new Dimension(0, 270));
 		scrollBar = scrollPane.getVerticalScrollBar();
 		setScrollSpeed(scrollSpeed);
-
-		panel.add(scrollPane, BorderLayout.CENTER);
+		inputPanel.add(scrollPane, BorderLayout.NORTH);
 
 		// 4. Test Button
-		JButton testBtn = createStyledButton("Test Colosseum Discord webhook", e -> {
+		JButton testBtn = createStyledButton("Test Colosseum template", e -> {
 			String selectedTrial = (String) trialSelector.getSelectedItem();
 			if (selectedTrial == null || selectedTrial.equals("Select Trial..."))
 			{
@@ -376,9 +367,32 @@ public class UtilitiesModePanel extends JPanel
 			}
 
 		});
+		testBtn.setBorder(new EmptyBorder(10, 5, 10, 5));
 		testBtn.setToolTipText("Click to submit a test using the configurations above. The header and footer will indicate it is a test submission.");
-		panel.add(testBtn, BorderLayout.SOUTH);
 
+		panel.add(inputPanel, BorderLayout.CENTER);
+		JPanel buttonPanel = new JPanel(new GridLayout(3, 0, 12, 5));
+		buttonPanel.add(testBtn, BorderLayout.NORTH);
+		JButton saveTemplateBtn = createStyledButton("Save template", e -> {
+			String customTemplateText = customFormatInput.getText().strip();
+			configManager.setConfiguration(CONFIG_GROUP, "colosseumCustomTemplate", customTemplateText);
+			SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(this,
+				"Saved custom template to configurations",
+				"Success", JOptionPane.INFORMATION_MESSAGE));
+		});
+		saveTemplateBtn.setToolTipText("Save the content of the custom textfield to the plugin configurations ");
+		buttonPanel.add(saveTemplateBtn, BorderLayout.CENTER);
+
+		JButton resetTemplateBtn = createStyledButton("Reset template", e -> {
+			customFormatInput.setText(config.colosseumCustomTemplate());
+		});
+		resetTemplateBtn.setBorder(new EmptyBorder(5, 15, 5, 5));
+		resetTemplateBtn.setToolTipText("Resets the content of the textfield to the current configuration");
+		buttonPanel.add(resetTemplateBtn, BorderLayout.SOUTH);
+
+		buttonPanel.setBackground(ColorScheme.DARK_GRAY_COLOR);
+//		customFormatInput.setForeground(Color.WHITE);
+		panel.add(buttonPanel, BorderLayout.SOUTH);
 		return panel;
 	}
 
@@ -504,13 +518,13 @@ public class UtilitiesModePanel extends JPanel
 		switch (scrollSpeed)
 		{
 			case LOW:
-				scrollBar.setUnitIncrement(8);
+				scrollBar.setUnitIncrement(30);
 				break;
 			case MEDIUM:
-				scrollBar.setUnitIncrement(16);
+				scrollBar.setUnitIncrement(60);
 				break;
 			case HIGH:
-				scrollBar.setUnitIncrement(32);
+				scrollBar.setUnitIncrement(120);
 				break;
 		}
 	}

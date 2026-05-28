@@ -23,46 +23,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.datalogger.utils.migration.colosseumtrial.models;
+package com.datalogger.models.enums;
 
-import com.datalogger.dto.TrackedSuppliesDTO;
-import com.datalogger.models.supplytracker.ValuedItemStack;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NonNull;
-
-@Data
-@Builder
-public class ColosseumAttemptDtoV1 {
-	@NonNull
-	private String attemptId;
-	private long timestamp;
-	@NonNull
-	private String accountName;
-	private String tag;
-	private String gameMode;
-	@NonNull
-	private String result;
-	private int rewardsValue;
-
-	@Builder.Default
-	private Map<String, ValuedItemStack> rewards = new LinkedHashMap<>();
-
-	private int consumedSupplyValue;
-	private TrackedSuppliesDTO consumedSupplies;
-	private int totalGlory;
-	private double totalTime;
-
-	@Builder.Default
-	private List<String> activeModifiers = new ArrayList<>();
-
-	@Builder.Default
-	private List<ColosseumWaveDtoV1> waves = new ArrayList<>();
-
-	@Builder.Default
-	private int version = 1;
+public enum GameMode
+{
+	REGULAR, DEADMAN, LEAGUES, BETA
 }

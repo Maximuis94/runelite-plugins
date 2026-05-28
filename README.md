@@ -54,10 +54,10 @@ For each offer, the following datapoints are logged;
 - IsHistoryEntry: If true, data is drawn solely from the Grand Exchange history UI
 - IsCancelled: If true, the offer was cancelled prematurely
 
-![img.png](images/example-grand-exchange-log.png)
-_An example entry in the CSV file produced by the Grand Exchange logger_
+![img.png](images/example-grand-exchange-log.png)<br>
+_An example entry in the CSV file produced by the Grand Exchange logger_<br><br>
 
-Grand exchange offers are stored internally in a JSON file, a copy of this JSON file will be made if its configuration is enabled.
+Grand exchange offers are stored internally in a JSONL file, a copy of this JSON file will be made if its configuration is enabled.
 Furthermore, offers may also be written to a CSV file. Files produced by the Grand Exchange logger are stored in the `.runelite/grand-exchange/<ACCOUNT_NAME>` directory.
 CSV files are separated per day, named as `grand-exchange_YYYY-MM-DD.csv`. To facilitate using multiple clients simultaneously, the account name is used as root directory, 
 effectively separating files per account.
@@ -114,8 +114,8 @@ Copies the internal JSON file to the grand-exchange directory. Existing file wil
 <details>
     <summary>Click to expand</summary>
 
-If enabled, the contents of item vaults (e.g. banks/seed vault) and ongoing grand exchange offers are logged per account and also merged into a single, separate file.
-An item vault is defined as some container that may have items drawn from it. Following this definition, the items in the containers are the items you can extract from them (i.e. these are not always the input items).
+If enabled, the contents of item vaults (e.g. bank/seed vault) and ongoing grand exchange offers are logged per account and also merged into a single, separate file.
+An item vault is defined as some container that may have items drawn from it. As such, the items in the containers are the items you can extract from them (i.e. these are not always the input items).
 
 <details>
     <summary>Item sources</summary>
@@ -125,6 +125,8 @@ General Vaults & Storages
     Bank  
 
     Seed vault  
+
+    Items in inventory and worn equipment
 
     Ongoing Grand Exchange offers
 
@@ -196,7 +198,7 @@ Each row of the merged list has the following attributes;
 #### Examples of item vault data
 
 ![example-item-vaults-all.png](images/example-item-vaults-all.png)</br>
-_Example of an excerpt from a combined item csv file_
+_Example of an excerpt from a combined item csv file_<br><br>
 
 
 The following data is logged as an item vault entry;
@@ -307,172 +309,244 @@ The data described above may be generated as JSON file and as CSV file. The latt
 
 ```JSON
 {
-  "attemptId": "ACCOUNT_NAME_yymmdd_hhmmss",
+  "attemptId": "ACCOUNT_NAME_260501_111111",
   "timestamp": 1777777777777,
-  "account": "ACCOUNT_NAME",
+  "accountName": "ACCOUNT_NAME",
   "result": "COMPLETED",
-  "rewardsValue": 3667620,
+  "rewardsValue": 4389528,
   "rewards": {
+    "Dragon platelegs": {
+      "count": 1,
+      "totalValueInGp": 161117
+    },
     "Death rune": {
       "count": 150,
-      "totalValueInGp": 28050
+      "totalValueInGp": 30000
     },
     "Sunfire splinters": {
-      "count": 4080,
-      "totalValueInGp": 1297440
-    },
-    "Dragon arrowtips": {
-      "count": 250,
-      "totalValueInGp": 793750
+      "count": 4580,
+      "totalValueInGp": 1589260
     },
     "Onyx bolts": {
+      "count": 205,
+      "totalValueInGp": 1717900
+    },
+    "Rune kiteshield": {
+      "count": 9,
+      "totalValueInGp": 287919
+    },
+    "Rune 2h sword": {
+      "count": 2,
+      "totalValueInGp": 75932
+    },
+    "Steel cannonball": {
       "count": 80,
-      "totalValueInGp": 660080
-    },
-    "Snapdragon seed": {
-      "count": 2,
-      "totalValueInGp": 102668
-    },
-    "Rune warhammer": {
-      "count": 5,
-      "totalValueInGp": 124430
-    },
-    "Rune chainbody": {
-      "count": 2,
-      "totalValueInGp": 58882
+      "totalValueInGp": 20000
     },
     "Dragon bolts (unf)": {
       "count": 200,
-      "totalValueInGp": 507200
-    },
-    "Earth orb": {
-      "count": 80,
-      "totalValueInGp": 95120
+      "totalValueInGp": 507400
     }
   },
-  "consumedSupplyValue": 432111,
+  "consumedSupplyValue": 421520,
   "consumedSupplies": {
-    "totalValue": 432111,
+    "totalValue": 421520,
     "consumedItems": {
       "Death rune": {
-        "count": 16,
-        "totalValueInGp": 2992
+        "count": 20,
+        "totalValueInGp": 4000
       },
       "Blood rune": {
-        "count": 106,
-        "totalValueInGp": 28726
+        "count": 125,
+        "totalValueInGp": 36750
       },
       "Dragon arrow": {
-        "count": 39,
-        "totalValueInGp": 120783
+        "count": 38,
+        "totalValueInGp": 114836
       },
       "Aether rune": {
-        "count": 34,
-        "totalValueInGp": 26180
+        "count": 41,
+        "totalValueInGp": 33005
       },
       "Fire rune": {
-        "count": 180,
-        "totalValueInGp": 900
+        "count": 210,
+        "totalValueInGp": 840
       }
     },
     "consumedDoses": {
-      "Super restore": {
-        "count": 16,
-        "totalValueInGp": 42496
-      },
       "Divine ranging potion": {
-        "count": 4,
-        "totalValueInGp": 6768
+        "count": 5,
+        "totalValueInGp": 7725
       },
       "Saradomin brew": {
-        "count": 4,
-        "totalValueInGp": 8220
+        "count": 1,
+        "totalValueInGp": 1963
       },
       "Divine super combat potion": {
         "count": 6,
-        "totalValueInGp": 29244
+        "totalValueInGp": 29274
       },
       "Sanfew serum": {
-        "count": 12,
-        "totalValueInGp": 64464
+        "count": 22,
+        "totalValueInGp": 100320
       }
     },
     "consumedCharges": {
       "Scythe of vitur": {
-        "count": 131,
-        "totalValueInGp": 84757
+        "count": 135,
+        "totalValueInGp": 91125
       },
       "Venator bow": {
-        "count": 15,
-        "totalValueInGp": 285
+        "count": 25,
+        "totalValueInGp": 400
       },
       "Tumekens shadow": {
-        "count": 12,
-        "totalValueInGp": 16296
+        "count": 1,
+        "totalValueInGp": 1282
       }
     }
   },
-  "totalGlory": 47675,
-  "totalTime": 1308.0,
+  "totalGlory": 50307,
+  "totalTime": 1473.6,
   "activeModifiers": [
-    "BLASPHEMY_III",
     "FRAILTY_II",
+    "MYOPIA_III",
     "DOOM_II",
-    "MANTIMAYHEM_III",
-    "MYOPIA_I",
-    "VOLATILITY_I"
+    "SOLARFLARE_III",
+    "REENTRY_I",
+    "BLASPHEMY_I"
   ],
   "waves": [
+    {
+      "wave": 1,
+      "status": "COMPLETED",
+      "accountName": "ACCOUNT_NAME",
+      "tag": "",
+      "earnedLoot": {
+        "itemId": 28924,
+        "itemName": "Sunfire splinters",
+        "quantity": 80
+      },
+      "lootValue": 28240,
+      "modifierChoices": [
+        "BLASPHEMY_I",
+        "RELENTLESS_I",
+        "FRAILTY_I"
+      ],
+      "chosenModifier": "FRAILTY_I",
+      "activeModifiers": [
+        "FRAILTY_I"
+      ],
+      "timeTaken": 28.2,
+      "speedBonus": 453,
+      "damageTaken": 0,
+      "damageBonus": 100,
+      "modifierGlory": 200,
+      "completionBonus": 100,
+      "waveGlory": 853,
+      "totalGlory": 853,
+      "totalTimeTaken": 28.2,
+      "serpentShamanSpawnX": 33,
+      "serpentShamanSpawnY": 42,
+      "version": 1
+    },
     {
       "wave": 11,
       "status": "COMPLETED",
       "accountName": "ACCOUNT_NAME",
       "tag": "",
       "earnedLoot": {
-        "itemId": 1347,
-        "itemName": "Rune warhammer",
-        "quantity": 5
+        "itemId": 9342,
+        "itemName": "Onyx bolts",
+        "quantity": 75
       },
+      "lootValue": 628500,
       "modifierChoices": [
-        "DOOM_III",
-        "FRAILTY_III",
-        "MYOPIA_I"
+        "REENTRY_I",
+        "BLASPHEMY_I",
+        "VOLATILITY_I"
       ],
-      "chosenModifier": "MYOPIA_I",
-      "activeModifiers": "BLASPHEMY_III|FRAILTY_II|DOOM_II|MANTIMAYHEM_III|MYOPIA_I",
-      "timeTaken": 153.0,
-      "speedBonus": 2695,
-      "damageTaken": 0,
-      "damageBonus": 1100,
-      "modifierGlory": 1750,
+      "chosenModifier": "REENTRY_I",
+      "activeModifiers": [
+        "FRAILTY_II",
+        "MYOPIA_III",
+        "TOTEMIC",
+        "DOOM_II",
+        "SOLARFLARE_III",
+        "REENTRY_I"
+      ],
+      "timeTaken": 192.6,
+      "speedBonus": 1969,
+      "damageTaken": 12,
+      "damageBonus": 0,
+      "modifierGlory": 2300,
       "completionBonus": 1100,
-      "waveGlory": 6645,
-      "totalGlory": 40349,
-      "totalTimeTaken": 1172.4,
-      "javelinColossusSpawnAX": 40,
-      "javelinColossusSpawnAY": 35,
-      "manticoreSpawnAX": 33,
-      "manticoreSpawnAY": 42,
+      "waveGlory": 5369,
+      "totalGlory": 40727,
+      "totalTimeTaken": 1362.6,
+      "javelinColossusSpawnAX": 44,
+      "javelinColossusSpawnAY": 37,
+      "manticoreSpawnAX": 35,
+      "manticoreSpawnAY": 37,
       "manticoreSequenceA": [
-        "MAGIC",
         "RANGE",
+        "MAGIC",
         "MELEE"
       ],
-      "manticoreSpawnBX": 32,
-      "manticoreSpawnBY": 27,
+      "manticoreSpawnBX": 35,
+      "manticoreSpawnBY": 31,
       "manticoreSequenceB": [
+        "RANGE",
         "MAGIC",
-        "MELEE",
-        "RANGE"
+        "MELEE"
       ],
-      "shockwaveColossusSpawnAX": 35,
-      "shockwaveColossusSpawnAY": 31,
+      "shockwaveColossusSpawnAX": 29,
+      "shockwaveColossusSpawnAY": 37,
       "serpentShamanReinforcementsSpawnX": 31,
       "serpentShamanReinforcementsSpawnY": 48,
       "minotaurReinforcementsSpawnX": 32,
-      "minotaurReinforcementsSpawnY": 48
+      "minotaurReinforcementsSpawnY": 48,
+      "version": 1
+    },
+    {
+      "wave": 12,
+      "status": "COMPLETED",
+      "accountName": "ACCOUNT_NAME",
+      "tag": "",
+      "earnedLoot": {
+        "itemId": 9342,
+        "itemName": "Onyx bolts",
+        "quantity": 100
+      },
+      "lootValue": 838000,
+      "modifierChoices": [
+        "QUARTET",
+        "FRAILTY_III",
+        "BLASPHEMY_I"
+      ],
+      "chosenModifier": "BLASPHEMY_I",
+      "activeModifiers": [
+        "FRAILTY_II",
+        "MYOPIA_III",
+        "TOTEMIC",
+        "DOOM_II",
+        "SOLARFLARE_III",
+        "REENTRY_I",
+        "BLASPHEMY_I"
+      ],
+      "timeTaken": 111,
+      "speedBonus": 3780,
+      "damageTaken": 0,
+      "damageBonus": 1200,
+      "modifierGlory": 2400,
+      "completionBonus": 2200,
+      "waveGlory": 9580,
+      "totalGlory": 50307,
+      "totalTimeTaken": 1473.6,
+      "version": 1
     }
-  ]
+  ],
+  "version": 1
 }
 ```
 _An example entry in the Colosseum JSON log. The waves list only shows wave 11 as an example._
@@ -480,8 +554,8 @@ _An example entry in the Colosseum JSON log. The waves list only shows wave 11 a
 </details>
 
 
-![img.png](images/example-colosseum-log-entry-csv.png)
-_Example of a partial CSV row of the Colosseum wave logger_
+![img.png](images/example-colosseum-log-entry-csv.png)<br>
+_Example of a partial CSV row of the Colosseum wave logger_<br><br>
 </details>
 
 
@@ -566,8 +640,8 @@ _Example of state data_
 
 
 If enabled, a screenshot is created and stored in the directory created for that attempt when the interface between waves or the rewards chest interface pops up.
-![img_1.png](images/example-wave-completion-screenshot.png)
-_An example of a screenshot taken after wave 12 is completed_
+![img_1.png](images/example-wave-completion-screenshot.png)<br>
+_An example of a screenshot taken after wave 12 is completed_<br><br>
 
 </details>
 
@@ -808,7 +882,7 @@ This is an example of a template string, followed by an image of the message sen
 ```
 
 ![img.png](images/example-custom-discord-colosseum-trial.png)</br>
-*An example Discord message broadcast following the same unfortunately failed trial using the custom template above*
+_An example Discord message broadcast following the same unfortunately failed trial using the custom template above_
 
 
 </details>
@@ -829,7 +903,7 @@ The Colosseum statistics panel is a data viewer that allows you to browse throug
 
 
 ![example-colosseum-statistics-data-viewer.png](images/example-colosseum-statistics-data-viewer.png)</br>
-_The four table modes that can be selected in the data viewer._
+_The four table modes that can be selected in the data viewer._<br><br>
 
 Filters can be applied based on waves that are to be included, modifiers that should (not) be active or the final result of the trial. For example, the Waves panel in the image above shows results for wave 11 and 12 in which any tier of Bees! was active.  
 
@@ -841,10 +915,10 @@ At the top of the panel, aggregated stats are listed for the filtered subset of 
 
 
 ![example-colosseum-statistics-filters.png](images/example-colosseum-statistics-stats-filters.png)</br>
-_The aggregated stats and filter section in the Colosseum statistics panel_
+_The aggregated stats and filter section in the Colosseum statistics panel_<br><br>
 
 ![example-colosseum-failed-trial-gp.png](images/example-colosseum-failed-trial-gp.png)<br>
-_The tooltip that appears when hovering over the Avg Value/trial card, showing the total amount of GP I unfortunately missed out on_
+_The tooltip that appears when hovering over the Avg Value/trial card, showing the total amount of GP I unfortunately missed out on_<br><br>
 
 </details>
 
@@ -862,7 +936,7 @@ The buttons can be used to clear all data related to that account, or just the s
 Data deletion only affects data that was generated by the plugin and that resides inside the internal folder of the plugin.
 
 ![example-items-manager-ui.png](images/example-items-manager-ui.png)</br>
-_The items manager UI_
+_The items manager UI_<br><br>
 
 </details>
 
@@ -872,7 +946,9 @@ _The items manager UI_
 <details>
 <summary>Click to expand</summary>
 
-TO-DO
+Panel with (aggregated) item data. It has filter panels that can be used to filter by account, source and item name. 
+The aggregated stats describe the filtered subset of items that are shown in the table at the bottom of the items panel.
+
 
 </details>
 

@@ -314,7 +314,7 @@ public class GrandExchangeLogger extends AbstractLogger
 	}
 
 	public void initialScan() {
-		if (!isOnPermanentWorld()) return;
+		if (!isOnRegularWorld()) return;
 
 		GrandExchangeOffer[] offers = client.getGrandExchangeOffers();
 		if (offers == null) return;

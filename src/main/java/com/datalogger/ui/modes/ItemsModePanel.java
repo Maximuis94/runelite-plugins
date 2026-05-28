@@ -32,6 +32,8 @@ import com.datalogger.models.enums.UIScrollSpeed;
 import com.datalogger.models.itemvault.BankedItem;
 import com.datalogger.services.AccountHashMapper;
 import com.datalogger.ui.utils.Components;
+import static com.datalogger.ui.utils.Components.createLabelSmall;
+import static com.datalogger.ui.utils.Components.createStyledButton;
 import com.datalogger.ui.utils.Models.AccountItem;
 import com.datalogger.ui.utils.table.ItemTable;
 import com.google.gson.Gson;
@@ -40,6 +42,8 @@ import com.google.gson.JsonParser;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dimension;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
 import java.awt.GridLayout;
 import java.io.File;
 import java.io.FileReader;
@@ -52,6 +56,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import javax.inject.Inject;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
@@ -126,7 +131,7 @@ public class ItemsModePanel extends JPanel
 		JPanel northWrapper = new JPanel(new BorderLayout(0, 10));
 		northWrapper.setBackground(ColorScheme.DARK_GRAY_COLOR);
 
-		JPanel targetPanel = Components.createTitledPanel("Filter Data", new GridLayout(0, 1, 5, 5));
+		JPanel targetPanel = Components.createTitledPanel("Filter Data", new GridBagLayout());
 
 		accountFilter = Components.createComboBox();
 		sourceFilter = Components.createComboBox();
@@ -144,7 +149,6 @@ public class ItemsModePanel extends JPanel
 			"<html><body style='padding: 2px;'>Filter items by partial source name.<br>Separate multiple with commas.</body></html>");
 		itemNameFilterInput = Components.createStatefulTextField(text -> applyFilters(),
 			"<html><body style='padding: 2px; max-width: 250px;'>Filter items by partial item name.<br>Separate multiple with commas (e.g., <b>rune, blood, sword</b>).</body></html>");
-
 		// Build structured layout for each combobox-textfield pairing
 		JPanel accountPanel = new JPanel(new BorderLayout(0, 2));
 		accountPanel.setOpaque(false);
@@ -156,24 +160,25 @@ public class ItemsModePanel extends JPanel
 		sourcePanel.add(sourceFilter, BorderLayout.NORTH);
 		sourcePanel.add(sourceFilterInput, BorderLayout.CENTER);
 
-		JPanel itemPanel = new JPanel(new BorderLayout(0, 2));
-		itemPanel.setOpaque(false);
-		itemPanel.add(itemNameFilterInput, BorderLayout.CENTER);
+		JLabel itemLabel = createLabelSmall("Filter by (partial) item name");
+
+		GridBagConstraints gbc = new GridBagConstraints();
+		gbc.fill = GridBagConstraints.HORIZONTAL;
+		gbc.weightx = 1.0;
+		gbc.gridx = 0;
+		gbc.gridy = 0;
+		gbc.insets = new java.awt.Insets(0, 0, 5, 0);
 
 		JPanel buttonPanel = new JPanel(new GridLayout(1, 2, 5, 0));
 		buttonPanel.setOpaque(false);
 
-		Dimension buttonSize = new Dimension(0, 30);
+		Dimension buttonSize = new Dimension(0, 20);
 
-		JButton refreshBtn = new JButton("Refresh");
-		refreshBtn.setFocusable(false);
+		JButton refreshBtn = createStyledButton("Refresh", e -> loadAllDataFromDisk());
+		refreshBtn.setToolTipText("Click to update the filtered list. The list can also be updated by pressing ENTER while typing in any textbox.");
 		refreshBtn.setPreferredSize(buttonSize);
-		refreshBtn.addActionListener(e -> loadAllDataFromDisk());
 
-		JButton clearBtn = new JButton("Clear");
-		clearBtn.setFocusable(false);
-		clearBtn.setPreferredSize(buttonSize);
-		clearBtn.addActionListener(e -> {
+		JButton clearBtn = createStyledButton("Clear", e -> {
 			accountFilterInput.setText("");
 			sourceFilterInput.setText("");
 			itemNameFilterInput.setText("");
@@ -181,6 +186,8 @@ public class ItemsModePanel extends JPanel
 			if (sourceFilter.getItemCount() > 0) sourceFilter.setSelectedIndex(0);
 			applyFilters();
 		});
+		clearBtn.setPreferredSize(buttonSize);
+		clearBtn.setToolTipText("Empties the account- source- and itemName filter input fields.");
 
 		buttonPanel.add(refreshBtn);
 		buttonPanel.add(clearBtn);
@@ -189,10 +196,20 @@ public class ItemsModePanel extends JPanel
 		buttonWrapper.setOpaque(false);
 		buttonWrapper.add(buttonPanel, BorderLayout.SOUTH);
 
-		targetPanel.add(accountPanel);
-		targetPanel.add(sourcePanel);
-		targetPanel.add(itemPanel);
-		targetPanel.add(buttonWrapper); // Add the wrapper instead of the raw buttonPanel
+		targetPanel.add(accountPanel, gbc);
+		gbc.gridy++;
+
+		targetPanel.add(sourcePanel, gbc);
+		gbc.gridy += 4;
+
+		targetPanel.add(itemLabel, gbc);
+		gbc.gridy++;
+
+		targetPanel.add(itemNameFilterInput, gbc);
+		gbc.gridy++;
+
+		gbc.insets = new java.awt.Insets(0, 0, 0, 0);
+		targetPanel.add(buttonWrapper, gbc);
 
 		statsContainer = new JPanel(new GridLayout(0, 2, 5, 5));
 		statsContainer.setBackground(ColorScheme.DARK_GRAY_COLOR);
@@ -297,6 +314,13 @@ public class ItemsModePanel extends JPanel
 				rawVaultData.addAll(tempRawData);
 
 				SwingUtilities.invokeLater(this::buildBaseUi);
+
+				executor.schedule(() -> {
+					SwingUtilities.invokeLater(() -> {
+						populateAccounts();
+						applyFilters();
+					});
+				}, 5000, TimeUnit.MILLISECONDS);
 			});
 		});
 	}
@@ -350,7 +374,6 @@ public class ItemsModePanel extends JPanel
 		populateAccounts();
 		populateSources();
 
-		// Attach listeners to append choices to the text fields
 		for (java.awt.event.ActionListener al : accountFilter.getActionListeners()) accountFilter.removeActionListener(al);
 		for (java.awt.event.ActionListener al : sourceFilter.getActionListeners()) sourceFilter.removeActionListener(al);
 
@@ -472,7 +495,6 @@ public class ItemsModePanel extends JPanel
 		Map<Integer, ItemStat> currentView = new HashMap<>();
 
 		int uniqueItems = 0;
-		long totalQuantity = 0;
 		long totalValue = 0;
 		boolean hideZeroPriceItems = config.hideZeroPriceItems();
 
@@ -542,22 +564,20 @@ public class ItemsModePanel extends JPanel
 			dataModel.addRow(new Object[]{ stat });
 
 			uniqueItems++;
-			totalQuantity += stat.getQuantity();
 			totalValue += stat.getStackValue();
 		}
 
-		updateStatsUi(uniqueItems, totalQuantity, totalValue, filteredAccounts, filteredSources);
+		updateStatsUi(uniqueItems, totalValue, filteredAccounts, filteredSources);
 		itemTableWrapper.updateData(dataModel);
 
 		contentPanel.revalidate();
 		contentPanel.repaint();
 	}
 
-	private void updateStatsUi(int uniqueItems, long totalQuantity, long totalValue, Set<String> accounts, Set<String> sources)
+	private void updateStatsUi(int uniqueItems, long totalValue, Set<String> accounts, Set<String> sources)
 	{
 		statsContainer.removeAll();
 
-		// Changed to a 2x2 grid so all four cards have enough space on the side panel
 		statsContainer.setLayout(new GridLayout(2, 2, 5, 5));
 
 		statsContainer.add(Components.createStatCard(
@@ -569,7 +589,7 @@ public class ItemsModePanel extends JPanel
 		statsContainer.add(Components.createStatCard(
 			"Est. Value",
 			QuantityFormatter.quantityToStackSize(totalValue) + " gp",
-			"Total estimated Grand Exchange value"
+			"Estimated Grand Exchange value of all items in the subset"
 		));
 
 		statsContainer.add(Components.createStatCard(
@@ -582,7 +602,7 @@ public class ItemsModePanel extends JPanel
 		statsContainer.add(Components.createStatCard(
 			"Sources",
 			String.valueOf(sources.size()),
-			"<html>A total of " + accounts.size() + " sources were found;<br>" +
+			"<html>A total of " + sources.size() + " sources were found;<br>" +
 				(sources.isEmpty() ? "None" : String.join("<br>", sources)) + "</html>"
 		));
 

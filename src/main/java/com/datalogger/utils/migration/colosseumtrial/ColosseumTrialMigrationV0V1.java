@@ -29,7 +29,7 @@ import com.datalogger.DataLoggerConfig;
 import com.datalogger.constants.Colosseum;
 import static com.datalogger.constants.Colosseum.Item.DIZANAS_QUIVER_REWARD;
 import static com.datalogger.constants.Colosseum.Item.DIZANAS_QUIVER_SWAPPED_REWARD;
-import static com.datalogger.constants.PluginConstants.COLOSSEUM_ROOT_DIR;
+import static com.datalogger.constants.PluginConstants.DEFAULT_GAMEMODE_DTO;
 import static com.datalogger.constants.PluginConstants.INTERNAL_COLOSSEUM_TRIAL_HISTORY;
 import com.datalogger.models.itemvault.ItemBundle;
 import com.datalogger.models.supplytracker.ValuedItemStack;
@@ -65,6 +65,9 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.game.ItemManager;
 
+/**
+ * Migrates JSON trial data from 1.1.0 to 1.2.0
+ */
 @Slf4j
 public class ColosseumTrialMigrationV0V1 implements DataMigration {
 	private final ItemManager itemManager;
@@ -211,10 +214,10 @@ public class ColosseumTrialMigrationV0V1 implements DataMigration {
 			.timestamp(timestamp)
 			.accountName(accountFallback)
 			.result(trialV0.getResult() != null ? trialV0.getResult() : "UNKNOWN")
-			.rewardsValue(0) 			// Default for historical records
-			.rewards(new HashMap<>())	// Default for historical records
-			.consumedSupplyValue(0)		// Default for historical records
-			.consumedSupplies(null) 	// Default for historical records
+			.rewardsValue(0)
+			.rewards(new HashMap<>())
+			.consumedSupplyValue(0)
+			.consumedSupplies(null)
 			.totalGlory(trialV0.getTotalGlory())
 			.totalTime(formatTime(totalTimeCalculated))
 			.tag(tagFallback)
@@ -233,8 +236,9 @@ public class ColosseumTrialMigrationV0V1 implements DataMigration {
 			.status(waveV0.getStatus())
 			.accountName(waveV0.getAccountName())
 			.tag(waveV0.getTag())
+			.gameMode(DEFAULT_GAMEMODE_DTO)
 			.earnedLoot(v1Loot)
-			.lootValue(waveLootValue) // Populated correctly!
+			.lootValue(waveLootValue)
 			.modifierChoices(waveV0.getModifierChoices() != null ? new ArrayList<>(waveV0.getModifierChoices()) : new ArrayList<>())
 			.chosenModifier(waveV0.getChosenModifier())
 			.activeModifiers(activeModifiers != null ? activeModifiers : Collections.emptyList())
@@ -349,15 +353,20 @@ public class ColosseumTrialMigrationV0V1 implements DataMigration {
 		List<ColosseumWaveDtoV1> newWaves = new ArrayList<>();
 
 		Map<String, String> activeModsMap = new LinkedHashMap<>();
-
+		String tag = v0.getTag();
 		if (v0.getWaves() != null) {
 			for (ColosseumWaveDtoV0 waveV0 : v0.getWaves()) {
 
 				int waveLootValue = 0;
 				ItemBundle singleLoot = null;
 
+				if (waveV0.getTag() == null)
+				{
+					waveV0.setTag(tag);
+				}
+
 				if (waveV0.getEarnedLoot() != null && !waveV0.getEarnedLoot().isEmpty()) {
-					if (waveV0.getWave() < 12) {
+					if (waveV0.getWave() < 12 || waveV0.getEarnedLoot().size() < 2) {
 						singleLoot = waveV0.getEarnedLoot().get(0);
 					} else {
 						singleLoot = waveV0.getEarnedLoot().get(1);
@@ -395,6 +404,8 @@ public class ColosseumTrialMigrationV0V1 implements DataMigration {
 				.attemptId(attemptId)
 				.timestamp(timestamp)
 				.accountName(account)
+				.tag(tag)
+				.gameMode(DEFAULT_GAMEMODE_DTO)
 				.result(v0.getResult())
 				.rewardsValue(totalRewardsValue)
 				.rewards(totalRewardsMap)

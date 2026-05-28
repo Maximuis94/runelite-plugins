@@ -25,6 +25,7 @@
 
 package com.datalogger.events;
 
+import com.datalogger.models.enums.GameMode;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
@@ -39,5 +40,6 @@ public class AccountSessionStarted
 	private final long accountHash;
 	private final String accountName;
 	private final boolean onMembersWorld;
-	private final boolean onPermanentWorld;
+	private final boolean onRegularWorld;
+	private final GameMode gameMode;
 }

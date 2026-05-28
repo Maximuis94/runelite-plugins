@@ -34,6 +34,8 @@ import lombok.Data;
 public class ColosseumAttemptDtoV0 {
 	private long attemptId;
 	private long timestamp;
+	@Builder.Default
+	private String tag = "";
 	private String result;
 	private int totalGlory;
 	private List<ColosseumWaveDtoV0> waves;

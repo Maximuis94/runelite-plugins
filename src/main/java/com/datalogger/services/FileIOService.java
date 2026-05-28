@@ -202,7 +202,7 @@ public class FileIOService
 	@Subscribe
 	public void onAccountSessionStarted(AccountSessionStarted event)
 	{
-		updateAccountInfo(event.getAccountName(), event.getAccountHashString(), event.isOnPermanentWorld());
+		updateAccountInfo(event.getAccountName(), event.getAccountHashString(), event.isOnRegularWorld());
 	}
 
 	private boolean isValidAccountString(String accountString)

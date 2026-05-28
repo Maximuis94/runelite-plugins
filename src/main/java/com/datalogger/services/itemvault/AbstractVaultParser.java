@@ -7,11 +7,7 @@ import com.datalogger.loggers.ItemVaultLogger;
 import com.datalogger.models.itemvault.BankedItem;
 import com.datalogger.services.AccountHashMapper;
 import java.io.File;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 import javax.inject.Inject;
 import lombok.Value;
 import lombok.extern.slf4j.Slf4j;
@@ -55,7 +51,7 @@ public abstract class AbstractVaultParser implements VaultParser
 	@Subscribe
 	public void onAccountSessionStarted(AccountSessionStarted event)
 	{
-		isOnPermanentWorld = event.isOnPermanentWorld();
+		isOnPermanentWorld = event.isOnRegularWorld();
 		updateAccountHash(event.getAccountHash(), event.getAccountName());
 		updateConfigFlags();
 	}

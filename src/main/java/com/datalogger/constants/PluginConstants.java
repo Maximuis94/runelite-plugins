@@ -25,6 +25,7 @@
 
 package com.datalogger.constants;
 
+import com.datalogger.models.enums.GameMode;
 import java.io.File;
 import net.runelite.client.RuneLite;
 
@@ -59,4 +60,7 @@ public final class PluginConstants
 	public static final int IGNORED_ENUM_ID = -1;
 
 	public static final int CURRENT_COLOSSEUM_TRIAL_LOG_VERSION = 1;
+
+	public static final GameMode DEFAULT_GAME_MODE = GameMode.REGULAR;
+	public static final String DEFAULT_GAMEMODE_DTO = DEFAULT_GAME_MODE.name();
 }

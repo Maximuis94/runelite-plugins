@@ -135,10 +135,19 @@ public interface DataLoggerConfig extends Config {
 	default boolean showSideBarPanel() { return true; }
 
 	@ConfigItem(
+		keyName = "allowOuterScrollbar",
+		name = "Allow outer sidepanel scrollbar",
+		description = "If enabled, the sidepanel has a scrollbar, allowing you to view more data at once.",
+		position = 1,
+		section = SIDE_BAR_PANEL_SECTION
+	)
+	default boolean allowOuterScrollbar() { return true; }
+
+	@ConfigItem(
 		keyName = "outerScrollSpeed",
 		name = "Outer scroll speed",
-		description = "Tweaks the scroll speed of the outer scroll bar in the sidebar panel.",
-		position = 1,
+		description = "Tweaks the scroll speed of the outer scroll bar in the sidebar panel (if present).",
+		position = 2,
 		section = SIDE_BAR_PANEL_SECTION
 	)
 	default UIScrollSpeed outerScrollSpeed() { return UIScrollSpeed.HIGH; }
@@ -147,7 +156,7 @@ public interface DataLoggerConfig extends Config {
 		keyName = "innerScrollSpeed",
 		name = "Inner scroll speed",
 		description = "Tweaks the scroll speed of the inner scroll bar in the sidebar panel.",
-		position = 2,
+		position = 3,
 		section = SIDE_BAR_PANEL_SECTION
 	)
 	default UIScrollSpeed innerScrollSpeed() { return UIScrollSpeed.MEDIUM; }
@@ -156,7 +165,7 @@ public interface DataLoggerConfig extends Config {
 		keyName = "hideZeroPriceItems",
 		name = "Exclude 0 price items",
 		description = "If enabled, exclude items from the item viewer with a price of 0.",
-		position = 3,
+		position = 4,
 		section = SIDE_BAR_PANEL_SECTION
 	)
 	default boolean hideZeroPriceItems() { return true; }
@@ -505,8 +514,6 @@ public interface DataLoggerConfig extends Config {
 	)
 	default boolean logBeamCrystal() { return false; }
 
-	// --- SupplyLogger Items ---
-
 	// --- Screenshot Items ---
 
 	@ConfigItem(
@@ -672,7 +679,7 @@ public interface DataLoggerConfig extends Config {
 			"# Edit this text to format your Discord webhook.\n" +
 			"# Global: <PLAYER>, <RESULT>, <TOTAL_GLORY>, <TIME>\n" +
 			"# Wave-specific: <1:MOD>, <12:TIME>, <6:STATUS>\n" +
-			"# Use 'Test with uploaded log' button in side panel to preview template!\n" +
+			"# Use 'Test Colosseum Discord webhook' button in side panel to preview template!\n" +
 			"# See Custom Template Keywords section at https://runelite.net/plugin-hub/show/data-logger for a complete list of keywords\n" +
 			"# You can also quickly test various templates in the utilities section of the sidebar panel\n" +
 			"# --------------------\n" +

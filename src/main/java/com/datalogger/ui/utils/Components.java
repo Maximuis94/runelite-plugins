@@ -27,6 +27,7 @@ package com.datalogger.ui.utils;
 
 import java.awt.Color;
 import java.awt.Component;
+import java.awt.Container;
 import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Rectangle;
@@ -41,11 +42,14 @@ import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JComponent;
 import javax.swing.JOptionPane;
+import javax.swing.JPopupMenu;
 import javax.swing.JScrollBar;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.border.EmptyBorder;
+import javax.swing.event.PopupMenuEvent;
+import javax.swing.event.PopupMenuListener;
 import javax.swing.plaf.basic.BasicScrollBarUI;
 import net.runelite.client.ui.ColorScheme;
 import java.awt.BorderLayout;
@@ -133,6 +137,32 @@ public final class Components
 	}
 
 	/**
+	 * Create a label with pre-defined styling and return it
+	 */
+	public static JLabel createLabelSmall(String text)
+	{
+		JLabel titleLabel = new JLabel(text);
+		titleLabel.setFont(FontManager.getRunescapeSmallFont());
+		titleLabel.setForeground(Color.white);
+		titleLabel.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+		titleLabel.setHorizontalAlignment(JLabel.CENTER);
+		return titleLabel;
+	}
+
+	/**
+	 * Create a label with pre-defined styling and return it
+	 */
+	public static JLabel createLabel(String text)
+	{
+		JLabel titleLabel = new JLabel(text);
+		titleLabel.setFont(FontManager.getRunescapeFont());
+		titleLabel.setForeground(Color.white);
+		titleLabel.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+		titleLabel.setHorizontalAlignment(JLabel.CENTER);
+		return titleLabel;
+	}
+
+	/**
 	 * Creates a styled text field that automatically tracks its previous state.
 	 * The provided callback is ONLY triggered if the user presses Enter or clicks away,
 	 * AND the text has actually changed since the last trigger.
@@ -193,6 +223,22 @@ public final class Components
 
 				return c;
 			}
+		});
+		box.addPopupMenuListener(new PopupMenuListener() {
+			@Override
+			public void popupMenuWillBecomeVisible(PopupMenuEvent e) {
+				// Find the JScrollPane that holds the popup list
+				Container popup = (Container) box.getAccessibleContext().getAccessibleChild(0);
+				if (popup instanceof JPopupMenu) {
+					JScrollPane scrollPane = (JScrollPane) ((JPopupMenu) popup).getComponent(0);
+
+					// Use your existing method to override the scrollbar
+					scrollPane.setVerticalScrollBar(wrapWithRuneLiteScrollbar(((JPopupMenu) popup).getComponentPopupMenu()).getVerticalScrollBar());
+				}
+			}
+
+			@Override public void popupMenuWillBecomeInvisible(PopupMenuEvent e) {}
+			@Override public void popupMenuCanceled(PopupMenuEvent e) {}
 		});
 	}
 

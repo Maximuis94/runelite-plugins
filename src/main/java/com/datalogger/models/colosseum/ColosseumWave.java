@@ -27,6 +27,7 @@ package com.datalogger.models.colosseum;
 import com.datalogger.dto.ColosseumWaveDTO;
 import com.datalogger.framework.DataRow;
 import com.datalogger.models.enums.ColosseumModifier;
+import com.datalogger.models.enums.GameMode;
 import com.datalogger.models.enums.WaveStatus;
 import com.datalogger.models.itemvault.ItemBundle;
 import java.math.BigDecimal;
@@ -54,6 +55,8 @@ public class ColosseumWave implements DataRow
 
 	private String accountName;
 	private String tag;
+
+	private GameMode gameMode;
 
 	private ItemBundle earnedLoot;
 	private int lootValue;
@@ -104,6 +107,7 @@ public class ColosseumWave implements DataRow
 			.status(status.name())
 			.accountName(accountName)
 			.tag(tag)
+			.gameMode(gameMode.name())
 			.earnedLoot(earnedLoot)
 			.lootValue(lootValue)
 			.modifierChoices(modifierChoices != null ? modifierChoices.stream()
@@ -154,7 +158,7 @@ public class ColosseumWave implements DataRow
 	}
 
 	public static String csvHeader() {
-		return "wave,status,accountName,tag,itemId,itemName,quantity,modifierChoice_I,modifierChoice_II,modifierChoice_III,chosenModifier,activeModifiers,timeTaken,damageTaken,speedBonus,damageBonus,modifierGlory,completionBonus,waveGlory,totalGlory,totalTimeTaken,serpentShamanSpawnX,serpentShamanSpawnY,javelinColossusSpawnAX,javelinColossusSpawnAY,javelinColossusSpawnBX,javelinColossusSpawnBY,manticoreSpawnAX,manticoreSpawnAY,manticoreSequenceA,manticoreSpawnBX,manticoreSpawnBY,manticoreSequenceB,shockwaveColossusSpawnAX,shockwaveColossusSpawnAY,shockwaveColossusSpawnBX,shockwaveColossusSpawnBY,jaguarWarriorReinfSpawnX,jaguarWarriorReinfSpawnY,serpentShamanReinfSpawnX,serpentShamanReinfSpawnY,minotaurReinfSpawnX,minotaurReinfSpawnY";
+		return "wave,status,accountName,tag,gameMode,itemId,itemName,quantity,modifierChoice_I,modifierChoice_II,modifierChoice_III,chosenModifier,activeModifiers,timeTaken,damageTaken,speedBonus,damageBonus,modifierGlory,completionBonus,waveGlory,totalGlory,totalTimeTaken,serpentShamanSpawnX,serpentShamanSpawnY,javelinColossusSpawnAX,javelinColossusSpawnAY,javelinColossusSpawnBX,javelinColossusSpawnBY,manticoreSpawnAX,manticoreSpawnAY,manticoreSequenceA,manticoreSpawnBX,manticoreSpawnBY,manticoreSequenceB,shockwaveColossusSpawnAX,shockwaveColossusSpawnAY,shockwaveColossusSpawnBX,shockwaveColossusSpawnBY,jaguarWarriorReinfSpawnX,jaguarWarriorReinfSpawnY,serpentShamanReinfSpawnX,serpentShamanReinfSpawnY,minotaurReinfSpawnX,minotaurReinfSpawnY";
 	}
 
 	public String toCsvRow() {
@@ -176,6 +180,7 @@ public class ColosseumWave implements DataRow
 			modStatus,
 			accountName,
 			tag,
+			gameMode.name(),
 			itemId,
 			itemName,
 			quantity,
