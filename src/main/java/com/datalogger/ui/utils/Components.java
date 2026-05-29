@@ -47,6 +47,7 @@ import javax.swing.JScrollBar;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.JTextField;
+import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
 import javax.swing.event.PopupMenuEvent;
 import javax.swing.event.PopupMenuListener;
@@ -68,7 +69,7 @@ public final class Components
 
 	private Components() {}
 
-	public static RuneLiteScrollBarUI scrollBarUI = new RuneLiteScrollBarUI();
+	public static final RuneLiteScrollBarUI scrollBarUI = new RuneLiteScrollBarUI();
 
 	/**
 	 * Creates a standard RuneLite-styled button.
@@ -101,6 +102,16 @@ public final class Components
 		JButton button = createStyledButton(text);
 		button.addActionListener(actionListener);
 		return button;
+	}
+
+	/**
+	 * Show a confirm dialog with the Strings provided. Value returned depends on what the user clicks.
+	 */
+	public static void showInformationDialog(Component parent, String title, String message)
+	{
+		SwingUtilities.invokeLater(() -> {
+			JOptionPane.showMessageDialog(parent, message, title, JOptionPane.INFORMATION_MESSAGE);
+		});
 	}
 
 	/**

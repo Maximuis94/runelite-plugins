@@ -38,9 +38,7 @@ import com.datalogger.models.itemvault.ValuedItemBundle;
 import com.datalogger.services.AccountHashMapper;
 import com.datalogger.services.FileIOService;
 import com.datalogger.services.itemvault.VaultParser;
-import com.google.gson.reflect.TypeToken;
 import java.io.File;
-import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -132,12 +130,6 @@ public class ItemVaultLogger extends AbstractLogger
 	{
 		return vaultCache.getOrDefault(accountHash, new HashMap<>()).getOrDefault(itemCharge.name(), new ArrayList<>());
 	}
-
-//	public List<BankedItem> getStashVault(long accountHash, ItemCharge itemCharge)
-//	{
-//		Type type = new TypeToken<Map<Integer, List<BankedItem>>>(){}.getType();
-//		Map<Integer, List<BankedItem>> loadedStates = fileIOService.readJson(cacheFile, type);
-//	}
 
 	private boolean ignoreHash(long accountHash)
 	{
@@ -268,18 +260,6 @@ public class ItemVaultLogger extends AbstractLogger
 
 		});
 	}
-
-//	private void logItemChargesVault()
-//	{
-//		if (config.logItemVaultJSON()) {
-//			File externalJson = VaultType.ITEM_CHARGES.getExternalJSONFile(accountName);
-//			fileIOService.writeJson(externalJson, slimItems);
-//		}
-//		if (config.logItemVaultCSV()) {
-//			File csvFile = VaultType.ITEM_CHARGES.getExternalCSVFile(accountName);
-//			fileIOService.writeVaultCsv(csvFile, items, false);
-//		}
-//	}
 
 	/**
 	 * Formats and exports the merged item data across all Vaults and Accounts.

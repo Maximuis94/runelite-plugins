@@ -28,17 +28,11 @@ package com.datalogger.services.itemvault.other;
 import com.datalogger.models.enums.VaultType;
 import com.datalogger.models.itemvault.BankedItem;
 import com.datalogger.services.itemvault.AbstractVaultParser;
-import com.google.gson.reflect.TypeToken;
 import java.io.File;
-import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import javax.inject.Inject;
 import javax.inject.Singleton;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.ScriptPreFired;
@@ -60,18 +54,6 @@ public class POHCostumeRoomParser extends AbstractVaultParser
 	{
 		return VaultType.POH_COSTUME_ROOM;
 	}
-
-//	@Override
-//	protected void loadSessionData(File cacheFile)
-//	{
-//		Type type = new TypeToken<List<CostumeItem>>(){}.getType();
-//		List<CostumeItem> loadedData = fileIOService.readJson(cacheFile, type);
-//		if (loadedData != null)
-//		{
-//			storedItems.clear();
-//			storedItems.addAll(loadedData);
-//		}
-//	}
 
 	@Override
 	protected void loadSessionData(File cacheFile)

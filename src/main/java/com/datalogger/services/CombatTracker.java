@@ -77,7 +77,6 @@ public class CombatTracker
 	{
 		Hitsplat hitsplat = event.getHitsplat();
 
-		// Fast exit: only track our own hits
 		if (!hitsplat.isMine()) return;
 
 		int hitsplatType = hitsplat.getHitsplatType();
@@ -86,37 +85,6 @@ public class CombatTracker
 		if (equipmentTracker.canConsumeBloodFuryCharges() && !isMiss)
 			equipmentTracker.incrementBloodFuryCharge();
 
-//		Actor target = event.getActor();
-//		if (target == client.getLocalPlayer() || !(target instanceof NPC)) return;
-//
-//		NPC npc = (NPC) target;
-//		int npcIndex = npc.getIndex();
-//		int damage = isMiss ? 0 : hitsplat.getAmount();
-//
-//		TargetNpc targetNpc = activeCombatStats.computeIfAbsent(
-//			npcIndex,
-//			k -> new TargetNpc(npcIndex, npc.getId(), npc.getName())
-//		);
-//
-//		PlayerAttack attack = new PlayerAttack(
-//			npcIndex,
-//			client.getTickCount(),
-//			damage,
-//			isMiss,
-//			hitsplatType,
-//			equipmentTracker.getBaseWeaponId(),
-//			equipmentTracker.getCurrentCombatType()
-//		);
-//
-//		targetNpc.addPlayerAttack(attack);
-//
-//		// Broadcast for downstream loggers (e.g. Colosseum loggers)
-//		eventBus.post(new OutgoingHitApplied(
-//			target, hitsplat, damage,
-//			equipmentTracker.getBaseWeaponId(),
-//			equipmentTracker.getCurrentCombatType(),
-//			client.getTickCount()
-//		));
 	}
 
 	// =========================================================================
@@ -223,18 +191,6 @@ public class CombatTracker
 	// =========================================================================
 	// Target NPC Lifecycle Management
 	// =========================================================================
-
-//	@Subscribe
-//	public void onNpcDespawned(NpcDespawned event)
-//	{
-//		TargetNpc finalStats = activeCombatStats.remove(event.getNpc().getIndex());
-//		if (finalStats != null)
-//		{
-//			log.debug("Target despawned: {} (ID: {}) took {} hits, {} misses, {} total damage.",
-//				finalStats.getNpcName(), finalStats.getNpcId(),
-//				finalStats.getSuccessfulHits(), finalStats.getMissedHits(), finalStats.getTotalDamage());
-//		}
-//	}
 
 	@Subscribe
 	public void onGameStateChanged(GameStateChanged event)

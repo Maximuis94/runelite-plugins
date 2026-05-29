@@ -302,7 +302,7 @@ public class ColosseumTrialMigrationCsvV0V1 implements DataMigration {
 			int quantity = entry.getValue();
 
 			ItemComposition comp = itemManager.getItemComposition(itemId);
-			String itemName = (comp != null) ? comp.getName() : "Unknown Item (" + itemId + ")";
+			String itemName = comp.getName();
 
 			int price = itemManager.getItemPrice(itemId);
 			int totalValue = price * quantity;

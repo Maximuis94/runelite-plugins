@@ -168,11 +168,4 @@ public enum VaultType
 		});
 	}
 
-//	/**
-//	 * Return the File used to track unlocked vaults for the given accountHash across sessions.
-//	 */
-//	public File getUnlockedVaultCacheFile(long accountHash)
-//	{
-//		return new File(INTERNAL_VAULT_DIR, "unlocked-vaults-cache_" + accountHash + ".json");
-//	}
 }

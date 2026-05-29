@@ -68,7 +68,7 @@ public class MigrationManager
 	public static final long COLOSSEUM_TRIAL_MIGRATION_THRESHOLD = 1780000000000L;
 
 //	private File jsonFile = new File(COLOSSEUM_ROOT_DIR, "migration-test.jsonl");
-	private File jsonFile = INTERNAL_COLOSSEUM_TRIAL_HISTORY;
+	private final File jsonFile = INTERNAL_COLOSSEUM_TRIAL_HISTORY;
 
 	@Inject
 	public MigrationManager(ColosseumTrialMigrationCsvV0V1 csvMigration, ColosseumTrialMigrationV0V1 jsonMigration, Gson gson)
@@ -204,7 +204,7 @@ public class MigrationManager
 			return;
 		}
 
-		log.info("Starting to rebuild Colosseum trial directories from {}", jsonlFile.getName());
+		log.debug("Starting to rebuild Colosseum trial directories from {}", jsonlFile.getName());
 
 		try (BufferedReader reader = new BufferedReader(new FileReader(jsonlFile)))
 		{
@@ -250,7 +250,7 @@ public class MigrationManager
 				}
 			}
 
-			log.info("Successfully rebuilt {} trial directories.", count);
+			log.debug("Successfully rebuilt {} trial directories.", count);
 		}
 		catch (Exception e)
 		{

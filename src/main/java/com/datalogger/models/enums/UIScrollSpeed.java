@@ -29,5 +29,5 @@ public enum UIScrollSpeed
 {
 	LOW,
 	MEDIUM,
-	HIGH;
+	HIGH
 }

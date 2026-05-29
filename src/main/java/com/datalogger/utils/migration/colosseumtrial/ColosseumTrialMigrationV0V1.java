@@ -76,10 +76,10 @@ public class ColosseumTrialMigrationV0V1 implements DataMigration {
 	private final DataLoggerConfig config;
 
 	@Getter
-	private File outFile = null;
+	private final File outFile = null;
 
 	//	private File jsonlFile = new File(COLOSSEUM_ROOT_DIR, "migration-test.jsonl");
-	private File jsonlFile = INTERNAL_COLOSSEUM_TRIAL_HISTORY;
+	private final File jsonlFile = INTERNAL_COLOSSEUM_TRIAL_HISTORY;
 
 	@Inject
 	public ColosseumTrialMigrationV0V1(ItemManager itemManager, Gson gson, ClientThread clientThread, DataLoggerConfig config) {
@@ -278,7 +278,7 @@ public class ColosseumTrialMigrationV0V1 implements DataMigration {
 
 	@Override
 	public boolean migrate(File file) {
-		log.info("Migrating Colosseum wave-log to V1: {}", file.getName());
+		log.debug("Migrating Colosseum wave-log to V1: {}", file.getName());
 
 		try {
 			ColosseumAttemptDtoV1 v1Data = performMigration(file);

@@ -151,10 +151,6 @@ public class ActiveGrandExchangeOfferParser extends AbstractVaultParser
 
 		this.currentVaultItems = newItems;
 
-//		if (hasValidAccountHash)
-//		{
-//			fileIOService.writeJson(vaultFile, currentVaultItems);
-//		}
 		submitVault(currentVaultItems);
 
 		log.debug("Parsed {} uncompleted items from Active GE Offers.", newItems.size());

@@ -34,13 +34,10 @@ import com.datalogger.dto.ColosseumAttemptDTO;
 import com.datalogger.dto.ColosseumWaveDTO;
 import com.datalogger.models.enums.ColosseumBroadcastMode;
 import com.datalogger.models.enums.ColosseumWebhookFormatter;
-import com.datalogger.models.enums.Directory;
 import com.datalogger.models.enums.UIScrollSpeed;
 import com.datalogger.services.DiscordWebhookService;
 import com.datalogger.ui.utils.Components;
 import static com.datalogger.ui.utils.Components.createStyledButton;
-import com.datalogger.ui.utils.Models;
-import static com.datalogger.ui.utils.Util.openDirectory;
 import static com.datalogger.ui.utils.Util.openUrl;
 import com.datalogger.webhook.ColosseumCustomDiscordFormatter;
 import com.datalogger.webhook.ColosseumDiscordBroadcaster;
@@ -242,7 +239,7 @@ public class WebhookTestModePanel extends JPanel
 		}
 
 		File trialDir = new File(PluginConstants.COLOSSEUM_TRIALS_DIR, trialId);
-		File[] jsonFiles = trialDir.listFiles((d, name) -> name.endsWith(".json"));
+		File[] jsonFiles = trialDir.listFiles((d, name) -> name.endsWith("wave-log.json"));
 
 		if (jsonFiles == null || jsonFiles.length == 0)
 		{

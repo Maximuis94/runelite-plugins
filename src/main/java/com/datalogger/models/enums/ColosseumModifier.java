@@ -165,9 +165,6 @@ public enum ColosseumModifier {
 	}
 
 	/**
-	 * Calculates the total baseline glory value from a pipe-delimited string of modifier names.
-	 */
-	/**
 	 * Calculates the total baseline glory value from a list of modifier names.
 	 */
 	public static int calculateTotalGlory(List<String> activeModifiers)

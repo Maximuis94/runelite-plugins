@@ -151,24 +151,12 @@ public class ColosseumDiscordBroadcaster
 		{
 			case COMPLETED:
 				broadcastMode = broadcastCompletedTrial;
-//				webhookFormatter = broadcastCompletedTrial;
-//				attachScreenshot = broadcastCompletedTrial.isAttachScreenshot();
-//				isScreenshotFormat = (webhookFormat == ColosseumWebhookFormatter.SCREENSHOT);
-//				payload = generatePayload(attemptDto, broadcastCompletedTrial);
-//				attachScreenshot = isScreenshotFormat || shouldBroadcastScreenshot(finalWave);
 				break;
 			case FAILED:
 				broadcastMode = broadcastFailedTrial;
-//				isScreenshotFormat = (webhookFormat == ColosseumWebhookFormatter.SCREENSHOT);
-//				payload = generatePayload(attemptDto, broadcastFailedTrial);
-//				attachScreenshot = isScreenshotFormat || shouldBroadcastScreenshot(finalWave);
 				break;
 			default:
 				broadcastMode = broadcastCancelledTrial;
-
-//				isScreenshotFormat = (webhookFormat == ColosseumWebhookFormatter.SCREENSHOT);
-//				payload = generatePayload(attemptDto, broadcastCancelledTrial);
-//				attachScreenshot = isScreenshotFormat || shouldBroadcastScreenshot(finalWave);
 				break;
 		}
 		ColosseumWebhookFormatter webhookFormatter = broadcastMode.getFormatter();
@@ -252,26 +240,6 @@ public class ColosseumDiscordBroadcaster
 		log.debug("CurrentAttempt has {}; waveNumber and rewardsValue conditions have {}been met; {}broadcasting run", hasSucceeded ? "succeeded" : "failed", result ? "" : "not ", statusConditionMet&&result ? "" : "not ");
 		return statusConditionMet && result;
 	}
-
-//	/**
-//	 * Return true if a screenshot is to be attached, given configurations and the final state.
-//	 */
-//	private boolean shouldBroadcastScreenshot(ColosseumWaveDTO finalWave)
-//	{
-//		WaveStatus status = WaveStatus.fromString(finalWave.getStatus());
-//		switch (status) {
-//			case COMPLETED:
-//				return broadcastCompletedTrial && broadcastScreenshot.isScreenshotOnSuccess();
-//			case FAILED:
-//				return broadcastFailedTrial && broadcastScreenshot.isScreenshotOnFailure();
-//			case CANCELLED:
-//			case CLAIMED:
-//				return broadcastCancelledTrial && broadcastScreenshot.isScreenshotOnClaim();
-//			default:
-//				log.debug("Encountered a non-implemented status of {}", status);
-//				return false;
-//		}
-//	}
 
 	/**
 	 * Return the expected screenshotFile, given ColosseumAttemptDTO and its associated root.

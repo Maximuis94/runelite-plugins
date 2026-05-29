@@ -42,7 +42,7 @@ import com.datalogger.ui.utils.Models.AccountItem;
 import static com.datalogger.ui.utils.Util.openDirectory;
 import com.datalogger.utils.migration.MigrationManager;
 import java.awt.BorderLayout;
-import java.awt.Color;
+import java.awt.Dimension;
 import java.awt.GridLayout;
 import java.io.File;
 import java.util.ArrayList;
@@ -54,8 +54,8 @@ import javax.inject.Inject;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
-import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
+import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
@@ -145,36 +145,48 @@ public class UtilitiesModePanel extends JPanel
 					boolean isInternal = selectedDir.toString().startsWith("Internal");
 					File targetDirectory = selectedDir.getDirectory();
 
-					// Append the account-specific subfolder if required
 					if (selectedDir.isAccountSpecificDirectories())
 					{
 						AccountItem selectedAccount = (AccountItem) accountSelector.getSelectedItem();
 
 						if (selectedAccount != null)
 						{
-							long selectedHash = accountHashMapper.getAccountHashByAccountName(selectedAccount.toString());
+							long selectedHash = accountHashMapper.getAccountHashByAccountName(selectedAccount.getName());
 							log.debug("Selected account: {} hash={} Internal={} directory={}", selectedAccount, selectedHash, isInternal, selectedDir);
 							if (isInternal) {
-								// Internal folders use the Account Hash
 								targetDirectory = new File(targetDirectory, String.valueOf(selectedHash));
 							} else {
-								// External folders use the Account Name
 								targetDirectory = new File(targetDirectory, selectedAccount.toString().toLowerCase());
 							}
+							if (targetDirectory.exists()) {
+								openDirectory(targetDirectory, executor);
+							} else {
+								File parentDir = selectedDir.getDirectory();
+								if (parentDir.exists()) {
+									openDirectory(parentDir, executor);
+								}
+								else {
+									SwingUtilities.invokeLater(() -> {
+										JOptionPane.showMessageDialog(this,
+											"Unable to open non-existent directory at " + parentDir.getAbsolutePath(),
+											"Non-existent directory", JOptionPane.ERROR_MESSAGE);
+									});
+								}
+
+							}
+							return;
 						}
 						log.debug("targetDirectory={}", targetDirectory);
 					}
 
-					// Open the specific account folder if it exists, otherwise open the parent folder
 					if (targetDirectory != null && targetDirectory.exists()) {
-						openDirectory(targetDirectory.getAbsolutePath(), executor);
-					} else if (targetDirectory != null) {
+						openDirectory(targetDirectory, executor);
+					} else if (targetDirectory != null && targetDirectory.exists()) {
 						File parentDir = selectedDir.getDirectory();
-						openDirectory(parentDir.getAbsolutePath(), executor);
+						openDirectory(parentDir, executor);
 					}
 				}
 			});
-
 
 			panel.add(controlsPanel, BorderLayout.CENTER);
 			panel.add(openBtn, BorderLayout.SOUTH);
@@ -183,29 +195,9 @@ public class UtilitiesModePanel extends JPanel
 		return panel;
 	}
 
-	private void populateAccounts(JComboBox<AccountItem> accountSelector)
-	{
-		accountSelector.removeAllItems();
-		accountSelector.addItem(new AccountItem("Select Account...", -1L));
-
-		List<AccountItem> items = new ArrayList<>();
-
-		// Fetch all known hashes directly from your mapper
-		for (Long hash : accountHashMapper.getAccountHashes()) {
-			String name = accountHashMapper.getAccountName(hash);
-			if (name == null || name.isEmpty()) {
-				name = String.valueOf(hash);
-			}
-			items.add(new AccountItem(name, hash));
-		}
-
-		// Sort alphabetically and add to combobox
-		items.sort(Comparator.comparing(AccountItem::getName, String.CASE_INSENSITIVE_ORDER));
-		for (AccountItem item : items) {
-			accountSelector.addItem(item);
-		}
-	}
-
+	/**
+	 * Button action that calls the itemVaultLogger to aggregate and export all item data
+	 */
 	private void exportAggregatedData()
 	{
 		int result = showConfirmDialog(
@@ -225,6 +217,9 @@ public class UtilitiesModePanel extends JPanel
 		});
 	}
 
+	/**
+	 * Generate and returns the Export merged item data button
+	 */
 	private JButton exportAggregatedVaultButton()
 	{
 		JButton exportVaultSummary = createStyledButton("Export merged item data", e -> exportAggregatedData());
@@ -232,10 +227,13 @@ public class UtilitiesModePanel extends JPanel
 		return exportVaultSummary;
 	}
 
+	/**
+	 * Button action that iterates over all logged Colosseum trials and merges all wave logs
+	 */
 	private void mergeWaveLogs()
 	{
 		executor.submit(() -> {
-			this.fileIOService.mergeColosseumWaveLogs();
+			fileIOService.mergeColosseumWaveLogs();
 			SwingUtilities.invokeLater(() -> {
 				JOptionPane.showMessageDialog(this,
 					"Successfully merged and exported Colosseum trials to " + COLOSSEUM_ROOT_DIR.getAbsolutePath(),
@@ -306,18 +304,32 @@ public class UtilitiesModePanel extends JPanel
 		if (hasLegacyColosseumTrials())
 		{
 			JPanel panel;
+			final JLabel label = Components.createLabel("<html><div style='width: 200px; color: white; padding-bottom: 2px;'>Some legacy trials have been found.<br>Click the button below to convert <br>them so they may be used with the <br>data viewer");
+
 			JButton convertBtn;
-			panel = Components.createTitledPanel("Data migration", new GridLayout(0, 1, 0, 5));
-			convertBtn = createStyledButton("Migrate logs", e -> initiateColosseumTrialMigration());
-			convertBtn.setToolTipText("Migrate logged Colosseum trials to a newer version, if possible.");
-			panel.add(convertBtn);
+			// Use BorderLayout(0, 5) for a 5px vertical gap between the label and button
+			panel = Components.createTitledPanel("Data migration", new BorderLayout(0, 5));
+
+			convertBtn = createStyledButton("Migrate logs", e -> {
+				initiateColosseumTrialMigration(label);
+
+			});
+			convertBtn.setToolTipText("Migrates logged Colosseum trials to a newer version, if possible.");
+
+			// Set the preferred height to 20. The width (0) will be ignored by BorderLayout.SOUTH
+			Dimension dimension = new Dimension(0, 30);
+			convertBtn.setPreferredSize(dimension);
+
+			// Add the label to the top and the button directly to the bottom so it stretches horizontally
+			panel.add(label, BorderLayout.NORTH);
+			panel.add(convertBtn, BorderLayout.SOUTH);
 
 			return panel;
 		}
 		return null;
 	}
 
-	private void initiateColosseumTrialMigration()
+	private void initiateColosseumTrialMigration(JLabel label)
 	{
 		executor.submit(() -> {
 			try
@@ -338,6 +350,7 @@ public class UtilitiesModePanel extends JPanel
 							"Success", JOptionPane.INFORMATION_MESSAGE);
 					});
 				}
+				label.setText("<html><div style='width: 200px; color: white; padding-bottom: 2px;'>Converted all wave logs!");
 			}
 			catch (Exception e)
 			{

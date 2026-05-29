@@ -57,41 +57,6 @@ public final class ColosseumDetailedDiscordFormatter
 	@Nonnull
 	public static JsonObject buildPayload(@Nonnull ColosseumAttemptDTO dto, @Nonnull DataLoggerConfig config, boolean isTest) {
 		JsonObject embed = isTest ? generateTestEmbed(dto.getAccountName()) : generateBaseEmbed(dto.getAccountName());
-//		StringBuilder description = new StringBuilder();
-//
-//		List<String> topStats = new ArrayList<>();
-//		if (config.includeStatus()) {
-//			topStats.add(String.format("**Status:** %s | %s/12 completed",
-//				dto.getResult().toLowerCase(),
-//				getWavesCompleted(dto.getWaves())));
-//		}
-//		if (config.includeTime()) {
-//			topStats.add(String.format("**Time:** %s", formatSeconds(dto.getTotalTime())));
-//		}
-//		if (config.includeGlory()) {
-//			topStats.add(String.format("**Glory:** %,d", dto.getTotalGlory()));
-//		}
-//
-//		if (!topStats.isEmpty()) {
-//			description.append(String.join(" | ", topStats)).append("\n");
-//		}
-//
-//		if (config.includeModifiers()) {
-//			String activeModifiers = formatActiveModifiers(dto.getActiveModifiers(), true);
-//			description.append(String.format("**Modifiers**: [ %s ]\n", activeModifiers));
-//		}
-//
-//		List<String> econStats = new ArrayList<>();
-//		if (config.includeRewardValue()) {
-//			econStats.add(String.format("**Reward:** %,d gp", dto.getRewardsValue()));
-//		}
-//		if (config.includeSupplyValue()) {
-//			econStats.add(String.format("**Supplies:** %,d gp", dto.getConsumedSupplyValue()));
-//		}
-//
-//		if (!econStats.isEmpty()) {
-//			description.append(String.join(" | ", econStats)).append("\n");
-//		}
 
 		embed.addProperty("description", buildDescription(dto, config));
 

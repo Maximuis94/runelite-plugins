@@ -109,8 +109,6 @@ public class FileIOService
 	public static final File INTERNAL_GE_DIR = new File(PluginConstants.INTERNAL_ROOT_DIR, "grand-exchange");
 	public static final File INTERNAL_GE_OFFERS_DIR = new File(INTERNAL_GE_DIR, "completed");
 	public static final File INTERNAL_GE_HISTORY_DIR = new File(INTERNAL_GE_DIR, "history");
-	public static final File DEBUG_DIR = new File(PluginConstants.PLUGIN_ROOT, "debug");
-	public static final File GE_OFFER_SUBMIT_MODE_LOG = new File(DEBUG_DIR, "grand-exchange-submission-log.json");
 	public static final File COLOSSEUM_WAVE_LOG_MERGED_CSV = new File(PluginConstants.COLOSSEUM_ROOT_DIR, "colosseum-waves-merged.csv");
 	public static final File COLOSSEUM_WAVE_LOG_MERGED_JSON = new File(PluginConstants.COLOSSEUM_ROOT_DIR, "colosseum-waves-merged.json");
 	private final Gson gson;

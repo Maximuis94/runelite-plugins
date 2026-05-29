@@ -36,7 +36,6 @@ import com.datalogger.models.enums.ExchangeLoggerCsvFileStrategy;
 import com.datalogger.models.enums.ExchangeLoggerJsonFileStrategy;
 import com.datalogger.models.grandexchange.ActiveGeOffer;
 import com.datalogger.models.grandexchange.GeLedgerEntry;
-import static com.datalogger.services.FileIOService.GE_OFFER_SUBMIT_MODE_LOG;
 import com.datalogger.services.GrandExchangeExportService;
 import com.google.gson.JsonObject;
 import java.io.File;
@@ -48,7 +47,6 @@ import java.util.Properties;
 import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.inject.Singleton;
-import lombok.Data;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.GrandExchangeOffer;
@@ -81,44 +79,6 @@ public class GrandExchangeLogger extends AbstractLogger
 	private ExchangeLoggerJsonFileStrategy jsonFileNamingStrategy = null;
 	private ExchangeLoggerCsvFileStrategy csvFileNamingStrategy = null;
 
-	@Data
-	private class SubmissionCounters
-	{
-		private int countExchangeOfferChanged = 0;
-		private int countSoundEffectPlayed = 0;
-		private int countScriptPreFired = 0;
-
-		protected void increaseCounter(SubmissionMode mode)
-		{
-			switch (mode)
-			{
-				case SCRIPT_PRE_FIRED:
-					countScriptPreFired++;
-					break;
-				case SOUND_EFFECT_PLAYED:
-					countSoundEffectPlayed++;
-					break;
-				case EXCHANGE_OFFER_CHANGED:
-					countExchangeOfferChanged++;
-					break;
-			}
-			saveSubmissionCounters();
-		}
-
-		private void saveSubmissionCounters()
-		{
-			fileIOService.writeJson(GE_OFFER_SUBMIT_MODE_LOG, this);
-		}
-	}
-
-	private SubmissionCounters submissionModeCounters = new SubmissionCounters();
-
-	private void loadSubmissionCounters()
-	{
-		SubmissionCounters loaded = fileIOService.readJson(GE_OFFER_SUBMIT_MODE_LOG, SubmissionCounters.class);
-		submissionModeCounters = Objects.requireNonNullElseGet(loaded, SubmissionCounters::new);
-	}
-
 	@Override
 	public LogType getLogType() { return LogType.GRAND_EXCHANGE; }
 
@@ -139,7 +99,6 @@ public class GrandExchangeLogger extends AbstractLogger
 		if (!loggerIsEnabled)
 			return;
 
-		loadSubmissionCounters();
 		Properties state = fileIOService.getAccountState();
 		for (int i = 0; i < 8; i++) {
 			lastLoggedFingerprints[i] = state.getProperty("last_fp_" + i);
@@ -330,7 +289,6 @@ public class GrandExchangeLogger extends AbstractLogger
 			if (!fingerprint.equals(lastLoggedFp)) {
 				lastLoggedFingerprints[slot] = fingerprint;
 				logFinalTrade(slot, offer, createdTs, accountHashLong);
-				submissionModeCounters.increaseCounter(mode);
 
 				state.setProperty("last_fp_" + slot, fingerprint);
 				fileIOService.saveAccountState(state);

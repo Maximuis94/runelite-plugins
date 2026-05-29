@@ -120,7 +120,7 @@ public class ColosseumStatisticsModePanel extends JPanel
 	private final JPanel dynamicControlsPanel;
 	private final PluginErrorPanel errorPanel;
 
-	private ColosseumModifierTable modifierTableWrapper;
+	private final ColosseumModifierTable modifierTableWrapper;
 	private JTable rankingTable;
 	private TableMode currentTableMode = TableMode.MODIFIERS;
 	private final Map<Integer, ImageIcon> itemIconCache = new HashMap<>();
@@ -133,7 +133,7 @@ public class ColosseumStatisticsModePanel extends JPanel
 		"- To require a specific state, type its exact name.<br>" +
 		"- To exclude a specific state, prefix it with an exclamation mark (e.g., <b>!BLASPHEMY_0</b>).<br><br>" +
 		"Separate multiple conditions with commas. Unrecognized states are ignored.";
-	private static Dimension MODIFIER_SIZE = new Dimension(200, 35);
+	private static final Dimension MODIFIER_SIZE = new Dimension(200, 35);
 	private final static Dimension SCROLLPANE_PREFERRED_SIZE = new Dimension(250, 800);
 	private final static Dimension SCROLLPANE_MAXIMUM_SIZE = new Dimension(Integer.MAX_VALUE, 800);
 	private final static String[] TRIAL_RESULTS = {"COMPLETED", "FAILED", "CANCELLED"};
@@ -372,10 +372,6 @@ public class ColosseumStatisticsModePanel extends JPanel
 	private JPanel buildDetailedStatsTogglePanel()
 	{
 		JPanel panel = Components.createTitledPanel("Detailed Wave Stats", new GridLayout(2, 2, 5, 5));
-//		JButton waveGloryBtn;
-//		JButton timeBtn;
-//		JButton rewardBtn;
-//		JButton totalGloryBtn;
 
 		JButton timeBtn = createToggleButton("Time", showDetailedTime);
 
@@ -777,8 +773,6 @@ public class ColosseumStatisticsModePanel extends JPanel
 
 		scrollPane.setPreferredSize(SCROLLPANE_PREFERRED_SIZE);
 		scrollPane.setMaximumSize(SCROLLPANE_MAXIMUM_SIZE);
-//		scrollPane.setPreferredSize(SCROLLPANE_NO_OUTER_SCROLLBAR_SIZE);
-//		scrollPane.setMaximumSize(SCROLLPANE_NO_OUTER_SCROLLBAR_SIZE);
 		scrollBar = scrollPane.getVerticalScrollBar();
 		setScrollSpeed(scrollSpeed);
 
@@ -865,7 +859,7 @@ public class ColosseumStatisticsModePanel extends JPanel
 			sortBtn.setBorder(BorderFactory.createLineBorder(ColorScheme.DARKER_GRAY_HOVER_COLOR, 1));
 
 			if (type == currentHistorySortType) {
-				sortBtn.setText(type.toString() + (isHistoryAscending ? " \u25B2" : " \u25BC"));
+				sortBtn.setText(type + (isHistoryAscending ? " \u25B2" : " \u25BC"));
 				sortBtn.setForeground(Color.WHITE);
 				sortBtn.setBackground(ColorScheme.DARKER_GRAY_HOVER_COLOR);
 			} else {

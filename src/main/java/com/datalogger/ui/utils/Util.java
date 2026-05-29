@@ -40,7 +40,7 @@ public final class Util
 	 * Helper method to open a directory in the native OS file explorer.
 	 */
 	public static void openDirectory(String path, ScheduledExecutorService executor) {
-		openDirectory(new File(path), executor);
+		executor.submit(() -> LinkBrowser.open(path));
 	}
 
 	/**
@@ -51,13 +51,9 @@ public final class Util
 
 			if (!directory.exists()) {
 				log.warn("Directory does not exist, attempting to create: {}", directory.getAbsolutePath());
-				if (!directory.mkdirs()) {
-					log.error("Failed to create directory: {}", directory.getAbsolutePath());
-					return;
-				}
 			}
 
-			LinkBrowser.browse(directory.getAbsolutePath());
+			LinkBrowser.open(directory.getAbsolutePath());
 		});
 	}
 

@@ -30,16 +30,13 @@ import com.datalogger.dto.ColosseumAttemptDTO;
 import com.datalogger.dto.ColosseumWaveDTO;
 import com.datalogger.models.enums.WaveStatus;
 import com.datalogger.utils.ImageUtil;
-import static com.datalogger.webhook.ColosseumDiscordBroadcaster.generateBaseEmbed;
 import static com.datalogger.webhook.ColosseumDiscordBroadcaster.generateMinimalEmbed;
 import static com.datalogger.webhook.ColosseumDiscordBroadcaster.generateMinimalTestEmbed;
-import static com.datalogger.webhook.ColosseumDiscordBroadcaster.generateTestEmbed;
 import static com.datalogger.webhook.DiscordWebhookUtils.wrapEmbedIntoPayload;
 import static com.datalogger.webhook.WebhookFormatUtils.formatActiveModifiers;
 import static com.datalogger.webhook.WebhookFormatUtils.formatColosseumWaveLine;
 import static com.datalogger.webhook.WebhookFormatUtils.formatSeconds;
 import static com.datalogger.webhook.WebhookFormatUtils.getWavesCompleted;
-import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import java.awt.Color;
 import java.awt.Font;
@@ -47,10 +44,7 @@ import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.io.File;
-import java.io.FileReader;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Comparator;
 import java.util.List;
 import javax.annotation.Nonnull;
 import javax.imageio.ImageIO;
@@ -164,85 +158,6 @@ public final class ColosseumScreenshotDiscordFormatter
 	}
 
 	/**
-	 * DEBUG: Reads a specific attempt folder, finds the last screenshot (matching config extension)
-	 * and the wave-log JSON, projects the wave data onto the image, and saves it.
-	 */
-	public static void debugProjectDataOntoImage(File attemptFolder, DataLoggerConfig config, Gson gson)
-	{
-		if (!attemptFolder.exists() || !attemptFolder.isDirectory())
-		{
-			return;
-		}
-		String extension = config.screenshotFormat().getExtension();
-		String discordImageFileName= "discord." + extension;
-
-		try
-		{
-			File[] jsonFiles = attemptFolder.listFiles((dir, name) -> name.endsWith("_wave-log.json"));
-			if (jsonFiles == null || jsonFiles.length == 0)
-			{
-				System.err.println("Debug: No _wave-log.json file found in " + attemptFolder);
-				return;
-			}
-			File jsonFile = jsonFiles[0];
-
-			// 2. Parse the JSON file into your ColosseumAttemptDTO
-			ColosseumAttemptDTO dto;
-			try (FileReader reader = new FileReader(jsonFile))
-			{
-				dto = gson.fromJson(reader, ColosseumAttemptDTO.class);
-			}
-
-			// 3. Dynamically get the extension from your config (e.g., "png" or "jpg")
-			// NOTE: Adjust 'config.imageFormat()' to match your actual config method!
-			// If your config returns an Enum, you might need config.imageFormat().name().toLowerCase()
-
-			// 4. Find the alphabetically last image file matching the config extension
-			File[] imageFiles = attemptFolder.listFiles((dir, name) -> {
-				String lowerName = name.toLowerCase();
-				return lowerName.endsWith("." + extension) && !lowerName.startsWith("debug_output");
-			});
-
-			if (imageFiles == null || imageFiles.length == 0)
-			{
-				System.err.println("Debug: No ." + extension + " files found in " + attemptFolder);
-				return;
-			}
-
-			File targetImageFile = null;
-
-			for (File file : imageFiles)
-			{
-				String lowerName = file.getName().toLowerCase();
-				if (lowerName.contains("-death") || lowerName.contains("-reward"))
-				{
-					targetImageFile = file;
-					break;
-				}
-			}
-
-			if (targetImageFile == null)
-			{
-				Arrays.sort(imageFiles, Comparator.comparing(File::getName));
-				targetImageFile = imageFiles[imageFiles.length - 1];
-			}
-
-			BufferedImage originalImage = ImageIO.read(targetImageFile);
-
-			BufferedImage projectedImage = projectWaveDataOntoScreenshot(originalImage, dto, config);
-
-			File outputFile = new File(attemptFolder, discordImageFileName);
-			ImageIO.write(projectedImage, extension, outputFile);
-
-
-		}
-		catch (Exception e)
-		{
-			e.printStackTrace();
-		}
-	}
-
-	/**
 	 * Takes the original screenshot, projects the wave data onto it, and saves it
 	 * as a new file specifically for Discord broadcasting.
 	 */
@@ -276,8 +191,6 @@ public final class ColosseumScreenshotDiscordFormatter
 	{
 		List<String> lines = new ArrayList<>();
 		String sep = " | ";
-
-//		lines.add("Colosseum run by: " + dto.getAccount());
 
 		List<String> topStats = new ArrayList<>();
 		if (config.includeStatus()) {

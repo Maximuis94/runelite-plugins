@@ -25,12 +25,8 @@
 package com.datalogger.constants;
 
 import com.datalogger.models.itemvault.ItemBundle;
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import net.runelite.api.gameval.NpcID;
-import net.runelite.api.gameval.ItemID;
 
 /**
  * Centralized constants related to Fortis Colosseum

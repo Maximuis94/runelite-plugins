@@ -948,11 +948,6 @@ Panel with various buttons that navigate to the directories with the data dumps
 
 The manual exports panel contains various buttons that may be used to manually start export operations that may involve parsing many (large) files and/or writing large files. The export operations typically involve combining a number of data structures.
 
-
-#### Debug & Testing
-
-The debug panel contains various buttons with actions that invoke actions to test configurations. It may be used to generate a Discord broadcast of a selected wave log, for instance.
-
 </details>
 
 

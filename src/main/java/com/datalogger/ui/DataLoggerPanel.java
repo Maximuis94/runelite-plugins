@@ -27,7 +27,6 @@ package com.datalogger.ui;
 import com.datalogger.DataLoggerConfig;
 import com.datalogger.models.enums.PanelViewMode;
 import com.datalogger.models.enums.UIScrollSpeed;
-import com.datalogger.ui.modes.ColosseumReviewModePanel;
 import com.datalogger.ui.modes.ColosseumStatisticsModePanel;
 import com.datalogger.ui.modes.ItemsManagerModePanel;
 import com.datalogger.ui.modes.ItemsModePanel;
@@ -39,7 +38,6 @@ import java.awt.BorderLayout;
 import java.awt.CardLayout;
 import java.awt.Component;
 import java.awt.Dimension;
-import java.awt.Panel;
 import java.awt.Rectangle;
 import java.awt.event.ItemEvent;
 import java.util.function.BooleanSupplier;
@@ -52,9 +50,7 @@ import javax.swing.Scrollable;
 import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
 
-import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
-import net.runelite.client.config.ConfigManager;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.PluginPanel;
 
@@ -110,13 +106,10 @@ public class DataLoggerPanel extends PluginPanel {
 
 		cardContainer.add(utilitiesPanel, PanelViewMode.UTILITIES.name());
 		cardContainer.add(colosseumPanel, PanelViewMode.COLOSSEUM_STATISTICS.name());
-//     cardContainer.add(colosseumReviewPanel, PanelViewMode.COLOSSEUM_REVIEW.name());
 		cardContainer.add(itemsPanel, PanelViewMode.ITEMS.name());
 		cardContainer.add(itemsManagerPanel, PanelViewMode.ITEMS_MANAGER.name());
 		cardContainer.add(webhookTestModePanel, PanelViewMode.WEBHOOK_TEST.name());
 
-//		cardContainer.setMaximumSize(new Dimension(cardContainer.getWidth(), 1500));
-//		cardContainer.setPreferredSize(new Dimension(cardContainer.getWidth(), 1500));
 
 		viewSelector.addItemListener(e -> {
 			if (e.getStateChange() == ItemEvent.SELECTED)

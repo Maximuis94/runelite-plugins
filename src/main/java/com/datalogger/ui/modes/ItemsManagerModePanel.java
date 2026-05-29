@@ -1,5 +1,6 @@
 package com.datalogger.ui.modes;
 
+import com.datalogger.DataLoggerConfig;
 import static com.datalogger.constants.Item.CACHED_ITEM_DATA_TYPE;
 import static com.datalogger.constants.PluginConstants.INTERNAL_VAULT_DIR;
 import com.datalogger.constants.PluginConstants;
@@ -10,7 +11,6 @@ import com.datalogger.ui.utils.Components;
 import com.datalogger.ui.utils.Models.VaultItem;
 import com.datalogger.ui.utils.Models.AccountItem;
 import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
@@ -18,7 +18,6 @@ import java.awt.Dimension;
 import java.awt.GridLayout;
 import java.io.File;
 import java.io.FileReader;
-import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -66,18 +65,20 @@ public class ItemsManagerModePanel extends JPanel
 	private final ItemManager itemManager;
 
 	private final ClientThread clientThread;
+	private final DataLoggerConfig config;
 
 	private UIScrollSpeed scrollSpeed = UIScrollSpeed.MEDIUM;
 	private JScrollBar scrollBar = null;
 
 	@Inject
-	public ItemsManagerModePanel(AccountHashMapper accountHashMapper, Gson gson, ScheduledExecutorService executor, ItemManager itemManager, ClientThread clientThread)
+	public ItemsManagerModePanel(AccountHashMapper accountHashMapper, Gson gson, ScheduledExecutorService executor, ItemManager itemManager, ClientThread clientThread, DataLoggerConfig config)
 	{
 		this.accountHashMapper = accountHashMapper;
 		this.gson = gson;
 		this.executor = executor;
 		this.itemManager = itemManager;
 		this.clientThread = clientThread;
+		this.config = config;
 
 		setLayout(new BorderLayout(0, 10));
 		setBackground(ColorScheme.DARK_GRAY_COLOR);
@@ -311,15 +312,26 @@ public class ItemsManagerModePanel extends JPanel
 
 			clientThread.invokeLater(() -> {
 				Map<Integer, String> itemNamesMap = new HashMap<>();
+				List<BankedItem> filteredItems = new ArrayList<>();
+				boolean hideZeroPrice = config.hideZeroPriceItems();
 
 				for (BankedItem item : items) {
+					if (item.getQuantity() <= 0) continue;
+
+					if (hideZeroPrice) {
+						int price = itemManager.getItemPrice(item.getItemId());
+						if (price <= 0) continue;
+					}
+
 					try {
 						ItemComposition comp = itemManager.getItemComposition(item.getItemId());
 						itemNamesMap.put(item.getItemId(), comp.getName());
 					} catch (Exception ignored) {}
+
+					filteredItems.add(item);
 				}
 
-				SwingUtilities.invokeLater(() -> buildItemsTable(items, itemNamesMap));
+				SwingUtilities.invokeLater(() -> buildItemsTable(filteredItems, itemNamesMap));
 			});
 		});
 	}

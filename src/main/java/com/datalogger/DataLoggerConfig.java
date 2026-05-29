@@ -83,14 +83,6 @@ public interface DataLoggerConfig extends Config {
 	)
 	String COLOSSEUM_TIMELINE_SECTION = "colosseumTimeline";
 
-//	@ConfigSection(
-//		name = "Supply logger",
-//		description = "Settings related to supply loggers",
-//		position = 5,
-//		closedByDefault = true
-//	)
-//	String SUPPLY_SECTION = "supplyLogger";
-
 	@ConfigSection(
 		name = "Screenshots",
 		description = "Settings for automatic screenshot capturing",

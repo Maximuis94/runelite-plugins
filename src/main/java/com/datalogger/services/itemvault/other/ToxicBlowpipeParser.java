@@ -71,7 +71,7 @@ public class ToxicBlowpipeParser extends AbstractVaultParser
 		private int scalesQuantity = 0;
 	}
 
-	private BlowpipeState currentState = new BlowpipeState();
+	private final BlowpipeState currentState = new BlowpipeState();
 	private boolean pendingSave = false;
 
 	@Override
@@ -193,29 +193,6 @@ public class ToxicBlowpipeParser extends AbstractVaultParser
 
 		return items;
 	}
-
-//	@Override
-//	public List<BankedItem> parseOfflineFile(long accountHash, File vaultFile)
-//	{
-//		BlowpipeState offlineState = fileIOService.readJson(vaultFile, BlowpipeState.class);
-//		List<BankedItem> items = new ArrayList<>();
-//
-//		if (offlineState == null) return items;
-//
-//		String accountName = accountHashMapper.getAccountName(accountHash);
-//
-//		if (offlineState.getDartQuantity() > 0 && offlineState.getDartId() != -1)
-//		{
-//			items.add(new BankedItem(getVaultType(), accountHash, accountName, offlineState.getDartId(), offlineState.getDartName(), offlineState.getDartQuantity()));
-//		}
-//
-//		if (offlineState.getScalesQuantity() > 0)
-//		{
-//			items.add(new BankedItem(getVaultType(), accountHash, accountName, ItemID.SNAKEBOSS_SCALE, "Zulrah's scales", offlineState.getScalesQuantity()));
-//		}
-//
-//		return items;
-//	}
 
 	@Override
 	protected File getInternalVaultFile()

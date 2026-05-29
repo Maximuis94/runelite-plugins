@@ -55,8 +55,8 @@ public abstract class AbstractVariableVaultParser extends AbstractVaultParser
 	private int debounceTicks = 0;
 	private static final int TICKS_TO_WAIT = 5;
 
-	protected Map<Integer, Integer> currentVarpValues = new HashMap<>();
-	protected Map<Integer, Integer> currentVarbitValues = new HashMap<>();
+	protected final Map<Integer, Integer> currentVarpValues = new HashMap<>();
+	protected final Map<Integer, Integer> currentVarbitValues = new HashMap<>();
 
 	protected Set<Integer> getTrackedVarpIds() { return Collections.emptySet(); }
 	protected Set<Integer> getTrackedVarbitIds() { return Collections.emptySet(); }
