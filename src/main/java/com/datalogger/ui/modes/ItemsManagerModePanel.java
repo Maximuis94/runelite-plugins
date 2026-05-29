@@ -373,7 +373,7 @@ public class ItemsManagerModePanel extends JPanel
 			centerRenderer.setHorizontalAlignment(SwingConstants.CENTER);
 			itemsTable.getColumnModel().getColumn(2).setCellRenderer(centerRenderer);
 
-			itemsTable.setPreferredScrollableViewportSize(new Dimension(itemsTable.getPreferredSize().width, 36 * 8));
+			itemsTable.setPreferredScrollableViewportSize(new Dimension(itemsTable.getPreferredSize().width, 36 * 14));
 
 			JScrollPane scrollPane = Components.createScrollPane(itemsTable);
 

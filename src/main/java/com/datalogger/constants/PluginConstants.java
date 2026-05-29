@@ -35,6 +35,7 @@ import net.runelite.client.RuneLite;
 public final class PluginConstants
 {
 	public static final String CONFIG_GROUP = "datalogger";
+	public static final String PLUGIN_URL = "https://runelite.net/plugin-hub/show/data-logger";
 
 	public static final File PLUGIN_ROOT = new File(RuneLite.RUNELITE_DIR, "data-logger");
 	public static final File COLOSSEUM_ROOT_DIR = new File(PLUGIN_ROOT, "colosseum");

@@ -10,7 +10,7 @@ Logged item data and Colosseum trials may also be viewed via the sidepanel, whic
 <details>
   <summary>Click to expand</summary>
 
-The logger plugin stores its exported data in subdirectories of the plugin root, the plugin itself also relies on internal data.
+The logger plugin stores its exported data in subdirectories of the plugin root, the plugin itself relies primarily on internal data.
 
 ### Internal
 One of the subdirectories, internal, is used by the plugin. These files are assumed to be used by the
@@ -207,8 +207,8 @@ the json and csv file content. This data is added to merged data structures.
 
 ## Colosseum
 Data loggers related to tracking Colosseum progress.
-Generated files are bundled per attempt in a newly created directory, which is named as `<ACCOUNT_NAME>_<YYMMDD>_<HHMMSS>`,
-and created in `${user.home}/.runelite/data-logger/colosseum/trials`. All tracked data that is related to an attempt is stored in 
+Generated files are bundled per trial in a newly created directory, which is named as `<ACCOUNT_NAME>_<YYMMDD>_<HHMMSS>`,
+and created in `${user.home}/.runelite/data-logger/colosseum/trials`. All tracked data that is related to a trial is stored in 
 this folder.
 
 Note that it is possible to set a tag in the configurations, which will allow you to group trials in the data viewer.
@@ -220,7 +220,7 @@ Note that it is possible to set a tag in the configurations, which will allow yo
 
 Overall Run Summary
 
-At the root level, the log captures the final metrics and economics of the entire attempt:
+At the root level, the log captures the final metrics and economics of the entire trial:
 
     Attempt ID & Timestamp: Unique identifier (Account + Date/Time) and exact Unix timestamp.
 
@@ -236,7 +236,7 @@ At the root level, the log captures the final metrics and economics of the entir
         Breakdown of all rewards as item, quantity and value
 
     Supply Cost Breakdown: 
-        Total Grand Exchange value of all supplies consumed during the attempt.
+        Total Grand Exchange value of all supplies consumed during the trial.
 
         Items/Runes: Tracked by quantity and GE value (e.g., Blood runes, Dragon arrows).
 
@@ -620,7 +620,7 @@ _Example of state data_
   <summary>Click to expand</summary>
 
 
-If enabled, a screenshot is created and stored in the directory created for that attempt when the interface between waves or the rewards chest interface pops up.
+If enabled, a screenshot is created and stored in the directory created for that trial when the interface between waves or the rewards chest interface pops up.
 ![img_1.png](images/example-wave-completion-screenshot.png)<br>
 _An example of a screenshot taken after wave 12 is completed_<br><br>
 
@@ -632,10 +632,10 @@ _An example of a screenshot taken after wave 12 is completed_<br><br>
   <summary>Click to expand</summary>
 
 
-If enabled, supplies are also tracked during colosseum trials. A snapshot is created at the start of an attempt, and 
+If enabled, supplies are also tracked during colosseum trials. A snapshot is created at the start of a trial, and 
 the supplies at the end are subtracted from the initial snapshot and stored into a file.
 These supplies also include an estimate of certain item charges, like Scythe of vitur or Venator bow charges. </br>Additionally, all supplies are valued according to current market prices, this value is added to each supply count.  
-Supply logs are saved as `<ACCOUNT_NAME>_<YYMMDD>_<HHMMSS>_supply-log.<EXTENSION>` in the directory created for the particular attempt.
+Supply logs are saved as `<ACCOUNT_NAME>_<YYMMDD>_<HHMMSS>_supply-log.<EXTENSION>` in the directory created for the particular trial.
 
 <details>
 
@@ -750,7 +750,7 @@ The Data Logger allows one to fully customize how your trials are formatted look
 
 Lines starting with # are treated as comments and will not be sent to Discord. A small example is provided as default value, which can also be restored by resetting the config to its default value.
 
-You can completely customize the Discord webhook messages sent by the Data Logger plugin by using a custom template. The plugin will parse your template and replace the keywords below with the actual data from your Colosseum attempt.
+You can completely customize the Discord webhook messages sent by the Data Logger plugin by using a custom template. The plugin will parse your template and replace the keywords below with the actual data from your Colosseum trial.
 
 It is also possible to test a defined template using the "Test with Uploaded Log" button in the side panel, which generates a discord message using the wave-log passed. 
 
@@ -952,5 +952,23 @@ The manual exports panel contains various buttons that may be used to manually s
 #### Debug & Testing
 
 The debug panel contains various buttons with actions that invoke actions to test configurations. It may be used to generate a Discord broadcast of a selected wave log, for instance.
+
+</details>
+
+
+### Discord webhook test panel
+
+<details>
+<summary>Click to expand</summary>
+
+
+![example-webhook-test-panel.png](images/example-webhook-test-panel.png)<br>
+This panel may be used to select a trial, a broadcasting method and a panel to define the template text.
+The keywords that may be used in the custom template are outlined in the `Discord webhook` section.
+
+At the bottom of the panel there are three buttons;
+- `Test Colosseum template`: used to submit a trial to the configured webhook url using the selected trial, broadcasting method and (if applicable) custom template.
+- `Save template`: used to save the template to the plugin configurations.
+- `Reset template`: used to restore the template in the textfield to the currently configured template.
 
 </details>

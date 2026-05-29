@@ -28,15 +28,20 @@ package com.datalogger.ui.modes;
 import com.datalogger.DataLoggerConfig;
 import com.datalogger.constants.PluginConstants;
 import static com.datalogger.constants.PluginConstants.CONFIG_GROUP;
+import static com.datalogger.constants.PluginConstants.PLUGIN_URL;
 import static com.datalogger.constants.PluginConstants.WEBHOOK_TEST_COOLDOWN_SECONDS_SUCCESS;
 import com.datalogger.dto.ColosseumAttemptDTO;
 import com.datalogger.dto.ColosseumWaveDTO;
 import com.datalogger.models.enums.ColosseumBroadcastMode;
 import com.datalogger.models.enums.ColosseumWebhookFormatter;
+import com.datalogger.models.enums.Directory;
 import com.datalogger.models.enums.UIScrollSpeed;
 import com.datalogger.services.DiscordWebhookService;
 import com.datalogger.ui.utils.Components;
 import static com.datalogger.ui.utils.Components.createStyledButton;
+import com.datalogger.ui.utils.Models;
+import static com.datalogger.ui.utils.Util.openDirectory;
+import static com.datalogger.ui.utils.Util.openUrl;
 import com.datalogger.webhook.ColosseumCustomDiscordFormatter;
 import com.datalogger.webhook.ColosseumDiscordBroadcaster;
 import com.google.gson.Gson;
@@ -116,7 +121,9 @@ public class WebhookTestModePanel extends JPanel
 		JPanel controlsPanel = new JPanel(new GridLayout(0, 1, 0, 5));
 		controlsPanel.setOpaque(false);
 
-		JLabel instructionsLabel = new JLabel("<html><div style='width: 200px; color: white; padding-bottom: 2px;'>Test various broadcasting options<br>here using existing trial submissions</div></html>");
+		JLabel instructionsLabel = new JLabel("<html><div style='width: 200px; color: white; padding-bottom: 2px;'>Test various broadcasting options<br>here using existing trial submissions<br>For a more elaborate explanation, go <br>to the DataLogger README and head <br>to the Custom broadcasting <br>templates section</div></html>");
+		JButton pluginHubBtn = createStyledButton("Open DataLogger README", e -> {openUrl(PLUGIN_URL, executor);});
+		pluginHubBtn.setToolTipText("Click here to go to the DataLogger plugin hub page, in which the README can be found.");
 
 		JComboBox<String> trialSelector = Components.createComboBox();
 		trialSelector.addItem("Select Trial...");
@@ -148,7 +155,9 @@ public class WebhookTestModePanel extends JPanel
 		JPanel topWrapper = new JPanel(new BorderLayout(0, 5));
 		topWrapper.setOpaque(false);
 		topWrapper.add(instructionsLabel, BorderLayout.NORTH);
-		topWrapper.add(controlsPanel, BorderLayout.CENTER);
+		topWrapper.add(pluginHubBtn, BorderLayout.CENTER);
+		topWrapper.add(controlsPanel, BorderLayout.SOUTH);
+
 		panel.add(topWrapper, BorderLayout.NORTH);
 
 		JTextArea customFormatInput = new JTextArea(config.colosseumCustomTemplate());

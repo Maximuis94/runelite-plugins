@@ -27,11 +27,11 @@ package com.datalogger.models.enums;
 
 public enum PanelViewMode
 {
+	UTILITIES("Utilities"),
 	COLOSSEUM_STATISTICS("Colosseum Statistics"),
 	//	COLOSSEUM_REVIEW("Colosseum history"),
 	ITEMS_MANAGER("Items manager"),
 	ITEMS("Items"),
-	UTILITIES("Utilities"),
 	WEBHOOK_TEST("Webhook Test");
 
 	private final String displayName;

@@ -108,11 +108,11 @@ public class DataLoggerPanel extends PluginPanel {
 		cardContainer = new ScrollableCardContainer(cardLayout, () -> !config.allowOuterScrollbar());
 		cardContainer.setBackground(ColorScheme.DARK_GRAY_COLOR);
 
+		cardContainer.add(utilitiesPanel, PanelViewMode.UTILITIES.name());
 		cardContainer.add(colosseumPanel, PanelViewMode.COLOSSEUM_STATISTICS.name());
 //     cardContainer.add(colosseumReviewPanel, PanelViewMode.COLOSSEUM_REVIEW.name());
 		cardContainer.add(itemsPanel, PanelViewMode.ITEMS.name());
 		cardContainer.add(itemsManagerPanel, PanelViewMode.ITEMS_MANAGER.name());
-		cardContainer.add(utilitiesPanel, PanelViewMode.UTILITIES.name());
 		cardContainer.add(webhookTestModePanel, PanelViewMode.WEBHOOK_TEST.name());
 
 //		cardContainer.setMaximumSize(new Dimension(cardContainer.getWidth(), 1500));
