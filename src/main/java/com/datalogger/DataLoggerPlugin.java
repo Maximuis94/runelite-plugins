@@ -408,10 +408,11 @@ public class DataLoggerPlugin extends Plugin
 
 				GameMode oldValue = gameMode;
 				gameMode = determineGameMode();
+				isRegularWorld = gameMode == GameMode.REGULAR;
 				if (oldValue != gameMode) updateLoggerEnabledFlags();
 
-				log.debug("Loaded new session data. accountHash={} accountName={} isMembers={} gameMode={}", hashString, accountName, isMembers, gameMode);
-				eventBus.post(new AccountSessionStarted(hashString, currentHash, accountName, isMembers, gameMode == GameMode.REGULAR, gameMode));
+				log.debug("Loaded new session data. accountHash={} accountName={} isMembers={} isRegularGameMode={}, gameMode={}", hashString, accountName, isMembers, isRegularWorld, gameMode);
+				eventBus.post(new AccountSessionStarted(hashString, currentHash, accountName, isMembers, isRegularWorld, gameMode));
 			}
 		}
 	}
@@ -439,6 +440,7 @@ public class DataLoggerPlugin extends Plugin
 	private void updateLoggerEnabledFlags()
 	{
 		boolean geLoggingEnabled = isRegularWorld && config.logGrandExchange();
+		log.debug("GE logging enabled: {}", geLoggingEnabled);
 		geLogger.setLoggerIsEnabled(geLoggingEnabled);
 		grandExchangeHistoryParser.setEnabled(geLoggingEnabled);
 //		coloLogger.setEnabledLogging(config.logColosseum());

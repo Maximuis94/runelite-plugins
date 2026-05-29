@@ -32,12 +32,14 @@ import com.datalogger.ui.modes.ColosseumStatisticsModePanel;
 import com.datalogger.ui.modes.ItemsManagerModePanel;
 import com.datalogger.ui.modes.ItemsModePanel;
 import com.datalogger.ui.modes.UtilitiesModePanel;
+import com.datalogger.ui.modes.WebhookTestModePanel;
 import com.datalogger.ui.utils.Components;
 import static com.datalogger.ui.utils.Components.wrapWithRuneLiteScrollbar;
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
 import java.awt.Component;
 import java.awt.Dimension;
+import java.awt.Panel;
 import java.awt.Rectangle;
 import java.awt.event.ItemEvent;
 import java.util.function.BooleanSupplier;
@@ -68,6 +70,8 @@ public class DataLoggerPanel extends PluginPanel {
 	private final ColosseumStatisticsModePanel colosseumPanel;
 	private final ItemsModePanel itemsPanel;
 	private final ItemsManagerModePanel itemsManagerPanel;
+	private final WebhookTestModePanel webhookTestModePanel;
+
 
 	@Inject
 	public DataLoggerPanel(
@@ -76,7 +80,7 @@ public class DataLoggerPanel extends PluginPanel {
 //     ColosseumReviewModePanel colosseumReviewPanel,
 		ItemsModePanel itemsPanel,
 		ItemsManagerModePanel itemsManagerPanel,
-		DataLoggerConfig config
+		DataLoggerConfig config, WebhookTestModePanel webhookTestModePanel
 	)
 	{
 		super(false);
@@ -87,6 +91,7 @@ public class DataLoggerPanel extends PluginPanel {
 		// this.colosseumReviewPanel = colosseumReviewPanel;
 		this.itemsPanel = itemsPanel;
 		this.itemsManagerPanel = itemsManagerPanel;
+		this.webhookTestModePanel = webhookTestModePanel;
 
 		this.setBorder(new EmptyBorder(10, 10, 10, 10));
 		this.setBackground(ColorScheme.DARK_GRAY_COLOR);
@@ -108,6 +113,7 @@ public class DataLoggerPanel extends PluginPanel {
 		cardContainer.add(itemsPanel, PanelViewMode.ITEMS.name());
 		cardContainer.add(itemsManagerPanel, PanelViewMode.ITEMS_MANAGER.name());
 		cardContainer.add(utilitiesPanel, PanelViewMode.UTILITIES.name());
+		cardContainer.add(webhookTestModePanel, PanelViewMode.WEBHOOK_TEST.name());
 
 //		cardContainer.setMaximumSize(new Dimension(cardContainer.getWidth(), 1500));
 //		cardContainer.setPreferredSize(new Dimension(cardContainer.getWidth(), 1500));
@@ -183,7 +189,7 @@ public class DataLoggerPanel extends PluginPanel {
 	{
 		SwingUtilities.invokeLater(() -> {
 			itemsPanel.setScrollSpeed(scrollSpeed);
-			utilitiesPanel.setScrollSpeed(scrollSpeed);
+			webhookTestModePanel.setScrollSpeed(scrollSpeed);
 			itemsManagerPanel.setScrollSpeed(scrollSpeed);
 			colosseumPanel.setScrollSpeed(scrollSpeed);
 		});

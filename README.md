@@ -1,9 +1,9 @@
 # Data Logger
-Data logger that will store completed Grand exchange offers, Bank/seed vault contents and Colosseum trials locally.  
-Logged data is stored in directories located in the plugin root directory located at ${user.home}/.runelite/data-logger</br>
+Data logger that will store completed Grand exchange offers, item data and Colosseum trials locally.  
+Logged data is stored in directories located in the plugin root directory located at `${user.home}/.runelite/data-logger`</br>
 Additionally, Colosseum trials may also be submitted to Discord channels by configuring a webhook URL.
 
-The plugin itself does not (yet) provide means to interact with/view data, it merely logs.
+Logged item data and Colosseum trials may also be viewed via the sidepanel, which can be used to view both individual datapoints, as well as aggregated stats based on these datapoints.
 
 ## File structure
 
@@ -13,18 +13,18 @@ The plugin itself does not (yet) provide means to interact with/view data, it me
 The logger plugin stores its exported data in subdirectories of the plugin root, the plugin itself also relies on internal data.
 
 ### Internal
-One of the subdirectories, internal, is used by the plugin. These files are assumed to be used by the 
+One of the subdirectories, internal, is used by the plugin. These files are assumed to be used by the
 plugin only, modifying them or interacting with them while the plugin is used may negatively affect plugin performance.
-Most of the data in other folders can be reproduced using the internally cached data. 
+Most of the data in other folders can be reproduced using the internally cached data.
 
 ### Other directories
-All other directories are data dumps produced by the logger; locking the files (e.g. by opening a CSV file using excel) 
-may prevent the plugin from updating it, but should not interfere with the plugin in any other way. The sections below describe 
+All other directories are data dumps produced by the logger; locking the files (e.g. by opening a CSV file using excel)
+may prevent the plugin from updating it, but should not interfere with the plugin in any other way. The sections below describe
 what data is stored where.
 
 </details>
 
-## Item-related data loggers
+## Item data loggers
 These loggers have been written to accommodate using multiple clients simultaneously and minimize risk for I/O errors.
 Furthermore, they are designed to keep track of items across multiple accounts.
 
@@ -34,88 +34,63 @@ Furthermore, they are designed to keep track of items across multiple accounts.
 
   <summary>Click to expand</summary>
 
-If enabled, completed Grand Exchange offers are logged upon finalizing (more specifically; as soon as the progress bar turns green or red, indicating completion or cancellation, respectively).
+If enabled, completed Grand Exchange offers are logged upon the moment they are completed and while collecting the offers. For each completed exchange offer, the following datapoints are logged;
 
-For each offer, the following datapoints are logged;
 - ItemId: The OSRS item ID
-- ItemName
-- OfferCreationTime: Timestamp at which the offer was created
-- Timestamp: Timestamp at which the offer was completed
-- TradeType: BUY for a purchase, SELL for a sale
+- ItemName: Name of the item
+- isBuy: true for a purchase, false for a sale
 - Quantity: Quantity of items traded
-- OfferQuantity: Quantity of items in the offer
 - Price: Price per item traded
-- OfferPrice: Price per item in the offer
 - Value: Amount of GP transferred in the trade
-- Tax: Total tax paid
+- Tax: Tax paid per item
 - AccountName: Name of the account that placed the offer
 - AccountHash: account-specific hash value (retained across name changes)
-- GeSlot: Value of 0-7 that indicates the Grand Exchange slot used, or -1 for entries generated from the Grand Exchange history data only.
-- IsHistoryEntry: If true, data is drawn solely from the Grand Exchange history UI
+- GeSlot: Value of 0-7 that indicates the Grand Exchange slot used
 - IsCancelled: If true, the offer was cancelled prematurely
+- OfferCreationTime: Timestamp at which the offer was created
+- ExactTimestamp: Timestamp at which the offer was logged
+- OriginalOfferQuantity: Quantity of items in the offer
+- OriginalOfferPrice: Price per item in the offer
 
-![img.png](images/example-grand-exchange-log.png)<br>
-_An example entry in the CSV file produced by the Grand Exchange logger_<br><br>
+```json
+{
+  "itemId": 6018,
+  "itemName": "Poison ivy berries",
+  "isBuy": false,
+  "quantity": 73,
+  "price": 500,
+  "value": 36500,
+  "tax": 10,
+  "accountName": "ACCOUNT_NAME",
+  "accountHash": 1111111111111111111,
+  "geSlot": 6,
+  "isCancelled": true,
+  "offerCreationTime": 1777777777776,
+  "exactTimestamp":1777777777778,
+  "originalOfferQuantity": 9500,
+  "originalOfferPrice": 400
+}
+```
+_An example entry of a completed Grand Exchange offer submitted to a JSON file_
 
-Grand exchange offers are stored internally in a JSONL file, a copy of this JSON file will be made if its configuration is enabled.
-Furthermore, offers may also be written to a CSV file. Files produced by the Grand Exchange logger are stored in the `.runelite/grand-exchange/<ACCOUNT_NAME>` directory.
-CSV files are separated per day, named as `grand-exchange_YYYY-MM-DD.csv`. To facilitate using multiple clients simultaneously, the account name is used as root directory, 
-effectively separating files per account.
-
-Grand Exchange offers are designed to contain as much information as possible. This information is limited to offer metadata and its 
-values upon completion. To minimize the risk of missing out on offer submissions, completed offers that have not been collected are 
-submitted on certain occasions, like right before collecting the offer.
-In order to avoid duplicate submissions, a completed offer passed to the handler will not be submitted if the last registered
-offer for that slot is identical to the to-be submitted offer.
-Ongoing offers are also tracked to determine the creation timestamp. The creation timestamp is logged if it is available,
-if not it is set to the submission timestamp instead. 
+Grand exchange offers are stored internally in a JSONL file. After this file is updated, JSON/CSV files are written/appended as well, depending on configurations.
+The naming format can also be configured and this may bundle completed offer per day/week/month. Files produced by the Grand Exchange logger are stored in the `.runelite/grand-exchange/completed/<ACCOUNT_NAME>` directory.
 
 
-<details>
-    <summary>Grand Exchange History</summary>
+#### Grand Exchange History
 
-The Grand Exchange logger is also designed to retroactively update Grand Exchange offers that have already been
-submitted, this mechanism is triggered by opening the Grand Exchange history interface. 
-
-Certain values of previous submitted offers are overwritten by parsing the Grand Exchange history, like the tax.
-This Grand Exchange history entry data tends to be more accurate, as it literally describes the amount of tax deducted / GP traded in a completed offer. 
-The taxed value cannot be induced with absolute certainty for sale offers priced above 50gp using RuneLite Grand Exchange offers (i.e. whether one sells an item for 99 gp 
-or 100 gp results in a 1gp and 2gp tax, respectively. Both cases would in turn result in the person selling receiving 98 
-gp per item, which is the information provided by RuneLite). 
-An attempt is made to resolve this discrepancy by updating existing offers with this grand exchange history entry, provided a match can be made with an existing submission.
-If no match can be made, the offer is not submitted.
-
-All files located in the grand-exchange directory are constructed using data from the internal ge-history directory. 
-These files can be reproduced manually by via the buttons in the sidebar menu. The amount of internally logged offers 
-can be limited via the config menu, if need be. An undefined value means the internal offer cache may be expanded 
-indefinitely.
-
-</details>
-
-### Sidebar buttons
-
-<details>
-    <summary>Write CSV files</summary>
-
-Write all internal data to CSV files, grouped per day. Existing files will be overwritten.
-</details>
-
-<details>
-    <summary>Write json file</summary>
-
-Copies the internal JSON file to the grand-exchange directory. Existing file will be overwritten.
-
-</details>
+The Grand Exchange history UI is parsed whenever it is opened. Its entries are exported to `.runelite/grand-exchange/history/<ACCOUNT_NAME>`. Though the history entries are less informative, they may still catch offers that have been missed for whatever reason and the tax value tends to be more precise. History entries are only logged after opening the UI. They are also checked for duplicates in the 40 most recent submissions.
+History entries are tracked separately from regular completed exchange offers.
 
 
 </details>
 
-### Item vault logger
+### Item logger
 <details>
     <summary>Click to expand</summary>
 
-If enabled, the contents of item vaults (e.g. bank/seed vault) and ongoing grand exchange offers are logged per account and also merged into a single, separate file.
-An item vault is defined as some container that may have items drawn from it. As such, the items in the containers are the items you can extract from them (i.e. these are not always the input items).
+If enabled, item data (e.g. bank/seed vault/STASH units) is logged per account and stored locally into separate files per account per source.
+In case of item charges, the items logged are the items you would retrieve if you were to uncharge the item.
 
 <details>
     <summary>Item sources</summary>
@@ -164,21 +139,21 @@ Charged Weapons & Equipment
 
     Ranged: Toxic blowpipe, Venator bow, Tonalztics of Ralos, Craw's bow, Webweaver bow  
 
-    Magic: Tumeken's shadow, Eye of Ayak, Sanguinesti staff, Toxic staff of the dead, Toxic trident (including Enhanced), Trident of the seas (including Enhanced), Warped sceptre, Thammaron's sceptre, Accursed sceptre  
+    Magic: Tumeken's shadow, Eye of Ayak, Sanguinesti staff, Toxic trident (including Enhanced), Trident of the seas (including Enhanced), Warped sceptre, Thammaron's sceptre, Accursed sceptre  
 
     Elemental tomes: Tome of fire, Tome of earth, Tome of water
 
 </details>
 
 Specific accounts may be excluded from aggregated lists via plugin configurations.
-Partially completed offers are added to item vault data as;
+Partially completed offers are logged as;
 
 - The unspent amount of GP for buy offers
 - The quantity of items that is yet to be sold for sell offers
 
 All tracked lists are updated whenever possible, albeit at a moderate frequency. For this reason, item charges only update following item charge related chat messages.
 
-The combined list is a single file that combines all vault data of all accounts into a single json/csv file. All rows can
+All item data across all accounts may be combined into a single json/csv file. All rows can
  still be retraced after combining it, as they are tagged with an account name and a vault type (e.g. BANK).</br> 
 Each row of the combined list has the following attributes;
 - accountName
@@ -195,7 +170,7 @@ Each row of the merged list has the following attributes;
 - quantity (merged quantity across all sources)
 - value (of the merged quantity)
 
-#### Examples of item vault data
+#### Examples of item data
 
 ![example-item-vaults-all.png](images/example-item-vaults-all.png)</br>
 _Example of an excerpt from a combined item csv file_<br><br>
@@ -233,7 +208,7 @@ the json and csv file content. This data is added to merged data structures.
 ## Colosseum
 Data loggers related to tracking Colosseum progress.
 Generated files are bundled per attempt in a newly created directory, which is named as `<ACCOUNT_NAME>_<YYMMDD>_<HHMMSS>`,
-and created in ${user.home}/.runelite/data-logger/colosseum/attempt. All tracked data that is related to an attempt is stored in 
+and created in `${user.home}/.runelite/data-logger/colosseum/trials`. All tracked data that is related to an attempt is stored in 
 this folder.
 
 Note that it is possible to set a tag in the configurations, which will allow you to group trials in the data viewer.
@@ -249,7 +224,7 @@ At the root level, the log captures the final metrics and economics of the entir
 
     Attempt ID & Timestamp: Unique identifier (Account + Date/Time) and exact Unix timestamp.
 
-    Account Name & Final Result: The player's name and the outcome of the run (COMPLETED, FAILED, or CANCELLED).
+    Account Name & Final Result: The player's name and the outcome of the run (COMPLETED, FAILED, or CLAIMED).
 
     Total Run Metrics: Final cumulative time taken (in seconds) and total Glory earned.
 
@@ -258,7 +233,7 @@ At the root level, the log captures the final metrics and economics of the entir
     Rewards Breakdown: 
         Total Grand Exchange value of all earned loot.
 
-        Itemized breakdown of all rewards, including item name, quantity, and individual GE value.
+        Breakdown of all rewards as item, quantity and value
 
     Supply Cost Breakdown: 
         Total Grand Exchange value of all supplies consumed during the attempt.
@@ -273,11 +248,13 @@ Wave-by-Wave Data (waves array)
 
 For granular analysis, every individual wave logs the following data points:
 
-    Wave Number & Status: The current wave and its specific completion status.
+    Wave Number & Status: The current wave and its specific completion status (COMPLETED, FAILED, or CANCELLED)
 
     Tag: A custom, user-defined tag that can be set in the config menu.
 
-    Wave Reward: The specific loot earned for completing this wave (Item ID, Name, and Quantity). Note: This only includes the random roll, not the Quiver reward.
+    AccountName & GameMode: Name of the account completing the trial and the GameMode of the world it was completed in (e.g. Leagues) 
+
+    Wave Reward: The specific loot earned for completing this wave (Item ID, Name, and Quantity) and its value. Note: This only includes the random roll, not the Quiver reward.
 
     Modifiers: 
 
@@ -313,108 +290,105 @@ The data described above may be generated as JSON file and as CSV file. The latt
   "timestamp": 1777777777777,
   "accountName": "ACCOUNT_NAME",
   "result": "COMPLETED",
-  "rewardsValue": 4389528,
+  "rewardsValue": 3961576,
+  "gameMode": "REGULAR",
   "rewards": {
     "Dragon platelegs": {
-      "count": 1,
-      "totalValueInGp": 161117
+      "count": 4,
+      "totalValueInGp": 644824
     },
     "Death rune": {
-      "count": 150,
-      "totalValueInGp": 30000
+      "count": 600,
+      "totalValueInGp": 112200
     },
     "Sunfire splinters": {
-      "count": 4580,
-      "totalValueInGp": 1589260
+      "count": 5330,
+      "totalValueInGp": 2137330
+    },
+    "Dragon arrowtips": {
+      "count": 250,
+      "totalValueInGp": 719250
     },
     "Onyx bolts": {
-      "count": 205,
-      "totalValueInGp": 1717900
+      "count": 30,
+      "totalValueInGp": 248700
     },
-    "Rune kiteshield": {
-      "count": 9,
-      "totalValueInGp": 287919
+    "Snapdragon seed": {
+      "count": 1,
+      "totalValueInGp": 60714
     },
-    "Rune 2h sword": {
-      "count": 2,
-      "totalValueInGp": 75932
-    },
-    "Steel cannonball": {
-      "count": 80,
-      "totalValueInGp": 20000
-    },
-    "Dragon bolts (unf)": {
-      "count": 200,
-      "totalValueInGp": 507400
+    "Rune platebody": {
+      "count": 1,
+      "totalValueInGp": 38558
     }
   },
-  "consumedSupplyValue": 421520,
+  "consumedSupplyValue": 452114,
   "consumedSupplies": {
-    "totalValue": 421520,
+    "totalValue": 452114,
     "consumedItems": {
       "Death rune": {
-        "count": 20,
-        "totalValueInGp": 4000
+        "count": 14,
+        "totalValueInGp": 2618
       },
       "Blood rune": {
-        "count": 125,
-        "totalValueInGp": 36750
+        "count": 69,
+        "totalValueInGp": 20562
       },
       "Dragon arrow": {
-        "count": 38,
-        "totalValueInGp": 114836
+        "count": 46,
+        "totalValueInGp": 131974
       },
       "Aether rune": {
-        "count": 41,
-        "totalValueInGp": 33005
+        "count": 25,
+        "totalValueInGp": 20250
       },
       "Fire rune": {
-        "count": 210,
-        "totalValueInGp": 840
+        "count": 110,
+        "totalValueInGp": 440
+      },
+      "Black chinchompa": {
+        "count": 6,
+        "totalValueInGp": 18960
       }
     },
     "consumedDoses": {
       "Divine ranging potion": {
         "count": 5,
-        "totalValueInGp": 7725
-      },
-      "Saradomin brew": {
-        "count": 1,
-        "totalValueInGp": 1963
+        "totalValueInGp": 8330
       },
       "Divine super combat potion": {
         "count": 6,
-        "totalValueInGp": 29274
+        "totalValueInGp": 28434
       },
       "Sanfew serum": {
-        "count": 22,
-        "totalValueInGp": 100320
+        "count": 26,
+        "totalValueInGp": 121108
       }
     },
     "consumedCharges": {
       "Scythe of vitur": {
-        "count": 135,
-        "totalValueInGp": 91125
+        "count": 123,
+        "totalValueInGp": 83394
       },
       "Venator bow": {
-        "count": 25,
-        "totalValueInGp": 400
+        "count": 57,
+        "totalValueInGp": 912
       },
       "Tumekens shadow": {
-        "count": 1,
-        "totalValueInGp": 1282
+        "count": 12,
+        "totalValueInGp": 15132
       }
     }
   },
-  "totalGlory": 50307,
-  "totalTime": 1473.6,
+  "totalGlory": 51448,
+  "totalTime": 1439.4,
   "activeModifiers": [
-    "FRAILTY_II",
-    "MYOPIA_III",
-    "DOOM_II",
+    "FRAILTY_III",
+    "DOOM_III",
+    "TOTEMIC",
     "SOLARFLARE_III",
-    "REENTRY_I",
-    "BLASPHEMY_I"
+    "MYOPIA_I",
+    "VOLATILITY_I"
   ],
   "waves": [
     {
@@ -427,7 +401,8 @@ The data described above may be generated as JSON file and as CSV file. The latt
         "itemName": "Sunfire splinters",
         "quantity": 80
       },
-      "lootValue": 28240,
+      "lootValue": 32400,
+      "gameMode": "REGULAR",
       "modifierChoices": [
         "BLASPHEMY_I",
         "RELENTLESS_I",
@@ -435,19 +410,21 @@ The data described above may be generated as JSON file and as CSV file. The latt
       ],
       "chosenModifier": "FRAILTY_I",
       "activeModifiers": [
+        "BLASPHEMY_I",
+        "RELENTLESS_I",
         "FRAILTY_I"
       ],
-      "timeTaken": 28.2,
-      "speedBonus": 453,
+      "timeTaken": 21.6,
+      "speedBonus": 464,
       "damageTaken": 0,
       "damageBonus": 100,
       "modifierGlory": 200,
       "completionBonus": 100,
-      "waveGlory": 853,
-      "totalGlory": 853,
-      "totalTimeTaken": 28.2,
-      "serpentShamanSpawnX": 33,
-      "serpentShamanSpawnY": 42,
+      "waveGlory": 864,
+      "totalGlory": 864,
+      "totalTimeTaken": 21.6,
+      "serpentShamanSpawnX": 35,
+      "serpentShamanSpawnY": 37,
       "version": 1
     },
     {
@@ -456,37 +433,39 @@ The data described above may be generated as JSON file and as CSV file. The latt
       "accountName": "ACCOUNT_NAME",
       "tag": "",
       "earnedLoot": {
-        "itemId": 9342,
-        "itemName": "Onyx bolts",
-        "quantity": 75
+        "itemId": 560,
+        "itemName": "Death rune",
+        "quantity": 300
       },
-      "lootValue": 628500,
+      "lootValue": 56100,
+      "gameMode": "REGULAR",
       "modifierChoices": [
-        "REENTRY_I",
-        "BLASPHEMY_I",
-        "VOLATILITY_I"
-      ],
-      "chosenModifier": "REENTRY_I",
-      "activeModifiers": [
-        "FRAILTY_II",
-        "MYOPIA_III",
-        "TOTEMIC",
-        "DOOM_II",
         "SOLARFLARE_III",
-        "REENTRY_I"
+        "MYOPIA_II",
+        "RELENTLESS_I"
       ],
-      "timeTaken": 192.6,
-      "speedBonus": 1969,
-      "damageTaken": 12,
-      "damageBonus": 0,
-      "modifierGlory": 2300,
+      "chosenModifier": "SOLARFLARE_III",
+      "activeModifiers": [
+        "BLASPHEMY_I",
+        "RELENTLESS_I",
+        "FRAILTY_III",
+        "DOOM_III",
+        "TOTEMIC",
+        "SOLARFLARE_III",
+        "MYOPIA_I"
+      ],
+      "timeTaken": 157.8,
+      "speedBonus": 2607,
+      "damageTaken": 0,
+      "damageBonus": 1100,
+      "modifierGlory": 2350,
       "completionBonus": 1100,
-      "waveGlory": 5369,
-      "totalGlory": 40727,
-      "totalTimeTaken": 1362.6,
+      "waveGlory": 7157,
+      "totalGlory": 42154,
+      "totalTimeTaken": 1311.6,
       "javelinColossusSpawnAX": 44,
-      "javelinColossusSpawnAY": 37,
-      "manticoreSpawnAX": 35,
+      "javelinColossusSpawnAY": 32,
+      "manticoreSpawnAX": 44,
       "manticoreSpawnAY": 37,
       "manticoreSequenceA": [
         "RANGE",
@@ -496,15 +475,15 @@ The data described above may be generated as JSON file and as CSV file. The latt
       "manticoreSpawnBX": 35,
       "manticoreSpawnBY": 31,
       "manticoreSequenceB": [
-        "RANGE",
         "MAGIC",
+        "RANGE",
         "MELEE"
       ],
       "shockwaveColossusSpawnAX": 29,
       "shockwaveColossusSpawnAY": 37,
       "serpentShamanReinforcementsSpawnX": 31,
       "serpentShamanReinforcementsSpawnY": 48,
-      "minotaurReinforcementsSpawnX": 32,
+      "minotaurReinforcementsSpawnX": 33,
       "minotaurReinforcementsSpawnY": 48,
       "version": 1
     },
@@ -514,35 +493,37 @@ The data described above may be generated as JSON file and as CSV file. The latt
       "accountName": "ACCOUNT_NAME",
       "tag": "",
       "earnedLoot": {
-        "itemId": 9342,
-        "itemName": "Onyx bolts",
-        "quantity": 100
+        "itemId": 11237,
+        "itemName": "Dragon arrowtips",
+        "quantity": 250
       },
-      "lootValue": 838000,
+      "lootValue": 719250,
+      "gameMode": "REGULAR",
       "modifierChoices": [
-        "QUARTET",
-        "FRAILTY_III",
-        "BLASPHEMY_I"
+        "VOLATILITY_I",
+        "BEES_I",
+        "QUARTET"
       ],
-      "chosenModifier": "BLASPHEMY_I",
+      "chosenModifier": "VOLATILITY_I",
       "activeModifiers": [
-        "FRAILTY_II",
-        "MYOPIA_III",
+        "BLASPHEMY_I",
+        "RELENTLESS_I",
+        "FRAILTY_III",
+        "DOOM_III",
         "TOTEMIC",
-        "DOOM_II",
         "SOLARFLARE_III",
-        "REENTRY_I",
-        "BLASPHEMY_I"
+        "MYOPIA_I",
+        "VOLATILITY_I"
       ],
-      "timeTaken": 111,
-      "speedBonus": 3780,
+      "timeTaken": 127.8,
+      "speedBonus": 3444,
       "damageTaken": 0,
       "damageBonus": 1200,
-      "modifierGlory": 2400,
+      "modifierGlory": 2450,
       "completionBonus": 2200,
-      "waveGlory": 9580,
-      "totalGlory": 50307,
-      "totalTimeTaken": 1473.6,
+      "waveGlory": 9294,
+      "totalGlory": 51448,
+      "totalTimeTaken": 1439.4,
       "version": 1
     }
   ],
@@ -751,11 +732,11 @@ summary, whereas the latter adds wave-specific information for all waves to that
 It is possible to omit certain properties by toggling the respective checkbox in the Discord pre-defined template section.
 
 ![img.png](images/example-detailed-discord-colosseum-trial.png)</br>
-*An example Discord message broadcast following an unfortunately failed trial with an image attached to it using the detailed template*
+_An example Discord message broadcast following an unfortunately failed trial with an image attached to it using the detailed template_</br></br>
 
 
 ![img.png](images/example-concise-discord-colosseum-trial.png)</br>
-*An example Discord message broadcast following the same unfortunately failed trial using the concise template*
+_An example Discord message broadcast following the same unfortunately failed trial using the concise template_</br></br>
 
 
 
@@ -882,7 +863,7 @@ This is an example of a template string, followed by an image of the message sen
 ```
 
 ![img.png](images/example-custom-discord-colosseum-trial.png)</br>
-_An example Discord message broadcast following the same unfortunately failed trial using the custom template above_
+_An example Discord message broadcast following the same unfortunately failed trial using the custom template above_</br></br>
 
 
 </details>

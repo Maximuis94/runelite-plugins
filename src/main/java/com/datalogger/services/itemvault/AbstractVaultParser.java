@@ -26,10 +26,9 @@ public abstract class AbstractVaultParser implements VaultParser
 	protected String currentAccountName = "Unknown";
 	protected File vaultFile = null;
 
-	protected boolean isOnPermanentWorld = false;
+	protected boolean isOnRegularWorld = false;
 	protected boolean hasValidAccountHash = false;
 	protected boolean hasGlobalConfigEnabled = false;
-	protected boolean hasItemConfigEnabled = true;
 
 	protected boolean isEnabled = true;
 
@@ -51,7 +50,7 @@ public abstract class AbstractVaultParser implements VaultParser
 	@Subscribe
 	public void onAccountSessionStarted(AccountSessionStarted event)
 	{
-		isOnPermanentWorld = event.isOnRegularWorld();
+		isOnRegularWorld = event.isOnRegularWorld();
 		updateAccountHash(event.getAccountHash(), event.getAccountName());
 		updateConfigFlags();
 	}
@@ -106,7 +105,7 @@ public abstract class AbstractVaultParser implements VaultParser
 
 	private void updateIsEnabled()
 	{
-		isEnabled = hasValidAccountHash && hasGlobalConfigEnabled && hasItemConfigEnabled && isOnPermanentWorld;
+		isEnabled = hasValidAccountHash && hasGlobalConfigEnabled && isOnRegularWorld;
 	}
 
 	protected void ensureAccountNameIsCached()

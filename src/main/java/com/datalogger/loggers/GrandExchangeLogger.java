@@ -36,6 +36,8 @@ import com.datalogger.models.enums.ExchangeLoggerCsvFileStrategy;
 import com.datalogger.models.enums.ExchangeLoggerJsonFileStrategy;
 import com.datalogger.models.grandexchange.ActiveGeOffer;
 import com.datalogger.models.grandexchange.GeLedgerEntry;
+import static com.datalogger.services.FileIOService.GE_OFFER_SUBMIT_MODE_LOG;
+import com.datalogger.services.GrandExchangeExportService;
 import com.google.gson.JsonObject;
 import java.io.File;
 import java.time.Instant;
@@ -46,6 +48,7 @@ import java.util.Properties;
 import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import lombok.Data;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.GrandExchangeOffer;
@@ -64,8 +67,7 @@ public class GrandExchangeLogger extends AbstractLogger
 {
 	@Inject private ItemManager itemManager;
 	@Inject private ClientThread clientThread;
-
-	private static final String CSV_HEADER = "ItemId,ItemName,OfferCreationTime,Timestamp,TradeType,Quantity,OfferQuantity,Price,OfferPrice,Value,Tax,AccountName,AccountHash,GeSlot,IsHistoryEntry,IsCancelled";
+	@Inject private GrandExchangeExportService grandExchangeExportService;
 
 	private ActiveGeOffer[] currentActiveOffers = new ActiveGeOffer[8];
 
@@ -76,31 +78,52 @@ public class GrandExchangeLogger extends AbstractLogger
 	private boolean collectionScriptRunning = false;
 	private int offerSubmissionTick = 0;
 
-	// GE Logging Config Toggles
-	private boolean geIncludeItemId = true;
-	private boolean geIncludeItemName = true;
-	private boolean geIncludeIsBuy = true;
-	private boolean geIncludeQuantity = true;
-	private boolean geIncludePrice = true;
-	private boolean geIncludeValue = true;
-	private boolean geIncludeTax = true;
-	private boolean geIncludeAccountName = true;
-	private boolean geIncludeAccountHash = true;
-	private boolean geIncludeGeSlot = true;
-	private boolean geIncludeIsCancelled = true;
-	private boolean geIncludeOfferCreationTime = true;
-	private boolean geIncludeExactTimestamp = true;
-	private boolean geIncludeOriginalOfferQuantity = true;
-	private boolean geIncludeOriginalOfferPrice = true;
-
 	private ExchangeLoggerJsonFileStrategy jsonFileNamingStrategy = null;
 	private ExchangeLoggerCsvFileStrategy csvFileNamingStrategy = null;
+
+	@Data
+	private class SubmissionCounters
+	{
+		private int countExchangeOfferChanged = 0;
+		private int countSoundEffectPlayed = 0;
+		private int countScriptPreFired = 0;
+
+		protected void increaseCounter(SubmissionMode mode)
+		{
+			switch (mode)
+			{
+				case SCRIPT_PRE_FIRED:
+					countScriptPreFired++;
+					break;
+				case SOUND_EFFECT_PLAYED:
+					countSoundEffectPlayed++;
+					break;
+				case EXCHANGE_OFFER_CHANGED:
+					countExchangeOfferChanged++;
+					break;
+			}
+			saveSubmissionCounters();
+		}
+
+		private void saveSubmissionCounters()
+		{
+			fileIOService.writeJson(GE_OFFER_SUBMIT_MODE_LOG, this);
+		}
+	}
+
+	private SubmissionCounters submissionModeCounters = new SubmissionCounters();
+
+	private void loadSubmissionCounters()
+	{
+		SubmissionCounters loaded = fileIOService.readJson(GE_OFFER_SUBMIT_MODE_LOG, SubmissionCounters.class);
+		submissionModeCounters = Objects.requireNonNullElseGet(loaded, SubmissionCounters::new);
+	}
 
 	@Override
 	public LogType getLogType() { return LogType.GRAND_EXCHANGE; }
 
 	@Override
-	public String getCsvHeader() { return CSV_HEADER; }
+	public String getCsvHeader() { return GrandExchangeExportService.CSV_HEADER; }
 
 	@Override
 	public boolean isEnabled() { return loggerIsEnabled; }
@@ -112,9 +135,11 @@ public class GrandExchangeLogger extends AbstractLogger
 	public void setup()
 	{
 		updateConfigurations();
+		grandExchangeExportService.updateConfigurations();
 		if (!loggerIsEnabled)
 			return;
 
+		loadSubmissionCounters();
 		Properties state = fileIOService.getAccountState();
 		for (int i = 0; i < 8; i++) {
 			lastLoggedFingerprints[i] = state.getProperty("last_fp_" + i);
@@ -168,9 +193,8 @@ public class GrandExchangeLogger extends AbstractLogger
 
 			if (offer == null || !isFinalState(offer.getState())) {continue;}
 
-			log.debug("Attempting to submit completed trade in GE slot {} via {}...", geSlot, mode);
-			if (handleOffer(geSlot, offer, mode))
-				log.debug("Submitted completed offer from GE slot {}", geSlot);
+			log.debug("Attempting to submit completed trade in GE slot {} SubmissionMode={}", geSlot, mode.name());
+			handleOffer(geSlot, offer, mode);
 		}
 	}
 
@@ -183,7 +207,7 @@ public class GrandExchangeLogger extends AbstractLogger
 		if (!canSubmitActiveOffers(gameTick)) return;
 
 		collectionScriptRunning = true;
-		log.debug("Offers are being collected - attempting to submit completed offers before they are cleared");
+		log.debug("Can submit offers through mode={}", mode.name());
 		submitCompletedOffers(mode);
 		offerSubmissionTick = gameTick + 1;
 		collectionScriptRunning = false;
@@ -204,7 +228,8 @@ public class GrandExchangeLogger extends AbstractLogger
 
 		if (isGrandExchangeSubmissionScript(event.getScriptId()))
 		{
-			onCollectActiveGrandExchangeOffers(SubmissionMode.SCRIPT_PREFIRED);
+			log.debug("Attempting to collect GE offers via SCRIPT_PRE_FIRED...");
+			onCollectActiveGrandExchangeOffers(SubmissionMode.SCRIPT_PRE_FIRED);
 		}
 	}
 
@@ -218,6 +243,7 @@ public class GrandExchangeLogger extends AbstractLogger
 
 		if (isGrandExchangeCollectionSound(event.getSoundId()))
 		{
+			log.debug("Attempting to collect GE offers via SOUND_EFFECT_PLAYED...");
 			onCollectActiveGrandExchangeOffers(SubmissionMode.SOUND_EFFECT_PLAYED);
 		}
 	}
@@ -281,6 +307,9 @@ public class GrandExchangeLogger extends AbstractLogger
 		fileIOService.saveActiveGeOffers(listToSave);
 	}
 
+	/**
+	 * Process the given offer for the given slot, from the given SubmissionMode. Return success/failure boolean.
+	 */
 	private boolean handleOffer(int slot, GrandExchangeOffer offer, SubmissionMode mode) {
 		if (!loggerIsEnabled) return false;
 
@@ -301,6 +330,7 @@ public class GrandExchangeLogger extends AbstractLogger
 			if (!fingerprint.equals(lastLoggedFp)) {
 				lastLoggedFingerprints[slot] = fingerprint;
 				logFinalTrade(slot, offer, createdTs, accountHashLong);
+				submissionModeCounters.increaseCounter(mode);
 
 				state.setProperty("last_fp_" + slot, fingerprint);
 				fileIOService.saveAccountState(state);
@@ -313,6 +343,9 @@ public class GrandExchangeLogger extends AbstractLogger
 		return false;
 	}
 
+	/**
+	 * Initial scan to parse ongoing exchange offers from the client
+	 */
 	public void initialScan() {
 		if (!isOnRegularWorld()) return;
 
@@ -370,10 +403,6 @@ public class GrandExchangeLogger extends AbstractLogger
 		log.debug("Initial GE scan complete. Live active offers saved to disk for {}", getAccountName());
 	}
 
-	private boolean isCancelledState(GrandExchangeOfferState state) {
-		return state == GrandExchangeOfferState.CANCELLED_BUY || state == GrandExchangeOfferState.CANCELLED_SELL;
-	}
-
 	/**
 	 * Approximate the tax paid using the offer data that is available. Note that this is not a perfect estimate.
 	 */
@@ -424,7 +453,6 @@ public class GrandExchangeLogger extends AbstractLogger
 			.accountName(currentAccountName)
 			.accountHash(accountHash)
 			.geSlot(slot)
-			.isHistoryEntry(false)
 			.isCancelled(isCancelledState(offer.getState()))
 			.exactTimestamp(System.currentTimeMillis())
 			.originalOfferQuantity(offer.getTotalQuantity())
@@ -447,7 +475,7 @@ public class GrandExchangeLogger extends AbstractLogger
 
 		if (csvFileNamingStrategy != ExchangeLoggerCsvFileStrategy.NONE)
 		{
-			String row = formatCsvRow(ledgerEntry);
+			String row = grandExchangeExportService.formatCsvRow(ledgerEntry);
 			logRow(row, csvFileNamingStrategy.getCsvFile(ledgerEntry.getAccountName()));
 		}
 
@@ -462,23 +490,7 @@ public class GrandExchangeLogger extends AbstractLogger
 					parent.mkdirs();
 				}
 
-				JsonObject jsonObject = new JsonObject();
-
-				if (geIncludeItemId) jsonObject.addProperty("itemId", ledgerEntry.getItemId());
-				if (geIncludeItemName) jsonObject.addProperty("itemName", ledgerEntry.getItemName());
-				if (geIncludeIsBuy) jsonObject.addProperty("isBuy", ledgerEntry.isBuy());
-				if (geIncludeQuantity) jsonObject.addProperty("quantity", ledgerEntry.getQuantity());
-				if (geIncludePrice) jsonObject.addProperty("price", ledgerEntry.getPrice());
-				if (geIncludeValue) jsonObject.addProperty("value", ledgerEntry.getValue());
-				if (geIncludeTax) jsonObject.addProperty("tax", ledgerEntry.getTax());
-				if (geIncludeAccountName) jsonObject.addProperty("accountName", ledgerEntry.getAccountName());
-				if (geIncludeAccountHash) jsonObject.addProperty("accountHash", ledgerEntry.getAccountHash());
-				if (geIncludeGeSlot) jsonObject.addProperty("geSlot", ledgerEntry.getGeSlot());
-				if (geIncludeIsCancelled) jsonObject.addProperty("isCancelled", ledgerEntry.isCancelled());
-				if (geIncludeOfferCreationTime) jsonObject.addProperty("offerCreationTime", ledgerEntry.getOfferCreationTime());
-				if (geIncludeExactTimestamp) jsonObject.addProperty("exactTimestamp", ledgerEntry.getExactTimestamp());
-				if (geIncludeOriginalOfferQuantity) jsonObject.addProperty("originalOfferQuantity", ledgerEntry.getOriginalOfferQuantity());
-				if (geIncludeOriginalOfferPrice) jsonObject.addProperty("originalOfferPrice", ledgerEntry.getOriginalOfferPrice());
+				JsonObject jsonObject = grandExchangeExportService.buildGeJsonObject(ledgerEntry);
 
 				if (jsonFileNamingStrategy == ExchangeLoggerJsonFileStrategy.JSONLINE)
 				{
@@ -490,49 +502,6 @@ public class GrandExchangeLogger extends AbstractLogger
 				}
 			}
 		}
-	}
-
-	/**
-	 * Converts a GeLedgerEntry into a comma-separated string aligning with:
-	 * ItemId,ItemName,OfferCreationTime,Timestamp,TradeType,Quantity,OfferQuantity,Price,OfferPrice,Value,Tax,AccountName,AccountHash,GeSlot,IsHistoryEntry,IsCancelled
-	 */
-	private String formatCsvRow(GeLedgerEntry entry) {
-		String safeItemName = entry.getItemName() != null ? entry.getItemName() : "Unknown";
-		if (safeItemName.contains(",")) {
-			safeItemName = "\"" + safeItemName + "\"";
-		}
-
-		String creationTimeStr = "";
-		if (entry.getOfferCreationTime() > 0) {
-			creationTimeStr = Instant.ofEpochMilli(entry.getOfferCreationTime()).toString();
-		}
-
-		long mainTimeMillis = entry.getExactTimestamp() > 0 ? entry.getExactTimestamp() : entry.getParseTime();
-		String timeStr = "";
-		if (mainTimeMillis > 0) {
-			timeStr = Instant.ofEpochMilli(mainTimeMillis).toString();
-		}
-
-		String tradeType = entry.isBuy() ? "BUY" : "SELL";
-
-		return String.join(",",
-			String.valueOf(entry.getItemId()),
-			safeItemName,
-			creationTimeStr,
-			timeStr,
-			tradeType,
-			String.valueOf(entry.getQuantity()),
-			String.valueOf(entry.getOriginalOfferQuantity()),
-			String.valueOf(entry.getPrice()),
-			String.valueOf(entry.getOriginalOfferPrice()),
-			String.valueOf(entry.getValue()),
-			String.valueOf(entry.getTax()),
-			entry.getAccountName() != null ? entry.getAccountName() : "",
-			String.valueOf(entry.getAccountHash()),
-			String.valueOf(entry.getGeSlot()),
-			String.valueOf(entry.isHistoryEntry()),
-			String.valueOf(entry.isCancelled())
-		);
 	}
 
 	/**
@@ -555,8 +524,10 @@ public class GrandExchangeLogger extends AbstractLogger
 		return existing;
 	}
 
+	/**
+	 * Clear the data of the given slot of the currently active account
+	 */
 	private void clearSlotMemory(int slot) {
-		String hash = getAccountHashString();
 		Properties state = fileIOService.getAccountState();
 
 		if (state.containsKey("slot_created_" + slot)) {
@@ -566,10 +537,16 @@ public class GrandExchangeLogger extends AbstractLogger
 		}
 	}
 
+	/**
+	 * Generate and return a 'fingerprint' of the given offer that may be used to uniquely identify it
+	 */
 	private String generateFingerprint(GrandExchangeOffer offer) {
 		return offer.getItemId() + "_" + offer.getTotalQuantity() + "_" + offer.getSpent() + "_" + offer.getState();
 	}
 
+	/**
+	 * Return true if state refers to a completed offer state
+	 */
 	private boolean isFinalState(GrandExchangeOfferState state) {
 		return state == GrandExchangeOfferState.BOUGHT ||
 			state == GrandExchangeOfferState.SOLD ||
@@ -577,6 +554,9 @@ public class GrandExchangeLogger extends AbstractLogger
 			state == GrandExchangeOfferState.CANCELLED_SELL;
 	}
 
+	/**
+	 * Return true if state refers to a purchase
+	 */
 	private boolean isBuy(GrandExchangeOfferState state) {
 		return state == GrandExchangeOfferState.BUYING ||
 			state == GrandExchangeOfferState.BOUGHT ||
@@ -584,32 +564,28 @@ public class GrandExchangeLogger extends AbstractLogger
 	}
 
 	/**
-	 * Updates relevant configurations into class variables
+	 * Return true if state refers to a cancelled exchange offer
 	 */
-	private void updateConfigurations()
-	{
-//		loggerIsEnabled = config.logGrandExchange() && isOnPermanentWorld();
-		jsonFileNamingStrategy = config.geJsonFileStrategy();
-		csvFileNamingStrategy = config.geCsvFileStrategy();
-		geIncludeItemId = config.geIncludeItemId();
-		geIncludeItemName = config.geIncludeItemName();
-		geIncludeIsBuy = config.geIncludeIsBuy();
-		geIncludeQuantity = config.geIncludeQuantity();
-		geIncludePrice = config.geIncludePrice();
-		geIncludeValue = config.geIncludeValue();
-		geIncludeTax = config.geIncludeTax();
-		geIncludeAccountName = config.geIncludeAccountName();
-		geIncludeAccountHash = config.geIncludeAccountHash();
-		geIncludeGeSlot = config.geIncludeGeSlot();
-		geIncludeIsCancelled = config.geIncludeIsCancelled();
-		geIncludeOfferCreationTime = config.geIncludeOfferCreationTime();
-		geIncludeExactTimestamp = config.geIncludeExactTimestamp();
-		geIncludeOriginalOfferQuantity = config.geIncludeOriginalOfferQuantity();
-		geIncludeOriginalOfferPrice = config.geIncludeOriginalOfferPrice();
+	private boolean isCancelledState(GrandExchangeOfferState state) {
+		return state == GrandExchangeOfferState.CANCELLED_BUY || state == GrandExchangeOfferState.CANCELLED_SELL;
 	}
 
+	/**
+	 * Updates relevant configurations into class variables
+	 */
+	public void updateConfigurations()
+	{
+		jsonFileNamingStrategy = config.geJsonFileStrategy();
+		csvFileNamingStrategy = config.geCsvFileStrategy();
+
+	}
+
+	/**
+	 * Various routes via which a completed ExchangeOffer may be submitted. EXCHANGE_OFFER_CHANGED is conventional and
+	 * most used, the other two are fallbacks.
+	 */
 	private enum SubmissionMode
 	{
-		EXCHANGE_OFFER_CHANGED, SOUND_EFFECT_PLAYED, SCRIPT_PREFIRED
+		EXCHANGE_OFFER_CHANGED, SOUND_EFFECT_PLAYED, SCRIPT_PRE_FIRED
 	}
 }

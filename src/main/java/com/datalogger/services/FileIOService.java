@@ -110,6 +110,7 @@ public class FileIOService
 	public static final File INTERNAL_GE_OFFERS_DIR = new File(INTERNAL_GE_DIR, "completed");
 	public static final File INTERNAL_GE_HISTORY_DIR = new File(INTERNAL_GE_DIR, "history");
 	public static final File DEBUG_DIR = new File(PluginConstants.PLUGIN_ROOT, "debug");
+	public static final File GE_OFFER_SUBMIT_MODE_LOG = new File(DEBUG_DIR, "grand-exchange-submission-log.json");
 	public static final File COLOSSEUM_WAVE_LOG_MERGED_CSV = new File(PluginConstants.COLOSSEUM_ROOT_DIR, "colosseum-waves-merged.csv");
 	public static final File COLOSSEUM_WAVE_LOG_MERGED_JSON = new File(PluginConstants.COLOSSEUM_ROOT_DIR, "colosseum-waves-merged.json");
 	private final Gson gson;
@@ -127,7 +128,7 @@ public class FileIOService
 	private final DataLoggerConfig config;
 	private final EventBus eventBus;
 
-	private boolean isTemporaryGameMode = false;
+	private boolean isOnRegularGamemode = false;
 	private String accountName = "";
 	private String accountHashString = "";
 	@Getter
@@ -156,6 +157,7 @@ public class FileIOService
 			.create();
 		this.config = config;
 		this.eventBus = eventBus;
+		migrateLegacyGEFiles();
 	}
 
 	/**
@@ -214,7 +216,7 @@ public class FileIOService
 	 * Update account info with the given accountName and accountHash Strings. If either one is not valid, indicate this
 	 * via the hasValidAccountInfo flag, but keep the previous name and/or hash cached.
 	 */
-	private void updateAccountInfo(String accountName, String accountHashString, boolean isTemporaryGameMode)
+	private void updateAccountInfo(String accountName, String accountHashString, boolean isOnRegularGamemode)
 	{
 		boolean isValidName = isValidAccountString(accountName);
 		boolean isValidHash = isValidAccountString(accountHashString);
@@ -224,7 +226,7 @@ public class FileIOService
 			this.accountHashString = accountHashString;
 			internalVaultRoot = getInternalRoot(accountHashString);
 			hasValidAccountInfo = true;
-			this.isTemporaryGameMode = isTemporaryGameMode;
+			this.isOnRegularGamemode = isOnRegularGamemode;
 		}
 		else if (hasValidAccountInfo)
 		{
@@ -610,7 +612,7 @@ public class FileIOService
 	 */
 	private void migrateLedgerToJsonl(File oldFile, File newFile)
 	{
-		log.info("Migrating internal GE ledger from JSON array to JSON Lines for: {}", oldFile.getName());
+		log.debug("Migrating internal GE ledger from JSON array to JSON Lines for: {}", oldFile.getName());
 		try
 		{
 			if (oldFile.length() > 0)
@@ -619,11 +621,9 @@ public class FileIOService
 					 FileWriter fw = new FileWriter(newFile, true);
 					 BufferedWriter bw = new BufferedWriter(fw))
 				{
-					// Parse the old array
 					JsonArray array = gson.fromJson(reader, JsonArray.class);
 					if (array != null)
 					{
-						// Write each element as a new line
 						for (JsonElement element : array)
 						{
 							bw.write(gson.toJson(element));
@@ -635,7 +635,7 @@ public class FileIOService
 
 			if (oldFile.delete())
 			{
-				log.info("Successfully migrated and deleted old JSON ledger.");
+				log.debug("Successfully migrated and deleted old JSON ledger.");
 			}
 			else
 			{
@@ -653,7 +653,7 @@ public class FileIOService
 	 */
 	public void extendInternalGeLedger(GeLedgerEntry entry)
 	{
-		if (!isTemporaryGameMode) return;
+		if (!isOnRegularGamemode) return;
 		String accountHash = String.valueOf(entry.getAccountHash());
 
 		File jsonlFile = INTERNAL_LEDGER_CACHE.computeIfAbsent(accountHash, hash -> {
@@ -665,12 +665,6 @@ public class FileIOService
 			return new File(dir, hash + ".jsonl");
 		});
 
-		File oldJsonFile = new File(INTERNAL_GE_DIR, accountHash + ".json");
-		if (oldJsonFile.exists())
-		{
-			migrateLedgerToJsonl(oldJsonFile, jsonlFile);
-		}
-
 		try (FileWriter fw = new FileWriter(jsonlFile, true);
 			 BufferedWriter bw = new BufferedWriter(fw))
 		{
@@ -680,6 +674,40 @@ public class FileIOService
 		catch (IOException e)
 		{
 			log.error("Failed to append to internal GE ledger (.jsonl): {}", jsonlFile.getAbsolutePath(), e);
+		}
+	}
+
+	/**
+	 * Converts old JSON GE files to JSONL files
+	 */
+	private void migrateLegacyGEFiles()
+	{
+
+		File[] files = INTERNAL_GE_DIR.listFiles();
+		if (files != null)
+		{
+			executor.execute(() -> {
+				if (!INTERNAL_GE_OFFERS_DIR.exists())
+				{
+					INTERNAL_GE_OFFERS_DIR.mkdirs();
+				}
+				int fileNameLength = 24;
+				for (File file : files)
+				{
+					if (file.isDirectory())
+					{
+						continue;
+					}
+
+					String fileName = file.getName();
+					if (fileName.length() == fileNameLength && fileName.endsWith(".json") && fileName.matches("[-?\\d]\\d{18}\\.json"))
+					{
+						File jsonlFile = new File(INTERNAL_GE_OFFERS_DIR, file.getName() + "l");
+						migrateLedgerToJsonl(file, jsonlFile);
+
+					}
+				}
+			});
 		}
 	}
 

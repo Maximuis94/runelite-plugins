@@ -52,6 +52,7 @@ import java.util.Map;
 import java.util.concurrent.ScheduledExecutorService;
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
@@ -66,7 +67,7 @@ public class GrandExchangeExportService
 	private static final DateTimeFormatter DAILY_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd").withZone(ZoneId.systemDefault());
 	private static final DateTimeFormatter WEEKLY_FORMAT = DateTimeFormatter.ofPattern("YYYY-ww").withZone(ZoneId.systemDefault());
 	private static final DateTimeFormatter MONTHLY_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM").withZone(ZoneId.systemDefault());
-	private static final String CSV_HEADER = "ItemId,ItemName,OfferCreationTime,Timestamp,TradeType,Quantity,OfferQuantity,Price,OfferPrice,Value,Tax,AccountName,AccountHash,GeSlot,IsHistoryEntry,IsCancelled";
+	public static final String CSV_HEADER = "ItemId,ItemName,OfferCreationTime,Timestamp,TradeType,Quantity,OfferQuantity,Price,OfferPrice,Value,Tax,AccountName,AccountHash,GeSlot,IsHistoryEntry,IsCancelled";
 
 	private boolean geIncludeItemId = true;
 	private boolean geIncludeItemName = true;
@@ -302,7 +303,7 @@ public class GrandExchangeExportService
 		return new File(root, "exchange-offers" + separator + dateSuffix + extension);
 	}
 
-	private String formatCsvRow(GeLedgerEntry entry)
+	public String formatCsvRow(GeLedgerEntry entry)
 	{
 		String safeItemName = entry.getItemName() != null ? entry.getItemName() : "Unknown";
 		if (safeItemName.contains(",")) safeItemName = "\"" + safeItemName + "\"";
@@ -313,7 +314,8 @@ public class GrandExchangeExportService
 		String tradeType = entry.isBuy() ? "BUY" : "SELL";
 
 		return String.join(",",
-			String.valueOf(entry.getItemId()), safeItemName, creationTimeStr, timeStr, tradeType,
+			String.valueOf(entry.getItemId()),
+			safeItemName, creationTimeStr, timeStr, tradeType,
 			String.valueOf(entry.getQuantity()), String.valueOf(entry.getOriginalOfferQuantity()),
 			String.valueOf(entry.getPrice()), String.valueOf(entry.getOriginalOfferPrice()),
 			String.valueOf(entry.getValue()), String.valueOf(entry.getTax()),
@@ -323,10 +325,12 @@ public class GrandExchangeExportService
 		);
 	}
 
-	private JsonObject buildGeJsonObject(GeLedgerEntry ledgerEntry)
+	/**
+	 * Construct a JsonObject based on enabled configurations and return it
+	 */
+	public JsonObject buildGeJsonObject(GeLedgerEntry ledgerEntry)
 	{
 		JsonObject jsonObject = new JsonObject();
-
 		if (geIncludeItemId) jsonObject.addProperty("itemId", ledgerEntry.getItemId());
 		if (geIncludeItemName) jsonObject.addProperty("itemName", ledgerEntry.getItemName());
 		if (geIncludeIsBuy) jsonObject.addProperty("isBuy", ledgerEntry.isBuy());

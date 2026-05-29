@@ -25,25 +25,41 @@
 
 package com.datalogger.models.enums;
 
-public enum PanelViewMode
+import static com.datalogger.constants.PluginConstants.COLOSSEUM_TRIALS_DIR;
+import static com.datalogger.constants.PluginConstants.GRAND_EXCHANGE_DIR;
+import static com.datalogger.constants.PluginConstants.INTERNAL_COLOSSEUM_DIR;
+import static com.datalogger.constants.PluginConstants.INTERNAL_VAULT_DIR;
+import static com.datalogger.constants.PluginConstants.ITEM_VAULT_DIR;
+import static com.datalogger.services.FileIOService.INTERNAL_GE_HISTORY_DIR;
+import static com.datalogger.services.FileIOService.INTERNAL_GE_OFFERS_DIR;
+import java.io.File;
+import lombok.Getter;
+
+@Getter
+public enum Directory
 {
-	COLOSSEUM_STATISTICS("Colosseum Statistics"),
-	//	COLOSSEUM_REVIEW("Colosseum history"),
-	ITEMS_MANAGER("Items manager"),
-	ITEMS("Items"),
-	UTILITIES("Utilities"),
-	WEBHOOK_TEST("Webhook Test");
+	COLOSSEUM_TRAILS("Colosseum trial log", COLOSSEUM_TRIALS_DIR, false),
+	ITEMS("Item log", ITEM_VAULT_DIR, true),
+	GRAND_EXCHANGE("Grand Exchange log", GRAND_EXCHANGE_DIR, true),
+	COLOSSEUM_TRAILS_INTERNAL("Internal Colosseum trial log", INTERNAL_COLOSSEUM_DIR, false),
+	ITEMS_INTERNAL("Internal Item log", INTERNAL_VAULT_DIR, true),
+	GRAND_EXCHANGE_INTERNAL("Internal Grand Exchange log", INTERNAL_GE_OFFERS_DIR, false),
+	GRAND_EXCHANGE_HISTORY_INTERNAL("Internal Grand Exchange history log", INTERNAL_GE_HISTORY_DIR, false);
 
-	private final String displayName;
+	final String label;
+	final File directory;
+	final boolean accountSpecificDirectories;
 
-	PanelViewMode(String displayName)
+	Directory(String label, File directory, boolean accountSpecific)
 	{
-		this.displayName = displayName;
+		this.label = label;
+		this.directory = directory;
+		this.accountSpecificDirectories = accountSpecific;
 	}
 
 	@Override
 	public String toString()
 	{
-		return displayName;
+		return label;
 	}
 }

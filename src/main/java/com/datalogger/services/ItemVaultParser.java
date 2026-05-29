@@ -86,6 +86,9 @@ public class ItemVaultParser
 		);
 	}
 
+	/**
+	 * Extract the items from a widget associated via VaultType attributes and return it as a List of BankedItem
+	 */
 	private List<BankedItem> parseVault(VaultType vaultType)
 	{
 		Widget widget = client.getWidget(vaultType.getGroupId(), vaultType.getChildId());
@@ -96,7 +99,7 @@ public class ItemVaultParser
 			log.debug("Unable to extract or parse widget for vault {}", vaultType.name());
 			return parsedItems;
 		}
-		if (isMembersWorld)
+		if (!isMembersWorld)
 		{
 			for (Widget w : widget.getChildren())
 			{
@@ -143,15 +146,5 @@ public class ItemVaultParser
 	@Subscribe
 	public void onWidgetClosed(WidgetClosed event) {
 		processWidget(event.getGroupId());
-	}
-
-	@Subscribe
-	public void onVarbitChanged(VarbitChanged event)
-	{
-		int varbitId = event.getVarbitId();
-		switch (varbitId)
-		{
-			case TOB_LOBBY_WELL_CONTENTS:
-		}
 	}
 }
