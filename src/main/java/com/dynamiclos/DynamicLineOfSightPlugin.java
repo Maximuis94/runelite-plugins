@@ -64,6 +64,7 @@ import net.runelite.client.util.HotkeyListener;
 )
 public class DynamicLineOfSightPlugin extends Plugin
 {
+
 	@Provides
 	DynamicLineOfSightConfig provideConfig(ConfigManager configManager)
 	{
@@ -90,6 +91,7 @@ public class DynamicLineOfSightPlugin extends Plugin
 
 	@Getter
 	private int cachedAttackRange = 1;
+	private boolean configUpdatePending = false;
 
 	private static final int COLOSSEUM_REGION_ID = 7175;
 	private static final int MYOPIA_VARBIT_ID = VarbitID.COLOSSEUM_MODIFIER_MYOPIA_STACKS_CLIENT;
@@ -118,6 +120,7 @@ public class DynamicLineOfSightPlugin extends Plugin
 	@Override
 	protected void startUp() throws Exception
 	{
+		overlay.parseConfigs();
 		overlayManager.add(overlay);
 		clientThread.invokeLater(this::initialize);
 		keyManager.registerKeyListener(losHotkeyListener);
@@ -151,7 +154,16 @@ public class DynamicLineOfSightPlugin extends Plugin
 	{
 		if (!isPluginConfig(event)) return;
 
-		overlay.parseConfigs();
+		if (!configUpdatePending)
+		{
+			configUpdatePending = true;
+			clientThread.invokeLater(() ->
+			{
+				configUpdatePending = false;
+				overlay.parseConfigs();
+				updateCachedRange();
+			});
+		}
 	}
 
 	@Subscribe

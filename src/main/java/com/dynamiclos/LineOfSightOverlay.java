@@ -91,7 +91,7 @@ public class LineOfSightOverlay extends Overlay {
 	private boolean isAffectedByMyopiaRange5 = false;
 
 	private boolean enabledAnyNpcHighlight = false;
-	private boolean hasAlteredAnyFixedRange = false;
+	private boolean forceRecalculate = true;
 
 	private boolean enabledActiveWeaponLos;
 	private Color activeWeaponOutlineColor;
@@ -144,11 +144,6 @@ public class LineOfSightOverlay extends Overlay {
 
 	private WorldPoint lastPlayerLocation = null;
 	private int lastCalculatedActiveRange = -1;
-	private int lastCalculatedFixed1Range = -1;
-	private int lastCalculatedFixed2Range = -1;
-	private int lastCalculatedFixed3Range = -1;
-	private int lastCalculatedFixed4Range = -1;
-	private int lastCalculatedFixed5Range = -1;
 
 	private final Set<WorldPoint> cachedActiveWeaponTiles = new HashSet<>();
 	private final Set<WorldPoint> cachedMaxRangeTiles = new HashSet<>();
@@ -173,6 +168,31 @@ public class LineOfSightOverlay extends Overlay {
 		}
 	}
 
+	/**
+	 * Helper class used to sort enabled lines of sight by distance descending.
+	 * This prevents larger fills from rendering on top of and hiding smaller ranges.
+	 */
+	private static class RenderLayer implements Comparable<RenderLayer> {
+		final int range;
+		final Set<WorldPoint> tiles;
+		final Color fill;
+		final Color outline;
+		final float lineWidth;
+
+		RenderLayer(int range, Set<WorldPoint> tiles, Color fill, Color outline, float lineWidth) {
+			this.range = range;
+			this.tiles = tiles;
+			this.fill = fill;
+			this.outline = outline;
+			this.lineWidth = lineWidth;
+		}
+
+		@Override
+		public int compareTo(RenderLayer other) {
+			return Integer.compare(other.range, this.range); // Descending
+		}
+	}
+
 	private final Map<String, List<NpcLosDef>> npcLosDefinitionsByName = new HashMap<>();
 	private final Map<Integer, List<NpcLosDef>> npcLosDefinitionsById = new HashMap<>();
 	private final Map<CombatStyle, Set<WorldPoint>> cachedHoveredNpcTilesByStyle = new EnumMap<>(CombatStyle.class);
@@ -188,18 +208,11 @@ public class LineOfSightOverlay extends Overlay {
 		setLayer(OverlayLayer.ABOVE_SCENE);
 	}
 
-	/**
-	 * Updates the attackRange of the currently equipped weapon and whether it was affected by Myopia or not
-	 */
 	public void setActiveAttackRange(int attackRange, boolean affectedByMyopia) {
 		activeWeaponRange = attackRange;
 		isAffectedByMyopia = affectedByMyopia;
 	}
 
-	/**
-	 * Sets the given attack range reduction that follows from the active Myopia tier and subsequently updates all
-	 * affected attack ranges.
-	 */
 	public void setMyopiaReduction(int myopiaReduction) {
 		this.myopiaReduction = myopiaReduction;
 
@@ -223,12 +236,9 @@ public class LineOfSightOverlay extends Overlay {
 		fixed5Range = Math.max(1, range5 - myopiaReduction);
 		isAffectedByMyopiaRange5 = fixed5Range < range5;
 
-		updateHasAlteredAnyFixedRange();
+		forceRecalculate = true;
 	}
 
-	/**
-	 * Unpacks plugin configurations into their respective variables.
-	 */
 	public void parseConfigs() {
 		enabledNpcLos = config.enableNpcLos();
 		Keybind key = config.npcLosHotkey();
@@ -318,8 +328,7 @@ public class LineOfSightOverlay extends Overlay {
 		if (myopiaReduction > 0)
 			setMyopiaReduction(myopiaReduction);
 
-		updateHasAlteredAnyFixedRange();
-
+		forceRecalculate = true;
 		parseNpcDefinitions();
 	}
 
@@ -371,17 +380,6 @@ public class LineOfSightOverlay extends Overlay {
 		}
 	}
 
-	/**
-	 * Updates the hasAlteredAnyFixedRange flag
-	 */
-	private void updateHasAlteredAnyFixedRange() {
-		hasAlteredAnyFixedRange = fixed1Range != lastCalculatedFixed1Range ||
-			fixed2Range != lastCalculatedFixed2Range ||
-			fixed3Range != lastCalculatedFixed3Range ||
-			fixed4Range != lastCalculatedFixed4Range ||
-			fixed5Range != lastCalculatedFixed5Range;
-	}
-
 	@Override
 	public Dimension render(Graphics2D graphics) {
 		Player player = client.getLocalPlayer();
@@ -430,7 +428,7 @@ public class LineOfSightOverlay extends Overlay {
 
 		if (!currentLocation.equals(lastPlayerLocation) ||
 			activeWeaponRange != lastCalculatedActiveRange ||
-			hasAlteredAnyFixedRange) {
+			forceRecalculate) {
 
 			cachedActiveWeaponTiles.clear();
 			cachedMaxRangeTiles.clear();
@@ -443,11 +441,9 @@ public class LineOfSightOverlay extends Overlay {
 			if (enabledActiveWeaponLos) {
 				cachedActiveWeaponTiles.addAll(calculateLineOfSightTiles(playerArea, wv, activeWeaponRange, false, isAffectedByMyopia, false));
 			}
-
 			if (enabledMaxRangeLos) {
 				cachedMaxRangeTiles.addAll(calculateLineOfSightTiles(playerArea, wv, 10, false, false, false));
 			}
-
 			if (enabledFixed1) {
 				cachedFixedRange1Tiles.addAll(calculateLineOfSightTiles(playerArea, wv, fixed1Range, false, isAffectedByMyopiaRange1, false));
 			}
@@ -466,47 +462,28 @@ public class LineOfSightOverlay extends Overlay {
 
 			lastPlayerLocation = currentLocation;
 			lastCalculatedActiveRange = activeWeaponRange;
-			lastCalculatedFixed1Range = fixed1Range;
-			lastCalculatedFixed2Range = fixed2Range;
-			lastCalculatedFixed3Range = fixed3Range;
-			lastCalculatedFixed4Range = fixed4Range;
-			lastCalculatedFixed5Range = fixed5Range;
-
-			hasAlteredAnyFixedRange = false;
+			forceRecalculate = false;
 		}
 
 		if (!plugin.isPlayerLosToggledOff())
 		{
 			if (!mutuallyExcludedPlayerLos)
 			{
-				if (enabledActiveWeaponLos)
-				{
-					drawTilesArea(graphics, cachedActiveWeaponTiles, activeWeaponFillColor, activeWeaponOutlineColor, activeRangeLineWidth);
-				}
+				List<RenderLayer> layers = new ArrayList<>();
 
-				if (enabledMaxRangeLos)
-				{
-					drawTilesArea(graphics, cachedMaxRangeTiles, maxRangeFillColor, maxRangeOutlineColor, maxRangeLineWidth);
-				}
-				if (enabledFixed1)
-				{
-					drawTilesArea(graphics, cachedFixedRange1Tiles, fixed1FillColor, fixed1OutlineColor, fixed1LineWidth);
-				}
-				if (enabledFixed2)
-				{
-					drawTilesArea(graphics, cachedFixedRange2Tiles, fixed2FillColor, fixed2OutlineColor, fixed2LineWidth);
-				}
-				if (enabledFixed3)
-				{
-					drawTilesArea(graphics, cachedFixedRange3Tiles, fixed3FillColor, fixed3OutlineColor, fixed3LineWidth);
-				}
-				if (enabledFixed4)
-				{
-					drawTilesArea(graphics, cachedFixedRange4Tiles, fixed4FillColor, fixed4OutlineColor, fixed4LineWidth);
-				}
-				if (enabledFixed5)
-				{
-					drawTilesArea(graphics, cachedFixedRange5Tiles, fixed5FillColor, fixed5OutlineColor, fixed5LineWidth);
+				if (enabledActiveWeaponLos) layers.add(new RenderLayer(activeWeaponRange, cachedActiveWeaponTiles, activeWeaponFillColor, activeWeaponOutlineColor, activeRangeLineWidth));
+				if (enabledMaxRangeLos) layers.add(new RenderLayer(10, cachedMaxRangeTiles, maxRangeFillColor, maxRangeOutlineColor, maxRangeLineWidth));
+				if (enabledFixed1) layers.add(new RenderLayer(fixed1Range, cachedFixedRange1Tiles, fixed1FillColor, fixed1OutlineColor, fixed1LineWidth));
+				if (enabledFixed2) layers.add(new RenderLayer(fixed2Range, cachedFixedRange2Tiles, fixed2FillColor, fixed2OutlineColor, fixed2LineWidth));
+				if (enabledFixed3) layers.add(new RenderLayer(fixed3Range, cachedFixedRange3Tiles, fixed3FillColor, fixed3OutlineColor, fixed3LineWidth));
+				if (enabledFixed4) layers.add(new RenderLayer(fixed4Range, cachedFixedRange4Tiles, fixed4FillColor, fixed4OutlineColor, fixed4LineWidth));
+				if (enabledFixed5) layers.add(new RenderLayer(fixed5Range, cachedFixedRange5Tiles, fixed5FillColor, fixed5OutlineColor, fixed5LineWidth));
+
+				// Sort rendering layers from Largest range to Smallest range
+				layers.sort(null);
+
+				for (RenderLayer layer : layers) {
+					drawTilesArea(graphics, layer.tiles, layer.fill, layer.outline, layer.lineWidth);
 				}
 			}
 
