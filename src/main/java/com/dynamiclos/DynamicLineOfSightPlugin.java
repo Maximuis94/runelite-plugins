@@ -31,17 +31,25 @@ import static com.dynamiclos.PluginConstants.STAFF_AUTOCAST_STYLE_INDEX;
 import static com.dynamiclos.PluginConstants.STAFF_DEFENSIVE_AUTOCAST_STYLE_INDEX;
 import static com.dynamiclos.PluginConstants.STAFF_EQUIPMENT_TYPE_ID;
 import com.google.inject.Provides;
+import java.awt.Color;
+import java.util.EnumMap;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Set;
 import javax.inject.Inject;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
+import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
 import net.runelite.api.EquipmentInventorySlot;
 import net.runelite.api.GameState;
 import net.runelite.api.Item;
+import net.runelite.api.KeyCode;
+import net.runelite.api.Menu;
 import net.runelite.api.WorldView;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.ItemContainerChanged;
+import net.runelite.api.events.MenuEntryAdded;
 import net.runelite.api.events.VarbitChanged;
 import net.runelite.api.gameval.InventoryID;
 import net.runelite.api.gameval.VarPlayerID;
@@ -50,11 +58,19 @@ import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
+import net.runelite.client.game.chatbox.ChatboxPanelManager;
 import net.runelite.client.input.KeyManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.overlay.OverlayManager;
+import net.runelite.client.util.ColorUtil;
 import net.runelite.client.util.HotkeyListener;
+import net.runelite.api.MenuAction;
+import net.runelite.api.MenuEntry;
+import net.runelite.api.NPC;
+import net.runelite.client.game.chatbox.ChatboxPanelManager;
+import java.util.Arrays;
+import java.util.stream.Collectors;
 
 @Slf4j
 @PluginDescriptor(
@@ -89,6 +105,12 @@ public class DynamicLineOfSightPlugin extends Plugin
 	@Inject
 	private KeyManager keyManager;
 
+	@Inject
+	private ChatboxPanelManager chatboxPanelManager;
+
+	@Inject
+	private ConfigManager configManager;
+
 	@Getter
 	private int cachedAttackRange = 1;
 	private boolean configUpdatePending = false;
@@ -106,6 +128,7 @@ public class DynamicLineOfSightPlugin extends Plugin
 	private static final int LONGRANGE_EXTENSION = 2;
 	private static final Set<Integer> LONGRANGE_STYLE_IDS = Set.of(3, 5, 7, 19, 24);
 
+
 	private int equippedWeaponId = -1;
 	private int equippedWeaponType = -1;
 	private int attackStyleIndex = -1;
@@ -117,10 +140,24 @@ public class DynamicLineOfSightPlugin extends Plugin
 	private int myopiaReduction = 0;
 	private boolean isAffectedByMyopia = false;
 
+	private boolean showMenuEntry = false;
+	private boolean showGameMessage = false;
+	private int MIN_CHAT_RANGE = 0;
+	private int MAX_CHAT_RANGE = 20;
+
+	private Color meleeColor;
+	private Color rangedColor;
+	private Color magicColor;
+	private Color hybridColor;
+
+	private final Map<CombatStyle, Map<String, Integer>> npcDistancesByName = new EnumMap<>(CombatStyle.class);
+	private final Map<CombatStyle, Map<Integer, Integer>> npcDistancesById = new EnumMap<>(CombatStyle.class);
+
 	@Override
 	protected void startUp() throws Exception
 	{
 		overlay.parseConfigs();
+		parseConfigColors();
 		overlayManager.add(overlay);
 		clientThread.invokeLater(this::initialize);
 		keyManager.registerKeyListener(losHotkeyListener);
@@ -162,6 +199,7 @@ public class DynamicLineOfSightPlugin extends Plugin
 				configUpdatePending = false;
 				overlay.parseConfigs();
 				updateCachedRange();
+				parseConfigColors();
 			});
 		}
 	}
@@ -182,6 +220,87 @@ public class DynamicLineOfSightPlugin extends Plugin
 				updateCachedRange();
 			}
 		}
+	}
+
+	private Color getColorFromConfig(CombatStyle combatStyle)
+	{
+
+		Color color = Color.decode(configManager.getConfiguration(PLUGIN_CONFIG_GROUP, combatStyle.npcOutlineColorKey));
+		if (color.getAlpha() == 0) color = Color.decode(configManager.getConfiguration(PLUGIN_CONFIG_GROUP, combatStyle.npcFillColorKey));
+		return new Color(color.getRed(), color.getGreen(), color.getBlue());
+	}
+
+	private void parseConfigColors()
+	{
+		meleeColor = getColorFromConfig(CombatStyle.MELEE);
+		rangedColor = getColorFromConfig(CombatStyle.RANGED);
+		magicColor = getColorFromConfig(CombatStyle.MAGIC);
+		hybridColor = getColorFromConfig(CombatStyle.OTHER);
+
+		parseNpcDistances(CombatStyle.MELEE, config.meleeNpcDefs());
+		parseNpcDistances(CombatStyle.RANGED, config.rangedNpcDefs());
+		parseNpcDistances(CombatStyle.MAGIC, config.magicNpcDefs());
+		parseNpcDistances(CombatStyle.OTHER, config.otherNpcDefs());
+
+		showMenuEntry = config.enableNpcLosMenu();
+		showGameMessage = config.broadcastGameMessageNpcLos();
+	}
+
+	private void parseNpcDistances(CombatStyle style, String configValue)
+	{
+		Map<String, Integer> byName = new HashMap<>();
+		Map<Integer, Integer> byId = new HashMap<>();
+
+		if (configValue != null && !configValue.trim().isEmpty()) {
+			String normalizedConfig = configValue.replace("\r\n", "\n").replace(",", "\n");
+			String[] entries = normalizedConfig.split("\n");
+
+			for (String entry : entries) {
+				if (entry.trim().isEmpty()) continue;
+				String[] parts = entry.split("\\|");
+				if (parts.length != 2) continue;
+
+				String identifier = parts[0].trim().toLowerCase();
+				try {
+					String rangeStr = parts[1].trim();
+					if (rangeStr.endsWith("*")) {
+						rangeStr = rangeStr.substring(0, rangeStr.length() - 1); // remove diagonal indicator if present
+					}
+					int range = Integer.parseInt(rangeStr);
+
+					try {
+						int id = Integer.parseInt(identifier);
+						byId.put(id, range);
+					} catch (NumberFormatException e) {
+						byName.put(identifier, range);
+					}
+				} catch (NumberFormatException e) { }
+			}
+		}
+		npcDistancesByName.put(style, byName);
+		npcDistancesById.put(style, byId);
+	}
+
+	private String getMenuOptionText(String baseText, Color color, NPC npc, CombatStyle style)
+	{
+		Integer dist = null;
+		if (npc != null) {
+			Map<Integer, Integer> byId = npcDistancesById.get(style);
+			if (byId != null && byId.containsKey(npc.getId())) {
+				dist = byId.get(npc.getId());
+			} else {
+				Map<String, Integer> byName = npcDistancesByName.get(style);
+				if (byName != null && npc.getName() != null) {
+					dist = byName.get(npc.getName().toLowerCase());
+				}
+			}
+		}
+
+		String label = baseText;
+		if (dist != null) {
+			label += " (" + dist + ")";
+		}
+		return ColorUtil.wrapWithColorTag(label, color);
 	}
 
 	private void updateInColosseum()
@@ -271,6 +390,270 @@ public class DynamicLineOfSightPlugin extends Plugin
 			updateActiveLongRangeBonus();
 			updateCachedRange();
 		}
+	}
+
+	@Subscribe
+	public void onMenuEntryAdded(MenuEntryAdded event)
+	{
+		if (!showMenuEntry || !client.isKeyPressed(KeyCode.KC_SHIFT))
+		{
+			return;
+		}
+
+		if ("Examine".equals(event.getOption()) && event.getMenuEntry().getNpc() != null)
+		{
+			NPC npc = event.getMenuEntry().getNpc();
+
+			if (npc.getComposition() == null || npc.getComposition().getActions() == null)
+			{
+				return;
+			}
+
+			boolean isAttackable = false;
+			for (String action : npc.getComposition().getActions())
+			{
+				if (action != null && action.equalsIgnoreCase("Attack"))
+				{
+					isAttackable = true;
+					break;
+				}
+			}
+
+			if (!isAttackable)
+			{
+				return;
+			}
+
+			String target = event.getTarget();
+
+			MenuEntry parent = client.getMenu().createMenuEntry(-1)
+				.setOption("Set/clear los")
+				.setTarget(target)
+				.setType(MenuAction.RUNELITE);
+
+			Menu submenu = parent.createSubMenu();
+
+			// Conditionally add the "Clear all" option
+			if (hasAnyLosConfigured(npc))
+			{
+				submenu.createMenuEntry(-1)
+					.setOption("Clear all")
+					.setType(MenuAction.RUNELITE)
+					.onClick(e -> clearAllLos(npc));
+			}
+
+			submenu.createMenuEntry(-1)
+				.setOption(getMenuOptionText("Other", hybridColor, npc, CombatStyle.OTHER))
+				.setType(MenuAction.RUNELITE)
+				.onClick(e -> handleLosConfiguration(npc, CombatStyle.OTHER, hybridColor));
+
+			submenu.createMenuEntry(-1)
+				.setOption(getMenuOptionText("Magic", magicColor, npc, CombatStyle.MAGIC))
+				.setType(MenuAction.RUNELITE)
+				.onClick(e -> handleLosConfiguration(npc, CombatStyle.MAGIC, magicColor));
+
+			submenu.createMenuEntry(-1)
+				.setOption(getMenuOptionText("Ranged", rangedColor, npc, CombatStyle.RANGED))
+				.setType(MenuAction.RUNELITE)
+				.onClick(e -> handleLosConfiguration(npc, CombatStyle.RANGED, rangedColor));
+
+			submenu.createMenuEntry(-1)
+				.setOption(getMenuOptionText("Melee", meleeColor, npc, CombatStyle.MELEE))
+				.setType(MenuAction.RUNELITE)
+				.onClick(e -> handleLosConfiguration(npc, CombatStyle.MELEE, meleeColor));
+		}
+	}
+
+	private boolean hasAnyLosConfigured(NPC npc)
+	{
+		if (npc == null) return false;
+
+		String name = npc.getName() != null ? npc.getName().toLowerCase() : null;
+		int id = npc.getId();
+
+		for (CombatStyle style : CombatStyle.values())
+		{
+			Map<Integer, Integer> byId = npcDistancesById.get(style);
+			if (byId != null && byId.containsKey(id))
+			{
+				return true;
+			}
+
+			Map<String, Integer> byName = npcDistancesByName.get(style);
+			if (byName != null && name != null && byName.containsKey(name))
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private boolean hasLosConfigured(NPC npc, CombatStyle combatStyle)
+	{
+		if (npc == null) return false;
+
+		String name = npc.getName() != null ? npc.getName().toLowerCase() : null;
+		int id = npc.getId();
+
+		Map<Integer, Integer> byId = npcDistancesById.get(combatStyle);
+		if (byId != null && byId.containsKey(id))
+		{
+			return true;
+		}
+
+		Map<String, Integer> byName = npcDistancesByName.get(combatStyle);
+		if (byName != null && name != null && byName.containsKey(name))
+		{
+			return true;
+		}
+
+		return false;
+	}
+
+	private void clearAllLos(NPC npc)
+	{
+		String npcName = npc.getName();
+		if (npcName == null) return;
+
+		boolean removedAny = false;
+		for (CombatStyle style : CombatStyle.values())
+		{
+			String configKey = getConfigKeyForStyle(style);
+			String currentConfig = configManager.getConfiguration(PluginConstants.PLUGIN_CONFIG_GROUP, configKey);
+			if (currentConfig == null) currentConfig = "";
+
+			if (isNpcInConfig(npcName, currentConfig))
+			{
+				String newConfig = removeNpcFromConfig(npcName, currentConfig);
+				configManager.setConfiguration(PluginConstants.PLUGIN_CONFIG_GROUP, configKey, newConfig);
+				removedAny = true;
+			}
+		}
+
+		if (removedAny)
+		{
+			sendGameMessage("Cleared all LoS configurations for " + ColorUtil.wrapWithColorTag(npcName, Color.RED) + ".");
+		}
+	}
+
+	/**
+	 * Sends a specific message into the chatbox, but only if the configurations allow for it
+	 */
+	private void sendGameMessage(String message)
+	{
+		if (showGameMessage)
+		{
+			clientThread.invokeLater(() -> {
+				client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", message, "");
+			});
+		}
+	}
+
+	private String inputTextWithNothing(String combatStyleFormatted, String npcName)
+	{
+		return "Enter " + combatStyleFormatted + " LoS distance for NPC " + npcName + " (Set to 1-20, 1*, or nothing)";
+	}
+
+	private String inputTextWithoutNothing(String combatStyleFormatted, String npcName)
+	{
+		return "Enter " + combatStyleFormatted + " LoS distance for NPC " + npcName + " (Set to 1-20, 1*)";
+	}
+
+	private void handleLosConfiguration(NPC npc, CombatStyle style, Color color)
+	{
+		String npcName = npc.getName();
+		if (npcName == null) return;
+
+		String configKey = getConfigKeyForStyle(style);
+		String currentConfig = configManager.getConfiguration(PluginConstants.PLUGIN_CONFIG_GROUP, configKey);
+		if (currentConfig == null) currentConfig = "";
+
+		final boolean hasLos = hasLosConfigured(npc, style);
+
+		String styleFormatted = ColorUtil.wrapWithColorTag(style.name().toLowerCase(), color);
+
+		String textInputText = hasLos ? inputTextWithNothing(styleFormatted, npcName) : inputTextWithoutNothing(styleFormatted, npcName);
+
+		final String existingConfig = currentConfig;
+		chatboxPanelManager.openTextInput(textInputText)
+			.onDone((input) -> {
+				try
+				{
+					String newEntry;
+					String newConfig;
+					String range;
+					String i = input.strip();
+
+					if (i.isEmpty())
+					{
+						if (hasLos)
+						{
+							newConfig = removeNpcFromConfig(npcName, existingConfig);
+							configManager.setConfiguration(PluginConstants.PLUGIN_CONFIG_GROUP, configKey, newConfig);
+							sendGameMessage("Removed " + styleFormatted + " line of sight for " + npcName);
+						}
+						return;
+					}
+					else if (i.equals("1*"))
+					{
+						newEntry = npcName + "|" + i;
+						range = i;
+					}
+					else
+					{
+						int rangeInt = Integer.parseInt(i);
+						range =  String.valueOf(rangeInt);
+
+						if (rangeInt < MIN_CHAT_RANGE || rangeInt > MAX_CHAT_RANGE)
+						{
+							sendGameMessage("Range of " + range + " is outside of the range of " + MIN_CHAT_RANGE + "-" + MAX_CHAT_RANGE + ". For a value larger than " + MAX_CHAT_RANGE + ", set it manually in config.");
+							return;
+						}
+
+						newEntry = npcName + "|" + range;
+					}
+					newConfig = existingConfig.isEmpty() ? newEntry : existingConfig + "\n" + newEntry;
+					configManager.setConfiguration(PluginConstants.PLUGIN_CONFIG_GROUP, configKey, newConfig);
+					sendGameMessage("Set " + styleFormatted + " line of sight range for NPC " + npcName + " to " + range);
+				}
+				catch (NumberFormatException e)
+				{
+					log.warn("Invalid range input provided for NPC LoS: {}", input);
+				}
+			})
+			.build();
+
+	}
+
+	private String getConfigKeyForStyle(CombatStyle style)
+	{
+		switch (style)
+		{
+			case MELEE: return "meleeNpcDefs";
+			case RANGED: return "rangedNpcDefs";
+			case MAGIC: return "magicNpcDefs";
+			case OTHER: return "otherNpcDefs";
+			default: return "";
+		}
+	}
+
+	private boolean isNpcInConfig(String npcName, String currentConfig)
+	{
+		String searchStr = npcName.toLowerCase() + "|";
+		return Arrays.stream(currentConfig.split("\n"))
+			.map(String::trim)
+			.filter(s -> !s.isEmpty())
+			.anyMatch(s -> s.toLowerCase().startsWith(searchStr));
+	}
+
+	private String removeNpcFromConfig(String npcName, String currentConfig)
+	{
+		String searchStr = npcName.toLowerCase() + "|";
+		return Arrays.stream(currentConfig.split("\n"))
+			.map(String::trim)
+			.filter(s -> !s.isEmpty())
+			.filter(s -> !s.toLowerCase().startsWith(searchStr))
+			.collect(Collectors.joining("\n"));
 	}
 
 	@Getter

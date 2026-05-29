@@ -157,6 +157,7 @@ public interface DynamicLineOfSightConfig extends Config
 	)
 	default boolean enableNpcLos() { return true; }
 
+
 	@ConfigItem(
 		keyName = "drawActiveWeaponRange",
 		name = "Enable active weapon LoS",
@@ -297,12 +298,30 @@ public interface DynamicLineOfSightConfig extends Config
 	// NPC LOS STYLING & DEFINITIONS
 	// =========================================
 
+	@ConfigItem(
+		keyName = "enableNpcLosMenu",
+		name = "Update NPC LoS via shift+rmb",
+		description = "If checked, a menu is added when shift right-clicking an attackable NPC to update its LoS",
+		position = 0,
+		section = npcStylingSection
+	)
+	default boolean enableNpcLosMenu() { return true; }
+
+	@ConfigItem(
+		keyName = "broadcastGameMessageNpcLos",
+		name = "NPC LoS game message",
+		description = "If checked, display a game message showing the result of the modified NPC line of sight config via the right click menu",
+		position = 1,
+		section = npcStylingSection
+	)
+	default boolean broadcastGameMessageNpcLos() { return true; }
+
 	@Alpha
 	@ConfigItem(
 		keyName = "meleeNpcOutlineColor",
 		name = "Melee outline color",
 		description = "The outline color for melee NPC lines of sight",
-		position = 0,
+		position = 2,
 		section = npcStylingSection
 	)
 	default Color meleeNpcOutlineColor() { return DEFAULT_COLOR_MELEE_OUTLINE; }
@@ -312,7 +331,7 @@ public interface DynamicLineOfSightConfig extends Config
 		keyName = "meleeNpcFillColor",
 		name = "Melee fill color",
 		description = "The fill color for melee NPC lines of sight",
-		position = 1,
+		position = 3,
 		section = npcStylingSection
 	)
 	default Color meleeNpcFillColor() { return DEFAULT_COLOR_MELEE_FILL; }
@@ -321,7 +340,7 @@ public interface DynamicLineOfSightConfig extends Config
 		keyName = "meleeNpcLineWidth",
 		name = "Melee line width",
 		description = "The thickness of the outline for melee NPC lines of sight",
-		position = 2,
+		position = 4,
 		section = npcStylingSection
 	)
 	default double meleeNpcLineWidth() { return DEFAULT_LINE_WIDTH; }
@@ -330,7 +349,7 @@ public interface DynamicLineOfSightConfig extends Config
 		keyName = "meleeNpcDefs",
 		name = "Melee NPCs",
 		description = "Format: <NPC_[NAME/ID]>|ATK_RANGE. Configures specific NPC atk ranges using melee color styling",
-		position = 3,
+		position = 5,
 		section = npcStylingSection
 	)
 	default String meleeNpcDefs() {
@@ -357,7 +376,7 @@ public interface DynamicLineOfSightConfig extends Config
 		keyName = "rangedNpcOutlineColor",
 		name = "Ranged outline color",
 		description = "The outline color for ranged NPC lines of sight",
-		position = 4,
+		position = 6,
 		section = npcStylingSection
 	)
 	default Color rangedNpcOutlineColor() { return DEFAULT_COLOR_RANGED_OUTLINE; }
@@ -367,7 +386,7 @@ public interface DynamicLineOfSightConfig extends Config
 		keyName = "rangedNpcFillColor",
 		name = "Ranged fill color",
 		description = "The fill color for ranged NPC lines of sight",
-		position = 5,
+		position = 7,
 		section = npcStylingSection
 	)
 	default Color rangedNpcFillColor() { return DEFAULT_COLOR_RANGED_FILL; }
@@ -376,7 +395,7 @@ public interface DynamicLineOfSightConfig extends Config
 		keyName = "rangedNpcLineWidth",
 		name = "Ranged line width",
 		description = "The thickness of the outline for ranged NPC lines of sight",
-		position = 6,
+		position = 8,
 		section = npcStylingSection
 	)
 	default double rangedNpcLineWidth() { return DEFAULT_LINE_WIDTH; }
@@ -385,7 +404,7 @@ public interface DynamicLineOfSightConfig extends Config
 		keyName = "rangedNpcDefs",
 		name = "Ranged NPCs",
 		description = "Format: <NPC_[NAME/ID]>|ATK_RANGE. Configures specific NPC atk ranges using ranged color styling",
-		position = 7,
+		position = 9,
 		section = npcStylingSection
 	)
 	default String rangedNpcDefs() {
@@ -401,7 +420,7 @@ public interface DynamicLineOfSightConfig extends Config
 		keyName = "magicNpcOutlineColor",
 		name = "Magic outline color",
 		description = "The outline color for magic NPC lines of sight",
-		position = 8,
+		position = 10,
 		section = npcStylingSection
 	)
 	default Color magicNpcOutlineColor() { return DEFAULT_COLOR_MAGIC_OUTLINE; }
@@ -411,7 +430,7 @@ public interface DynamicLineOfSightConfig extends Config
 		keyName = "magicNpcFillColor",
 		name = "Magic fill color",
 		description = "The fill color for magic NPC lines of sight",
-		position = 9,
+		position = 11,
 		section = npcStylingSection
 	)
 	default Color magicNpcFillColor() { return DEFAULT_COLOR_MAGIC_FILL; }
@@ -420,7 +439,7 @@ public interface DynamicLineOfSightConfig extends Config
 		keyName = "magicNpcLineWidth",
 		name = "Magic line width",
 		description = "The thickness of the outline for magic NPC lines of sight",
-		position = 10,
+		position = 12,
 		section = npcStylingSection
 	)
 	default double magicNpcLineWidth() { return DEFAULT_LINE_WIDTH; }
@@ -429,7 +448,7 @@ public interface DynamicLineOfSightConfig extends Config
 		keyName = "magicNpcDefs",
 		name = "Magic NPCs",
 		description = "Format: <NPC_[NAME/ID]>|ATK_RANGE. Configures specific NPC atk ranges using magic color styling",
-		position = 11,
+		position = 13,
 		section = npcStylingSection
 	)
 	default String magicNpcDefs() {
@@ -445,7 +464,7 @@ public interface DynamicLineOfSightConfig extends Config
 		keyName = "otherNpcOutlineColor",
 		name = "Hybrid outline color",
 		description = "The outline color for hybrid/typeless NPC lines of sight",
-		position = 12,
+		position = 14,
 		section = npcStylingSection
 	)
 	default Color otherNpcOutlineColor() { return DEFAULT_COLOR_OTHER_OUTLINE; }
@@ -455,7 +474,7 @@ public interface DynamicLineOfSightConfig extends Config
 		keyName = "otherNpcFillColor",
 		name = "Hybrid fill color",
 		description = "The fill color for hybrid/typeless NPC lines of sight",
-		position = 13,
+		position = 15,
 		section = npcStylingSection
 	)
 	default Color otherNpcFillColor() { return DEFAULT_COLOR_OTHER_FILL; }
@@ -464,7 +483,7 @@ public interface DynamicLineOfSightConfig extends Config
 		keyName = "otherNpcLineWidth",
 		name = "Hybrid line width",
 		description = "The thickness of the outline for hybrid/typeless NPC lines of sight",
-		position = 14,
+		position = 16,
 		section = npcStylingSection
 	)
 	default double otherNpcLineWidth() { return DEFAULT_LINE_WIDTH; }
@@ -473,7 +492,7 @@ public interface DynamicLineOfSightConfig extends Config
 		keyName = "otherNpcDefs",
 		name = "Hybrid/Typeless NPCs",
 		description = "Format: <NPC_[NAME/ID]>|ATK_RANGE. Configures specific NPC atk ranges using hybrid color styling",
-		position = 15,
+		position = 17,
 		section = npcStylingSection
 	)
 	default String otherNpcDefs() {

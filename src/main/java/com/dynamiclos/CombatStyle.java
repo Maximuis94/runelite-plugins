@@ -25,10 +25,23 @@
 
 package com.dynamiclos;
 
+import lombok.Getter;
+
+@Getter
 public enum CombatStyle
 {
 	MELEE,
 	RANGED,
 	MAGIC,
-	OTHER
+	OTHER;
+
+	String npcOutlineColorKey;
+	String npcFillColorKey;
+
+	CombatStyle()
+	{
+		String lowerCaseName = name().toLowerCase();
+		npcOutlineColorKey = lowerCaseName + "NpcOutlineColor";
+		npcFillColorKey = lowerCaseName + "NpcFillColor";
+	}
 }
