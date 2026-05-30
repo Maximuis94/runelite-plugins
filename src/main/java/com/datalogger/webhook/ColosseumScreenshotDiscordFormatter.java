@@ -182,8 +182,7 @@ public final class ColosseumScreenshotDiscordFormatter
 		}
 		catch (Exception e)
 		{
-			System.err.println("Failed to project data onto screenshot for broadcast: " + e.getMessage());
-			return originalFile; // Fallback to original image if projection fails
+			return originalFile;
 		}
 	}
 
