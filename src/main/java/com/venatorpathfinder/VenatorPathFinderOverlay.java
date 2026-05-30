@@ -338,7 +338,7 @@ public class VenatorPathFinderOverlay extends Overlay
 	/**
 	 * Purely geometric distance check: Returns true if the Chebyshev distance is lesser than or equal to 2
 	 */
-	private boolean finds(int sX, int sY, int tX, int tY)
+	public static boolean finds(int sX, int sY, int tX, int tY)
 	{
 		return Math.max(Math.abs(sX - tX), Math.abs(sY - tY)) <= 2;
 	}
