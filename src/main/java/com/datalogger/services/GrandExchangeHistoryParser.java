@@ -28,6 +28,7 @@ package com.datalogger.services;
 import com.datalogger.DataLoggerConfig;
 import static com.datalogger.constants.Item.InterfaceID.GE_GROUP_ID;
 import static com.datalogger.constants.Item.InterfaceID.GE_HISTORY_CHILD_ID;
+import static com.datalogger.constants.PluginConstants.GRAND_EXCHANGE_DIR;
 import com.datalogger.events.AccountSessionStarted;
 import com.datalogger.models.grandexchange.GrandExchangeHistoryEntry;
 import static com.datalogger.services.FileIOService.INTERNAL_GE_HISTORY_DIR;
@@ -35,6 +36,8 @@ import com.google.gson.Gson;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -69,7 +72,8 @@ public class GrandExchangeHistoryParser
 
 	private long accountHash = -1;
 	private String accountName = null;
-	private File geHistoryLogFile = null;
+	private File internalGeHistoryLogFile = null;
+	private File externalGeHistoryLogFile = null;
 
 	private long parseTimeMillis;
 
@@ -100,8 +104,9 @@ public class GrandExchangeHistoryParser
 	{
 		accountHash = event.getAccountHash();
 		accountName = event.getAccountName();
-		geHistoryLogFile = new File(INTERNAL_GE_HISTORY_DIR, accountHash + ".jsonl");
-
+		internalGeHistoryLogFile = new File(INTERNAL_GE_HISTORY_DIR, accountHash + ".jsonl");
+		File dir = new File(GRAND_EXCHANGE_DIR, accountName);
+		externalGeHistoryLogFile = new File(dir, "exchange-history.jsonl");
 		hasParsed = false;
 		isCacheLoaded = false;
 		recentHistoryCache.clear();
@@ -158,7 +163,7 @@ public class GrandExchangeHistoryParser
 	 */
 	private void loadCacheFromFile()
 	{
-		List<GrandExchangeHistoryEntry> fileEntries = fileIOService.readJsonlFile(geHistoryLogFile, GrandExchangeHistoryEntry.class);
+		List<GrandExchangeHistoryEntry> fileEntries = fileIOService.readJsonlFile(internalGeHistoryLogFile, GrandExchangeHistoryEntry.class);
 
 		if (fileEntries == null || fileEntries.isEmpty()) return;
 
@@ -256,17 +261,38 @@ public class GrandExchangeHistoryParser
 			List<GrandExchangeHistoryEntry> toAppend = new ArrayList<>(newEntries);
 			Collections.reverse(toAppend);
 
-			try (FileWriter writer = new FileWriter(geHistoryLogFile, true))
+			boolean writeSuccess = false;
+			try (FileWriter writer = new FileWriter(internalGeHistoryLogFile, true))
 			{
 				for (GrandExchangeHistoryEntry entry : toAppend)
 				{
 					writer.write(gson.toJson(entry) + "\n");
 				}
 				log.debug("Successfully appended {} new GE History entries.", toAppend.size());
+				writeSuccess = true;
 			}
 			catch (IOException e)
 			{
 				log.error("Failed to append to GE history log file", e);
+			}
+
+			// Copy the updated internal file to the external directory if the write succeeded
+			if (writeSuccess && internalGeHistoryLogFile != null && internalGeHistoryLogFile.exists())
+			{
+				try
+				{
+					File parentDir = externalGeHistoryLogFile.getParentFile();
+					if (parentDir != null && !parentDir.exists())
+					{
+						parentDir.mkdirs();
+					}
+					Files.copy(internalGeHistoryLogFile.toPath(), externalGeHistoryLogFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+					log.debug("Successfully copied GE history to external file.");
+				}
+				catch (IOException e)
+				{
+					log.error("Failed to copy internal GE history file to external directory", e);
+				}
 			}
 
 			recentHistoryCache.addAll(0, newEntries);

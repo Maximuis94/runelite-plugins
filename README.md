@@ -74,12 +74,12 @@ If enabled, completed Grand Exchange offers are logged upon the moment they are 
 _An example entry of a completed Grand Exchange offer submitted to a JSON file_
 
 Grand exchange offers are stored internally in a JSONL file. After this file is updated, JSON/CSV files are written/appended as well, depending on configurations.
-The naming format can also be configured and this may bundle completed offer per day/week/month. Files produced by the Grand Exchange logger are stored in the `.runelite/grand-exchange/completed/<ACCOUNT_NAME>` directory.
+The naming format can also be configured and this may bundle completed offer per day/week/month. Files produced by the Grand Exchange logger are stored in the `.runelite/data-logger/grand-exchange/completed/<ACCOUNT_NAME>` directory.
 
 
 #### Grand Exchange History
 
-The Grand Exchange history UI is parsed whenever it is opened. Its entries are exported to `.runelite/grand-exchange/history/<ACCOUNT_NAME>`. Though the history entries are less informative, they may still catch offers that have been missed for whatever reason and the tax value tends to be more precise. History entries are only logged after opening the UI. They are also checked for duplicates in the 40 most recent submissions.
+The Grand Exchange history UI is parsed whenever it is opened. Its entries are exported to `.runelite/data-logger/grand-exchange/history/<ACCOUNT_NAME>`. Though the history entries are less informative, they may still catch offers that have been missed for whatever reason and the tax value tends to be more precise. History entries are only logged after opening the UI. They are also checked for duplicates in the 40 most recent submissions.
 History entries are tracked separately from regular completed exchange offers.
 
 
