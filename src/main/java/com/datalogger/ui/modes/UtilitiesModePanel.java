@@ -277,7 +277,7 @@ public class UtilitiesModePanel extends JPanel
 		panel.add(exportAggregatedVaultButton());
 		panel.add(mergedColosseumWaveLogsButton());
 
-		JButton exportHistoricalGeBtn = createStyledButton("Export Historical GE Data", e -> exportHistoricalGeData());
+		JButton exportHistoricalGeBtn = createStyledButton("Export GE logs", e -> exportHistoricalGeData());
 		exportHistoricalGeBtn.setToolTipText("Exports all accounts' internal GE history based on configured File Strategies.");
 		panel.add(exportHistoricalGeBtn);
 

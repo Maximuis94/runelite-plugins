@@ -297,8 +297,7 @@ public class GrandExchangeExportService
 				dateSuffix = "";
 		}
 
-		// Align with enum naming ("exchange-offers_2026..." for CSV vs "exchange-offers-2026..." for JSON)
-		String separator = extension.equals(".csv") ? "_" : "";
+		String separator = dateSuffix.isEmpty() ? "" : "_";
 		return new File(root, "exchange-offers" + separator + dateSuffix + extension);
 	}
 

@@ -5,7 +5,7 @@
 
 ### Summary
 - Added this changelog
-- Reorganized folder structure
+- Reorganized directories used
 - Added supply tracker
 - Additional value tracking during Colosseum trials
 - Added discord webhook
