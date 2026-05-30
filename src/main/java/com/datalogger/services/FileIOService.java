@@ -510,8 +510,7 @@ public class FileIOService
 		Future<?> futureInternal = executor.submit(() -> {
 			ensureDirectoryExists(INTERNAL_COLOSSEUM_TRIAL_HISTORY.getParentFile());
 
-			Gson flatGson = new Gson();
-			String jsonLine = flatGson.toJson(attemptDto);
+			String jsonLine = gson.toJson(attemptDto);
 
 			try (FileWriter fw = new FileWriter(INTERNAL_COLOSSEUM_TRIAL_HISTORY, true);
 				 BufferedWriter bw = new BufferedWriter(fw);
