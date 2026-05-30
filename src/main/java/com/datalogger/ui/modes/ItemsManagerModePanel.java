@@ -6,10 +6,10 @@
  * modification, are permitted provided that the following conditions are met:
  *
  * 1. Redistributions of source code must retain the above copyright notice, this
- * list of conditions and the following disclaimer.
+ *    list of conditions and the following disclaimer.
  * 2. Redistributions in binary form must reproduce the above copyright notice,
- * this list of conditions and the following disclaimer in the documentation
- * and/or other materials provided with the distribution.
+ *    this list of conditions and the following disclaimer in the documentation
+ *    and/or other materials provided with the distribution.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
@@ -27,14 +27,14 @@ package com.datalogger.ui.modes;
 
 import com.datalogger.DataLoggerConfig;
 import static com.datalogger.constants.Item.CACHED_ITEM_DATA_TYPE;
-import static com.datalogger.constants.PluginConstants.INTERNAL_VAULT_DIR;
 import com.datalogger.constants.PluginConstants;
+import static com.datalogger.constants.PluginConstants.INTERNAL_VAULT_DIR;
 import com.datalogger.models.enums.UIScrollSpeed;
 import com.datalogger.models.itemvault.BankedItem;
 import com.datalogger.services.AccountHashMapper;
 import com.datalogger.ui.utils.Components;
-import com.datalogger.ui.utils.Models.VaultItem;
 import com.datalogger.ui.utils.Models.AccountItem;
+import com.datalogger.ui.utils.Models.VaultItem;
 import com.google.gson.Gson;
 import java.awt.BorderLayout;
 import java.awt.Color;
