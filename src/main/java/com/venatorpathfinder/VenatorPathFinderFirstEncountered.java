@@ -25,20 +25,20 @@
 
 package com.venatorpathfinder;
 
-import com.venatorpathfinder.node.VenatorPathNode;
 import com.venatorpathfinder.node.VenatorNodeSize1;
 import com.venatorpathfinder.node.VenatorNodeSize2;
 import com.venatorpathfinder.node.VenatorNodeSize3;
 import com.venatorpathfinder.node.VenatorNodeSize4;
 import com.venatorpathfinder.node.VenatorNodeSize5;
+import com.venatorpathfinder.node.VenatorPathNode;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import net.runelite.api.Client;
 import net.runelite.api.NPC;
-import net.runelite.api.coords.WorldPoint;
 import net.runelite.api.coords.WorldArea;
+import net.runelite.api.coords.WorldPoint;
 
 @Singleton
 public class VenatorPathFinderFirstEncountered

@@ -6,10 +6,10 @@
  * modification, are permitted provided that the following conditions are met:
  *
  * 1. Redistributions of source code must retain the above copyright notice, this
- * 	list of conditions and the following disclaimer.
+ *    list of conditions and the following disclaimer.
  * 2. Redistributions in binary form must reproduce the above copyright notice,
- * 	this list of conditions and the following disclaimer in the documentation
- * 	and/or other materials provided with the distribution.
+ *    this list of conditions and the following disclaimer in the documentation
+ *    and/or other materials provided with the distribution.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
@@ -25,20 +25,20 @@
 
 package com.venatorpathfinder;
 
-import com.venatorpathfinder.node.VenatorPathNode;
 import com.venatorpathfinder.node.VenatorNodeSize1;
 import com.venatorpathfinder.node.VenatorNodeSize2;
 import com.venatorpathfinder.node.VenatorNodeSize3;
 import com.venatorpathfinder.node.VenatorNodeSize4;
 import com.venatorpathfinder.node.VenatorNodeSize5;
+import com.venatorpathfinder.node.VenatorPathNode;
 import java.util.HashMap;
 import java.util.Map;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import net.runelite.api.Client;
 import net.runelite.api.NPC;
-import net.runelite.api.coords.WorldPoint;
 import net.runelite.api.coords.WorldArea;
+import net.runelite.api.coords.WorldPoint;
 
 @Singleton
 public class VenatorPathFinderLowestIndex
