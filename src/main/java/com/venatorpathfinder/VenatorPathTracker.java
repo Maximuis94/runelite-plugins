@@ -26,6 +26,7 @@
 package com.venatorpathfinder;
 
 import com.google.gson.Gson;
+import com.venatorpathfinder.node.VenatorPathNode;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.FileWriter;
@@ -54,24 +55,28 @@ public class VenatorPathTracker
 	private final Client client;
 	private final DrawManager drawManager;
 	private final Gson gson;
-
-	private static final int VENATOR_ATTACK_SOUND = 4022;
-	private static final int VENATOR_BOUNCE_SOUND = 4023;
+	private final VenatorPathFinderLowestIndex pathFinder;
+//	private final VenatorPathFinderFirstEncountered pathFinder; // Add this line
 
 	private boolean isTracking = false;
 	private int ticksSinceAttack = 0;
 	private int expectedPathSize = 1;
 
+	private static final File ROOT = new File(RuneLite.RUNELITE_DIR, "venator-path-finder");
+	private static final File JSON_ROOT = new File(ROOT, "json");
+	private static final File CSV_FILE = new File(ROOT, "venator-paths.csv");
+	private static final File IMG_ROOT = new File(ROOT, "image");
+
 	private final List<NPC> currentPath = new ArrayList<>();
 
 	@Inject
-	public VenatorPathTracker(Client client, DrawManager drawManager, Gson gson)
+	public VenatorPathTracker(Client client, DrawManager drawManager, Gson gson, VenatorPathFinderLowestIndex pathFinder)
 	{
 		this.client = client;
 		this.drawManager = drawManager;
 
-		// We configure Gson to pretty-print so it's readable by humans if needed
 		this.gson = gson.newBuilder().setPrettyPrinting().create();
+		this.pathFinder = pathFinder;
 	}
 
 	@Subscribe
@@ -79,7 +84,7 @@ public class VenatorPathTracker
 	{
 		int soundId = event.getSoundId();
 
-		if (soundId == VENATOR_ATTACK_SOUND)
+		if (soundId == VenatorPathFinderPlugin.VENATOR_ATTACK_SOUND)
 		{
 			if (isTracking && !currentPath.isEmpty())
 			{
@@ -88,12 +93,19 @@ public class VenatorPathTracker
 
 			isTracking = true;
 			ticksSinceAttack = 0;
-			expectedPathSize = 1;
+			expectedPathSize = 1; // Base attack is 1 hit
 			currentPath.clear();
 		}
-		else if (isTracking && soundId == VENATOR_BOUNCE_SOUND)
+		else if (isTracking)
 		{
-			expectedPathSize++;
+			if (soundId == VenatorPathFinderPlugin.VENATOR_BOUNCE_SOUND_1)
+			{
+				expectedPathSize = Math.max(expectedPathSize, 2);
+			}
+			else if (soundId == VenatorPathFinderPlugin.VENATOR_BOUNCE_SOUND_2)
+			{
+				expectedPathSize = Math.max(expectedPathSize, 3);
+			}
 		}
 	}
 
@@ -110,7 +122,6 @@ public class VenatorPathTracker
 			NPC target = (NPC) event.getActor();
 			currentPath.add(target);
 
-			// SCREENSHOT & JSON TRIGGER: 3rd hitsplat within 4 ticks
 			if (currentPath.size() == 3 && ticksSinceAttack <= 4)
 			{
 				finalizeTrack();
@@ -143,12 +154,50 @@ public class VenatorPathTracker
 			return;
 		}
 
+		// --- PREDICTION GENERATION & COMPARISON ---
+		NPC initialTarget = currentPath.get(0);
+		VenatorPathNode[] predictedNodes = pathFinder.findPath(initialTarget);
+		List<NPC> predictedNpcs = new ArrayList<>();
+
+		if (predictedNodes != null)
+		{
+			for (int i = 0; i < 3; i++)
+			{
+				if (predictedNodes[i] != null && predictedNodes[i].getNpc() != null)
+				{
+					predictedNpcs.add(predictedNodes[i].getNpc());
+				}
+			}
+		}
+
+		boolean matchesPrediction = currentPath.size() == predictedNpcs.size();
+		if (matchesPrediction)
+		{
+			for (int i = 0; i < currentPath.size(); i++)
+			{
+				if (currentPath.get(i).getIndex() != predictedNpcs.get(i).getIndex())
+				{
+					matchesPrediction = false;
+					break;
+				}
+			}
+		}
+
+		// --- PATHLESS SKIP LOGIC ---
+		// If both the actual path and the predicted path only contain 1 hit, discard the log entirely.
+		if (currentPath.size() == 1 && predictedNpcs.size() == 1)
+		{
+			isTracking = false;
+			currentPath.clear();
+			return;
+		}
+		// ------------------------------------------
+
 		long timestamp = System.currentTimeMillis();
 
-		logCsvData();
+		logCsvData(matchesPrediction);
 		exportEnvironmentJson(timestamp);
 
-		// Only screenshot if it was a full 3-hit path
 		if (currentPath.size() == 3)
 		{
 			takeScreenshot(timestamp);
@@ -158,10 +207,27 @@ public class VenatorPathTracker
 		currentPath.clear();
 	}
 
-	private void logCsvData()
+	private void logCsvData(boolean matchesPrediction)
 	{
-		StringBuilder sb = new StringBuilder("VenatorData,");
-		sb.append(expectedPathSize).append(",").append(currentPath.size()).append(",");
+		// 1. Check if the file exists BEFORE the FileWriter creates it
+		boolean isNewFile = !CSV_FILE.exists();
+
+		StringBuilder sb = new StringBuilder();
+
+		// 2. Append the header if it is a brand new file
+		if (isNewFile)
+		{
+			// Added 'MatchesPrediction' as the first column
+			sb.append("MatchesPrediction,ExpectedPathSize,ActualPathSize,")
+				.append("Npc1_ID,Npc1_Name,Npc1_Index,Npc1_RegX,Npc1_RegY,")
+				.append("Npc2_ID,Npc2_Name,Npc2_Index,Npc2_RegX,Npc2_RegY,")
+				.append("Npc3_ID,Npc3_Name,Npc3_Index,Npc3_RegX,Npc3_RegY\n");
+		}
+
+		// Append the actual data
+		sb.append(matchesPrediction).append(",")
+			.append(expectedPathSize).append(",")
+			.append(currentPath.size()).append(",");
 
 		for (int i = 0; i < 3; i++)
 		{
@@ -169,16 +235,39 @@ public class VenatorPathTracker
 			{
 				NPC npc = currentPath.get(i);
 				sb.append(npc.getId()).append(",")
+					.append(npc.getName()).append(",")
 					.append(npc.getIndex()).append(",")
 					.append(npc.getWorldLocation().getX()).append(",")
 					.append(npc.getWorldLocation().getY()).append(",");
 			}
 			else
 			{
-				sb.append("NONE,-1,-1,-1,");
+				sb.append("-1,NONE,-1,-1,-1,");
 			}
 		}
-		log.info(sb.toString());
+
+		// Remove the trailing comma to keep the CSV clean
+		if (sb.length() > 0 && sb.charAt(sb.length() - 1) == ',')
+		{
+			sb.deleteCharAt(sb.length() - 1);
+		}
+
+		sb.append("\n");
+
+		// Ensure directory exists, then write to the file
+		try
+		{
+			CSV_FILE.getParentFile().mkdirs();
+
+			try (FileWriter writer = new FileWriter(CSV_FILE, true))
+			{
+				writer.write(sb.toString());
+			}
+		}
+		catch (Exception e)
+		{
+			log.error("Failed to write Venator data to CSV file", e);
+		}
 	}
 
 	/**
@@ -230,9 +319,8 @@ public class VenatorPathTracker
 			}
 
 			// Write to File
-			File dir = new File(RuneLite.RUNELITE_DIR, "screenshots/VenatorTracker");
-			dir.mkdirs();
-			File file = new File(dir, "Path-" + timestamp + ".json");
+			JSON_ROOT.mkdirs();
+			File file = new File(JSON_ROOT, "Path-" + timestamp + ".json");
 
 			try (FileWriter writer = new FileWriter(file))
 			{
@@ -253,10 +341,9 @@ public class VenatorPathTracker
 			BufferedImage bufferedImage = (BufferedImage) image;
 			try
 			{
-				File dir = new File(RuneLite.RUNELITE_DIR, "screenshots/VenatorTracker");
-				dir.mkdirs();
-				File file = new File(dir, "Path-" + timestamp + ".png");
-				ImageIO.write(bufferedImage, "png", file);
+				IMG_ROOT.mkdirs();
+				File file = new File(IMG_ROOT, "Path-" + timestamp + ".jpeg");
+				ImageIO.write(bufferedImage, "jpg", file);
 				log.info("Saved Venator screenshot to: {}", file.getAbsolutePath());
 			}
 			catch (Exception e)

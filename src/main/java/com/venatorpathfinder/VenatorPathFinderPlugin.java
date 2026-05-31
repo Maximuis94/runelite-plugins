@@ -30,11 +30,15 @@ import net.runelite.api.Client;
 import net.runelite.api.EquipmentInventorySlot;
 import net.runelite.api.Item;
 import net.runelite.api.ItemContainer;
+import net.runelite.api.NPC;
+import net.runelite.api.Player;
 import net.runelite.api.events.ItemContainerChanged;
+import net.runelite.api.events.SoundEffectPlayed;
 import net.runelite.api.events.VarbitChanged;
 import static net.runelite.api.gameval.ItemID.VENATOR_BOW;
 import static net.runelite.api.gameval.VarbitID.MULTIWAY_INDICATOR;
 import net.runelite.client.config.ConfigManager;
+import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.game.ItemVariationMapping;
@@ -51,6 +55,9 @@ import net.runelite.client.ui.overlay.OverlayManager;
 public class VenatorPathFinderPlugin extends Plugin
 {
 	public static final String CONFIG_GROUP = "venatorpathfinder";
+	public static final int VENATOR_ATTACK_SOUND = 6797;
+	public static final int VENATOR_BOUNCE_SOUND_1 = 6672;
+	public static final int VENATOR_BOUNCE_SOUND_2 = 6735;
 
 	@Inject
 	private OverlayManager overlayManager;
@@ -61,20 +68,48 @@ public class VenatorPathFinderPlugin extends Plugin
 	@Inject
 	private Client client;
 
+	@Inject
+	private EventBus eventBus;
+
+	@Inject
+	private VenatorPathFinderConfig config;
+
 	private final static int WEAPON_SLOT_INDEX = EquipmentInventorySlot.WEAPON.getSlotIdx();
 	private final static int INVENTORY_ID_EQUIPPED = net.runelite.api.gameval.InventoryID.WORN;
 	private final static int VENATOR_BOW_ITEM_ID = ItemVariationMapping.map(VENATOR_BOW);
+	public final static int IN_RANGE_RADIUS = 10;
+
+	private boolean debugLoggerRegistered = false;
+
+	@Inject
+	private VenatorPathTracker venatorPathTracker;
+
+	private void toggleDebugLogger(boolean isEnabled)
+	{
+		if (isEnabled && !debugLoggerRegistered)
+		{
+			eventBus.register(venatorPathTracker);
+			debugLoggerRegistered = true;
+		}
+		else if (!isEnabled && debugLoggerRegistered)
+		{
+			eventBus.unregister(venatorPathTracker);
+			debugLoggerRegistered = false;
+		}
+	}
 
 	@Override
 	protected void startUp()
 	{
 		overlayManager.add(overlay);
+		toggleDebugLogger(debugLoggingEnabled());
 	}
 
 	@Override
 	protected void shutDown()
 	{
 		overlayManager.remove(overlay);
+		toggleDebugLogger(false);
 	}
 
 	@Subscribe
@@ -83,6 +118,19 @@ public class VenatorPathFinderPlugin extends Plugin
 		if (event.getVarbitId() == MULTIWAY_INDICATOR)
 		{
 			overlay.setInMultiCombat(client.getVarbitValue(MULTIWAY_INDICATOR) == 1);
+		}
+	}
+
+	@Subscribe
+	public void onSoundEffectPlayed(SoundEffectPlayed event)
+	{
+		if (event.getSoundId() == VENATOR_ATTACK_SOUND)
+		{
+			Player player = client.getLocalPlayer();
+			if (player != null && player.getInteracting() instanceof NPC)
+			{
+				overlay.notifyAttack((NPC) player.getInteracting(), client.getTickCount());
+			}
 		}
 	}
 
@@ -96,10 +144,18 @@ public class VenatorPathFinderPlugin extends Plugin
 		overlay.setHasEquippedVenatorBow(weapon != null && ItemVariationMapping.map(weapon.getId()) == VENATOR_BOW_ITEM_ID);
 	}
 
+	public boolean debugLoggingEnabled()
+	{
+		return config.debugLoggingJsonEnabled() || config.debugLoggingScreenshotEnabled() || config.debugLoggingCsvEnabled();
+	}
+
 	@Subscribe
 	public void onConfigChanged(ConfigChanged event)
 	{
-		if (event.getGroup().equals(CONFIG_GROUP)) overlay.parseConfigs();
+		if (!event.getGroup().equals(CONFIG_GROUP)) return;
+
+		overlay.parseConfigs();
+		toggleDebugLogger(debugLoggingEnabled());
 	}
 
 	@Provides

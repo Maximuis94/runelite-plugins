@@ -25,15 +25,21 @@
 
 package com.venatorpathfinder.node;
 
-public interface VenatorNode
+import net.runelite.api.NPC;
+import net.runelite.api.coords.WorldPoint;
+
+/**
+ * Npc as a node within a venator bow's path
+ */
+public interface VenatorPathNode
 {
 	int getIndex();
 
+	NPC getNpc();
+
 	int getSize();
 
-	boolean canSend(VenatorNode recipient);
-
-	boolean canAccept(VenatorNode sender);
+	boolean inRange(WorldPoint wp);
 
 	int getSouthWestX();
 

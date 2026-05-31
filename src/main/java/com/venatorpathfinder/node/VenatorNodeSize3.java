@@ -25,9 +25,11 @@
 
 package com.venatorpathfinder.node;
 
-import com.venatorpathfinder.VenatorPathFinderOverlay;
+import static com.venatorpathfinder.VenatorPathFinderPlugin.IN_RANGE_RADIUS;
+import net.runelite.api.NPC;
+import net.runelite.api.coords.WorldPoint;
 
-public class VenatorNodeSize3 implements VenatorNode
+public class VenatorNodeSize3 implements VenatorPathNode
 {
 	private final int npcIndex;
 
@@ -40,10 +42,12 @@ public class VenatorNodeSize3 implements VenatorNode
 
 	private final int[] fromX;
 	private final int[] fromY;
+	private final NPC npc;
 
-	public VenatorNodeSize3(int npcIndex, int x, int y)
+	public VenatorNodeSize3(NPC npc, int x, int y)
 	{
-		this.npcIndex = npcIndex;
+		this.npcIndex = npc.getIndex();
+		this.npc = npc;
 		swX = x;
 		swY = y;
 
@@ -64,64 +68,21 @@ public class VenatorNodeSize3 implements VenatorNode
 	}
 
 	@Override
+	public NPC getNpc()
+	{
+		return npc;
+	}
+
+	@Override
 	public int getSize()
 	{
 		return 3;
 	}
 
-	// Sends from CENTER tile
 	@Override
-	public boolean canSend(VenatorNode recipient)
+	public boolean inRange(WorldPoint wp)
 	{
-		int tSwX = recipient.getSouthWestX();
-		int tSwY = recipient.getSouthWestY();
-		int tCX = recipient.getCenterX();
-		int tCY = recipient.getCenterY();
-
-		return VenatorPathFinderOverlay.finds(cX, cY, tSwX, tSwY) && VenatorPathFinderOverlay.finds(cX, cY, tCX, tCY);
-	}
-
-	/**
-	 * 5x5 accepts bounce to it, if targeting monster passes these rules.
-	 * Odd sized (1x1,3x3,5x5) needs to find 5x5's CENTRE and SW tiles.
-	 * 2x2 needs to find 5x5's CENTRE and CENTRE SW tiles.
-	 * 4x4 needs to find 5x5's SW and CENTRE SW tiles.
-	 */
-	@Override
-	public boolean canAccept(VenatorNode sender)
-	{
-		int senderX;
-		int senderY;
-		switch (sender.getSize())
-		{
-			// 1x1, 3x3, and 5x5 sends bounce if it finds targets SW and CENTRE tile from its CENTRE tile.
-			case 1:
-			case 3:
-			case 5:
-				senderX = sender.getCenterX();
-				senderY = sender.getCenterY();
-				return VenatorPathFinderOverlay.finds(senderX, senderY, swX, swY) && VenatorPathFinderOverlay.finds(senderX, senderY, cX, cY) ;
-
-				// If it finds targets CENTRE and CENTRE SW tile from any of its tiles (monster is ≥ 4x4).
-			case 2:
-				senderX = sender.getSouthWestX();
-				senderY = sender.getSouthWestY();
-				return VenatorPathFinderOverlay.finds(senderX, senderY, cX, cY) ||
-					VenatorPathFinderOverlay.finds(senderX+1, senderY, cX, cY) ||
-					VenatorPathFinderOverlay.finds(senderX, senderY+1, cX, cY) ||
-					VenatorPathFinderOverlay.finds(senderX+1, senderY+1, cX, cY);
-
-				// 4x4 needs to find 5x5's SW and CENTRE SW tiles from any of its middle 2x2 tiles.
-			case 4:
-				senderX = sender.getCenterSouthWestX();
-				senderY = sender.getCenterSouthWestY();
-				return VenatorPathFinderOverlay.finds(senderX, senderY, swX, swY) ||
-					VenatorPathFinderOverlay.finds(senderX+1, senderY, swX,swY) ||
-					VenatorPathFinderOverlay.finds(senderX, senderY+1, swX, swY) ||
-					VenatorPathFinderOverlay.finds(senderX+1, senderY+1, swX, swY);
-			default:
-				return false;
-		}
+		return Math.max(Math.abs(swX - wp.getX()), Math.abs(swY - wp.getY())) <= IN_RANGE_RADIUS;
 	}
 
 	@Override

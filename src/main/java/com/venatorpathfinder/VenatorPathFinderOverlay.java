@@ -25,23 +25,22 @@
 
 package com.venatorpathfinder;
 
+import com.venatorpathfinder.node.VenatorPathNode;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics2D;
-import java.awt.Point;
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import javax.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
+import net.runelite.api.Actor;
 import net.runelite.api.Client;
 import net.runelite.api.MenuEntry;
 import net.runelite.api.NPC;
 import net.runelite.api.Player;
 import net.runelite.api.WorldView;
 import net.runelite.api.coords.WorldArea;
-import net.runelite.api.coords.WorldPoint;
 import net.runelite.client.ui.overlay.Overlay;
 import net.runelite.client.ui.overlay.OverlayLayer;
 import net.runelite.client.ui.overlay.OverlayPosition;
@@ -61,23 +60,36 @@ public class VenatorPathFinderOverlay extends Overlay
 	private boolean shouldRenderPath = false;
 	private boolean drawOnlyOnePath = false;
 	private boolean limitPathSize = false;
+	private boolean drawPathOfTargetedNpc = false; // Add this line
 
 	private Color initialTargetOutline;
 	private Color firstBounceOutline;
 	private Color secondBounceOutline;
 	private Color boomerangBounceOutline;
 
+	private boolean lingeringOutline = false;
+	private NPC lastSourceNpc = null;
+
 	private int outlineWidth;
 	private int outlineFeather;
 
-	private int plane = 0;
 
+	// Add this to your class variables
+	private final VenatorPathFinderExhaustive pathFinderExhaustive;
+	private final VenatorPathFinderLowestIndex pathFinderLowestIndex;
+
+	private final Set<NPC> b1Npcs = new HashSet<>();
+	private final Set<NPC> b2Npcs = new HashSet<>();
+
+	// Update your constructor to include the pathFinder
 	@Inject
-	private VenatorPathFinderOverlay(Client client, VenatorPathFinderConfig config, ModelOutlineRenderer modelOutlineRenderer)
+	private VenatorPathFinderOverlay(Client client, VenatorPathFinderConfig config, ModelOutlineRenderer modelOutlineRenderer, VenatorPathFinderExhaustive pathFinder, VenatorPathFinderLowestIndex pathFinderLowestIndex)
 	{
 		this.client = client;
 		this.config = config;
 		this.modelOutlineRenderer = modelOutlineRenderer;
+		this.pathFinderExhaustive = pathFinder;
+		this.pathFinderLowestIndex = pathFinderLowestIndex;
 		setPosition(OverlayPosition.DYNAMIC);
 		setLayer(OverlayLayer.ABOVE_SCENE);
 		parseConfigs();
@@ -108,6 +120,10 @@ public class VenatorPathFinderOverlay extends Overlay
 		ignoreVenatorBowCondition = config.ignoreVenatorBowPrerequisite();
 		drawOnlyOnePath = config.drawOnlyOnePath();
 		limitPathSize = config.limitPathSize();
+
+		boolean screenshotLoggerEnabled = config.debugLoggingScreenshotEnabled();
+		drawPathOfTargetedNpc = config.drawPathOfTargetedNpc() || screenshotLoggerEnabled;
+
 		updateShouldRenderPath();
 	}
 
@@ -127,220 +143,158 @@ public class VenatorPathFinderOverlay extends Overlay
 		WorldArea playerArea = player.getWorldArea();
 		if (playerArea == null) return null;
 
-		plane = playerArea.getPlane();
-
-		MenuEntry[] menuEntries = client.getMenu().getMenuEntries();
-		if (menuEntries.length == 0 || client.isMenuOpen()) return null;
-
-		MenuEntry topEntry = menuEntries[menuEntries.length - 1];
-		NPC hoveredNpc = topEntry.getNpc();
-
-		if (!isAttackable(hoveredNpc)) return null;
-
-		DeflectingNpc dHoveredNpc = new DeflectingNpc(hoveredNpc);
-
+		NPC hoverNpc = null;
+		NPC combatNpc = null;
 		WorldView worldView = client.getTopLevelWorldView();
 
-		List<NPC> validNpcs = new ArrayList<>();
-		for (NPC npc : worldView.npcs())
+		MenuEntry[] menuEntries = client.getMenu().getMenuEntries();
+		if (menuEntries.length > 0 && !client.isMenuOpen())
 		{
-			if (isAttackable(npc))
+			MenuEntry topEntry = menuEntries[menuEntries.length - 1];
+			NPC hoveredNpc = topEntry.getNpc();
+
+			if (isAttackable(hoveredNpc))
 			{
-				if (hoveredNpc.getWorldLocation().distanceTo(npc.getWorldLocation()) <= 15)
-				{
-					validNpcs.add(npc);
-				}
+				hoverNpc = hoveredNpc;
 			}
 		}
 
-		Set<NPC> bounce1 = new HashSet<>();
-		Set<NPC> bounce2 = new HashSet<>();
-		boolean returnsToSender = false;
-
-		List<NPC> b1Candidates = new ArrayList<>(validNpcs);
-		b1Candidates.sort(this::compareNpcsByCoordinate);
-
-		for (NPC b1 : b1Candidates)
+		if (drawPathOfTargetedNpc)
 		{
-			if (b1 == hoveredNpc) continue;
-
-			DeflectingNpc dB1 = new DeflectingNpc(b1);
-			List<Point> hoveredSenderTiles = dHoveredNpc.getSenderTiles();
-			if (hoveredSenderTiles.isEmpty())
+			Actor interacting = player.getInteracting();
+			if (interacting instanceof NPC)
 			{
-				continue;
+				NPC interactingNpc = (NPC) interacting;
+				if (isAttackable(interactingNpc))
+				{
+					combatNpc = interactingNpc;
+				}
 			}
 
-			if (canBounce(worldView, dHoveredNpc, dB1, hoveredSenderTiles) && hasNpcLineOfSight(worldView, hoveredNpc.getWorldArea(), b1.getWorldArea()))
+			if (combatNpc == null && soundTargetNpc != null && (client.getTickCount() - lastAttackTick <= 4))
 			{
-				bounce1.add(b1);
-
-				if (limitPathSize)
+				for (NPC npc : worldView.npcs())
 				{
-					if (drawOnlyOnePath) break;
-					else continue;
-				}
-
-				List<Point> b1SenderTiles = dB1.getSenderTiles();
-				if (b1SenderTiles.isEmpty())
-				{
-					continue;
-				}
-
-				List<NPC> b2Candidates = new ArrayList<>(validNpcs);
-				b2Candidates.sort(this::compareNpcsByCoordinate);
-
-				for (NPC b2 : b2Candidates)
-				{
-					if (b2 == b1) continue;
-					DeflectingNpc dB2 = new DeflectingNpc(b2);
-
-					if (canBounce(worldView, dB1, dB2, b1SenderTiles) && hasNpcLineOfSight(worldView, b1.getWorldArea(), b2.getWorldArea()))
+					if (npc == soundTargetNpc)
 					{
-						if (b2 == hoveredNpc)
-						{
-							returnsToSender = true;
-						}
-						else
-						{
-							bounce2.add(b2);
-						}
+						combatNpc = soundTargetNpc;
+						break;
+					}
+				}
+			}
 
-						if (drawOnlyOnePath) break;
+			if (combatNpc != null)
+			{
+				lastSourceNpc = combatNpc;
+			}
+			else if (lastSourceNpc != null)
+			{
+				boolean isStillVisible = false;
+				for (NPC npc : worldView.npcs())
+				{
+					if (npc == lastSourceNpc)
+					{
+						isStillVisible = true;
+						break;
 					}
 				}
 
-				if (drawOnlyOnePath) break;
+				if (isStillVisible)
+				{
+					combatNpc = lastSourceNpc;
+				}
+				else
+				{
+					lastSourceNpc = null;
+				}
 			}
 		}
-
-		if (returnsToSender) {
-			modelOutlineRenderer.drawOutline(hoveredNpc, outlineWidth+1, boomerangBounceOutline, outlineFeather);
-		} else if (!bounce1.isEmpty()) {
-			modelOutlineRenderer.drawOutline(hoveredNpc, outlineWidth, initialTargetOutline, outlineFeather);
+		else
+		{
+			lastSourceNpc = null;
 		}
 
-		for (NPC n : bounce1) modelOutlineRenderer.drawOutline(n, outlineWidth, firstBounceOutline, outlineFeather);
-		for (NPC n : bounce2)
+		NPC sourceNpc = hoverNpc != null ? hoverNpc : combatNpc;
+
+		if (sourceNpc == null) return null;
+
+
+
+
+		if (drawOnlyOnePath)
 		{
-			if (!bounce1.contains(n)) {
-				modelOutlineRenderer.drawOutline(n, outlineWidth, secondBounceOutline, outlineFeather);
+			VenatorPathNode[] singlePath = pathFinderLowestIndex.findPath(sourceNpc);
+			if (singlePath == null || singlePath.length < 2) return null;
+
+			NPC first = singlePath[1] != null ? singlePath[1].getNpc() : null;
+
+			if (first == null) return null;
+
+			NPC second = null;
+			// Apply limitPathSize filter to the single path view as well
+			if (!limitPathSize && singlePath.length > 2 && singlePath[2] != null)
+			{
+				second = singlePath[2].getNpc();
+			}
+
+			boolean returnsToSender = second != null && sourceNpc.getIndex() == second.getIndex();
+
+			if (returnsToSender) {
+				modelOutlineRenderer.drawOutline(sourceNpc, outlineWidth+1, boomerangBounceOutline, outlineFeather);
+			} else {
+				modelOutlineRenderer.drawOutline(sourceNpc, outlineWidth, initialTargetOutline, outlineFeather);
+
+				if (second != null)
+					modelOutlineRenderer.drawOutline(second, outlineWidth, secondBounceOutline, outlineFeather);
+			}
+			modelOutlineRenderer.drawOutline(first, outlineWidth, firstBounceOutline, outlineFeather);
+		}
+		else
+		{
+			b1Npcs.clear();
+			b2Npcs.clear();
+			boolean returnsToSender = false;
+
+			List<VenatorPathNode[]> allPaths = pathFinderExhaustive.getPaths(sourceNpc);
+
+			for (VenatorPathNode[] path : allPaths)
+			{
+				if (path.length > 1 && path[1] != null)
+				{
+					b1Npcs.add(path[1].getNpc());
+				}
+
+				if (!limitPathSize && path.length > 2 && path[2] != null)
+				{
+					NPC b2 = path[2].getNpc();
+					if (b2.getIndex() == sourceNpc.getIndex())
+					{
+						returnsToSender = true; // Boomerang detected
+					}
+					else
+					{
+						b2Npcs.add(b2);
+					}
+				}
+			}
+
+			if (returnsToSender) {
+				modelOutlineRenderer.drawOutline(sourceNpc, outlineWidth+1, boomerangBounceOutline, outlineFeather);
+			} else if (!b1Npcs.isEmpty()) {
+				modelOutlineRenderer.drawOutline(sourceNpc, outlineWidth, initialTargetOutline, outlineFeather);
+			}
+
+			for (NPC n : b1Npcs) modelOutlineRenderer.drawOutline(n, outlineWidth, firstBounceOutline, outlineFeather);
+
+			for (NPC n : b2Npcs)
+			{
+				if (!b1Npcs.contains(n)) {
+					modelOutlineRenderer.drawOutline(n, outlineWidth, secondBounceOutline, outlineFeather);
+				}
 			}
 		}
 
 		return null;
-	}
-
-	private int compareNpcsByCoordinate(NPC n1, NPC n2)
-	{
-		int x1 = n1.getWorldLocation().getX();
-		int x2 = n2.getWorldLocation().getX();
-		if (x1 != x2)
-		{
-			return Integer.compare(x2, x1);
-		}
-
-		int y1 = n1.getWorldLocation().getY();
-		int y2 = n2.getWorldLocation().getY();
-
-		return Integer.compare(y2, y1);
-	}
-
-	private boolean hasNpcLineOfSight(WorldView wv, WorldArea sourceArea, WorldArea targetArea)
-	{
-		int nearestX = Math.max(sourceArea.getX(), Math.min(targetArea.getX(), sourceArea.getX() + sourceArea.getWidth() - 1));
-		int nearestY = Math.max(sourceArea.getY(), Math.min(targetArea.getY(), sourceArea.getY() + sourceArea.getHeight() - 1));
-		WorldArea nearestSourceTile = new WorldArea(nearestX, nearestY, 1, 1, plane);
-
-		return targetArea.hasLineOfSightTo(wv, nearestSourceTile);
-	}
-
-	/**
-	 * Returns true if the geometry allows a projectile to bounce from sender to target.
-	 * Mirrors engine behavior by finding the FIRST geometrically valid tile and short-circuiting
-	 * the entire bounce check if that specific tile lacks Line of Sight.
-	 */
-	private boolean canBounce(WorldView worldView, DeflectingNpc sender, DeflectingNpc target, List<Point> senderTiles)
-	{
-		for (Point s : senderTiles)
-		{
-			boolean geometryPasses = canSendGeometry(sender, target, s) && canAcceptGeometry(sender, target, s);
-
-			if (geometryPasses)
-			{
-				WorldArea simulatedPlayerArea = new WorldArea(s.x, s.y, 1, 1, plane);
-				Point tCenter = target.getCenterTile();
-
-				return simulatedPlayerArea.hasLineOfSightTo(worldView, new WorldPoint(tCenter.x, tCenter.y, plane));
-			}
-		}
-		return false;
-	}
-
-	/**
-	 * Determines if a sender NPC tile geometrically satisfies the requirements to initiate a bounce.
-	 */
-	private boolean canSendGeometry(DeflectingNpc sender, DeflectingNpc target, Point s)
-	{
-		int sSize = sender.getSize();
-		int tSize = target.getSize();
-
-		int tSwX = target.getSwX();
-		int tSwY = target.getSwY();
-		int tCX = target.getCX();
-		int tCY = target.getCY();
-		int tCSwX = target.getCSwX();
-		int tCSwY = target.getCSwY();
-
-		if (sSize % 2 != 0) {
-			return finds(s.x, s.y, tSwX, tSwY) && finds(s.x, s.y, tCX, tCY);
-		} else if (sSize == 2) {
-			return tSize <= 3 ?
-				finds(s.x, s.y, tCX, tCY) :
-				finds(s.x, s.y, tCX, tCY) && finds(s.x, s.y, tCSwX, tCSwY);
-		} else if (sSize == 4) {
-			return finds(s.x, s.y, tSwX, tSwY) && finds(s.x, s.y, tCSwX, tCSwY);
-		}
-		return false;
-	}
-
-	/**
-	 * Determines if a target NPC geometrically satisfies the requirements to accept a bounce.
-	 */
-	private boolean canAcceptGeometry(DeflectingNpc sender, DeflectingNpc target, Point s)
-	{
-		int sSize = sender.getSize();
-		int tSize = target.getSize();
-
-		int tSwX = target.getSwX();
-		int tSwY = target.getSwY();
-		int tCX = target.getCX();
-		int tCY = target.getCY();
-		int tCSwX = target.getCSwX();
-		int tCSwY = target.getCSwY();
-
-		if (tSize == 1 || tSize == 2) {
-			return finds(s.x, s.y, tSwX, tSwY);
-		} else if (tSize == 3) {
-			if (sSize % 2 != 0) return finds(s.x, s.y, tCX, tCY) && finds(s.x, s.y, tSwX, tSwY);
-			else if (sSize == 2) return finds(s.x, s.y, tCX, tCY);
-			else if (sSize == 4) return finds(s.x, s.y, tSwX, tSwY);
-		} else if (tSize == 4 || tSize == 5) {
-			if (sSize % 2 != 0) return finds(s.x, s.y, tCX, tCY) && finds(s.x, s.y, tSwX, tSwY);
-			else if (sSize == 2) return finds(s.x, s.y, tCX, tCY) && finds(s.x, s.y, tCSwX, tCSwY);
-			else if (sSize == 4) return finds(s.x, s.y, tSwX, tSwY) && finds(s.x, s.y, tCSwX, tCSwY);
-		} else {
-			log.warn("Found an unexpected NPC size of {}x{}", tSize, tSize);
-		}
-		return false;
-	}
-
-	/**
-	 * Purely geometric distance check: Returns true if the Chebyshev distance is lesser than or equal to 2
-	 */
-	public static boolean finds(int sX, int sY, int tX, int tY)
-	{
-		return Math.max(Math.abs(sX - tX), Math.abs(sY - tY)) <= 2;
 	}
 
 	private boolean isAttackable(NPC npc)
@@ -367,5 +321,22 @@ public class VenatorPathFinderOverlay extends Overlay
 		}
 
 		return false;
+	}
+
+	private int lastAttackTick = -1;
+	private NPC soundTargetNpc = null;
+
+	public void notifyAttack(NPC target, int currentTick)
+	{
+		this.soundTargetNpc = target;
+		this.lastAttackTick = currentTick;
+	}
+
+	/**
+	 * Purely geometric distance check used by VenatorNodes.
+	 */
+	public static boolean finds(int sX, int sY, int tX, int tY)
+	{
+		return Math.max(Math.abs(sX - tX), Math.abs(sY - tY)) <= 2;
 	}
 }

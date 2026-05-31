@@ -25,9 +25,11 @@
 
 package com.venatorpathfinder.node;
 
-import com.venatorpathfinder.VenatorPathFinderOverlay;
+import static com.venatorpathfinder.VenatorPathFinderPlugin.IN_RANGE_RADIUS;
+import net.runelite.api.NPC;
+import net.runelite.api.coords.WorldPoint;
 
-public class VenatorNodeSize2 implements VenatorNode
+public class VenatorNodeSize2 implements VenatorPathNode
 {
 	private final int npcIndex;
 
@@ -40,10 +42,13 @@ public class VenatorNodeSize2 implements VenatorNode
 
 	private final int[] fromX;
 	private final int[] fromY;
+	private final NPC npc;
 
-	public VenatorNodeSize2(int npcIndex, int x, int y)
+	public VenatorNodeSize2(NPC npc, int x, int y)
 	{
-		this.npcIndex = npcIndex;
+		this.npcIndex = npc.getIndex();
+		this.npc = npc;
+
 		swX = x;
 		swY = y;
 
@@ -53,8 +58,8 @@ public class VenatorNodeSize2 implements VenatorNode
 		cX = x;
 		cY = y;
 
-		fromX = new int[]{swX, cX};
-		fromY = new int[]{swY, cY};
+		fromX = new int[]{swX, swX+1};
+		fromY = new int[]{swY, swY+1};
 	}
 
 	@Override
@@ -64,54 +69,21 @@ public class VenatorNodeSize2 implements VenatorNode
 	}
 
 	@Override
+	public NPC getNpc()
+	{
+		return npc;
+	}
+
+	@Override
 	public int getSize()
 	{
 		return 2;
 	}
 
-	// Sends from ANY tile
 	@Override
-	public boolean canSend(VenatorNode recipient)
+	public boolean inRange(WorldPoint wp)
 	{
-		int cX = recipient.getCenterX();
-		int cY = recipient.getCenterY();
-
-		switch (recipient.getSize())
-		{
-			case 1:
-			case 2:
-			case 3:
-				for (int x : fromX)
-					for (int y : fromY)
-						if (VenatorPathFinderOverlay.finds(x, y, cX, cY))
-							return true;
-			case 4:
-			case 5:
-				int cSwX = recipient.getCenterSouthWestX();
-				int cSwY = recipient.getCenterSouthWestY();
-				for (int x : fromX)
-					for (int y : fromY)
-						if (VenatorPathFinderOverlay.finds(x, y, cX, cY) && VenatorPathFinderOverlay.finds(x, y, cSwX, cSwY))
-							return true;
-		}
-		return false;
-	}
-
-	/**
-	 * 5x5 accepts bounce to it, if targeting monster passes these rules.
-	 * Odd sized (1x1,3x3,5x5) needs to find 5x5's CENTRE and SW tiles.
-	 * 2x2 needs to find 5x5's CENTRE and CENTRE SW tiles.
-	 * 4x4 needs to find 5x5's SW and CENTRE SW tiles.
-	 */
-	@Override
-	public boolean canAccept(VenatorNode sender)
-	{
-		for (int x: sender.sendsFromX())
-			for (int y: sender.sendsFromY())
-				if (VenatorPathFinderOverlay.finds(x, y, swX, swY))
-					return true;
-
-		return false;
+		return Math.max(Math.abs(swX - wp.getX()), Math.abs(swY - wp.getY())) <= IN_RANGE_RADIUS;
 	}
 
 	@Override

@@ -117,4 +117,44 @@ public interface VenatorPathFinderConfig extends Config
 		position = 9
 	)
 	default boolean ignoreVenatorBowPrerequisite() { return true; }
+
+	@ConfigItem(
+		keyName = "drawTargetNpcPath",
+		name = "Draw predicted path(s) using the targeted NPC as starting point",
+		description = "If set, paths are drawn using the targeted NPC as path start. Paths are drawn while combat is ongoing.",
+		position = 9
+	)
+	default boolean drawTargetNpcPath() { return true; }
+
+	@ConfigItem(
+		keyName = "drawPathOfTargetedNpc",
+		name = "Draw path during combat",
+		description = "During combat with a venator bow, a path is drawn starting at the NPC you are attacking.",
+		position = 10
+	)
+	default boolean drawPathOfTargetedNpc() { return false; }
+
+	@ConfigItem(
+		keyName = "debugLoggingScreenshotEnabled",
+		name = "Enable screenshot debug logger",
+		description = "If set, save a screenshot of every deflected attack. Tries to ensure that both the predicted path and the actual hitsplats are visible. Forces drawPathOfTargetedNpc to be enabled.",
+		position = 11
+	)
+	default boolean debugLoggingScreenshotEnabled() { return false; }
+
+	@ConfigItem(
+		keyName = "debugLoggingCsvEnabled",
+		name = "Enable CSV debug logger",
+		description = "If set, save data of generated paths locally in a CSV file",
+		position = 12
+	)
+	default boolean debugLoggingCsvEnabled() { return false; }
+
+	@ConfigItem(
+		keyName = "debugLoggingJsonEnabled",
+		name = "Enable JSON debug logger",
+		description = "If set, save data of generated paths locally in a JSON file",
+		position = 13
+	)
+	default boolean debugLoggingJsonEnabled() { return false; }
 }
