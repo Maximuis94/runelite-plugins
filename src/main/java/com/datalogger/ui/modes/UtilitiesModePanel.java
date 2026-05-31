@@ -124,6 +124,7 @@ public class UtilitiesModePanel extends JPanel
 
 			for (String accountName : accountHashMapper.getAccountNames())
 				accountSelector.addItem(new AccountItem(accountName, -1L));
+			accountSelector.setEnabled(false);
 
 			directorySelector.addActionListener(e -> {
 				Directory selected = (Directory) directorySelector.getSelectedItem();

@@ -6,10 +6,10 @@
  * modification, are permitted provided that the following conditions are met:
  *
  * 1. Redistributions of source code must retain the above copyright notice, this
- * list of conditions and the following disclaimer.
+ *    list of conditions and the following disclaimer.
  * 2. Redistributions in binary form must reproduce the above copyright notice,
- * this list of conditions and the following disclaimer in the documentation
- * and/or other materials provided with the distribution.
+ *    this list of conditions and the following disclaimer in the documentation
+ *    and/or other materials provided with the distribution.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
@@ -229,12 +229,12 @@ public class DataLoggerPlugin extends Plugin
 	private void toggleSidebar(boolean enable)
 	{
 		if (enable) {
-			log.debug("Enabling sidebar panel icon");
+			log.debug("Showing sidebar panel");
 			final BufferedImage icon = ImageUtil.loadImageResource(getClass(), "icon.png");
 			navButton = NavigationButton.builder()
 				.tooltip("Data Logger Viewer")
 				.icon(icon)
-				.priority(5)
+				.priority(10)
 				.panel(panel)
 				.build();
 
@@ -242,7 +242,7 @@ public class DataLoggerPlugin extends Plugin
 			panel.setOuterScrollSpeed(config.outerScrollSpeed());
 			panel.setInnerScrollSpeed(config.innerScrollSpeed());
 		} else {
-			log.debug("Disabling sidebar panel icon");
+			log.debug("Hiding sidebar panel");
 			clientToolbar.removeNavigation(navButton);
 		}
 	}

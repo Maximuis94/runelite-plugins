@@ -25,11 +25,13 @@
 
 package com.datalogger.ui.utils;
 
+import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Container;
 import java.awt.Dimension;
 import java.awt.Graphics;
+import java.awt.LayoutManager;
 import java.awt.Rectangle;
 import java.awt.event.ActionListener;
 import java.awt.event.FocusAdapter;
@@ -39,29 +41,26 @@ import java.awt.event.MouseEvent;
 import java.util.function.Consumer;
 import javax.annotation.Nonnull;
 import javax.swing.BorderFactory;
+import javax.swing.DefaultListCellRenderer;
 import javax.swing.JButton;
+import javax.swing.JComboBox;
 import javax.swing.JComponent;
+import javax.swing.JLabel;
+import javax.swing.JList;
 import javax.swing.JOptionPane;
+import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.JScrollBar;
 import javax.swing.JScrollPane;
-import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
+import javax.swing.border.TitledBorder;
 import javax.swing.event.PopupMenuEvent;
 import javax.swing.event.PopupMenuListener;
 import javax.swing.plaf.basic.BasicScrollBarUI;
 import net.runelite.client.ui.ColorScheme;
-import java.awt.BorderLayout;
-import java.awt.LayoutManager;
-import javax.swing.JComboBox;
-import javax.swing.JLabel;
-import javax.swing.JPanel;
-import javax.swing.border.TitledBorder;
 import net.runelite.client.ui.FontManager;
-import javax.swing.DefaultListCellRenderer;
-import javax.swing.JList;
 import net.runelite.client.ui.laf.RuneLiteScrollBarUI;
 
 public final class Components
@@ -317,15 +316,6 @@ public final class Components
 		}
 
 		return card;
-	}
-
-	public static JScrollPane createScrollPane(JTable table)
-	{
-		JScrollPane scrollPane = new JScrollPane(table);
-		scrollPane.getViewport().setBackground(ColorScheme.DARK_GRAY_COLOR);
-		scrollPane.setBorder(BorderFactory.createEmptyBorder());
-		scrollPane.getVerticalScrollBar().setUI(scrollBarUI);
-		return scrollPane;
 	}
 
 	public static JScrollPane createScrollPane(Component component)
