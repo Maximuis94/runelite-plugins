@@ -572,6 +572,12 @@ public class ItemsModePanel extends JPanel
 
 		contentPanel.revalidate();
 		contentPanel.repaint();
+
+		SwingUtilities.invokeLater(() -> {
+			if (scrollBar != null) {
+				scrollBar.setValue(0);
+			}
+		});
 	}
 
 	private void updateStatsUi(int uniqueItems, long totalValue, Set<String> accounts, Set<String> sources)

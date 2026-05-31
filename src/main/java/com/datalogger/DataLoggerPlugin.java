@@ -229,12 +229,12 @@ public class DataLoggerPlugin extends Plugin
 	private void toggleSidebar(boolean enable)
 	{
 		if (enable) {
-			log.debug("Enabling sidebar panel icon");
+			log.debug("Showing sidebar panel");
 			final BufferedImage icon = ImageUtil.loadImageResource(getClass(), "icon.png");
 			navButton = NavigationButton.builder()
 				.tooltip("Data Logger Viewer")
 				.icon(icon)
-				.priority(5)
+				.priority(10)
 				.panel(panel)
 				.build();
 
@@ -242,7 +242,7 @@ public class DataLoggerPlugin extends Plugin
 			panel.setOuterScrollSpeed(config.outerScrollSpeed());
 			panel.setInnerScrollSpeed(config.innerScrollSpeed());
 		} else {
-			log.debug("Disabling sidebar panel icon");
+			log.debug("Hiding sidebar panel");
 			clientToolbar.removeNavigation(navButton);
 		}
 	}
