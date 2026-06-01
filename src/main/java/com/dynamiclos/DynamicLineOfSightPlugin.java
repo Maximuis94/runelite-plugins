@@ -32,10 +32,12 @@ import static com.dynamiclos.PluginConstants.STAFF_DEFENSIVE_AUTOCAST_STYLE_INDE
 import static com.dynamiclos.PluginConstants.STAFF_EQUIPMENT_TYPE_ID;
 import com.google.inject.Provides;
 import java.awt.Color;
+import java.util.Arrays;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import javax.inject.Inject;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
@@ -46,6 +48,9 @@ import net.runelite.api.GameState;
 import net.runelite.api.Item;
 import net.runelite.api.KeyCode;
 import net.runelite.api.Menu;
+import net.runelite.api.MenuAction;
+import net.runelite.api.MenuEntry;
+import net.runelite.api.NPC;
 import net.runelite.api.WorldView;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.ItemContainerChanged;
@@ -65,12 +70,6 @@ import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.overlay.OverlayManager;
 import net.runelite.client.util.ColorUtil;
 import net.runelite.client.util.HotkeyListener;
-import net.runelite.api.MenuAction;
-import net.runelite.api.MenuEntry;
-import net.runelite.api.NPC;
-import net.runelite.client.game.chatbox.ChatboxPanelManager;
-import java.util.Arrays;
-import java.util.stream.Collectors;
 
 @Slf4j
 @PluginDescriptor(
