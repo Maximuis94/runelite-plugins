@@ -6,10 +6,10 @@
  * modification, are permitted provided that the following conditions are met:
  *
  * 1. Redistributions of source code must retain the above copyright notice, this
- * list of conditions and the following disclaimer.
+ *    list of conditions and the following disclaimer.
  * 2. Redistributions in binary form must reproduce the above copyright notice,
- * this list of conditions and the following disclaimer in the documentation
- * and/or other materials provided with the distribution.
+ *    this list of conditions and the following disclaimer in the documentation
+ *    and/or other materials provided with the distribution.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
@@ -37,6 +37,7 @@ import net.runelite.client.game.ItemVariationMapping;
 public class AccursedSceptreParser extends AbstractItemChargeParser
 {
 	private static final int BASE_ID = ItemVariationMapping.map(ItemID.WILD_CAVE_ACCURSED_CHARGED);
+	private static final int WILDERNESS_WEAPON_CHARGE_COST = 1000;
 
 	private static final String CHECK_PREFIX = "Your sceptre has ";
 	private static final String UPDATE_PREFIX = "Your weapon has ";
@@ -75,7 +76,8 @@ public class AccursedSceptreParser extends AbstractItemChargeParser
 			if (endIndex != -1)
 			{
 				String numberStr = message.substring(CHECK_PREFIX.length(), endIndex);
-				return cleanAndParseInt(numberStr);
+				Integer charges = cleanAndParseInt(numberStr);
+				return charges != null ? charges + WILDERNESS_WEAPON_CHARGE_COST : 0;
 			}
 		}
 
@@ -85,7 +87,8 @@ public class AccursedSceptreParser extends AbstractItemChargeParser
 			if (endIndex != -1)
 			{
 				String numberStr = message.substring(UPDATE_PREFIX.length(), endIndex);
-				return cleanAndParseInt(numberStr);
+				Integer charges = cleanAndParseInt(numberStr);
+				return charges != null ? charges + WILDERNESS_WEAPON_CHARGE_COST : 0;
 			}
 		}
 
@@ -97,7 +100,8 @@ public class AccursedSceptreParser extends AbstractItemChargeParser
 			if (endIndex != -1)
 			{
 				String numberStr = message.substring(startIndex, endIndex);
-				return cleanAndParseInt(numberStr);
+				Integer charges = cleanAndParseInt(numberStr);
+				return charges != null ? charges + WILDERNESS_WEAPON_CHARGE_COST : 0;
 			}
 		}
 

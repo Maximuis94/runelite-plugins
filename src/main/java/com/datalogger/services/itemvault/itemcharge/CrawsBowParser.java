@@ -37,6 +37,7 @@ import net.runelite.client.game.ItemVariationMapping;
 public class CrawsBowParser extends AbstractItemChargeParser
 {
 	private static final int BASE_ID = ItemVariationMapping.map(ItemID.WILD_CAVE_BOW_CHARGED);
+	private static final int WILDERNESS_WEAPON_CHARGE_COST = 1000;
 
 	private static final String CHECK_PREFIX = "Your bow has ";
 	private static final String UPDATE_PREFIX = "Your weapon has ";
@@ -75,7 +76,8 @@ public class CrawsBowParser extends AbstractItemChargeParser
 			if (endIndex != -1)
 			{
 				String numberStr = message.substring(CHECK_PREFIX.length(), endIndex);
-				return cleanAndParseInt(numberStr);
+				Integer charges = cleanAndParseInt(numberStr);
+				return charges != null ? charges + WILDERNESS_WEAPON_CHARGE_COST : 0;
 			}
 		}
 
@@ -85,7 +87,8 @@ public class CrawsBowParser extends AbstractItemChargeParser
 			if (endIndex != -1)
 			{
 				String numberStr = message.substring(UPDATE_PREFIX.length(), endIndex);
-				return cleanAndParseInt(numberStr);
+				Integer charges = cleanAndParseInt(numberStr);
+				return charges != null ? charges + WILDERNESS_WEAPON_CHARGE_COST : 0;
 			}
 		}
 
@@ -97,7 +100,8 @@ public class CrawsBowParser extends AbstractItemChargeParser
 			if (endIndex != -1)
 			{
 				String numberStr = message.substring(startIndex, endIndex);
-				return cleanAndParseInt(numberStr);
+				Integer charges = cleanAndParseInt(numberStr);
+				return charges != null ? charges + WILDERNESS_WEAPON_CHARGE_COST : 0;
 			}
 		}
 
