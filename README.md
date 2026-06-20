@@ -886,7 +886,7 @@ The Colosseum statistics panel is a data viewer that allows you to browse throug
 ![example-colosseum-statistics-data-viewer.png](images/example-colosseum-statistics-data-viewer.png)</br>
 _The four table modes that can be selected in the data viewer._<br><br>
 
-Filters can be applied based on waves that are to be included, modifiers that should (not) be active or the final result of the trial. For example, the Waves panel in the image above shows results for wave 11 and 12 in which any tier of Bees! was active.  
+Filters can be applied based on waves that are to be included, modifiers that should (not) be active or the final result of the trial. For example, the Waves panel in the image above shows results for wave 11 and 12 in which Blasphemy is not active.  
 
 If you have set a tag in the configurations, you can also include or exclude trials based on these tags for that particular trial.
 
