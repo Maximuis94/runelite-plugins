@@ -468,7 +468,7 @@ public class ColosseumStatisticsModePanel extends JPanel
 	/**
 	 * Load registered trial data by parsing the internal history json file
 	 */
-	private void loadStatisticsFromDisk()
+	public void loadStatisticsFromDisk()
 	{
 		SwingUtilities.invokeLater(() -> {
 			statsContainer.removeAll();

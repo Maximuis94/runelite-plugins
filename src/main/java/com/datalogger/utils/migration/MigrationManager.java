@@ -42,6 +42,7 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
@@ -65,9 +66,8 @@ public class MigrationManager
 	@Getter
 	private boolean hasMigrated = false;
 
-	public static final long COLOSSEUM_TRIAL_MIGRATION_THRESHOLD = 1780000000000L;
+	public static final long COLOSSEUM_TRIAL_MIGRATION_THRESHOLD = 178232000000L;
 
-//	private File jsonFile = new File(COLOSSEUM_ROOT_DIR, "migration-test.jsonl");
 	private final File jsonFile = INTERNAL_COLOSSEUM_TRIAL_HISTORY;
 
 	@Inject
@@ -82,7 +82,7 @@ public class MigrationManager
 	 * Parse and return the trialIds from the output jsonl file. These trialIds are used to identify whether a trial is
 	 * already logged or not.
 	 */
-	private List<String> parseTrialIds()
+	public List<String> parseTrialIdsV1()
 	{
 		List<String> trialIds = new ArrayList<>();
 		if (jsonFile == null || !jsonFile.exists())
@@ -131,7 +131,7 @@ public class MigrationManager
 		}
 		hasMigrated = true;
 
-		List<String> existingTrialIds = parseTrialIds();
+		List<String> existingTrialIds = parseTrialIdsV1();
 
 		// Iterate over all directories in COLOSSEUM_ROOT_DIR
 		File[] directories = COLOSSEUM_ROOT_DIR.listFiles(File::isDirectory);
@@ -148,39 +148,47 @@ public class MigrationManager
 				continue;
 			}
 
-			// In each directory, attempt to convert the wave-log.json/csv, depending on the converter.
+			File jsonFile = null;
+			File csvFile = null;
+
 			for (File file : files)
 			{
-				// Test JSON Migration
-				if (jsonMigration.identify(file))
+				if (jsonFile == null && jsonMigration.identify(file)) jsonFile = file;
+				if (csvFile == null && csvMigration.identify(file)) csvFile = file;
+
+				if (jsonFile != null && csvFile != null) break;
+			}
+
+			if (jsonFile != null)
+			{
+				String trialId = jsonFile.getName().replace("_wave-log.json", "");
+				if (existingTrialIds.contains(trialId))
 				{
-					String trialId = file.getName().replace("_wave-log.json", "");
-					if (existingTrialIds.contains(trialId))
-					{
-						log.debug("JSON trial already migrated, skipping: {}", trialId);
-						continue;
-					}
-
-					log.debug("JSON migration identified file: {}", file.getName());
-					jsonMigration.migrate(file);
-
-					existingTrialIds.add(trialId);
-					nMigrated++;
+					log.debug("JSON trial already migrated, skipping: {}", trialId);
+					continue;
 				}
 
-				// Test CSV Migration
-				if (csvMigration.identify(file))
+				log.debug("JSON migration identified file: {}", jsonFile.getName());
+				if (jsonMigration.migrate(jsonFile))
 				{
-					String trialId = file.getName().replace("_wave-log.csv", "");
-					if (existingTrialIds.contains(trialId))
-					{
-						log.debug("CSV trial already migrated, skipping: {}", trialId);
-						continue;
-					}
+					existingTrialIds.add(trialId);
+					nMigrated++;
+					continue;
+				}
+			}
 
-					log.debug("CSV migration identified file: {}", file.getName());
-					csvMigration.migrate(file);
+			if (csvFile != null)
+			{
+				String trialId = csvFile.getName().replace("_wave-log.csv", "");
+				if (existingTrialIds.contains(trialId))
+				{
+					log.debug("CSV trial already migrated, skipping: {}", trialId);
+					continue;
+				}
 
+				log.debug("CSV migration identified file: {}", csvFile.getName());
+				if (csvMigration.migrate(csvFile))
+				{
 					existingTrialIds.add(trialId);
 					nMigrated++;
 				}
@@ -217,7 +225,6 @@ public class MigrationManager
 
 				try
 				{
-					// Parse directly into the main DTO (version field will default to 1 automatically)
 					ColosseumAttemptDTO attempt = gson.fromJson(line, ColosseumAttemptDTO.class);
 
 					if (attempt == null) continue;
@@ -228,17 +235,23 @@ public class MigrationManager
 						trialDir.mkdirs();
 					}
 
+					File srcDir = new File(COLOSSEUM_ROOT_DIR, attempt.getAttemptId());
+					String timelineFileName = attempt.getAttemptId()+"_timeline.json";
+					File srcTimelineFile = new File(srcDir, timelineFileName);
+					File dstTimelineFile = new File(trialDir, timelineFileName);
+					if (srcTimelineFile.exists() && !dstTimelineFile.exists())
+					{
+						Files.copy(srcTimelineFile.toPath(), dstTimelineFile.toPath(), StandardCopyOption.COPY_ATTRIBUTES);
+					}
+
 					String baseFileName = attempt.getAttemptId() + "_wave-log";
 
-					// 2. Dump the updated JSON
 					File jsonFile = new File(trialDir, baseFileName + ".json");
 					try (BufferedWriter jsonWriter = new BufferedWriter(new FileWriter(jsonFile)))
 					{
-						// Using a pretty-printing Gson instance here if preferred, or standard gson
 						gson.toJson(attempt, jsonWriter);
 					}
 
-					// 3. Dump the updated CSV
 					File csvFile = new File(trialDir, baseFileName + ".csv");
 					writeWaveLogCsv(csvFile, attempt);
 
@@ -360,7 +373,7 @@ public class MigrationManager
 	 * Returns true if dir follows the pattern of a logged Colosseum trial directory and if the timestamp suggests it is
 	 * a legacy trial.
 	 */
-	public boolean isMigrateableLoggedTrialDir(File dir)
+	public boolean isMigrateableLoggedTrialId(File dir)
 	{
 		String name = dir.getName();
 
@@ -411,5 +424,11 @@ public class MigrationManager
 		{
 			return false;
 		}
+	}
+
+	public boolean hasLogFilesToMigrate(File dir)
+	{
+		String baseFileName = dir.getName()+"_wave-log";
+		return new File(dir, baseFileName+".csv").exists() || new File(dir, baseFileName+".json").exists();
 	}
 }

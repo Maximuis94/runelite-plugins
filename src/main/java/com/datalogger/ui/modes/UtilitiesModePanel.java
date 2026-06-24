@@ -45,6 +45,7 @@ import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.GridLayout;
 import java.io.File;
+import java.util.List;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import javax.inject.Inject;
@@ -69,11 +70,13 @@ public class UtilitiesModePanel extends JPanel
 	private final MigrationManager migrationManager;
 	private final GrandExchangeExportService geExportService;
 	private final AccountHashMapper accountHashMapper;
+	private final ColosseumStatisticsModePanel colosseumStatisticsModePanel;
 
 	@Inject
 	public UtilitiesModePanel(ScheduledExecutorService executor, VaultManager vaultManager,
 							  FileIOService fileIOService, ItemVaultLogger itemVaultLogger,
-							  MigrationManager migrationManager, GrandExchangeExportService geExportService, AccountHashMapper accountHashMapper)
+							  MigrationManager migrationManager, GrandExchangeExportService geExportService,
+							  AccountHashMapper accountHashMapper, ColosseumStatisticsModePanel colosseumStatisticsModePanel)
 	{
 		this.executor = executor;
 		this.migrationManager = migrationManager;
@@ -82,6 +85,7 @@ public class UtilitiesModePanel extends JPanel
 		this.itemVaultLogger = itemVaultLogger;
 		this.geExportService = geExportService;
 		this.accountHashMapper = accountHashMapper;
+		this.colosseumStatisticsModePanel = colosseumStatisticsModePanel;
 
 		setLayout(new BorderLayout());
 		setBackground(ColorScheme.DARK_GRAY_COLOR);
@@ -282,14 +286,25 @@ public class UtilitiesModePanel extends JPanel
 		return panel;
 	}
 
+	/**
+	 * Returns true if the user has unlogged, legacy colosseum trials
+	 */
 	private boolean hasLegacyColosseumTrials()
 	{
 		File[] files = COLOSSEUM_ROOT_DIR.listFiles();
 		if (files == null) return false;
 
+		List<String> existingTrialIds = migrationManager.parseTrialIdsV1();
+
 		for (File nextDir : files)
 		{
-			if (migrationManager.isMigrateableLoggedTrialDir(nextDir))
+			String dirName = nextDir.getName();
+
+			boolean potentialTrial = migrationManager.isMigrateableLoggedTrialId(nextDir);
+			boolean hasLogFiles = migrationManager.hasLogFilesToMigrate(nextDir);
+			boolean trialIsLogged = existingTrialIds.contains(dirName);
+
+			if (potentialTrial && hasLogFiles && !trialIsLogged)
 			{
 				return true;
 			}
@@ -305,20 +320,18 @@ public class UtilitiesModePanel extends JPanel
 			final JLabel label = Components.createLabel("<html><div style='width: 200px; color: white; padding-bottom: 2px;'>Some legacy trials have been found.<br>Click the button below to convert <br>them so they may be used with the <br>data viewer");
 
 			JButton convertBtn;
-			// Use BorderLayout(0, 5) for a 5px vertical gap between the label and button
 			panel = Components.createTitledPanel("Data migration", new BorderLayout(0, 5));
 
-			convertBtn = createStyledButton("Migrate logs", e -> {
-				initiateColosseumTrialMigration(label);
+			convertBtn = createStyledButton("Migrate logs");
+			convertBtn.addActionListener(e -> {
+				initiateColosseumTrialMigration(label, convertBtn);
 
 			});
 			convertBtn.setToolTipText("Migrates logged Colosseum trials to a newer version, if possible.");
 
-			// Set the preferred height to 20. The width (0) will be ignored by BorderLayout.SOUTH
 			Dimension dimension = new Dimension(0, 30);
 			convertBtn.setPreferredSize(dimension);
 
-			// Add the label to the top and the button directly to the bottom so it stretches horizontally
 			panel.add(label, BorderLayout.NORTH);
 			panel.add(convertBtn, BorderLayout.SOUTH);
 
@@ -327,7 +340,7 @@ public class UtilitiesModePanel extends JPanel
 		return null;
 	}
 
-	private void initiateColosseumTrialMigration(JLabel label)
+	private void initiateColosseumTrialMigration(JLabel label, JButton startBtn)
 	{
 		executor.submit(() -> {
 			try
@@ -335,9 +348,10 @@ public class UtilitiesModePanel extends JPanel
 				int nMigrated = migrationManager.migrateColosseumTrialsV0V1();
 				if (nMigrated > 0)
 				{
+					colosseumStatisticsModePanel.loadStatisticsFromDisk();
 					SwingUtilities.invokeLater(() -> {
 						JOptionPane.showMessageDialog(this,
-							"Converted a total of " + nMigrated + " trials. The converted trials were transferred to " + COLOSSEUM_TRIALS_DIR.getAbsolutePath(),
+							"Converted a total of " + nMigrated + " trials. The converted trials were transferred to " + COLOSSEUM_TRIALS_DIR.getAbsolutePath() + ". Restart the client to view trial data in the statistics panel.",
 							"Success", JOptionPane.INFORMATION_MESSAGE);
 					});
 				}
@@ -348,7 +362,8 @@ public class UtilitiesModePanel extends JPanel
 							"Success", JOptionPane.INFORMATION_MESSAGE);
 					});
 				}
-				label.setText("<html><div style='width: 200px; color: white; padding-bottom: 2px;'>Converted all wave logs!");
+				label.setText("<html><div style='width: 200px; color: white; padding-bottom: 2px;'>Converted all wave logs!<br> Viewing trial data may require <br>restarting the client.");
+				startBtn.setVisible(false);
 			}
 			catch (Exception e)
 			{

@@ -40,7 +40,6 @@ import com.datalogger.utils.migration.colosseumtrial.models.ColosseumWaveDtoV0;
 import com.datalogger.utils.migration.colosseumtrial.models.ColosseumWaveDtoV1;
 import com.google.gson.Gson;
 import com.google.gson.JsonDeserializer;
-import com.google.gson.JsonElement;
 import com.google.gson.reflect.TypeToken;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -51,40 +50,37 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
-import java.util.stream.Collectors;
 import javax.inject.Inject;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.game.ItemManager;
 
-/**
- * Migrates JSON trial data from 1.1.0 to 1.2.0
- */
 @Slf4j
 public class ColosseumTrialMigrationV0V1 implements DataMigration {
+
+	private static final DateTimeFormatter FALLBACK_DATE_FORMAT = DateTimeFormatter.ofPattern("yyMMdd_HHmmss");
+
 	private final ItemManager itemManager;
-	private final Gson gson;
+	private final Gson standardGson;
 	private final ClientThread clientThread;
 	private final DataLoggerConfig config;
 
 	@Getter
 	private final File outFile = null;
-
-	//	private File jsonlFile = new File(COLOSSEUM_ROOT_DIR, "migration-test.jsonl");
 	private final File jsonlFile = INTERNAL_COLOSSEUM_TRIAL_HISTORY;
 
 	@Inject
 	public ColosseumTrialMigrationV0V1(ItemManager itemManager, Gson gson, ClientThread clientThread, DataLoggerConfig config) {
 		this.itemManager = itemManager;
-		this.gson = gson;
+		this.standardGson = gson;
 		this.clientThread = clientThread;
 		this.config = config;
 	}
@@ -97,339 +93,235 @@ public class ColosseumTrialMigrationV0V1 implements DataMigration {
 
 	@Override
 	public boolean identify(File file) {
-		if (file == null || !file.isFile()) {
-			return false;
-		}
-		return file.getName().endsWith("_wave-log.json");
-	}
-
-	/**
-	 * Parse the legacy file and return it as a legacy class instance
-	 */
-	private ColosseumAttemptDtoV0 parseInputFile(File inputFile)
-	{
-		if (inputFile == null || !inputFile.exists())
-		{
-			log.warn("Attempted to parse a null or non-existent file.");
-			return null;
-		}
-
-		try (FileReader reader = new FileReader(inputFile))
-		{
-			return gson.fromJson(reader, ColosseumAttemptDtoV0.class);
-
-		} catch (Exception e) {
-			log.error("Failed to parse legacy V0 input file: {}", inputFile.getName(), e);
-			return null;
-		}
-	}
-
-	/**
-	 * Convert the given trialLog to the newer version
-	 */
-	public ColosseumAttemptDtoV1 convertTrialLog(File inputDirectory)
-	{
-		File inputFile = new File(inputDirectory, inputDirectory.getName() + "_wave-log.json");
-
-		if (!inputFile.exists()) return null;
-
-		ColosseumAttemptDtoV0 trialV0 = parseInputFile(inputFile);
-
-		if (trialV0 == null) {
-			return null;
-		}
-
-		Map<String, ValuedItemStack> totalRewardsMap = new HashMap<>();
-		int totalRewardsValue = 0;
-
-		// 1. Extract attemptId, account, and ensure valid timestamp
-		String dirName = inputDirectory.getName();
-		String accountFallback = "Unknown";
-		long timestamp = trialV0.getTimestamp();
-
-		// Ensure we don't OutOfBounds if the directory name doesn't match the convention
-		if (dirName.length() >= 14) {
-			String dateString = dirName.substring(dirName.length() - 13);
-			accountFallback = dirName.substring(0, dirName.length() - 14);
-
-			// Fallback in case legacy timestamp was 0
-			if (timestamp == 0) {
-				try {
-					DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyMMdd_HHmmss");
-					LocalDateTime dateTime = LocalDateTime.parse(dateString, formatter);
-					timestamp = dateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
-				} catch (Exception e) {
-					log.warn("Failed to parse date string for timestamp fallback: {}", dateString, e);
-				}
-			}
-		}
-
-		String tagFallback = "";
-		double totalTimeCalculated = 0.0;
-		List<ColosseumWaveDtoV1> newWaves = new ArrayList<>();
-
-		// Use a LinkedHashMap to preserve insertion order while safely overwriting upgraded modifier tiers
-		Map<String, String> activeModsMap = new LinkedHashMap<>();
-
-		if (trialV0.getWaves() != null && !trialV0.getWaves().isEmpty()) {
-			for (ColosseumWaveDtoV0 waveV0 : trialV0.getWaves()) {
-				// Grab the tag from the first wave that has one
-				if (waveV0.getTag() != null && tagFallback.isEmpty()) {
-					tagFallback = waveV0.getTag();
-				}
-
-				// Register the modifier chosen THIS wave, overwriting lower tiers if they share a base name
-				String chosen = waveV0.getChosenModifier();
-				if (chosen != null && !chosen.isEmpty()) {
-					String baseMod = chosen.contains("_") ? chosen.substring(0, chosen.lastIndexOf('_')) : chosen;
-					activeModsMap.put(baseMod, chosen);
-				}
-				ItemBundle waveLoot = (waveV0.getEarnedLoot() != null && !waveV0.getEarnedLoot().isEmpty())
-					? waveV0.getEarnedLoot().get(0) : null;
-				if (waveV0.getEarnedLoot() != null) {
-					for (ItemBundle bundle : waveV0.getEarnedLoot()) {
-						String name = bundle.getItemName();
-						int qty = bundle.getQuantity();
-						int val = qty * itemManager.getItemPrice(bundle.getItemId());
-
-						ValuedItemStack existing = totalRewardsMap.getOrDefault(name, new ValuedItemStack(0, 0));
-						totalRewardsMap.put(name, new ValuedItemStack(existing.getCount() + qty, existing.getTotalValueInGp() + val));
-						totalRewardsValue += val;
-					}
-				}
-
-				List<String> activeModsList = new ArrayList<>(activeModsMap.values());
-
-				// Provide 0 as default for manual directory conversion
-				ColosseumWaveDtoV1 waveV1 = convertWave(waveV0, activeModsList, waveLoot, 0);
-				newWaves.add(waveV1);
-			}
-
-			ColosseumWaveDtoV0 lastWave = trialV0.getWaves().get(trialV0.getWaves().size() - 1);
-			totalTimeCalculated = lastWave.getTotalTimeTaken();
-		}
-
-		return ColosseumAttemptDtoV1.builder()
-			.attemptId(dirName)
-			.timestamp(timestamp)
-			.accountName(accountFallback)
-			.result(trialV0.getResult() != null ? trialV0.getResult() : "UNKNOWN")
-			.rewardsValue(0)
-			.rewards(new HashMap<>())
-			.consumedSupplyValue(0)
-			.consumedSupplies(null)
-			.totalGlory(trialV0.getTotalGlory())
-			.totalTime(formatTime(totalTimeCalculated))
-			.tag(tagFallback)
-			.activeModifiers(new ArrayList<>(activeModsMap.values()))
-			.waves(newWaves)
-			.build();
-	}
-
-	/**
-	 * Convert the individual legacy wave to the newer version
-	 */
-	private ColosseumWaveDtoV1 convertWave(ColosseumWaveDtoV0 waveV0, List<String> activeModifiers, ItemBundle v1Loot, int waveLootValue)
-	{
-		return ColosseumWaveDtoV1.builder()
-			.wave(waveV0.getWave())
-			.status(waveV0.getStatus())
-			.accountName(waveV0.getAccountName())
-			.tag(waveV0.getTag())
-			.gameMode(DEFAULT_GAMEMODE_DTO)
-			.earnedLoot(v1Loot)
-			.lootValue(waveLootValue)
-			.modifierChoices(waveV0.getModifierChoices() != null ? new ArrayList<>(waveV0.getModifierChoices()) : new ArrayList<>())
-			.chosenModifier(waveV0.getChosenModifier())
-			.activeModifiers(activeModifiers != null ? activeModifiers : Collections.emptyList())
-			.timeTaken(formatTime(waveV0.getTimeTaken()))
-			.speedBonus(waveV0.getSpeedBonus())
-			.damageTaken(waveV0.getDamageTaken())
-			.damageBonus(waveV0.getDamageBonus())
-			.modifierGlory(waveV0.getModifierGlory())
-			.completionBonus(waveV0.getCompletionBonus())
-			.waveGlory(waveV0.getWaveGlory())
-			.totalGlory(waveV0.getTotalGlory())
-			.totalTimeTaken(formatTime(waveV0.getTotalTimeTaken()))
-			.serpentShamanSpawnX(waveV0.getSerpentShamanSpawnX())
-			.serpentShamanSpawnY(waveV0.getSerpentShamanSpawnY())
-			.javelinColossusSpawnAX(waveV0.getJavelinColossusSpawnAX())
-			.javelinColossusSpawnAY(waveV0.getJavelinColossusSpawnAY())
-			.javelinColossusSpawnBX(waveV0.getJavelinColossusSpawnBX())
-			.javelinColossusSpawnBY(waveV0.getJavelinColossusSpawnBY())
-			.manticoreSpawnAX(waveV0.getManticoreSpawnAX())
-			.manticoreSpawnAY(waveV0.getManticoreSpawnAY())
-			.manticoreSequenceA(waveV0.getManticoreSequenceA())
-			.manticoreSpawnBX(waveV0.getManticoreSpawnBX())
-			.manticoreSpawnBY(waveV0.getManticoreSpawnBY())
-			.manticoreSequenceB(waveV0.getManticoreSequenceB())
-			.shockwaveColossusSpawnAX(waveV0.getShockwaveColossusSpawnAX())
-			.shockwaveColossusSpawnAY(waveV0.getShockwaveColossusSpawnAY())
-			.shockwaveColossusSpawnBX(waveV0.getShockwaveColossusSpawnBX())
-			.shockwaveColossusSpawnBY(waveV0.getShockwaveColossusSpawnBY())
-			.jaguarWarriorReinforcementsSpawnX(waveV0.getJaguarWarriorReinforcementsSpawnX())
-			.jaguarWarriorReinforcementsSpawnY(waveV0.getJaguarWarriorReinforcementsSpawnY())
-			.serpentShamanReinforcementsSpawnX(waveV0.getSerpentShamanReinforcementsSpawnX())
-			.serpentShamanReinforcementsSpawnY(waveV0.getSerpentShamanReinforcementsSpawnY())
-			.minotaurReinforcementsSpawnX(waveV0.getMinotaurReinforcementsSpawnX())
-			.minotaurReinforcementsSpawnY(waveV0.getMinotaurReinforcementsSpawnY())
-			.build();
+		return file != null && file.isFile() && file.getName().endsWith("_wave-log.json");
 	}
 
 	@Override
 	public boolean migrate(File file) {
 		log.debug("Migrating Colosseum wave-log to V1: {}", file.getName());
-
 		try {
-			ColosseumAttemptDtoV1 v1Data = performMigration(file);
-			if (v1Data == null) {
-				log.warn("Failed to parse or convert data in file: {}", file.getName());
-				return false;
-			}
+			ColosseumAttemptDtoV0 v0Data = parseLenientV0File(file);
+			if (v0Data == null) return false;
+
+			ColosseumAttemptDtoV1 v1Data = transformToV1(v0Data, file.getName().replace("_wave-log.json", ""));
 
 			try (BufferedWriter writer = new BufferedWriter(new FileWriter(jsonlFile, true))) {
-				Gson jsonlGson = this.gson.newBuilder().disableHtmlEscaping().create();
-				writer.write(jsonlGson.toJson(v1Data));
+				Gson noHtmlGson = this.standardGson.newBuilder().disableHtmlEscaping().create();
+				writer.write(noHtmlGson.toJson(v1Data));
 				writer.newLine();
 			}
 
 			log.debug("Successfully migrated {}", file.getName());
 			return true;
-
 		} catch (Exception e) {
-			log.error("Exception occurred while migrating file: {}", file.getName(), e);
+			log.error("Failed to migrate file: {}", file.getName(), e);
 			return false;
 		}
 	}
 
-	private double formatTime(double time) {
-		return Math.round(time * 10.0) / 10.0;
+	public ColosseumAttemptDtoV1 convertTrialLog(File inputDirectory) {
+		File inputFile = new File(inputDirectory, inputDirectory.getName() + "_wave-log.json");
+		ColosseumAttemptDtoV0 v0Data = parseLenientV0File(inputFile);
+		return v0Data != null ? transformToV1(v0Data, inputDirectory.getName()) : null;
 	}
 
-	public ColosseumAttemptDtoV1 performMigration(File file) throws Exception {
-		Gson legacyGson = this.gson.newBuilder()
-			.registerTypeAdapter(new TypeToken<List<ItemBundle>>(){}.getType(),
-				(JsonDeserializer<List<ItemBundle>>) (json, typeOfT, context) -> {
-					List<ItemBundle> list = new ArrayList<>();
-					if (json.isJsonArray()) {
-						for (JsonElement element : json.getAsJsonArray()) {
-							list.add(context.deserialize(element, ItemBundle.class));
-						}
-					} else if (json.isJsonObject()) {
-						list.add(context.deserialize(json, ItemBundle.class));
-					}
-					return list;
-				})
-			.create();
+	private ColosseumAttemptDtoV1 transformToV1(ColosseumAttemptDtoV0 v0, String sourceName) {
+		long timestamp = resolveTimestamp(v0.getTimestamp(), sourceName);
+		String accountName = resolveAccountName(v0, sourceName);
+		String attemptId = resolveAttemptId(accountName, timestamp, sourceName);
+		String globalTag = v0.getTag() != null ? v0.getTag() : "";
 
-		ColosseumAttemptDtoV0 v0;
-		try (FileReader reader = new FileReader(file)) {
-			v0 = legacyGson.fromJson(reader, ColosseumAttemptDtoV0.class);
-		}
+		Map<Integer, Integer> priceMap = getBatchPrices(v0);
 
-		Set<Integer> itemIds = v0.getWaves().stream()
-			.filter(w -> w.getEarnedLoot() != null)
-			.flatMap(w -> w.getEarnedLoot().stream())
-			.map(ItemBundle::getItemId)
-			.collect(Collectors.toSet());
+		Map<String, ValuedItemStack> totalRewards = new LinkedHashMap<>();
+		Map<String, String> activeModifiers = new LinkedHashMap<>();
+		List<ColosseumWaveDtoV1> v1Waves = new ArrayList<>();
 
-		Map<Integer, Integer> priceCache = new HashMap<>();
-		CompletableFuture<Void> priceFuture = new CompletableFuture<>();
-
-		clientThread.invoke(() -> {
-			for (Integer id : itemIds) {
-				priceCache.put(id, itemManager.getItemPrice(id));
-			}
-			priceFuture.complete(null);
-		});
-		priceFuture.join();
-
-		return processMigration(v0, priceCache);
-	}
-
-	private ColosseumAttemptDtoV1 processMigration(ColosseumAttemptDtoV0 v0, Map<Integer, Integer> priceCache) {
-		Map<String, ValuedItemStack> totalRewardsMap = new LinkedHashMap<>();
-		int totalRewardsValue = 0;
-		List<ColosseumWaveDtoV1> newWaves = new ArrayList<>();
-
-		Map<String, String> activeModsMap = new LinkedHashMap<>();
-		String tag = v0.getTag();
 		if (v0.getWaves() != null) {
-			for (ColosseumWaveDtoV0 waveV0 : v0.getWaves()) {
+			for (ColosseumWaveDtoV0 w0 : v0.getWaves()) {
+				String waveTag = w0.getTag() != null ? w0.getTag() : globalTag;
 
-				int waveLootValue = 0;
-				ItemBundle singleLoot = null;
-
-				if (waveV0.getTag() == null)
-				{
-					waveV0.setTag(tag);
+				String chosenMod = w0.getChosenModifier();
+				if (chosenMod != null && !chosenMod.isEmpty()) {
+					String baseModName = chosenMod.contains("_") ? chosenMod.substring(0, chosenMod.lastIndexOf('_')) : chosenMod;
+					activeModifiers.put(baseModName, chosenMod);
 				}
 
-				if (waveV0.getEarnedLoot() != null && !waveV0.getEarnedLoot().isEmpty()) {
-					if (waveV0.getWave() < 12 || waveV0.getEarnedLoot().size() < 2) {
-						singleLoot = waveV0.getEarnedLoot().get(0);
+				ItemBundle rngLootToLog = null;
+				int waveRngGp = 0;
+
+				List<ItemBundle> lootList = w0.getEarnedLoot();
+				if (lootList != null && !lootList.isEmpty()) {
+					if (w0.getWave() == 12) {
+						rngLootToLog = lootList.size() >= 2 ? lootList.get(1) : lootList.get(0);
+
+						// RULE: Inject Quiver into the Attempt's top-level rewards ledger
+						ItemBundle quiver = config.logQuiverAsSplinters() ? DIZANAS_QUIVER_SWAPPED_REWARD : DIZANAS_QUIVER_REWARD;
+						recordReward(totalRewards, quiver, priceMap);
 					} else {
-						singleLoot = waveV0.getEarnedLoot().get(1);
-						ItemBundle bundle = config.logQuiverAsSplinters() ?
-							DIZANAS_QUIVER_SWAPPED_REWARD :
-							DIZANAS_QUIVER_REWARD;
-						aggregateReward(totalRewardsMap, bundle, priceCache);
+						rngLootToLog = lootList.get(0);
 					}
-					aggregateReward(totalRewardsMap, singleLoot, priceCache);
-					waveLootValue = priceCache.getOrDefault(singleLoot.getItemId(), 0) * singleLoot.getQuantity();
+
+					// Record the RNG item into the top-level rewards ledger
+					recordReward(totalRewards, rngLootToLog, priceMap);
+
+					// RULE: Wave GP value is strictly the RNG drop's GP value
+					waveRngGp = rngLootToLog.getQuantity() * priceMap.getOrDefault(rngLootToLog.getItemId(), 0);
 				}
 
-				totalRewardsValue = totalRewardsMap.values().stream()
-					.mapToInt(ValuedItemStack::getTotalValueInGp)
-					.sum();
-
-				String chosen = waveV0.getChosenModifier();
-				if (chosen != null && !chosen.isEmpty()) {
-					String baseMod = chosen.contains("_") ? chosen.substring(0, chosen.lastIndexOf('_')) : chosen;
-					activeModsMap.put(baseMod, chosen);
-				}
-
-				newWaves.add(convertWave(waveV0, new ArrayList<>(activeModsMap.values()), singleLoot, waveLootValue));
+				v1Waves.add(convertWave(w0, new ArrayList<>(activeModifiers.values()), rngLootToLog, waveRngGp, waveTag));
 			}
-
-			String account = v0.getWaves().isEmpty() ? "Unknown" : v0.getWaves().get(0).getAccountName();
-			long timestamp = v0.getTimestamp();
-			String formattedTimestamp = Instant.ofEpochMilli(timestamp)
-				.atZone(ZoneId.systemDefault())
-				.format(Colosseum.COLOSSEUM_TRIAL_TIMESTAMP_FORMATTER);
-
-			String attemptId = account + "_" + formattedTimestamp;
-
-			return ColosseumAttemptDtoV1.builder()
-				.attemptId(attemptId)
-				.timestamp(timestamp)
-				.accountName(account)
-				.tag(tag)
-				.gameMode(DEFAULT_GAMEMODE_DTO)
-				.result(v0.getResult())
-				.rewardsValue(totalRewardsValue)
-				.rewards(totalRewardsMap)
-				.totalGlory(v0.getTotalGlory())
-				.totalTime(v0.getWaves().isEmpty() ? 0.0 : formatTime(v0.getWaves().get(v0.getWaves().size() - 1).getTotalTimeTaken()))
-				.activeModifiers(new ArrayList<>(activeModsMap.values()))
-				.waves(newWaves)
-				.build();
 		}
 
-		return null;
+		int grandTotalGp = totalRewards.values().stream().mapToInt(ValuedItemStack::getTotalValueInGp).sum();
+		double totalDuration = v1Waves.isEmpty() ? 0.0 : v1Waves.get(v1Waves.size() - 1).getTotalTimeTaken();
+
+		return ColosseumAttemptDtoV1.builder()
+			.attemptId(attemptId)
+			.timestamp(timestamp)
+			.accountName(accountName)
+			.tag(globalTag)
+			.gameMode(DEFAULT_GAMEMODE_DTO)
+			.result(v0.getResult() != null ? v0.getResult() : "UNKNOWN")
+			.rewardsValue(grandTotalGp)
+			.rewards(totalRewards)
+			.consumedSupplyValue(0)
+			.consumedSupplies(null)
+			.totalGlory(v0.getTotalGlory())
+			.totalTime(formatTime(totalDuration))
+			.activeModifiers(new ArrayList<>(activeModifiers.values()))
+			.waves(v1Waves)
+			.build();
 	}
 
-	private void aggregateReward(Map<String, ValuedItemStack> map, ItemBundle bundle, Map<Integer, Integer> priceCache) {
-		String name = bundle.getItemName();
-		int qty = bundle.getQuantity();
+	private ColosseumWaveDtoV1 convertWave(ColosseumWaveDtoV0 w0, List<String> currentMods, ItemBundle loot, int lootGp, String tag) {
+		boolean canHaveManticore = w0.getWave() >= 4;
 
-		int price = priceCache.getOrDefault(bundle.getItemId(), 0);
-		int totalValue = price * qty;
+		return ColosseumWaveDtoV1.builder()
+			.wave(w0.getWave())
+			.status(w0.getStatus())
+			.accountName(w0.getAccountName())
+			.tag(tag)
+			.gameMode(DEFAULT_GAMEMODE_DTO)
+			.earnedLoot(loot)
+			.lootValue(lootGp)
+			.modifierChoices(w0.getModifierChoices() != null ? new ArrayList<>(w0.getModifierChoices()) : new ArrayList<>())
+			.chosenModifier(w0.getChosenModifier())
+			.activeModifiers(currentMods)
+			.timeTaken(formatTime(w0.getTimeTaken()))
+			.speedBonus(w0.getSpeedBonus())
+			.damageTaken(w0.getDamageTaken())
+			.damageBonus(w0.getDamageBonus())
+			.modifierGlory(w0.getModifierGlory())
+			.completionBonus(w0.getCompletionBonus())
+			.waveGlory(w0.getWaveGlory())
+			.totalGlory(w0.getTotalGlory())
+			.totalTimeTaken(formatTime(w0.getTotalTimeTaken()))
+			.serpentShamanSpawnX(w0.getSerpentShamanSpawnX())
+			.serpentShamanSpawnY(w0.getSerpentShamanSpawnY())
+			.javelinColossusSpawnAX(w0.getJavelinColossusSpawnAX())
+			.javelinColossusSpawnAY(w0.getJavelinColossusSpawnAY())
+			.javelinColossusSpawnBX(w0.getJavelinColossusSpawnBX())
+			.javelinColossusSpawnBY(w0.getJavelinColossusSpawnBY())
+			.shockwaveColossusSpawnAX(w0.getShockwaveColossusSpawnAX())
+			.shockwaveColossusSpawnAY(w0.getShockwaveColossusSpawnAY())
+			.shockwaveColossusSpawnBX(w0.getShockwaveColossusSpawnBX())
+			.shockwaveColossusSpawnBY(w0.getShockwaveColossusSpawnBY())
+			.jaguarWarriorReinforcementsSpawnX(w0.getJaguarWarriorReinforcementsSpawnX())
+			.jaguarWarriorReinforcementsSpawnY(w0.getJaguarWarriorReinforcementsSpawnY())
+			.serpentShamanReinforcementsSpawnX(w0.getSerpentShamanReinforcementsSpawnX())
+			.serpentShamanReinforcementsSpawnY(w0.getSerpentShamanReinforcementsSpawnY())
+			.minotaurReinforcementsSpawnX(w0.getMinotaurReinforcementsSpawnX())
+			.minotaurReinforcementsSpawnY(w0.getMinotaurReinforcementsSpawnY())
+			.manticoreSpawnAX(canHaveManticore ? w0.getManticoreSpawnAX() : null)
+			.manticoreSpawnAY(canHaveManticore ? w0.getManticoreSpawnAY() : null)
+			.manticoreSequenceA(canHaveManticore ? w0.getManticoreSequenceA() : null)
+			.manticoreSpawnBX(canHaveManticore ? w0.getManticoreSpawnBX() : null)
+			.manticoreSpawnBY(canHaveManticore ? w0.getManticoreSpawnBY() : null)
+			.manticoreSequenceB(canHaveManticore ? w0.getManticoreSequenceB() : null)
+			.build();
+	}
 
-		ValuedItemStack existing = map.getOrDefault(name, new ValuedItemStack(0, 0));
-		map.put(name, new ValuedItemStack(
-			existing.getCount() + qty,
-			existing.getTotalValueInGp() + totalValue
+	private void recordReward(Map<String, ValuedItemStack> ledger, ItemBundle bundle, Map<Integer, Integer> prices) {
+		if (bundle == null) return;
+		int addGp = prices.getOrDefault(bundle.getItemId(), 0) * bundle.getQuantity();
+
+		ValuedItemStack existing = ledger.getOrDefault(bundle.getItemName(), new ValuedItemStack(0, 0));
+		ledger.put(bundle.getItemName(), new ValuedItemStack(
+			existing.getCount() + bundle.getQuantity(),
+			existing.getTotalValueInGp() + addGp
 		));
 	}
+
+	private Map<Integer, Integer> getBatchPrices(ColosseumAttemptDtoV0 v0) {
+		Set<Integer> uniqueIds = new HashSet<>();
+		uniqueIds.add(DIZANAS_QUIVER_REWARD.getItemId());
+		uniqueIds.add(DIZANAS_QUIVER_SWAPPED_REWARD.getItemId());
+
+		if (v0.getWaves() != null) {
+			v0.getWaves().stream()
+				.filter(w -> w.getEarnedLoot() != null)
+				.flatMap(w -> w.getEarnedLoot().stream())
+				.forEach(b -> uniqueIds.add(b.getItemId()));
+		}
+
+		Map<Integer, Integer> prices = new HashMap<>();
+		CompletableFuture<Void> sync = new CompletableFuture<>();
+		clientThread.invoke(() -> {
+			uniqueIds.forEach(id -> prices.put(id, itemManager.getItemPrice(id)));
+			sync.complete(null);
+		});
+		sync.join();
+		return prices;
+	}
+
+	private ColosseumAttemptDtoV0 parseLenientV0File(File file) {
+		if (file == null || !file.exists()) return null;
+
+		Gson lenientGson = this.standardGson.newBuilder()
+			.registerTypeAdapter(new TypeToken<List<ItemBundle>>(){}.getType(),
+				(JsonDeserializer<List<ItemBundle>>) (json, type, ctx) -> {
+					List<ItemBundle> list = new ArrayList<>();
+					if (json.isJsonArray()) {
+						json.getAsJsonArray().forEach(el -> list.add(ctx.deserialize(el, ItemBundle.class)));
+					} else if (json.isJsonObject()) {
+						list.add(ctx.deserialize(json, ItemBundle.class));
+					}
+					return list;
+				}).create();
+
+		try (FileReader reader = new FileReader(file)) {
+			return lenientGson.fromJson(reader, ColosseumAttemptDtoV0.class);
+		} catch (Exception e) {
+			log.error("Lenient Gson failed to read legacy file: {}", file.getName(), e);
+			return null;
+		}
+	}
+
+	private String resolveAccountName(ColosseumAttemptDtoV0 v0, String folderName) {
+		if (v0.getWaves() != null && !v0.getWaves().isEmpty() && v0.getWaves().get(0).getAccountName() != null) {
+			return v0.getWaves().get(0).getAccountName();
+		}
+		return folderName.length() >= 14 ? folderName.substring(0, folderName.length() - 14) : "Unknown";
+	}
+
+	private long resolveTimestamp(long v0Timestamp, String folderName) {
+		if (v0Timestamp > 0) return v0Timestamp;
+		if (folderName.length() >= 14) {
+			try {
+				String dateStr = folderName.substring(folderName.length() - 13);
+				return LocalDateTime.parse(dateStr, FALLBACK_DATE_FORMAT)
+					.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
+			} catch (Exception ignored) {}
+		}
+		return System.currentTimeMillis();
+	}
+
+	private String resolveAttemptId(String account, long timestamp, String sourceName) {
+		if (sourceName.contains("_") && sourceName.length() >= 14) return sourceName;
+		String dateFormatted = Instant.ofEpochMilli(timestamp).atZone(ZoneId.systemDefault()).format(Colosseum.COLOSSEUM_TRIAL_TIMESTAMP_FORMATTER);
+		return account + "_" + dateFormatted;
+	}
+
+	private double formatTime(double val) { return Math.round(val * 10.0) / 10.0; }
 }

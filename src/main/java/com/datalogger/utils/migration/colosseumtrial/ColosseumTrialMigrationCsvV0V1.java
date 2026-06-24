@@ -26,8 +26,9 @@
 package com.datalogger.utils.migration.colosseumtrial;
 
 import com.datalogger.DataLoggerConfig;
-import static com.datalogger.constants.Colosseum.Item.DIZANAS_QUIVER_UNCHARGED_ID;
-import static com.datalogger.constants.Colosseum.Item.SUNFIRE_SPLINTERS_ID;
+import com.datalogger.constants.Colosseum;
+import static com.datalogger.constants.Colosseum.Item.DIZANAS_QUIVER_REWARD;
+import static com.datalogger.constants.Colosseum.Item.DIZANAS_QUIVER_SWAPPED_REWARD;
 import static com.datalogger.constants.PluginConstants.DEFAULT_GAMEMODE_DTO;
 import static com.datalogger.constants.PluginConstants.INTERNAL_COLOSSEUM_TRIAL_HISTORY;
 import com.datalogger.models.colosseum.ManticoreAttackSequence;
@@ -37,35 +38,35 @@ import com.datalogger.utils.migration.DataMigration;
 import com.datalogger.utils.migration.colosseumtrial.models.ColosseumAttemptDtoV1;
 import com.datalogger.utils.migration.colosseumtrial.models.ColosseumWaveDtoV1;
 import com.google.gson.Gson;
+import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
-import net.runelite.api.ItemComposition;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.game.ItemManager;
 
 /**
- * Migrates CSV trial data from 1.1.0 to 1.2.0
+ * Migrates CSV Colosseum trial data from v1.1.0 (V0) to v1.2.0 (V1).
  */
 @Slf4j
 @Singleton
 public class ColosseumTrialMigrationCsvV0V1 implements DataMigration {
+
+	private static final DateTimeFormatter FALLBACK_DATE_FORMAT = DateTimeFormatter.ofPattern("yyMMdd_HHmmss");
+
 	private final ItemManager itemManager;
 	private final Gson gson;
 	private final ClientThread clientThread;
@@ -73,7 +74,6 @@ public class ColosseumTrialMigrationCsvV0V1 implements DataMigration {
 
 	@Getter
 	private final File outFile = null;
-
 	private final File jsonlFile = INTERNAL_COLOSSEUM_TRIAL_HISTORY;
 
 	@Inject
@@ -92,10 +92,7 @@ public class ColosseumTrialMigrationCsvV0V1 implements DataMigration {
 
 	@Override
 	public boolean identify(File file) {
-		if (file == null || !file.isFile()) {
-			return false;
-		}
-		return file.getName().endsWith("_wave-log.csv");
+		return file != null && file.isFile() && file.getName().endsWith("_wave-log.csv");
 	}
 
 	@Override
@@ -104,229 +101,231 @@ public class ColosseumTrialMigrationCsvV0V1 implements DataMigration {
 
 		try {
 			List<String> lines = Files.readAllLines(file.toPath(), StandardCharsets.UTF_8);
-			if (lines.isEmpty()) {
-				log.warn("CSV file is empty: {}", file.getName());
+			if (lines.size() <= 1) {
+				log.warn("CSV file is empty or missing data rows: {}", file.getName());
 				return false;
 			}
 
-			String[] oldHeaders = lines.get(0).split(",", -1);
+			String[] headers = lines.get(0).split(",", -1);
 			Map<String, Integer> headerMap = new HashMap<>();
-			for (int i = 0; i < oldHeaders.length; i++) {
-				headerMap.put(oldHeaders[i].trim(), i);
+			for (int i = 0; i < headers.length; i++) {
+				headerMap.put(cleanCsvValue(headers[i]), i);
 			}
 
-			if (Arrays.asList(oldHeaders).contains("activeModifiers")) {
-				log.debug("CSV already contains activeModifiers. Skipping.");
+			if (headerMap.containsKey("activeModifiers")) {
+				log.debug("CSV already migrated to V1 schema. Skipping.");
 				return false;
 			}
-			Map<String, ValuedItemStack> totalRewardsMap = new HashMap<>();
-			int totalRewardsValue = 0;
 
-			List<ColosseumWaveDtoV1> waveDtos = new ArrayList<>();
+			String rawFileName = file.getName().replace("_wave-log.csv", "");
+			long attemptTimestamp = resolveTimestamp(rawFileName);
+			String attemptAccount = resolveAccount(rawFileName);
+			String attemptId = resolveAttemptId(attemptAccount, attemptTimestamp, rawFileName);
+
+			Map<Integer, Integer> priceMap = preWarmPriceCache(lines, headerMap);
+
+			Map<String, ValuedItemStack> totalRewardsLedger = new LinkedHashMap<>();
 			Map<String, String> activeModsMap = new LinkedHashMap<>();
-			String result = "";
-			String tag = "";
+			List<ColosseumWaveDtoV1> v1Waves = new ArrayList<>();
+
+			String attemptResult = "UNKNOWN";
+			String attemptTag = "";
+
 			for (int i = 1; i < lines.size(); i++) {
 				String[] cols = lines.get(i).split(",", -1);
-				if (cols.length < oldHeaders.length) continue;
+				if (cols.length < headers.length) continue;
 
-				Function<String, String> getCol = (name) -> {
+				Function<String, String> getCol = name -> {
 					Integer idx = headerMap.get(name);
-					return (idx != null && idx < cols.length) ? cols[idx] : null;
+					return (idx != null && idx < cols.length) ? cleanCsvValue(cols[idx]) : null;
 				};
 
-				String[] ids = getCol.apply("itemIds").split("\\|");
-				String[] names = getCol.apply("itemNames").split("\\|");
-				String[] qtys = getCol.apply("quantities").split("\\|");
+				int waveNum = getInt(getCol.apply("wave"), 0);
+				attemptTag = getCol.apply("tag") != null ? getCol.apply("tag") : "";
+				String rowStatus = getCol.apply("status");
 
-				ItemBundle earnedLoot = (ids.length > 0 && !ids[ids.length-1].isEmpty())
-					? new ItemBundle(Integer.parseInt(ids[ids.length-1]), names[ids.length-1], Integer.parseInt(qtys[ids.length-1]))
-					: null;
-
-				String chosen = getCol.apply("chosenModifier");
-				if (chosen != null && !chosen.isEmpty()) {
-					String baseMod = chosen.contains("_") ? chosen.substring(0, chosen.lastIndexOf('_')) : chosen;
-					activeModsMap.put(baseMod, chosen);
+				if (i == lines.size() - 1) {
+					attemptResult = "CANCELLED".equalsIgnoreCase(rowStatus) ? "CLAIMED" : rowStatus;
 				}
 
-				Function<String, Integer> getIntCol = (colName) -> {
-					String val = getCol.apply(colName);
-					if (val == null || val.isEmpty() || val.equals("-1")) {
-						return null;
+				String chosenMod = getCol.apply("chosenModifier");
+				if (chosenMod != null && !chosenMod.isEmpty()) {
+					String baseMod = chosenMod.contains("_") ? chosenMod.substring(0, chosenMod.lastIndexOf('_')) : chosenMod;
+					activeModsMap.put(baseMod, chosenMod);
+				}
+
+				// --- NEW: Reconstruct the 3 offered modifier choices ---
+				List<String> offeredChoices = new ArrayList<>();
+				for (String choiceCol : new String[]{"modifierChoice_I", "modifierChoice_II", "modifierChoice_III"}) {
+					String choiceVal = getCol.apply(choiceCol);
+					if (choiceVal != null && !choiceVal.isEmpty() && !"-1".equals(choiceVal) && !"UNKNOWN".equalsIgnoreCase(choiceVal)) {
+						offeredChoices.add(choiceVal);
 					}
-					try {
-						return Integer.parseInt(val);
-					} catch (NumberFormatException e) {
-						return null;
-					}
-				};
-				tag = getCol.apply("tag");
+				}
+
+				ItemBundle rngLoot = extractRngItemBundle(getCol);
+				int waveRngGp = 0;
+
+				if (rngLoot != null) {
+					int itemGp = rngLoot.getQuantity() * priceMap.getOrDefault(rngLoot.getItemId(), 0);
+					recordReward(totalRewardsLedger, rngLoot, itemGp);
+					waveRngGp = itemGp;
+				}
+
+				if (waveNum == 12) {
+					ItemBundle quiver = config.logQuiverAsSplinters() ? DIZANAS_QUIVER_SWAPPED_REWARD : DIZANAS_QUIVER_REWARD;
+					int quiverGp = quiver.getQuantity() * priceMap.getOrDefault(quiver.getItemId(), 0);
+					recordReward(totalRewardsLedger, quiver, quiverGp);
+				}
+
+				boolean canHaveManticore = waveNum >= 4 && waveNum < 12;
+
 				ColosseumWaveDtoV1 waveDto = ColosseumWaveDtoV1.builder()
-					.wave(Integer.parseInt(getCol.apply("wave")))
-					.status(getCol.apply("status"))
+					.wave(waveNum)
+					.status(rowStatus)
 					.accountName(getCol.apply("accountName"))
-					.tag(tag)
+					.tag(attemptTag)
 					.gameMode(DEFAULT_GAMEMODE_DTO)
-					.earnedLoot(earnedLoot)
-					.chosenModifier(chosen)
-					.completionBonus(Integer.parseInt(getCol.apply("completionBonus")))
-					.speedBonus(Integer.parseInt(getCol.apply("speedBonus")))
-					.damageBonus(Integer.parseInt(getCol.apply("damageBonus")))
-					.damageTaken(Integer.parseInt(getCol.apply("damageTaken")))
-					.modifierGlory(Integer.parseInt(getCol.apply("modifierGlory")))
+					.earnedLoot(rngLoot)
+					.lootValue(waveRngGp)
+					.modifierChoices(offeredChoices) // <-- Attached here!
+					.chosenModifier(chosenMod)
 					.activeModifiers(new ArrayList<>(activeModsMap.values()))
-					.timeTaken(Double.parseDouble(getCol.apply("timeTaken")))
-					.totalTimeTaken(formatTime(Double.parseDouble(getCol.apply("totalTimeTaken"))))
-					.waveGlory(Integer.parseInt(getCol.apply("waveGlory")))
-					.totalGlory(Integer.parseInt(getCol.apply("totalGlory")))
-					.serpentShamanSpawnX(getIntCol.apply("serpentShamanSpawnX"))
-					.serpentShamanSpawnY(getIntCol.apply("serpentShamanSpawnY"))
-					.javelinColossusSpawnAX(getIntCol.apply("javelinColossusSpawnAX"))
-					.javelinColossusSpawnAY(getIntCol.apply("javelinColossusSpawnAY"))
-					.javelinColossusSpawnBX(getIntCol.apply("javelinColossusSpawnBX"))
-					.javelinColossusSpawnBY(getIntCol.apply("javelinColossusSpawnBY"))
-					.manticoreSpawnAX(getIntCol.apply("manticoreSpawnAX"))
-					.manticoreSpawnAY(getIntCol.apply("manticoreSpawnAY"))
-					.manticoreSequenceA(parseManticoreSequence(getCol.apply("manticoreSequenceA")))
-					.manticoreSpawnBX(getIntCol.apply("manticoreSpawnBX"))
-					.manticoreSpawnBY(getIntCol.apply("manticoreSpawnBY"))
-					.manticoreSequenceB(parseManticoreSequence(getCol.apply("manticoreSequenceB")))
-					.shockwaveColossusSpawnAX(getIntCol.apply("shockwaveColossusSpawnAX"))
-					.shockwaveColossusSpawnAY(getIntCol.apply("shockwaveColossusSpawnAY"))
-					.shockwaveColossusSpawnBX(getIntCol.apply("shockwaveColossusSpawnBX"))
-					.shockwaveColossusSpawnBY(getIntCol.apply("shockwaveColossusSpawnBY"))
-					.jaguarWarriorReinforcementsSpawnX(getIntCol.apply("jaguarWarriorReinfSpawnX"))
-					.jaguarWarriorReinforcementsSpawnY(getIntCol.apply("jaguarWarriorReinfSpawnY"))
-					.serpentShamanReinforcementsSpawnX(getIntCol.apply("serpentShamanReinfSpawnX"))
-					.serpentShamanReinforcementsSpawnY(getIntCol.apply("serpentShamanReinfSpawnY"))
-					.minotaurReinforcementsSpawnX(getIntCol.apply("minotaurReinfSpawnX"))
-					.minotaurReinforcementsSpawnY(getIntCol.apply("minotaurReinfSpawnY"))
+					.timeTaken(formatTime(getDouble(getCol.apply("timeTaken"), 0.0)))
+					.totalTimeTaken(formatTime(getDouble(getCol.apply("totalTimeTaken"), 0.0)))
+					.speedBonus(getInt(getCol.apply("speedBonus"), 0))
+					.damageBonus(getInt(getCol.apply("damageBonus"), 0))
+					.damageTaken(getInt(getCol.apply("damageTaken"), 0))
+					.completionBonus(getInt(getCol.apply("completionBonus"), 0))
+					.modifierGlory(getInt(getCol.apply("modifierGlory"), 0))
+					.waveGlory(getInt(getCol.apply("waveGlory"), 0))
+					.totalGlory(getInt(getCol.apply("totalGlory"), 0))
+					.serpentShamanSpawnX(getCoord(getCol.apply("serpentShamanSpawnX")))
+					.serpentShamanSpawnY(getCoord(getCol.apply("serpentShamanSpawnY")))
+					.javelinColossusSpawnAX(getCoord(getCol.apply("javelinColossusSpawnAX")))
+					.javelinColossusSpawnAY(getCoord(getCol.apply("javelinColossusSpawnAY")))
+					.javelinColossusSpawnBX(getCoord(getCol.apply("javelinColossusSpawnBX")))
+					.javelinColossusSpawnBY(getCoord(getCol.apply("javelinColossusSpawnBY")))
+					.shockwaveColossusSpawnAX(getCoord(getCol.apply("shockwaveColossusSpawnAX")))
+					.shockwaveColossusSpawnAY(getCoord(getCol.apply("shockwaveColossusSpawnAY")))
+					.shockwaveColossusSpawnBX(getCoord(getCol.apply("shockwaveColossusSpawnBX")))
+					.shockwaveColossusSpawnBY(getCoord(getCol.apply("shockwaveColossusSpawnBY")))
+					.jaguarWarriorReinforcementsSpawnX(getCoord(getCol.apply("jaguarWarriorReinfSpawnX")))
+					.jaguarWarriorReinforcementsSpawnY(getCoord(getCol.apply("jaguarWarriorReinfSpawnY")))
+					.serpentShamanReinforcementsSpawnX(getCoord(getCol.apply("serpentShamanReinfSpawnX")))
+					.serpentShamanReinforcementsSpawnY(getCoord(getCol.apply("serpentShamanReinfSpawnY")))
+					.minotaurReinforcementsSpawnX(getCoord(getCol.apply("minotaurReinfSpawnX")))
+					.minotaurReinforcementsSpawnY(getCoord(getCol.apply("minotaurReinfSpawnY")))
+					.manticoreSpawnAX(canHaveManticore ? getCoord(getCol.apply("manticoreSpawnAX")) : null)
+					.manticoreSpawnAY(canHaveManticore ? getCoord(getCol.apply("manticoreSpawnAY")) : null)
+					.manticoreSequenceA(parseManticoreSequence(getCol.apply("manticoreSequenceA"), canHaveManticore))
+					.manticoreSpawnBX(canHaveManticore ? getCoord(getCol.apply("manticoreSpawnBX")) : null)
+					.manticoreSpawnBY(canHaveManticore ? getCoord(getCol.apply("manticoreSpawnBY")) : null)
+					.manticoreSequenceB(parseManticoreSequence(getCol.apply("manticoreSequenceB"), canHaveManticore))
 					.build();
 
-				waveDtos.add(waveDto);
-
-				result = getCol.apply("status");
-				if (result.equals("CANCELLED"))
-					result = "CLAIMED";
-			}
-			final String attemptResult = result;
-
-			String fileName = file.getName().replace("_wave-log.csv", "");
-			String[] nameParts = fileName.split("_");
-			long timestamp = LocalDateTime.parse(nameParts[1] + "_" + nameParts[2],
-				DateTimeFormatter.ofPattern("yyMMdd_HHmmss")).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
-
-			Set<Integer> itemIds = waveDtos.stream()
-				.map(ColosseumWaveDtoV1::getEarnedLoot)
-				.filter(java.util.Objects::nonNull)
-				.map(ItemBundle::getItemId)
-				.collect(Collectors.toSet());
-
-			Map<Integer, Integer> aggregatedRewards = new HashMap<>();
-			int totalGlory = 0;
-			double totalTime = .0;
-
-			for (ColosseumWaveDtoV1 wave : waveDtos) {
-				ItemBundle loot = wave.getEarnedLoot();
-				if (loot != null) {
-					aggregatedRewards.merge(loot.getItemId(), loot.getQuantity(), Integer::sum);
-					if (wave.getWave() == 12) {
-						if (config.logQuiverAsSplinters())
-							aggregatedRewards.merge(SUNFIRE_SPLINTERS_ID, 4000, Integer::sum);
-						else
-							aggregatedRewards.merge(DIZANAS_QUIVER_UNCHARGED_ID, 1, Integer::sum);
-					}
-				}
-				totalGlory = wave.getTotalGlory();
-				totalTime = wave.getTotalTimeTaken();
+				v1Waves.add(waveDto);
 			}
 
-			final int finalWaveTotalGlory = totalGlory;
-			final double finalWaveTotalTimeTaken = totalTime;
-			final String finalTag = tag;
-			clientThread.invokeLater(() -> {
-				Map<String, ValuedItemStack> rewardsMap = generateNamedRewardsMap(aggregatedRewards);
+			int grandTotalGp = totalRewardsLedger.values().stream().mapToInt(ValuedItemStack::getTotalValueInGp).sum();
+			int grandTotalGlory = v1Waves.isEmpty() ? 0 : v1Waves.get(v1Waves.size() - 1).getTotalGlory();
+			double grandTotalDuration = v1Waves.isEmpty() ? 0.0 : v1Waves.get(v1Waves.size() - 1).getTotalTimeTaken();
 
-				// SET LOOT VALUES HERE ON THE CLIENT THREAD
-				for (ColosseumWaveDtoV1 wave : waveDtos) {
-					if (wave.getEarnedLoot() != null) {
-						int price = itemManager.getItemPrice(wave.getEarnedLoot().getItemId());
-						wave.setLootValue(price * wave.getEarnedLoot().getQuantity());
-					}
-				}
+			ColosseumAttemptDtoV1 attemptDto = ColosseumAttemptDtoV1.builder()
+				.attemptId(attemptId)
+				.timestamp(attemptTimestamp)
+				.accountName(attemptAccount)
+				.gameMode(DEFAULT_GAMEMODE_DTO)
+				.tag(attemptTag)
+				.rewardsValue(grandTotalGp)
+				.rewards(totalRewardsLedger)
+				.result(attemptResult)
+				.totalGlory(grandTotalGlory)
+				.totalTime(formatTime(grandTotalDuration))
+				.activeModifiers(new ArrayList<>(activeModsMap.values()))
+				.waves(v1Waves)
+				.build();
 
-				ColosseumAttemptDtoV1 attemptDto = ColosseumAttemptDtoV1.builder()
-					.attemptId(fileName)
-					.timestamp(timestamp)
-					.accountName(nameParts[0])
-					.gameMode(DEFAULT_GAMEMODE_DTO)
-					.tag(finalTag)
-					.rewardsValue(rewardsMap.values().stream()
-						.mapToInt(ValuedItemStack::getTotalValueInGp)
-						.sum())
-					.rewards(rewardsMap)
-					.result(attemptResult)
-					.waves(waveDtos)
-					.totalGlory(finalWaveTotalGlory)
-					.totalTime(finalWaveTotalTimeTaken)
-					.activeModifiers(new ArrayList<>(activeModsMap.values()))
-					.build();
+			try (BufferedWriter writer = new BufferedWriter(new FileWriter(jsonlFile, true))) {
+				Gson noHtmlGson = this.gson.newBuilder().disableHtmlEscaping().create();
+				writer.write(noHtmlGson.toJson(attemptDto));
+				writer.newLine();
+			}
 
-				try (java.io.BufferedWriter bw = new java.io.BufferedWriter(new java.io.FileWriter(jsonlFile, true))) {
-					Gson jsonlGson = gson.newBuilder().disableHtmlEscaping().create();
-					bw.write(jsonlGson.toJson(attemptDto));
-					bw.newLine();
-					return true;
-				} catch (Exception e) {
-					log.error("Failed to append migrated Colosseum CSV to V1 JSONL", e);
-					return false;
-				}
-			});
-
+			log.debug("Successfully migrated CSV to V1 JSONL: {}", file.getName());
 			return true;
+
 		} catch (Exception e) {
-			log.error("Failed to migrate Colosseum CSV to V1", e);
+			log.error("Failed to migrate Colosseum CSV file: {}", file.getName(), e);
 			return false;
 		}
 	}
 
-	private Map<String, ValuedItemStack> generateNamedRewardsMap(Map<Integer, Integer> rewards) {
-		Map<String, ValuedItemStack> namedRewards = new LinkedHashMap<>();
+	private ItemBundle extractRngItemBundle(Function<String, String> getCol) {
+		String rawIds = getCol.apply("itemIds");
+		if (rawIds == null || rawIds.isEmpty()) return null;
 
-		if (rewards == null || rewards.isEmpty()) {
-			return namedRewards;
-		}
+		String[] ids = rawIds.split("\\|");
+		String[] names = getCol.apply("itemNames").split("\\|");
+		String[] qtys = getCol.apply("quantities").split("\\|");
 
-		for (Map.Entry<Integer, Integer> entry : rewards.entrySet()) {
-			int itemId = entry.getKey();
-			int quantity = entry.getValue();
+		int targetIdx = ids.length - 1;
+		if (targetIdx < 0 || ids[targetIdx].isEmpty()) return null;
 
-			ItemComposition comp = itemManager.getItemComposition(itemId);
-			String itemName = comp.getName();
-
-			int price = itemManager.getItemPrice(itemId);
-			int totalValue = price * quantity;
-
-			namedRewards.merge(itemName, new ValuedItemStack(quantity, totalValue),
-				(existing, replacement) -> new ValuedItemStack(
-					existing.getCount() + replacement.getCount(),
-					existing.getTotalValueInGp() + replacement.getTotalValueInGp()
-				));
-		}
-
-		return namedRewards;
+		try {
+			return new ItemBundle(Integer.parseInt(ids[targetIdx]), names[targetIdx], Integer.parseInt(qtys[targetIdx]));
+		} catch (NumberFormatException ignored) { return null; }
 	}
 
-	private double formatTime(double time) {
-		return Math.round(time * 10.0) / 10.0;
+	private void recordReward(Map<String, ValuedItemStack> ledger, ItemBundle bundle, int calculatedGp) {
+		ValuedItemStack existing = ledger.getOrDefault(bundle.getItemName(), new ValuedItemStack(0, 0));
+		ledger.put(bundle.getItemName(), new ValuedItemStack(
+			existing.getCount() + bundle.getQuantity(),
+			existing.getTotalValueInGp() + calculatedGp
+		));
 	}
 
-	private List<ManticoreAttackSequence.ManticoreOrb> parseManticoreSequence(String sequence) {
-		if (sequence == null || sequence.isEmpty() || sequence.equalsIgnoreCase("UNKNOWN")) {
-			return new ArrayList<>();
+	private Map<Integer, Integer> preWarmPriceCache(List<String> lines, Map<String, Integer> headerMap) {
+		Set<Integer> uniqueIds = new HashSet<>();
+		uniqueIds.add(DIZANAS_QUIVER_REWARD.getItemId());
+		uniqueIds.add(DIZANAS_QUIVER_SWAPPED_REWARD.getItemId());
+
+		Integer idColIdx = headerMap.get("itemIds");
+		if (idColIdx != null) {
+			for (int i = 1; i < lines.size(); i++) {
+				String[] cols = lines.get(i).split(",", -1);
+				if (idColIdx < cols.length && !cols[idColIdx].isEmpty()) {
+					for (String rawId : cols[idColIdx].split("\\|")) {
+						String clean = cleanCsvValue(rawId);
+						if (!clean.isEmpty()) {
+							try { uniqueIds.add(Integer.parseInt(clean)); } catch (NumberFormatException ignored) {}
+						}
+					}
+				}
+			}
 		}
 
-		return Arrays.stream(sequence.split("-"))
+		Map<Integer, Integer> prices = new HashMap<>();
+		CompletableFuture<Void> sync = new CompletableFuture<>();
+		clientThread.invoke(() -> {
+			uniqueIds.forEach(id -> prices.put(id, itemManager.getItemPrice(id)));
+			sync.complete(null);
+		});
+		sync.join();
+		return prices;
+	}
+
+	private List<ManticoreAttackSequence.ManticoreOrb> parseManticoreSequence(String sequence, boolean canHaveManticore) {
+		if (!canHaveManticore) return null;
+
+		// --- NEW: Returning null instead of new ArrayList<>() kills Difference #3! ---
+		if (sequence == null || sequence.isEmpty() || "UNKNOWN".equalsIgnoreCase(sequence) || "-1".equals(sequence)) {
+			return null;
+		}
+
+		List<ManticoreAttackSequence.ManticoreOrb> orbs = Arrays.stream(sequence.split("-"))
+			.map(String::trim)
+			.filter(s -> !s.isEmpty())
 			.map(s -> {
 				try {
 					return ManticoreAttackSequence.ManticoreOrb.valueOf(s.toUpperCase());
@@ -335,5 +334,52 @@ public class ColosseumTrialMigrationCsvV0V1 implements DataMigration {
 				}
 			})
 			.collect(Collectors.toList());
+
+		return orbs.isEmpty() ? null : orbs;
 	}
+
+	private Integer getCoord(String val) {
+		int v = getInt(val, -1);
+		return (v == -1) ? null : v;
+	}
+
+	private int getInt(String val, int fallback) {
+		if (val == null || val.isEmpty() || "-1".equals(val)) return fallback;
+		try { return Integer.parseInt(val); } catch (NumberFormatException e) { return fallback; }
+	}
+
+	private double getDouble(String val, double fallback) {
+		if (val == null || val.isEmpty()) return fallback;
+		try { return Double.parseDouble(val); } catch (NumberFormatException e) { return fallback; }
+	}
+
+	private String cleanCsvValue(String val) {
+		if (val == null) return "";
+		String trimmed = val.trim();
+		if (trimmed.startsWith("\"") && trimmed.endsWith("\"") && trimmed.length() >= 2) {
+			return trimmed.substring(1, trimmed.length() - 1);
+		}
+		return trimmed;
+	}
+
+	private long resolveTimestamp(String fileName) {
+		if (fileName.length() >= 14) {
+			try {
+				String dateStr = fileName.substring(fileName.length() - 13);
+				return LocalDateTime.parse(dateStr, FALLBACK_DATE_FORMAT).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
+			} catch (Exception ignored) {}
+		}
+		return System.currentTimeMillis();
+	}
+
+	private String resolveAccount(String fileName) {
+		return fileName.length() >= 14 ? fileName.substring(0, fileName.length() - 14) : "Unknown";
+	}
+
+	private String resolveAttemptId(String account, long timestamp, String sourceName) {
+		if (sourceName.contains("_") && sourceName.length() >= 14) return sourceName;
+		return account + "_" + Instant.ofEpochMilli(timestamp).atZone(ZoneId.systemDefault()).format(Colosseum.COLOSSEUM_TRIAL_TIMESTAMP_FORMATTER);
+	}
+
+	private double formatTime(double time) { return Math.round(time * 10.0) / 10.0; }
 }
