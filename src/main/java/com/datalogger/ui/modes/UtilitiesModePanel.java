@@ -345,7 +345,14 @@ public class UtilitiesModePanel extends JPanel
 		executor.submit(() -> {
 			try
 			{
+
 				int nMigrated = migrationManager.migrateColosseumTrialsV0V1();
+				if (nMigrated == -1)
+				{
+					log.debug("Failed to migrate trials...");
+					label.setText("<html><div style='width: 200px; color: white; padding-bottom: 2px;'>Failed to migrate trials!<br>");
+					return;
+				}
 				if (nMigrated > 0)
 				{
 					colosseumStatisticsModePanel.loadStatisticsFromDisk();

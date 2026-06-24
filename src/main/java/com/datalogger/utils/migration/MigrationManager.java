@@ -6,10 +6,10 @@
  * modification, are permitted provided that the following conditions are met:
  *
  * 1. Redistributions of source code must retain the above copyright notice, this
- *    list of conditions and the following disclaimer.
+ * list of conditions and the following disclaimer.
  * 2. Redistributions in binary form must reproduce the above copyright notice,
- *    this list of conditions and the following disclaimer in the documentation
- *    and/or other materials provided with the distribution.
+ * this list of conditions and the following disclaimer in the documentation
+ * and/or other materials provided with the distribution.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
@@ -78,10 +78,6 @@ public class MigrationManager
 		this.gson = gson;
 	}
 
-	/**
-	 * Parse and return the trialIds from the output jsonl file. These trialIds are used to identify whether a trial is
-	 * already logged or not.
-	 */
 	public List<String> parseTrialIdsV1()
 	{
 		List<String> trialIds = new ArrayList<>();
@@ -125,6 +121,12 @@ public class MigrationManager
 
 	public int migrateColosseumTrialsV0V1()
 	{
+		if (!jsonFile.exists() && !jsonFile.getParentFile().mkdirs())
+		{
+			log.debug("Failed to create the internal colosseum directory. Aborting migration...");
+			return -1;
+		}
+
 		if (!COLOSSEUM_ROOT_DIR.exists() || !COLOSSEUM_ROOT_DIR.isDirectory())
 		{
 			return 0;
@@ -133,7 +135,6 @@ public class MigrationManager
 
 		List<String> existingTrialIds = parseTrialIdsV1();
 
-		// Iterate over all directories in COLOSSEUM_ROOT_DIR
 		File[] directories = COLOSSEUM_ROOT_DIR.listFiles(File::isDirectory);
 		if (directories == null)
 		{
@@ -142,6 +143,9 @@ public class MigrationManager
 		int nMigrated = 0;
 		for (File dir : directories)
 		{
+			// CRITICAL SAFEGUARD: Do not treat the archive directory itself as a trial folder
+			if (dir.getName().equalsIgnoreCase("archive")) continue;
+
 			File[] files = dir.listFiles(File::isFile);
 			if (files == null)
 			{
@@ -214,6 +218,8 @@ public class MigrationManager
 
 		log.debug("Starting to rebuild Colosseum trial directories from {}", jsonlFile.getName());
 
+		File archiveDir = new File(COLOSSEUM_ROOT_DIR, "archive");
+
 		try (BufferedReader reader = new BufferedReader(new FileReader(jsonlFile)))
 		{
 			String line;
@@ -236,8 +242,16 @@ public class MigrationManager
 					}
 
 					File srcDir = new File(COLOSSEUM_ROOT_DIR, attempt.getAttemptId());
-					String timelineFileName = attempt.getAttemptId()+"_timeline.json";
+					File archivedTrialDir = new File(archiveDir, attempt.getAttemptId());
+
+					String timelineFileName = attempt.getAttemptId() + "_timeline.json";
+
 					File srcTimelineFile = new File(srcDir, timelineFileName);
+					if (!srcTimelineFile.exists())
+					{
+						srcTimelineFile = new File(archivedTrialDir, timelineFileName);
+					}
+
 					File dstTimelineFile = new File(trialDir, timelineFileName);
 					if (srcTimelineFile.exists() && !dstTimelineFile.exists())
 					{
@@ -255,6 +269,16 @@ public class MigrationManager
 					File csvFile = new File(trialDir, baseFileName + ".csv");
 					writeWaveLogCsv(csvFile, attempt);
 
+					if (srcDir.exists() && srcDir.isDirectory())
+					{
+						if (!archiveDir.exists())
+						{
+							archiveDir.mkdirs();
+						}
+						Files.move(srcDir.toPath(), archivedTrialDir.toPath(), StandardCopyOption.REPLACE_EXISTING);
+						log.debug("Moved old trial directory {} to archive dir", srcDir.getName());
+					}
+
 					count++;
 				}
 				catch (Exception e)
@@ -263,7 +287,7 @@ public class MigrationManager
 				}
 			}
 
-			log.debug("Successfully rebuilt {} trial directories.", count);
+			log.debug("Successfully rebuilt and archived {} trial directories.", count);
 		}
 		catch (Exception e)
 		{
@@ -271,19 +295,13 @@ public class MigrationManager
 		}
 	}
 
-	/**
-	 * Helper method to generate the CSV format for an attempt.
-	 * If your FileIOService already has a method for this, you can swap this out!
-	 */
 	private void writeWaveLogCsv(File csvFile, ColosseumAttemptDTO attempt) throws Exception
 	{
 		try (BufferedWriter bw = new BufferedWriter(new FileWriter(csvFile)))
 		{
-			// Write Headers
 			bw.write("wave,status,accountName,tag,itemId,itemName,quantity,lootValue,chosenModifier,activeModifiers,completionBonus,speedBonus,damageBonus,damageTaken,modifierGlory,timeTaken,totalTimeTaken,waveGlory,totalGlory,serpentShamanSpawnX,serpentShamanSpawnY,javelinColossusSpawnAX,javelinColossusSpawnAY,javelinColossusSpawnBX,javelinColossusSpawnBY,manticoreSpawnAX,manticoreSpawnAY,manticoreSequenceA,manticoreSpawnBX,manticoreSpawnBY,manticoreSequenceB,shockwaveColossusSpawnAX,shockwaveColossusSpawnAY,shockwaveColossusSpawnBX,shockwaveColossusSpawnBY,jaguarWarriorReinfSpawnX,jaguarWarriorReinfSpawnY,serpentShamanReinfSpawnX,serpentShamanReinfSpawnY,minotaurReinfSpawnX,minotaurReinfSpawnY");
 			bw.newLine();
 
-			// Write wave rows
 			for (ColosseumWaveDTO wave : attempt.getWaves())
 			{
 				StringBuilder sb = new StringBuilder();
@@ -367,12 +385,6 @@ public class MigrationManager
 		return (list != null && !list.isEmpty()) ? list.stream().map(Object::toString).collect(Collectors.joining("-")) : "";
 	}
 
-
-
-	/**
-	 * Returns true if dir follows the pattern of a logged Colosseum trial directory and if the timestamp suggests it is
-	 * a legacy trial.
-	 */
 	public boolean isMigrateableLoggedTrialId(File dir)
 	{
 		String name = dir.getName();
@@ -428,7 +440,7 @@ public class MigrationManager
 
 	public boolean hasLogFilesToMigrate(File dir)
 	{
-		String baseFileName = dir.getName()+"_wave-log";
-		return new File(dir, baseFileName+".csv").exists() || new File(dir, baseFileName+".json").exists();
+		String baseFileName = dir.getName() + "_wave-log";
+		return new File(dir, baseFileName + ".csv").exists() || new File(dir, baseFileName + ".json").exists();
 	}
 }
