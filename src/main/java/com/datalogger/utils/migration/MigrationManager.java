@@ -121,7 +121,8 @@ public class MigrationManager
 
 	public int migrateColosseumTrialsV0V1()
 	{
-		if (!jsonFile.exists() && !jsonFile.getParentFile().mkdirs())
+		File parentDir = jsonFile.getParentFile();
+		if (!jsonFile.exists() && !parentDir.exists() && !jsonFile.getParentFile().mkdirs())
 		{
 			log.debug("Failed to create the internal colosseum directory. Aborting migration...");
 			return -1;
