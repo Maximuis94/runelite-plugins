@@ -121,11 +121,14 @@ public class MigrationManager
 
 	public int migrateColosseumTrialsV0V1()
 	{
-		File parentDir = jsonFile.getParentFile();
-		if (!jsonFile.exists() && !parentDir.exists() && !jsonFile.getParentFile().mkdirs())
+		if (!jsonFile.exists())
 		{
-			log.debug("Failed to create the internal colosseum directory. Aborting migration...");
-			return -1;
+			File parentDir = jsonFile.getParentFile();
+			if (!parentDir.exists() && !parentDir.mkdirs())
+			{
+				log.debug("Failed to create the internal colosseum directory. Aborting migration...");
+				return -1;
+			}
 		}
 
 		if (!COLOSSEUM_ROOT_DIR.exists() || !COLOSSEUM_ROOT_DIR.isDirectory())
