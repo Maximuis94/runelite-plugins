@@ -107,7 +107,7 @@ public class ItemsModePanel extends JPanel
 	private final Map<Integer, Integer> itemPriceCache = new HashMap<>();
 
 	private ItemTable itemTableWrapper;
-	private JScrollBar scrollBar;
+	private JScrollBar scrollBar = null;
 	private UIScrollSpeed scrollSpeed = UIScrollSpeed.MEDIUM;
 
 	@Inject
@@ -414,6 +414,8 @@ public class ItemsModePanel extends JPanel
 	public void setScrollSpeed(UIScrollSpeed scrollSpeed)
 	{
 		this.scrollSpeed = scrollSpeed;
+		if (scrollBar == null) return;
+
 		switch (scrollSpeed){
 			case LOW:
 				scrollBar.setUnitIncrement(8);
