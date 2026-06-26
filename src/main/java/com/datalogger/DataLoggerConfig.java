@@ -25,6 +25,8 @@
 package com.datalogger;
 
 import static com.datalogger.constants.PluginConstants.CONFIG_GROUP;
+import static com.datalogger.constants.PluginConstants.NO_MIGRATION_CONFIG_KEY;
+import static com.datalogger.constants.PluginConstants.PLUGIN_VERSION_CONFIG_KEY;
 import com.datalogger.models.enums.ColosseumBroadcastMode;
 import com.datalogger.models.enums.ExchangeLoggerCsvFileStrategy;
 import com.datalogger.models.enums.ExchangeLoggerJsonFileStrategy;
@@ -405,8 +407,8 @@ public interface DataLoggerConfig extends Config {
 
 	@ConfigItem(
 		keyName = "screenshotBetweenWaves",
-		name = "Colosseum Wave Completion",
-		description = "Automatically take a screenshot after completing a wave when the intermission/rewards chest UI is visible",
+		name = "Take Colosseum screenshots",
+		description = "Automatically take a screenshot after a wave ends, when the chest UI is visible, or when you die.",
 		position = 3,
 		section = COLOSSEUM_SECTION
 	)
@@ -679,5 +681,25 @@ public interface DataLoggerConfig extends Config {
 			"**Result:** <RESULT>\n" +
 			"**Time:** <TIME>\n" +
 			"**Final Modifier:** <12:MOD>\n\n\n\n\n";
+	}
+
+	@ConfigItem(
+		keyName = PLUGIN_VERSION_CONFIG_KEY,
+		name = "Last Notified Version",
+		description = "Internal tracker for update notifications",
+		hidden = true
+	)
+	default String lastNotifiedVersion() {
+		return "";
+	}
+
+	@ConfigItem(
+		keyName = NO_MIGRATION_CONFIG_KEY,
+		name = "Has refused Colosseum data migration",
+		description = "Internal flag that is set if the user wishes not to migrate",
+		hidden = true
+	)
+	default boolean hasRefusedMigration() {
+		return false;
 	}
 }

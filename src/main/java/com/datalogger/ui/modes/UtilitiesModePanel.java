@@ -25,10 +25,13 @@
 
 package com.datalogger.ui.modes;
 
+import com.datalogger.DataLoggerConfig;
+import com.datalogger.constants.PluginConstants;
 import static com.datalogger.constants.PluginConstants.COLOSSEUM_ROOT_DIR;
 import static com.datalogger.constants.PluginConstants.COLOSSEUM_TRIALS_DIR;
 import static com.datalogger.constants.PluginConstants.GRAND_EXCHANGE_DIR;
 import static com.datalogger.constants.PluginConstants.ITEM_VAULT_DIR;
+import static com.datalogger.constants.PluginConstants.NO_MIGRATION_CONFIG_KEY;
 import com.datalogger.loggers.ItemVaultLogger;
 import com.datalogger.models.enums.Directory;
 import com.datalogger.services.AccountHashMapper;
@@ -45,7 +48,6 @@ import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.GridLayout;
 import java.io.File;
-import java.util.List;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import javax.inject.Inject;
@@ -58,6 +60,7 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
 import lombok.extern.slf4j.Slf4j;
+import net.runelite.client.config.ConfigManager;
 import net.runelite.client.ui.ColorScheme;
 
 @Slf4j
@@ -71,12 +74,17 @@ public class UtilitiesModePanel extends JPanel
 	private final GrandExchangeExportService geExportService;
 	private final AccountHashMapper accountHashMapper;
 	private final ColosseumStatisticsModePanel colosseumStatisticsModePanel;
+	private final DataLoggerConfig config;
+	private final ConfigManager configManager;
+
+	private boolean migrationPanelExists = false;
 
 	@Inject
 	public UtilitiesModePanel(ScheduledExecutorService executor, VaultManager vaultManager,
 							  FileIOService fileIOService, ItemVaultLogger itemVaultLogger,
 							  MigrationManager migrationManager, GrandExchangeExportService geExportService,
-							  AccountHashMapper accountHashMapper, ColosseumStatisticsModePanel colosseumStatisticsModePanel)
+							  AccountHashMapper accountHashMapper, ColosseumStatisticsModePanel colosseumStatisticsModePanel,
+							  DataLoggerConfig config, ConfigManager configManager)
 	{
 		this.executor = executor;
 		this.migrationManager = migrationManager;
@@ -86,6 +94,8 @@ public class UtilitiesModePanel extends JPanel
 		this.geExportService = geExportService;
 		this.accountHashMapper = accountHashMapper;
 		this.colosseumStatisticsModePanel = colosseumStatisticsModePanel;
+		this.config = config;
+		this.configManager = configManager;
 
 		setLayout(new BorderLayout());
 		setBackground(ColorScheme.DARK_GRAY_COLOR);
@@ -287,47 +297,36 @@ public class UtilitiesModePanel extends JPanel
 	}
 
 	/**
-	 * Returns true if the user has unlogged, legacy colosseum trials
+	 * Panel with buttons to initiate or decline colosseum data migration.
 	 */
-	private boolean hasLegacyColosseumTrials()
-	{
-		File[] files = COLOSSEUM_ROOT_DIR.listFiles();
-		if (files == null) return false;
-
-		List<String> existingTrialIds = migrationManager.parseTrialIdsV1();
-
-		for (File nextDir : files)
-		{
-			String dirName = nextDir.getName();
-
-			boolean potentialTrial = migrationManager.isMigrateableLoggedTrialId(nextDir);
-			boolean hasLogFiles = migrationManager.hasLogFilesToMigrate(nextDir);
-			boolean trialIsLogged = existingTrialIds.contains(dirName);
-
-			if (potentialTrial && hasLogFiles && !trialIsLogged)
-			{
-				return true;
-			}
-		}
-		return false;
-	}
-
 	private JPanel buildDataMigrationPanel()
 	{
-		if (hasLegacyColosseumTrials())
+		if (!config.hasRefusedMigration() && migrationManager.hasLegacyColosseumTrials())
 		{
+			migrationPanelExists = true;
 			JPanel panel;
-			final JLabel label = Components.createLabel("<html><div style='width: 200px; color: white; padding-bottom: 2px;'>Some legacy trials have been found.<br>Click the button below to convert <br>them so they may be used with the <br>data viewer");
+			final JLabel label = Components.createLabel(
+				"<html><div style='width: 200px; color: white; padding-bottom: 2px;'>" +
+				"Some legacy trials have been found.<br>" +
+				"Click the button below to convert <br>" +
+				"them so they may be used with the <br>" +
+				"data viewer.<br>" +
+				"If you wish to hide this message<br>" +
+				"permanently, click decline.");
 
 			JButton convertBtn;
-			panel = Components.createTitledPanel("Data migration", new BorderLayout(0, 5));
+			panel = Components.createTitledPanel("Colosseum data migration", new BorderLayout(0, 5));
+			JButton declineBtn = createStyledButton("Decline & hide");
 
 			convertBtn = createStyledButton("Migrate logs");
 			convertBtn.addActionListener(e -> {
-				initiateColosseumTrialMigration(label, convertBtn);
+				initiateColosseumTrialMigration(label, convertBtn, declineBtn);
 
 			});
-			convertBtn.setToolTipText("Migrates logged Colosseum trials to a newer version, if possible.");
+			convertBtn.setToolTipText(
+				"Migrates logged Colosseum trials to a newer version.<br>" +
+				"Trials logged before the data viewer was added have <br>" +
+				"to be migrated to be able to view them.");
 
 			Dimension dimension = new Dimension(0, 30);
 			convertBtn.setPreferredSize(dimension);
@@ -335,12 +334,50 @@ public class UtilitiesModePanel extends JPanel
 			panel.add(label, BorderLayout.NORTH);
 			panel.add(convertBtn, BorderLayout.SOUTH);
 
+			declineBtn.setToolTipText("Permanently dismiss this prompt without migrating old trials.");
+			declineBtn.setPreferredSize(new Dimension(0, 30));
+
+			declineBtn.addActionListener(e -> {
+				int confirm = JOptionPane.showConfirmDialog(
+					SwingUtilities.getWindowAncestor(panel),
+					"Are you sure? This panel will be permanently hidden without migrating the logs.",
+					"Decline Migration",
+					JOptionPane.YES_NO_OPTION,
+					JOptionPane.WARNING_MESSAGE
+				);
+
+				if (confirm == JOptionPane.YES_OPTION)
+				{
+					configManager.setConfiguration(
+						PluginConstants.CONFIG_GROUP,
+						NO_MIGRATION_CONFIG_KEY,
+						true
+					);
+
+					java.awt.Container parent = panel.getParent();
+					if (parent != null)
+					{
+						parent.remove(panel);
+						parent.revalidate();
+						parent.repaint();
+					}
+				}
+			});
+
+			JPanel buttonGrid = new JPanel(new java.awt.GridLayout(1, 2, 5, 0));
+			buttonGrid.setOpaque(false);
+			buttonGrid.add(convertBtn);
+			buttonGrid.add(declineBtn);
+
+			panel.add(label, BorderLayout.NORTH);
+			panel.add(buttonGrid, BorderLayout.SOUTH);
+
 			return panel;
 		}
 		return null;
 	}
 
-	private void initiateColosseumTrialMigration(JLabel label, JButton startBtn)
+	private void initiateColosseumTrialMigration(JLabel label, JButton startBtn, JButton declineBtn)
 	{
 		executor.submit(() -> {
 			try
@@ -369,8 +406,12 @@ public class UtilitiesModePanel extends JPanel
 							"Success", JOptionPane.INFORMATION_MESSAGE);
 					});
 				}
-				label.setText("<html><div style='width: 200px; color: white; padding-bottom: 2px;'>Converted all wave logs!<br> Viewing trial data may require <br>restarting the client.");
+				label.setText("<html><div style='width: 200px; color: white; padding-bottom: 2px;'>Converted all wave logs!<br> " +
+					"Viewing trial data may require <br>restarting the client.<br>" +
+					"Updated trial data was moved to data-logger/colosseum/trials<br>" +
+					"Legacy trial data was moved to data-logger/colosseum/archive");
 				startBtn.setVisible(false);
+				declineBtn.setVisible(false);
 			}
 			catch (Exception e)
 			{
@@ -382,5 +423,10 @@ public class UtilitiesModePanel extends JPanel
 				});
 			}
 		});
+	}
+
+	public boolean getMigrationPanelExists()
+	{
+		return migrationPanelExists;
 	}
 }

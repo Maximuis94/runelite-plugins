@@ -27,6 +27,7 @@ package com.datalogger.utils.migration;
 
 import com.datalogger.constants.PluginConstants;
 import static com.datalogger.constants.PluginConstants.COLOSSEUM_ROOT_DIR;
+import static com.datalogger.constants.PluginConstants.COLOSSEUM_TRIALS_DIR;
 import static com.datalogger.constants.PluginConstants.INTERNAL_COLOSSEUM_TRIAL_HISTORY;
 import com.datalogger.dto.ColosseumAttemptDTO;
 import com.datalogger.dto.ColosseumWaveDTO;
@@ -66,7 +67,7 @@ public class MigrationManager
 	@Getter
 	private boolean hasMigrated = false;
 
-	public static final long COLOSSEUM_TRIAL_MIGRATION_THRESHOLD = 178232000000L;
+	public static final long COLOSSEUM_TRIAL_MIGRATION_THRESHOLD = 1782300000L;
 
 	private final File jsonFile = INTERNAL_COLOSSEUM_TRIAL_HISTORY;
 
@@ -119,6 +120,47 @@ public class MigrationManager
 		return trialIds;
 	}
 
+	public File[] getMigrationsToDoList(List<String> existingTrialIds)
+	{
+		List<File> candidates = new ArrayList<>();
+
+		// In case a failed migration was executed prior to 1.2.1
+		if (COLOSSEUM_TRIALS_DIR.exists() && COLOSSEUM_TRIALS_DIR.isDirectory())
+		{
+			File[] trialDirs = COLOSSEUM_TRIALS_DIR.listFiles(File::isDirectory);
+			if (trialDirs != null)
+			{
+				for (File dir : trialDirs)
+				{
+					if (isMigrateableLoggedTrialId(dir) && !existingTrialIds.contains(dir.getName()))
+					{
+						candidates.add(dir);
+					}
+				}
+			}
+		}
+
+		if (COLOSSEUM_ROOT_DIR.exists() && COLOSSEUM_ROOT_DIR.isDirectory())
+		{
+			File[] rootDirs = COLOSSEUM_ROOT_DIR.listFiles(File::isDirectory);
+			if (rootDirs != null)
+			{
+				for (File dir : rootDirs)
+				{
+					String name = dir.getName();
+					if (name.equalsIgnoreCase("archive") || name.equalsIgnoreCase("trials")) continue;
+
+					if (isMigrateableLoggedTrialId(dir) && !existingTrialIds.contains(name) && !candidates.contains(dir))
+					{
+						candidates.add(dir);
+					}
+				}
+			}
+		}
+
+		return candidates.toArray(new File[0]);
+	}
+
 	public int migrateColosseumTrialsV0V1()
 	{
 		if (!jsonFile.exists())
@@ -138,46 +180,44 @@ public class MigrationManager
 		hasMigrated = true;
 
 		List<String> existingTrialIds = parseTrialIdsV1();
+		File[] dirsToProcess = getMigrationsToDoList(existingTrialIds);
 
-		File[] directories = COLOSSEUM_ROOT_DIR.listFiles(File::isDirectory);
-		if (directories == null)
+		if (dirsToProcess.length == 0)
 		{
 			return 0;
 		}
-		int nMigrated = 0;
-		for (File dir : directories)
-		{
-			// CRITICAL SAFEGUARD: Do not treat the archive directory itself as a trial folder
-			if (dir.getName().equalsIgnoreCase("archive")) continue;
 
-			File[] files = dir.listFiles(File::isFile);
+		int nMigrated = 0;
+		for (File trialDir : dirsToProcess)
+		{
+			File[] files = trialDir.listFiles(File::isFile);
 			if (files == null)
 			{
 				continue;
 			}
 
-			File jsonFile = null;
-			File csvFile = null;
+			File jsonCandidate = null;
+			File csvCandidate = null;
 
 			for (File file : files)
 			{
-				if (jsonFile == null && jsonMigration.identify(file)) jsonFile = file;
-				if (csvFile == null && csvMigration.identify(file)) csvFile = file;
+				if (jsonCandidate == null && jsonMigration.identify(file)) jsonCandidate = file;
+				if (csvCandidate == null && csvMigration.identify(file)) csvCandidate = file;
 
-				if (jsonFile != null && csvFile != null) break;
+				if (jsonCandidate != null && csvCandidate != null) break;
 			}
 
-			if (jsonFile != null)
+			if (jsonCandidate != null)
 			{
-				String trialId = jsonFile.getName().replace("_wave-log.json", "");
+				String trialId = jsonCandidate.getName().replace("_wave-log.json", "");
 				if (existingTrialIds.contains(trialId))
 				{
 					log.debug("JSON trial already migrated, skipping: {}", trialId);
 					continue;
 				}
 
-				log.debug("JSON migration identified file: {}", jsonFile.getName());
-				if (jsonMigration.migrate(jsonFile))
+				log.debug("JSON migration identified file: {}", jsonCandidate.getName());
+				if (jsonMigration.migrate(jsonCandidate))
 				{
 					existingTrialIds.add(trialId);
 					nMigrated++;
@@ -185,17 +225,17 @@ public class MigrationManager
 				}
 			}
 
-			if (csvFile != null)
+			if (csvCandidate != null)
 			{
-				String trialId = csvFile.getName().replace("_wave-log.csv", "");
+				String trialId = csvCandidate.getName().replace("_wave-log.csv", "");
 				if (existingTrialIds.contains(trialId))
 				{
 					log.debug("CSV trial already migrated, skipping: {}", trialId);
 					continue;
 				}
 
-				log.debug("CSV migration identified file: {}", csvFile.getName());
-				if (csvMigration.migrate(csvFile))
+				log.debug("CSV migration identified file: {}", csvCandidate.getName());
+				if (csvMigration.migrate(csvCandidate))
 				{
 					existingTrialIds.add(trialId);
 					nMigrated++;
@@ -446,5 +486,44 @@ public class MigrationManager
 	{
 		String baseFileName = dir.getName() + "_wave-log";
 		return new File(dir, baseFileName + ".csv").exists() || new File(dir, baseFileName + ".json").exists();
+	}
+
+	/**
+	 * Returns true if the user has unlogged, legacy colosseum trials
+	 */
+	public boolean hasLegacyColosseumTrials()
+	{
+		List<String> existingTrialIds = parseTrialIdsV1();
+
+		File[] searchDirectories = { COLOSSEUM_ROOT_DIR, COLOSSEUM_TRIALS_DIR };
+
+		for (File searchDir : searchDirectories)
+		{
+			if (!searchDir.exists() || !searchDir.isDirectory())
+			{
+				continue;
+			}
+
+			File[] files = searchDir.listFiles();
+			if (files == null) continue;
+
+			for (File nextDir : files)
+			{
+				String dirName = nextDir.getName();
+
+				if (!dirName.contains("_")) continue;
+
+				boolean potentialTrial = isMigrateableLoggedTrialId(nextDir);
+				boolean hasLogFiles = hasLogFilesToMigrate(nextDir);
+				boolean trialIsLogged = existingTrialIds.contains(dirName);
+
+				if (potentialTrial && hasLogFiles && !trialIsLogged)
+				{
+					return true;
+				}
+			}
+		}
+
+		return false;
 	}
 }

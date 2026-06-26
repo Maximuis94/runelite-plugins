@@ -25,6 +25,7 @@
 package com.datalogger;
 
 import static com.datalogger.constants.PluginConstants.CONFIG_GROUP;
+import static com.datalogger.constants.PluginConstants.PLUGIN_VERSION;
 import com.datalogger.events.AccountSessionStarted;
 import com.datalogger.events.DataLoggerConfigChanged;
 import com.datalogger.loggers.ColosseumAttemptLogger;
@@ -48,6 +49,7 @@ import com.datalogger.services.SupplyTracker;
 import com.datalogger.services.itemvault.VaultManager;
 import com.datalogger.ui.DataLoggerPanel;
 import com.datalogger.ui.modes.ItemsModePanel;
+import com.datalogger.utils.migration.MigrationManager;
 import com.datalogger.webhook.ColosseumDiscordBroadcaster;
 import com.google.inject.Provides;
 import java.awt.image.BufferedImage;
@@ -56,6 +58,7 @@ import javax.inject.Inject;
 import javax.swing.SwingUtilities;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Actor;
+import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
 import net.runelite.api.WorldType;
@@ -86,6 +89,7 @@ public class DataLoggerPlugin extends Plugin
 	@Inject private ClientToolbar clientToolbar;
 	@Inject private EventBus eventBus;
 	@Inject private DataLoggerConfig config;
+	@Inject private ConfigManager configManager;
 	@Inject private ItemManager itemManager;
 
 	@Inject private AccountHashMapper accountHashMapper;
@@ -108,6 +112,7 @@ public class DataLoggerPlugin extends Plugin
 	@Inject private DiscordWebhookService discordWebhookService;
 	@Inject private CombatTracker combatTracker;
 	@Inject private ItemsModePanel itemsModePanel;
+	@Inject private MigrationManager migrationManager;
 
 	private NavigationButton navButton;
 	private boolean sessionInitialized = false;
@@ -149,7 +154,7 @@ public class DataLoggerPlugin extends Plugin
 		toggleGrandExchange(config.logGrandExchange());
 		toggleColosseum(config.logColosseum());
 		toggleTimeline(config.logWaveTimeline());
-		toggleScreenshots(config.screenshotBetweenWaves());
+		toggleScreenshots(isColosseumScreenshotterNeeded());
 		toggleSidebar(config.showSideBarPanel());
 
 		startUpComplete = true;
@@ -206,7 +211,10 @@ public class DataLoggerPlugin extends Plugin
 				toggleTimeline(config.logWaveTimeline());
 				break;
 			case "screenshotBetweenWaves":
-				toggleScreenshots(config.screenshotBetweenWaves());
+			case "broadcastCompletedTrials":
+			case "broadcastCancelledTrials":
+			case "broadcastFailedTrials":
+				toggleScreenshots(isColosseumScreenshotterNeeded());
 				break;
 			case "showSideBarPanel":
 				toggleSidebar(config.showSideBarPanel());
@@ -224,6 +232,52 @@ public class DataLoggerPlugin extends Plugin
 		}
 
 		eventBus.post(new DataLoggerConfigChanged(event.getKey(), event.getOldValue(), event.getNewValue(), event));
+	}
+
+	/**
+	 * One-time message with new features highlighted and notifications after logging in.
+	 */
+	@Subscribe
+	public void onAccountSessionStarted(AccountSessionStarted event)
+	{
+		if (!event.isOnRegularWorld()) {
+			return;
+		}
+
+		pluginUpdateMessage();
+	}
+
+	/**
+	 * One-time message with newly added features highlighted after logging in.
+	 */
+	private void pluginUpdateMessage()
+	{
+		final String currentVersion = PLUGIN_VERSION;
+		final String notifiedVersion = config.lastNotifiedVersion();
+
+		if (!currentVersion.equals(notifiedVersion))
+		{
+			StringBuilder chatMessage = new StringBuilder()
+				.append("<col=FF0000>[Data Logger]</col> was updated to <col=FF0000>v").append(currentVersion).append("</col>!<br>")
+				.append("- Expanded item logger with various containers<br>")
+				.append("- Item data viewer added to sidebar panel<br>")
+				.append("- Colosseum data viewer added to sidebar panel<br>")
+				.append("- Colosseum trials may be shared to Discord servers");
+
+			if (panel.canMigrateColosseumTrials())
+			{
+				chatMessage.append("<br><col=FF0000>Found Colosseum trials that require updating to view them, click 'Migrate logs' in the Data Logger sidebar panel if you wish to update them.</col>");
+			}
+
+			client.addChatMessage(
+				ChatMessageType.GAMEMESSAGE,
+				"",
+				chatMessage.toString(),
+				null
+			);
+
+			configManager.setConfiguration(CONFIG_GROUP, "lastNotifiedVersion", currentVersion);
+		}
 	}
 
 	private void toggleSidebar(boolean enable)
@@ -405,5 +459,16 @@ public class DataLoggerPlugin extends Plugin
 		geLogger.setLoggerIsEnabled(geLoggingEnabled);
 		grandExchangeHistoryParser.setEnabled(geLoggingEnabled);
 //		coloLogger.setEnabledLogging(config.logColosseum());
+	}
+
+	/**
+	 * Return true if the user has opted to take screenshots during Colosseum trials, or if a screenshot is needed for sharing a trial via Discord.
+	 */
+	private boolean isColosseumScreenshotterNeeded()
+	{
+		return config.screenshotBetweenWaves() ||
+			config.broadcastCompletedTrials().isAttachScreenshot() ||
+			config.broadcastCancelledTrials().isAttachScreenshot() ||
+			config.broadcastFailedTrials().isAttachScreenshot();
 	}
 }

@@ -151,6 +151,7 @@ public class ColosseumTrialMigrationCsvV0V1 implements DataMigration {
 				attemptTag = getCol.apply("tag") != null ? getCol.apply("tag") : "";
 				String rowStatus = getCol.apply("status");
 
+				// Wave result cancelled -> trial result of claimed
 				if (i == lines.size() - 1) {
 					attemptResult = "CANCELLED".equalsIgnoreCase(rowStatus) ? "CLAIMED" : rowStatus;
 				}
@@ -161,7 +162,6 @@ public class ColosseumTrialMigrationCsvV0V1 implements DataMigration {
 					activeModsMap.put(baseMod, chosenMod);
 				}
 
-				// --- NEW: Reconstruct the 3 offered modifier choices ---
 				List<String> offeredChoices = new ArrayList<>();
 				for (String choiceCol : new String[]{"modifierChoice_I", "modifierChoice_II", "modifierChoice_III"}) {
 					String choiceVal = getCol.apply(choiceCol);

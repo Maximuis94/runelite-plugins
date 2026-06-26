@@ -49,7 +49,6 @@ import javax.swing.JScrollPane;
 import javax.swing.Scrollable;
 import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
-
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.PluginPanel;
@@ -67,7 +66,6 @@ public class DataLoggerPanel extends PluginPanel {
 	private final ItemsModePanel itemsPanel;
 	private final ItemsManagerModePanel itemsManagerPanel;
 	private final WebhookTestModePanel webhookTestModePanel;
-
 
 	@Inject
 	public DataLoggerPanel(
@@ -188,6 +186,11 @@ public class DataLoggerPanel extends PluginPanel {
 		});
 	}
 
+	public boolean canMigrateColosseumTrials()
+	{
+		return utilitiesPanel.getMigrationPanelExists();
+	}
+
 	/**
 	 * Custom Scrollable JPanel.
 	 * getScrollableTracksViewportWidth() returning TRUE forces child components
@@ -248,10 +251,5 @@ public class DataLoggerPanel extends PluginPanel {
 			}
 			return super.preferredLayoutSize(parent);
 		}
-	}
-
-	public void updateOuterScrollbar()
-	{
-
 	}
 }

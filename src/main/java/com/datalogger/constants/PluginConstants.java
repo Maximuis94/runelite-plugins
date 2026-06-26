@@ -37,6 +37,10 @@ public final class PluginConstants
 	public static final String CONFIG_GROUP = "datalogger";
 	public static final String PLUGIN_URL = "https://runelite.net/plugin-hub/show/data-logger";
 
+	public static final String PLUGIN_VERSION_CONFIG_KEY = "lastNotifiedVersion";
+	public static final String NO_MIGRATION_CONFIG_KEY = "hasRefusedMigration";
+	public static final String PLUGIN_VERSION = "1.2.1";
+
 	public static final File PLUGIN_ROOT = new File(RuneLite.RUNELITE_DIR, "data-logger");
 	public static final File COLOSSEUM_ROOT_DIR = new File(PLUGIN_ROOT, "colosseum");
 	public static final File COLOSSEUM_TRIALS_DIR = new File(COLOSSEUM_ROOT_DIR, "trials");

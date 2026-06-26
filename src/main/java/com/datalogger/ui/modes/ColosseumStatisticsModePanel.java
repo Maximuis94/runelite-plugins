@@ -136,7 +136,7 @@ public class ColosseumStatisticsModePanel extends JPanel
 	private static final Dimension MODIFIER_SIZE = new Dimension(200, 35);
 	private final static Dimension SCROLLPANE_PREFERRED_SIZE = new Dimension(250, 800);
 	private final static Dimension SCROLLPANE_MAXIMUM_SIZE = new Dimension(Integer.MAX_VALUE, 800);
-	private final static String[] TRIAL_RESULTS = {"COMPLETED", "FAILED", "CANCELLED"};
+	private final static String[] TRIAL_RESULTS = {"COMPLETED", "FAILED", "CLAIMED"};
 	private UIScrollSpeed scrollSpeed = UIScrollSpeed.MEDIUM;
 	private JScrollBar scrollBar;
 
@@ -673,10 +673,10 @@ public class ColosseumStatisticsModePanel extends JPanel
 			StringBuilder trialsTooltip = new StringBuilder("<html><body style='padding: 2px; max-width: 250px;'>");
 			trialsTooltip.append("Number of trials with one or more waves included.<br><br>");
 			int completed = stats.getAttemptResultCounts().getOrDefault("COMPLETED", 0);
-			int cancelled = stats.getAttemptResultCounts().getOrDefault("CANCELLED", 0);
+			int claimed = stats.getAttemptResultCounts().getOrDefault("CLAIMED", 0);
 			int failed = stats.getAttemptResultCounts().getOrDefault("FAILED", 0);
 			trialsTooltip.append("<span style='color: #a5a5a5;'>Completed:</span> <span style='color: white;'>").append(completed).append("</span><br>");
-			trialsTooltip.append("<span style='color: #a5a5a5;'>Cancelled:</span> <span style='color: white;'>").append(cancelled).append("</span><br>");
+			trialsTooltip.append("<span style='color: #a5a5a5;'>Claimed:</span> <span style='color: white;'>").append(claimed).append("</span><br>");
 			trialsTooltip.append("<span style='color: #a5a5a5;'>Failed:</span> <span style='color: white;'>").append(failed).append("</span>");
 			trialsTooltip.append("</body></html>");
 
@@ -1534,6 +1534,7 @@ public class ColosseumStatisticsModePanel extends JPanel
 					case "FAILED":
 						incrementFailed();
 						break;
+					case "CLAIMED":
 					case "CANCELLED":
 						incrementCancelled();
 						break;
