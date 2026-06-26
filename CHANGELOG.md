@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.2.1
+2026-06-26
+
+### Summary
+- Several fixes made based on feedback following 1.2.0 release at 24-06-2026
+- Added game message to share various new features when logging in
+- Added option to (permanently) refuse migrating Colosseum trial data to internal jsonl file
+- Revenant ether registered from wilderness weapons in the item logger now also includes the 1000 ether needed for charging it
+
+### Fixes 1.2.0 release feedback
+- Screenshot logger is registered to eventbus if any Colosseum trial result includes a screenshot
+- Added an additional check for the internal Colosseum directory before migrating that would cause the migration to fail if the jsonl file already exists.
+- Extended migration protocol to include incomplete migrations executed prior to 1.2.1
+- Added option to refuse data migration
+- Trial migration source data is now moved to an archive directory rather than left in the colosseum directory
+- Trial migration of json and csv files now produces almost identical resulting logs, as one would expect
+- Trial migration also includes transferring timeline files, if they exist
+
+### Update message
+- Added game message when logging in if a new version is released that describes newly added features
+- Added logic to track this update message so it will occur only once
+
 ## 1.2.0
 2026-05-28
 
