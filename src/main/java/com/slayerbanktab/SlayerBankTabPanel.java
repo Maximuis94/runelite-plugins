@@ -885,7 +885,7 @@ public class SlayerBankTabPanel extends PluginPanel
 			String fullKey = entry.getKey();
 			if (fullKey.startsWith(prefix) && hasValidItems(entry.getValue())) {
 				candidateMap.put(fullKey, formatKeyToReadable(fullKey));
-				exportCheckStates.put(fullKey, false); // Default to unchecked
+				exportCheckStates.put(fullKey, false);
 			}
 		}
 

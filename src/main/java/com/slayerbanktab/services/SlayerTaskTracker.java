@@ -5,7 +5,6 @@ import static com.slayerbanktab.PluginConstants.BOSS_TASK_ID;
 import static com.slayerbanktab.PluginConstants.MAX_ACCOUNT_HASH_CHARACTERS;
 import static com.slayerbanktab.PluginConstants.MIN_ACCOUNT_HASH_CHARACTERS;
 import static com.slayerbanktab.PluginConstants.NO_TASK_KEY_SUFFIX;
-import com.slayerbanktab.SlayerBankTabConfig;
 import com.slayerbanktab.events.NewSlayerTask;
 import com.slayerbanktab.models.SlayerArea;
 import com.slayerbanktab.models.SlayerMaster;
@@ -44,9 +43,6 @@ public class SlayerTaskTracker {
 
 	@Inject
 	private EventBus eventBus;
-
-	@Inject
-	private SlayerBankTabConfig config;
 
 	@Inject
 	private ConfigManager configManager;
@@ -123,6 +119,13 @@ public class SlayerTaskTracker {
 		isUpdated = updateActiveTask();
 	}
 
+	public void startUp() {
+		if (client.getGameState() == GameState.LOGGED_IN) {
+			checkTaskState();
+			updateActiveTask();
+		}
+	}
+
 	/**
 	 * Check the current task via varbits and update variables if it is no longer synced.
 	 */
@@ -132,8 +135,9 @@ public class SlayerTaskTracker {
 		int newCount = client.getVarpValue(VarPlayerID.SLAYER_COUNT);
 		int newTaskId = client.getVarpValue(VarPlayerID.SLAYER_TARGET);
 		int newAreaId = client.getVarpValue(VarPlayerID.SLAYER_AREA);
-		int newBossId = client.getVarbitValue(VarbitID.SLAYER_TARGET_BOSSID);
 		int newMasterId = client.getVarbitValue(VarbitID.SLAYER_MASTER);
+
+		int newBossId = (newTaskId == BOSS_TASK_ID) ? client.getVarbitValue(VarbitID.SLAYER_TARGET_BOSSID) : 0;
 
 		if (newCount != activeTaskCount || newTaskId != activeTaskId || newAreaId != activeAreaId || newMasterId != activeSlayerMasterId || newBossId != activeBossId) {
 			activeTaskCount = newCount;

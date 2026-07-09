@@ -6,13 +6,9 @@ import static com.slayerbanktab.PluginConstants.NO_TASK_KEY_SUFFIX;
 import com.slayerbanktab.SlayerBankTabConfig;
 import com.slayerbanktab.models.SlayerMaster;
 import com.slayerbanktab.models.Task;
-import java.util.HashMap;
-import java.util.Map;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import net.runelite.api.Client;
-import net.runelite.client.callback.ClientThread;
-import net.runelite.client.config.ConfigManager;
 
 @Singleton
 public class TaskKeyCompiler {
@@ -20,16 +16,13 @@ public class TaskKeyCompiler {
 	private final SlayerSetupManager setupManager;
 	private final DBTableScraper scraper;
 
-	private final Map<Integer, String> konarSlayerAreas = new HashMap<>();
-	private final ConfigManager configManager;
 	private final Client client;
 
 	@Inject
-	public TaskKeyCompiler(SlayerBankTabConfig config, SlayerSetupManager setupManager, ClientThread clientThread, DBTableScraper scraper, ConfigManager configManager, Client client) {
+	public TaskKeyCompiler(SlayerBankTabConfig config, SlayerSetupManager setupManager, DBTableScraper scraper, Client client) {
 		this.config = config;
 		this.setupManager = setupManager;
 		this.scraper = scraper;
-		this.configManager = configManager;
 		this.client = client;
 	}
 
@@ -67,7 +60,7 @@ public class TaskKeyCompiler {
 		}
 		else {
 			resolvedTaskId = taskId;
-			resolvedBossId = bossId;
+			resolvedBossId = (taskId == BOSS_TASK_ID) ? bossId : 0;
 		}
 		final int resolvedAreaId = masterId != SlayerMaster.KONAR.getId() ? 0 : areaId;
 
@@ -88,8 +81,6 @@ public class TaskKeyCompiler {
 	{
 		return hash + NO_TASK_KEY_SUFFIX;
 	}
-
-
 
 	public String formatKeyToReadable(String key)
 	{

@@ -24,8 +24,6 @@ import com.slayerbanktab.services.SlayerTaskTracker;
 import com.slayerbanktab.services.TaskKeyCompiler;
 import java.awt.image.BufferedImage;
 import java.lang.reflect.Type;
-import java.time.Duration;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -169,7 +167,7 @@ public class SlayerBankTabPlugin extends Plugin {
 	private SlayerSetup temporaryCachedSetup = null;
 
 	private boolean allowAutoSetupNotification = false;
-	private Instant lastCacheNotificationTime = Instant.EPOCH;
+	private final Set<String> notifiedTaskKeysSession = new HashSet<>();
 
 	private SlayerBankTabPanel panel;
 	private NavigationButton navButton;
@@ -313,7 +311,6 @@ public class SlayerBankTabPlugin extends Plugin {
 	@Subscribe
 	public void onGameStateChanged(GameStateChanged event) {
 		accountHashManager.onGameStateChanged(event.getGameState());
-
 		if (event.getGameState() == GameState.LOGGED_IN) {
 			refreshAccountState();
 		} else if (event.getGameState() == GameState.LOGIN_SCREEN) {
@@ -321,6 +318,7 @@ public class SlayerBankTabPlugin extends Plugin {
 			slayerTab = null;
 			slayerTabKey = null;
 			isSlayerTabActive = false;
+			notifiedTaskKeysSession.clear();
 		}
 	}
 
@@ -342,6 +340,8 @@ public class SlayerBankTabPlugin extends Plugin {
 			verifySlayerTag();
 
 			clientThread.invokeLater(() -> {
+				taskTracker.startUp();
+
 				if (taskTracker.hasActiveTask()) {
 					currentSetupKey = taskTracker.getSetupKey();
 					syncLayoutToBankTags();
@@ -396,18 +396,19 @@ public class SlayerBankTabPlugin extends Plugin {
 					configManager.setConfiguration(PluginConstants.CONFIG_GROUP, taskConfigKey, currentLayoutCsv);
 				} else {
 					currentLayoutCsv = "";
+					configManager.setConfiguration(PluginConstants.CONFIG_GROUP, taskConfigKey, currentLayoutCsv);
 				}
-				configManager.setConfiguration(PluginConstants.CONFIG_GROUP, taskConfigKey, currentLayoutCsv);
 			}
 
 			if (currentLayoutCsv.isEmpty()) {
-				String decoded = taskKeyCompiler.formatKeyToReadable(currentSetupKey);
-				sendChatMessage("[Slayer bank tab] No layout for task " + decoded + " exists.");
+				if (!allowSetupCaching && allowAutoSetupNotification && !notifiedTaskKeysSession.contains(currentSetupKey)) {
+					String decoded = taskKeyCompiler.formatKeyToReadable(currentSetupKey);
+					sendChatMessage("[Slayer bank tab] No layout for task " + decoded + " exists.");
+					notifiedTaskKeysSession.add(currentSetupKey);
+				}
 				configManager.setConfiguration("banktags", slayerTabKey, "");
 				lastSyncedBankTagsCsv = "";
-				String standardizedTabName = Text.standardize(slayerTab);
-				configManager.setConfiguration(PluginConstants.CONFIG_GROUP, standardizedTabName, currentLayoutCsv);
-
+				return;
 			} else {
 				String liveWovenCsv = Arrays.stream(currentLayoutCsv.split(","))
 					.map(String::trim)
@@ -557,9 +558,9 @@ public class SlayerBankTabPlugin extends Plugin {
 		temporaryCachedSetup = extractSetupFromGear(currentSetupKey);
 		setupCacheSlayerCount = currentTaskCount;
 
-		if (allowAutoSetupNotification && Duration.between(lastCacheNotificationTime, Instant.now()).getSeconds() >= 30) {
-			sendChatMessage("Current equipment and inventory were cached and will be set automatically as slayer tab setup for this task after making the first killcount.");
-			lastCacheNotificationTime = Instant.now();
+		if (allowAutoSetupNotification && !notifiedTaskKeysSession.contains(currentSetupKey)) {
+			notifiedTaskKeysSession.add(currentSetupKey);
+			sendChatMessage("[Slayer bank tab] No layout exists for " + currentTaskTarget + " assigned by " + currentSlayerMaster + ". Current equipment and inventory have been cached and will be saved automatically after your first killcount.");
 		}
 	}
 
@@ -1080,12 +1081,6 @@ public class SlayerBankTabPlugin extends Plugin {
 			case "createslayersetupcurrent":
 				createSetupFromInventoryAndEquipment(currentSetupKey);
 				break;
-			case "updateitemmappings":
-				updateCurrentSetupAdditionalItems();
-				break;
-			case "updateallitemmappings":
-				retroactivelyUpdateAdditionalItemsAcrossAllSetups();
-				break;
 		}
 	}
 
@@ -1258,22 +1253,6 @@ public class SlayerBankTabPlugin extends Plugin {
 		return layoutItemId;
 	}
 
-	public void updateCurrentSetupAdditionalItems() {
-		if (currentSetupKey == null) {
-			sendChatMessage("You do not currently have an active Slayer task setup.");
-			return;
-		}
-		if (updateAdditionalItemsForSetup(currentSetupKey, true)) {
-			sendChatMessage("Successfully refreshed additional items for your current setup!");
-		} else {
-			sendChatMessage("Extra item rules checked: No changes were needed for your current setup.");
-		}
-	}
-
-	public boolean updateAdditionalItemsForSetup(String setupKey) {
-		return updateAdditionalItemsForSetup(setupKey, false);
-	}
-
 	public boolean updateAdditionalItemsForSetup(String setupKey, boolean notify) {
 		if (setupKey == null) return false;
 		SlayerSetup oldSetup = setupManager.getSetupForTask(setupKey);
@@ -1312,7 +1291,7 @@ public class SlayerBankTabPlugin extends Plugin {
 
 		for (int i = coreGearBoundary; i < oldGrid.length; i++) {
 			if (oldGrid[i] > 0) {
-				recalculatedAdditionalItems.add(oldGrid[i]); // LinkedHashSet prevents duplicates
+				recalculatedAdditionalItems.add(oldGrid[i]);
 			}
 		}
 
@@ -1337,20 +1316,6 @@ public class SlayerBankTabPlugin extends Plugin {
 			syncLayoutToBankTags();
 		}
 		return true;
-	}
-
-	public void retroactivelyUpdateAdditionalItemsAcrossAllSetups() {
-		Map<String, SlayerSetup> allSetups = setupManager.getAllSetups();
-		if (allSetups == null || allSetups.isEmpty()) {
-			sendChatMessage("No saved setups found to update.");
-			return;
-		}
-
-		int updatedCount = 0;
-		for (String setupKey : allSetups.keySet()) {
-			if (updateAdditionalItemsForSetup(setupKey)) updatedCount++;
-		}
-		sendChatMessage("Successfully rebuilt additional item lists across " + updatedCount + " saved Slayer setups!");
 	}
 
 	public SlayerSetupManager getSetupManager() {

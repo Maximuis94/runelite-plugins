@@ -35,7 +35,7 @@ public interface SlayerBankTabConfig extends Config {
 		section = generalSection
 	)
 	default boolean enableInventoryIconMenuOption() {
-		return true;
+		return false;
 	}
 
 	@ConfigItem(
@@ -52,14 +52,14 @@ public interface SlayerBankTabConfig extends Config {
 
 	@ConfigItem(
 		keyName = "mergeOtherSetups",
-		name = "Merge non-Wildy/Konar setups",
-		description = "Groups setups for standard masters (e.g. Duradel, Nieve, Chaeldar) <br>" +
-			" together so you only need one setup per target.",
+		name = "Merge non-Wildy/Konar layouts",
+		description = "Groups layouts for standard masters (e.g. Duradel, Nieve, Chaeldar) <br>" +
+			" together so you only need one layout per target assigned by any regular Slayer master.",
 		position = 4,
 		section = generalSection
 	)
 	default boolean mergeOtherSetups() {
-		return false;
+		return true;
 	}
 
 	@ConfigItem(
@@ -74,7 +74,7 @@ public interface SlayerBankTabConfig extends Config {
 		section = generalSection
 	)
 	default boolean autoAssignUndefinedSetups() {
-		return false;
+		return true;
 	}
 
 	@ConfigItem(
