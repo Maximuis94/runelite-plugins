@@ -1,3 +1,28 @@
+/*
+ * Copyright (c) 2026, maximuis94 <https://github.com/maximuis94>
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright notice, this
+ *    list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ *    this list of conditions and the following disclaimer in the documentation
+ *    and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
+ * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
 package com.slayerbanktab.models;
 
 import static com.slayerbanktab.PluginConstants.BOSS_TASK_ID;
@@ -138,6 +163,7 @@ public enum Task {
 	WEREWOLF("Werewolf", ItemID.DAGGER_WOLFBANE, 6246, 33, 0),
 	WOLF("Wolf", ItemID.WOLF_MASK, 6222, 9, 0),
 	WYRM("Wyrm", ItemID.SLAYERGUIDE_WYRM, 6324, 111, 0),
+	VENATOR("Venator", 33695, 7201, 131, 0), // Uses venator heart as icon item
 	ZOMBIE("Zombie", ItemID.TRICK_OR_TREAT_HEAD, 6223, 10, 0),
 
 	ABYSSAL_SIRE("Abyssal Sire", ItemID.ABYSSALSIRE_PET, 6193, BOSS_TASK_ID, 21),
@@ -177,7 +203,7 @@ public enum Task {
 	UNKNOWN_BOSS("Unknown Boss", ItemID.CERT_GUIDE_ICON_DUMMY, 6331, BOSS_TASK_ID, -1);
 
 	private final String name;
-	private final int baseMonsterId;
+	private final int iconId;
 	private final int structId;
 	private final int slayerTargetId;
 	private final int slayerTargetBossId;

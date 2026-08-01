@@ -1,3 +1,28 @@
+/*
+ * Copyright (c) 2026, maximuis94 <https://github.com/maximuis94>
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright notice, this
+ *    list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ *    this list of conditions and the following disclaimer in the documentation
+ *    and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
+ * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
 package com.slayerbanktab.models;
 
 import java.util.ArrayList;
@@ -103,16 +128,26 @@ public enum SlayerMaster {
 		  )),
 
 	KRYSTILIA(7, "Krystilia", ItemID.SLAYER_WILDERNESS_KEY, Arrays.asList(
-				  Task.ABYSSAL_DEMON, Task.ANKOU, Task.AVIANSIE, Task.BANDIT, Task.BEAR, Task.BLACK_DEMON,
-			  Task.BLACK_DRAGON, Task.BLACK_KNIGHT, Task.BLOODVELD, Task.CHAOS_DRUID, Task.DARK_WARRIOR,
-			  Task.DUST_DEVIL, Task.EARTH_WARRIOR, Task.ENT, Task.FIRE_GIANT, Task.GREATER_DEMON,
-			  Task.GREEN_DRAGON, Task.HELLHOUND, Task.HILL_GIANT, Task.ICE_GIANT, Task.ICE_WARRIOR,
-			  Task.JELLY, Task.LAVA_DRAGON, Task.LESSER_DEMON, Task.MAGIC_AXE, Task.MAMMOTH,
-			  Task.MOSS_GIANT, Task.NECHRYAEL, Task.PIRATE, Task.REVENANT, Task.ROGUE, Task.SCORPION,
-			  Task.SKELETON, Task.SPIDER, Task.SPIRITUAL_CREATURE, Task.ZOMBIE,
-			  Task.CALLISTO, Task.CHAOS_ELEMENTAL, Task.CHAOS_FANATIC, Task.CRAZY_ARCHAEOLOGIST,
-			  Task.SCORPIA, Task.VENENATIS, Task.VETION
-			  )),
+		Task.ABYSSAL_DEMON, Task.ANKOU, Task.AVIANSIE, Task.BANDIT, Task.BEAR, Task.BLACK_DEMON,
+		Task.BLACK_DRAGON, Task.BLACK_KNIGHT, Task.BLOODVELD, Task.CHAOS_DRUID, Task.DARK_WARRIOR,
+		Task.DUST_DEVIL, Task.EARTH_WARRIOR, Task.ENT, Task.FIRE_GIANT, Task.GREATER_DEMON,
+		Task.GREEN_DRAGON, Task.HELLHOUND, Task.HILL_GIANT, Task.ICE_GIANT, Task.ICE_WARRIOR,
+		Task.JELLY, Task.LAVA_DRAGON, Task.LESSER_DEMON, Task.MAGIC_AXE, Task.MAMMOTH,
+		Task.MOSS_GIANT, Task.NECHRYAEL, Task.PIRATE, Task.REVENANT, Task.ROGUE, Task.SCORPION,
+		Task.SKELETON, Task.SPIDER, Task.SPIRITUAL_CREATURE, Task.ZOMBIE,
+		Task.CALLISTO, Task.CHAOS_ELEMENTAL, Task.CHAOS_FANATIC, Task.CRAZY_ARCHAEOLOGIST,
+		Task.SCORPIA, Task.VENENATIS, Task.VETION
+	)),
+
+	MORTIMER(10, "Mortimer", ItemID.SKULL, Arrays.asList(
+		Task.CRAWLING_HAND, Task.CAVE_CRAWLER, Task.BANSHEE, Task.ROCKSLUG,
+		Task.COCKATRICE, Task.PYREFIEND, Task.INFERNAL_MAGE, Task.BLOODVELD,
+		Task.GRYPHON, Task.JELLY, Task.CUSTODIAN_STALKER, Task.TUROTH,
+		Task.WARPED_CREATURE, Task.CAVE_HORROR, Task.ABERRANT_SPECTRE, Task.BASILISK,
+		Task.WYRM, Task.DUST_DEVIL, Task.KURASK, Task.VENATOR, Task.GARGOYLE,
+		Task.AQUANITE, Task.NECHRYAEL, Task.DRAKE, Task.ABYSSAL_DEMON, Task.DARK_BEAST,
+		Task.ARAXYTE, Task.SMOKE_DEVIL, Task.HYDRA
+	)),
 
 	// Merged category. Its ID is used in as masterId key for non-wildy boss tasks, and optionally used instead of certain other masters.
 	MERGED_STANDARD(99, "Standard Masters", ItemID.SLAYER_ETERNAL_GEM, Collections.emptyList());
@@ -146,7 +181,7 @@ public enum SlayerMaster {
 
 		Set<Task> combinedTasks = new HashSet<>();
 		for (SlayerMaster master : values()) {
-			if (master != TURAEL && master != KONAR && master != KRYSTILIA && master != UNKNOWN && master != NONE && master != MERGED_STANDARD) {
+			if (master != TURAEL && master != KONAR && master != KRYSTILIA && master != MORTIMER && master != UNKNOWN && master != NONE && master != MERGED_STANDARD) {
 				combinedTasks.addAll(master.getAssignableTasks());
 			}
 		}
@@ -215,6 +250,7 @@ public enum SlayerMaster {
 		else if (masterId == NONE.getId()) return false;
 		else if (masterId == TURAEL.getId()) return false;
 		else if (masterId == KRYSTILIA.getId()) return false;
+		else if (masterId == MORTIMER.getId()) return false;
 		else return masterId != KONAR.getId();
 	}
 
