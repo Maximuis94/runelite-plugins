@@ -270,21 +270,57 @@ public class SlayerBankTabPlugin extends Plugin {
 		}
 	}
 
-	private void loadAccountHashesFromConfig() {
-		String fromConfig = configManager.getConfiguration(CONFIG_GROUP, ACCOUNT_HASHES_CONFIG_KEY);
-		if (fromConfig == null) return;
-		for (String accountHash : fromConfig.split(",")) {
-			registeredAccountHashes.add(Long.parseLong(accountHash));
-		}
+	/**
+	 * Saves the current set of registered account hashes to ConfigManager as a clean, comma-separated string.
+	 */
+	private void saveAccountHashesToConfig() {
+		String csv = registeredAccountHashes.stream()
+			.map(String::valueOf)
+			.collect(Collectors.joining(","));
+		configManager.setConfiguration(CONFIG_GROUP, ACCOUNT_HASHES_CONFIG_KEY, csv);
 	}
 
+	/**
+	 * Registers a new account hash and persists it if it wasn't already tracked.
+	 */
 	private boolean addAccountHash(long accountHash) {
-		if (registeredAccountHashes.contains(accountHash)) return false;
+		if (accountHash <= 0 || registeredAccountHashes.contains(accountHash)) {
+			return false;
+		}
+
 		registeredAccountHashes.add(accountHash);
-		configManager.setConfiguration(CONFIG_GROUP, ACCOUNT_HASHES_CONFIG_KEY, registeredAccountHashes.stream()
-			.map(String::valueOf)
-			.collect(Collectors.joining(",")));
+		saveAccountHashesToConfig();
 		return true;
+	}
+
+	/**
+	 * Loads account hashes from the config, stripping legacy brackets/spaces and auto-repairing corrupt config entries.
+	 */
+	private void loadAccountHashesFromConfig() {
+		String fromConfig = configManager.getConfiguration(CONFIG_GROUP, ACCOUNT_HASHES_CONFIG_KEY);
+		if (fromConfig == null || fromConfig.trim().isEmpty()) return;
+
+		boolean wasLegacyBracketedFormat = fromConfig.contains("[");
+
+		String cleanConfig = fromConfig.replaceAll("[\\[\\]\\s]", "");
+		if (cleanConfig.isEmpty()) return;
+
+		for (String accountHash : cleanConfig.split(",")) {
+			if (!accountHash.isEmpty()) {
+				try {
+					long hash = Long.parseLong(accountHash);
+					if (hash > 0) {
+						registeredAccountHashes.add(hash);
+					}
+				} catch (NumberFormatException e) {
+					log.warn("Failed to parse account hash from config: {}", accountHash, e);
+				}
+			}
+		}
+
+		if (wasLegacyBracketedFormat) {
+			saveAccountHashesToConfig();
+		}
 	}
 
 	private void loadAreas() {
