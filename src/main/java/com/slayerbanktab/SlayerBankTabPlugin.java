@@ -420,10 +420,13 @@ public class SlayerBankTabPlugin extends Plugin {
 		currentSlayerLocation = event.getAreaName();
 		temporaryCachedSetup = null;
 		currentSetupKey = event.getSetupKey();
+
 		if (currentSetupKey != null) {
-			updateAdditionalItemsForSetup(currentSetupKey, false);
+			if (config.autoRefreshAdditionalItems()) {
+				updateAdditionalItemsForSetup(currentSetupKey, false);
+			}
+			syncLayoutToBankTags();
 		}
-		syncLayoutToBankTags();
 	}
 
 	private boolean currentSetupExists()
@@ -582,9 +585,10 @@ public class SlayerBankTabPlugin extends Plugin {
 			boolean wasActive = isSlayerTabActive;
 			isSlayerTabActive = true;
 			bankTitleWidget.setText(slayerTabHeaderText);
-
 			if (!wasActive && currentSetupKey != null) {
-				updateAdditionalItemsForSetup(currentSetupKey, false);
+				if (config.autoRefreshAdditionalItems()) {
+					updateAdditionalItemsForSetup(currentSetupKey, false);
+				}
 			}
 		}
 	}
@@ -1019,6 +1023,23 @@ public class SlayerBankTabPlugin extends Plugin {
 			});
 
 		client.getMenu().createMenuEntry(-1)
+			.setOption("Refresh additional items")
+			.setTarget(target)
+			.setType(MenuAction.RUNELITE)
+			.onClick(e -> {
+				if (currentSetupKey != null) {
+					clientThread.invokeLater(() -> {
+						boolean updated = updateAdditionalItemsForSetup(currentSetupKey, false);
+						if (updated) {
+							sendChatMessage("Refreshed additional items for current setup.");
+						} else {
+							sendChatMessage("Additional items are already up to date.");
+						}
+					});
+				}
+			});
+
+		client.getMenu().createMenuEntry(-1)
 			.setOption("Reload active task")
 			.setTarget(target)
 			.setType(MenuAction.RUNELITE)
@@ -1100,7 +1121,10 @@ public class SlayerBankTabPlugin extends Plugin {
 		temporaryCachedSetup = null;
 		lastSyncedBankTagsCsv = "";
 		if (currentSetupKey != null) {
-			updateAdditionalItemsForSetup(currentSetupKey, false);
+			if (config.autoRefreshAdditionalItems()) {
+				updateAdditionalItemsForSetup(currentSetupKey, false);
+			}
+			syncLayoutToBankTags();
 		}
 		syncLayoutToBankTags();
 

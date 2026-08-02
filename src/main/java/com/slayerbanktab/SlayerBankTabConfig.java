@@ -134,22 +134,6 @@ public interface SlayerBankTabConfig extends Config {
 	// --- AUXILIARY TOGGLES ---
 
 	@ConfigItem(
-		keyName = "customAdditionalItemMappings",
-		name = "Custom additional item mappings",
-		description = "Map extra items to a primary weapon or gear piece.<br>" +
-			"Format: Primary Item, Item 1, Item 2, <br>" +
-			"Alternatively, for mapping two items both ways: Item 1|Item 2, <br>" +
-			"Example: Tumeken's shadow, Soul rune, Chaos rune<br>" +
-			"        Herb sack|Open herb sack.<br>" +
-			"Accepts exact item names or IDs. One mapping per line.",
-		position = 4,
-		section = additionalItemSection
-	)
-	default String customAdditionalItemMappings() {
-		return "";
-	}
-
-	@ConfigItem(
 		keyName = "autoAddRunePouchRunes",
 		name = "Auto-add rune pouch runes",
 		description = "Adds the runes in the rune pouch as additional items to the setup, if applicable.",
@@ -183,5 +167,33 @@ public interface SlayerBankTabConfig extends Config {
 	)
 	default boolean autoAddLootingBagContents() {
 		return false;
+	}
+
+	@ConfigItem(
+		keyName = "autoRefreshAdditionalItems",
+		name = "Auto refresh additional items",
+		description = "Automatically refresh the additional items upon loading the tab.<br>" +
+						"This can be done manually by right-clicking the slayer tab.",
+		position = 4,
+		section = additionalItemSection
+	)
+	default boolean autoRefreshAdditionalItems() {
+		return true;
+	}
+
+	@ConfigItem(
+		keyName = "customAdditionalItemMappings",
+		name = "Custom additional item mappings",
+		description = "Map extra items to a primary weapon or gear piece.<br>" +
+			"Format: Primary Item, Item 1, Item 2, <br>" +
+			"Alternatively, for mapping two items both ways: Item 1|Item 2, <br>" +
+			"Example: Tumeken's shadow, Soul rune, Chaos rune<br>" +
+			"        Herb sack|Open herb sack.<br>" +
+			"Accepts exact item names or IDs. One mapping per line.",
+		position = 5,
+		section = additionalItemSection
+	)
+	default String customAdditionalItemMappings() {
+		return "";
 	}
 }
