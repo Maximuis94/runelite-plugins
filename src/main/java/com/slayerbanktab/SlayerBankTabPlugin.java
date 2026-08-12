@@ -59,6 +59,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import javax.inject.Inject;
+import javax.swing.SwingUtilities;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
@@ -406,6 +407,10 @@ public class SlayerBankTabPlugin extends Plugin {
 				if (taskTracker.hasActiveTask()) {
 					currentSetupKey = taskTracker.getSetupKey();
 					syncLayoutToBankTags();
+
+					if (panel != null) {
+						SwingUtilities.invokeLater(panel::loadCurrentlyActiveTask);
+					}
 				}
 			});
 		}
@@ -426,6 +431,10 @@ public class SlayerBankTabPlugin extends Plugin {
 				updateAdditionalItemsForSetup(currentSetupKey, false);
 			}
 			syncLayoutToBankTags();
+		}
+
+		if (panel != null && taskTracker.hasActiveTask()) {
+			SwingUtilities.invokeLater(panel::loadCurrentlyActiveTask);
 		}
 	}
 
@@ -642,6 +651,18 @@ public class SlayerBankTabPlugin extends Plugin {
 
 	private void autoSaveCachedSetup() {
 		if (temporaryCachedSetup != null && currentSetupKey != null) {
+			SlayerSetup existingSetup = setupManager.getSetupForTask(currentSetupKey);
+			if (existingSetup != null && existingSetup.getGridLayout() != null) {
+				for (int id : existingSetup.getGridLayout()) {
+					if (id > 0) {
+						log.debug("Did not save cached layout for current task, as a layout already exists.");
+						temporaryCachedSetup = null;
+						setupCacheSlayerCount = -1;
+						return;
+					}
+				}
+			}
+
 			setupManager.saveSetup(currentSetupKey, temporaryCachedSetup);
 			temporaryCachedSetup = null;
 			setupCacheSlayerCount = -1;

@@ -338,7 +338,12 @@ public class SlayerBankTabPanel extends PluginPanel
 				}
 
 				if (!found && masterCombo.getItemCount() > 0) {
-					masterCombo.setSelectedIndex(0);
+					if (plugin.getTaskTracker() != null && plugin.getTaskTracker().hasActiveTask()) {
+						loadCurrentlyActiveTask();
+						return;
+					} else {
+						masterCombo.setSelectedIndex(0);
+					}
 				}
 
 				updateTaskAndLocationDropdowns();
@@ -1267,7 +1272,17 @@ public class SlayerBankTabPanel extends PluginPanel
 		}
 	}
 
-	private void loadCurrentlyActiveTask() {
+	@Override
+	public void onActivate()
+	{
+		super.onActivate();
+		if (plugin.getTaskTracker() != null && plugin.getTaskTracker().hasActiveTask())
+		{
+			loadCurrentlyActiveTask();
+		}
+	}
+
+	public void loadCurrentlyActiveTask() {
 		if (plugin.getTaskTracker() == null || !plugin.getTaskTracker().hasActiveTask()) {
 			statusLabel.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
 			statusLabel.setText("No active Slayer task detected.");
