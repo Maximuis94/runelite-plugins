@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.2
+2026-08-13
+
+### Summary
+- Minor fix in GE history parser 
+
 ## 1.2.1
 2026-06-26
 

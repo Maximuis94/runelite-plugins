@@ -104,9 +104,17 @@ public class GrandExchangeHistoryParser
 	{
 		accountHash = event.getAccountHash();
 		accountName = event.getAccountName();
-		internalGeHistoryLogFile = new File(INTERNAL_GE_HISTORY_DIR, accountHash + ".jsonl");
-		File dir = new File(GRAND_EXCHANGE_DIR, accountName);
-		externalGeHistoryLogFile = new File(dir, "exchange-history.jsonl");
+		if (accountName == null || accountHash == -1)
+		{
+			internalGeHistoryLogFile = null;
+			externalGeHistoryLogFile = null;
+		}
+		else
+		{
+			internalGeHistoryLogFile = new File(INTERNAL_GE_HISTORY_DIR, accountHash + ".jsonl");
+			File dir = new File(GRAND_EXCHANGE_DIR, accountName);
+			externalGeHistoryLogFile = new File(dir, "exchange-history.jsonl");
+		}
 		hasParsed = false;
 		isCacheLoaded = false;
 		recentHistoryCache.clear();
@@ -148,7 +156,7 @@ public class GrandExchangeHistoryParser
 
 	private boolean allowedToParseHistory()
 	{
-		if (!config.logGrandExchange() || accountHash == -1 || hasParsed) return false;
+		if (!config.logGrandExchange() || accountHash == -1 || accountName == null || hasParsed) return false;
 
 		if (System.currentTimeMillis() - lastParsed < COOLDOWN_MS) {
 			log.debug("Skipping GE history parse; history was parsed less than 5 minutes ago.");
