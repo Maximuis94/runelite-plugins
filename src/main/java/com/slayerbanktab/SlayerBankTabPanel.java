@@ -586,6 +586,9 @@ public class SlayerBankTabPanel extends PluginPanel
 
 		if (setup == null || setup.getGridLayout() == null || setup.getGridLayout().length == 0) {
 			renderEmptyState("No setup defined for this selection.");
+
+			statusLabel.setForeground(Color.RED);
+			statusLabel.setText("No setup is defined for " + taskCombo.getSelectedItem() + " by " + masterCombo.getSelectedItem());
 			return;
 		}
 
@@ -610,6 +613,17 @@ public class SlayerBankTabPanel extends PluginPanel
 		projectionContainer.add(scrollPane, BorderLayout.CENTER);
 		projectionContainer.revalidate();
 		projectionContainer.repaint();
+
+		if (taskCombo.getSelectedItem() == null)
+		{
+			statusLabel.setForeground(Color.GREEN);
+			statusLabel.setText("Showing setup for no active task");
+		}
+		else
+		{
+			statusLabel.setForeground(Color.GREEN);
+			statusLabel.setText("Showing " + taskCombo.getSelectedItem() + " by " + masterCombo.getSelectedItem());
+		}
 	}
 
 	private void renderEmptyState(String message)
@@ -1198,10 +1212,10 @@ public class SlayerBankTabPanel extends PluginPanel
 			plugin.saveImportedLayout(targetKey, layout);
 
 			statusLabel.setForeground(Color.GREEN);
-			statusLabel.setText("Layout imported successfully!");
 			taskCombo.repaint();
 			locationCombo.repaint();
 			updateSetupProjection();
+			statusLabel.setText("Imported layout for " + taskCombo.getSelectedItem() + " by " + masterCombo.getSelectedItem());
 		} else {
 			statusLabel.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
 			statusLabel.setText("Import cancelled.");
@@ -1308,7 +1322,17 @@ public class SlayerBankTabPanel extends PluginPanel
 			}
 		}
 
-		SlayerMaster targetMaster = SlayerMaster.getById(activeTask.getMasterId());
+		int masterId = activeTask.getMasterId();
+		boolean isBoss = activeTask.getTaskId() == PluginConstants.BOSS_TASK_ID;
+		boolean isNonWildyBoss = isBoss && masterId != SlayerMaster.KRYSTILIA.getId() && masterId != SlayerMaster.MORTIMER.getId();
+
+		SlayerMaster targetMaster;
+		if (isNonWildyBoss || (config.mergeOtherSetups() && SlayerMaster.isMergeableMasterId(masterId))) {
+			targetMaster = SlayerMaster.MERGED_STANDARD;
+		} else {
+			targetMaster = SlayerMaster.getById(masterId);
+		}
+
 		for (int i = 0; i < masterCombo.getItemCount(); i++) {
 			if (masterCombo.getItemAt(i).getMaster() == targetMaster) {
 				masterCombo.setSelectedIndex(i);
@@ -1337,7 +1361,7 @@ public class SlayerBankTabPanel extends PluginPanel
 		updateSetupProjection();
 
 		statusLabel.setForeground(Color.GREEN);
-		statusLabel.setText("Loaded active task: " + activeTask.getTaskName());
+		statusLabel.setText("Active task " + activeTask.getTaskName() + " by " + activeTask.getMasterName());
 	}
 
 	/**

@@ -60,6 +60,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.swing.SwingUtilities;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
@@ -115,12 +116,15 @@ import net.runelite.client.util.Text;
 @PluginDependency(BankTagsPlugin.class)
 public class SlayerBankTabPlugin extends Plugin {
 
+	@Getter
 	@Inject
 	private Client client;
 
+	@Getter
 	@Inject
 	private SlayerTaskTracker taskTracker;
 
+	@Getter
 	@Inject
 	private ClientThread clientThread;
 
@@ -191,6 +195,7 @@ public class SlayerBankTabPlugin extends Plugin {
 	private boolean allowSetupCaching = false;
 	private int setupCacheSlayerCount = -1;
 	private SlayerSetup temporaryCachedSetup = null;
+	private String cachedSetupTaskKey = null;
 
 	private boolean allowAutoSetupNotification = false;
 	private final Set<String> notifiedTaskKeysSession = new HashSet<>();
@@ -204,18 +209,6 @@ public class SlayerBankTabPlugin extends Plugin {
 	@Provides
 	SlayerBankTabConfig provideConfig(ConfigManager configManager) {
 		return configManager.getConfig(SlayerBankTabConfig.class);
-	}
-
-	public Client getClient() {
-		return client;
-	}
-
-	public ClientThread getClientThread() {
-		return clientThread;
-	}
-
-	public SlayerTaskTracker getTaskTracker() {
-		return taskTracker;
 	}
 
 	public ClipboardManager getClipboardManager()
@@ -630,6 +623,7 @@ public class SlayerBankTabPlugin extends Plugin {
 		}
 
 		temporaryCachedSetup = extractSetupFromGear(currentSetupKey);
+		cachedSetupTaskKey = currentSetupKey;
 		setupCacheSlayerCount = currentTaskCount;
 
 		if (allowAutoSetupNotification && !notifiedTaskKeysSession.contains(currentSetupKey)) {
@@ -650,21 +644,27 @@ public class SlayerBankTabPlugin extends Plugin {
 	}
 
 	private void autoSaveCachedSetup() {
-		if (temporaryCachedSetup != null && currentSetupKey != null) {
-			SlayerSetup existingSetup = setupManager.getSetupForTask(currentSetupKey);
-			if (existingSetup != null && existingSetup.getGridLayout() != null) {
-				for (int id : existingSetup.getGridLayout()) {
-					if (id > 0) {
-						log.debug("Did not save cached layout for current task, as a layout already exists.");
-						temporaryCachedSetup = null;
-						setupCacheSlayerCount = -1;
-						return;
-					}
-				}
+		if (temporaryCachedSetup != null && currentSetupKey.equals(cachedSetupTaskKey)) {
+			String taskConfigKey = "layout_" + currentSetupKey;
+			String existingCsv = configManager.getConfiguration(PluginConstants.CONFIG_GROUP, taskConfigKey);
+
+			if (existingCsv != null && !existingCsv.trim().isEmpty()) {
+				log.debug("Discarding cached layout for {} because a layout was configured before first KC.", currentSetupKey);
+				temporaryCachedSetup = null;
+				cachedSetupTaskKey = null;
+				setupCacheSlayerCount = -1;
+				return;
 			}
 
 			setupManager.saveSetup(currentSetupKey, temporaryCachedSetup);
+
+			String csvLayout = Arrays.stream(temporaryCachedSetup.getGridLayout())
+				.mapToObj(String::valueOf)
+				.collect(Collectors.joining(","));
+			configManager.setConfiguration(PluginConstants.CONFIG_GROUP, taskConfigKey, csvLayout);
+
 			temporaryCachedSetup = null;
+			cachedSetupTaskKey = null;
 			setupCacheSlayerCount = -1;
 			syncLayoutToBankTags();
 			sendChatMessage("Auto-saved cached layout for task " + currentTaskTarget + " by " + currentSlayerMaster);
@@ -1140,6 +1140,7 @@ public class SlayerBankTabPlugin extends Plugin {
 		}
 
 		temporaryCachedSetup = null;
+		cachedSetupTaskKey = null;
 		lastSyncedBankTagsCsv = "";
 		if (currentSetupKey != null) {
 			if (config.autoRefreshAdditionalItems()) {

@@ -45,4 +45,9 @@ public class NewSlayerTask {
 
 	int areaId;
 	String areaName;
+
+	public String getTaskName()
+	{
+		return taskId != 98 ? taskName : bossName;
+	}
 }

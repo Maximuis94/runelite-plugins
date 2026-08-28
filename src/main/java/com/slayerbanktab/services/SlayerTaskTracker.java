@@ -243,6 +243,12 @@ public class SlayerTaskTracker {
 			return;
 		}
 
+		if (client.getVarpValue(VarPlayerID.SLAYER_COUNT) == 0 || setupKey.endsWith(PluginConstants.NO_TASK_KEY_SUFFIX)) {
+			currentTask = new NewSlayerTask(setupKey, 0, "None", 0, "None", 0, "NA", 0, "NA");
+			eventBus.post(currentTask);
+			return;
+		}
+
 		String taskName = "Unknown";
 		String bossName = "NA";
 		String taskLocation = "NA";
