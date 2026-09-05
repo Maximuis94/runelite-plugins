@@ -26,6 +26,8 @@ A specific slayer master will then be assigned to a layout, rather than the merg
 
 - `'Add item to tab' menu option`: If enabled, a menu option is added to items in the bank that may be used to add the item to the currently active slayer tab
 
+- `Layout mode`: The display mode to apply for the layout in the bank.
+
 ## Examples
 
 ### Configuring a single task layout

@@ -25,24 +25,7 @@
 
 package com.slayerbanktab.models;
 
-import java.util.List;
-import java.util.Map;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
-public class SlayerSetup {
-	private int[] gridLayout;
-	private Map<ExtendedEquipmentSlot, Integer> equipment;
-	private Integer[] inventory;
-	private List<Integer> auxiliary;
-	private LayoutMode layoutMode = LayoutMode.DEFAULT;
-
-	public SlayerSetup(int[] gridLayout) {
-		this.gridLayout = gridLayout;
-		this.layoutMode = LayoutMode.DEFAULT;
-	}
+public enum LayoutMode
+{
+	DEFAULT, ZIGZAG
 }

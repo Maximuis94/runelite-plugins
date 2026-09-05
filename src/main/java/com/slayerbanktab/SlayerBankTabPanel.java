@@ -26,11 +26,13 @@
 package com.slayerbanktab;
 
 import com.slayerbanktab.events.NewSlayerTask;
+import com.slayerbanktab.models.LayoutMode;
 import com.slayerbanktab.models.SlayerMaster;
 import com.slayerbanktab.models.SlayerSetup;
 import com.slayerbanktab.models.Task;
 import com.slayerbanktab.services.ClipboardManager;
 import com.slayerbanktab.services.DBTableScraper;
+import com.slayerbanktab.services.SetupGridBuilder;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
@@ -62,11 +64,13 @@ import javax.swing.border.LineBorder;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Value;
+import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.FontManager;
 import net.runelite.client.ui.PluginPanel;
 
+@Slf4j
 public class SlayerBankTabPanel extends PluginPanel
 {
 	private final SlayerBankTabPlugin plugin;
@@ -184,9 +188,25 @@ public class SlayerBankTabPanel extends PluginPanel
 		deleteLayoutBtn.setToolTipText("Clears the layout for the currently selected dropdown combination");
 		deleteLayoutBtn.addActionListener(e -> deleteSelectedLayout());
 
+		JLabel hubBtnLabel = new JLabel("Plugin hub page with guides");
+		hubBtnLabel.setFont(FontManager.getRunescapeSmallFont());
+		hubBtnLabel.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
+		hubBtnLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+		JButton pluginHubBtn = new JButton("Plugin Hub Page");
+		pluginHubBtn.setFont(FontManager.getRunescapeFont());
+		pluginHubBtn.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+		pluginHubBtn.setFocusPainted(false);
+		pluginHubBtn.setToolTipText("Open the Slayer Bank Tab page on the RuneLite Plugin Hub");
+		pluginHubBtn.addActionListener(e -> net.runelite.client.util.LinkBrowser.browse("https://runelite.net/plugin-hub/show/slayer-bank-tab"));
+
 		alignAndAddButton(buttonPanel, loadActiveBtn);
 		buttonPanel.add(Box.createRigidArea(new Dimension(0, 4)));
 		alignAndAddButton(buttonPanel, deleteLayoutBtn);
+		buttonPanel.add(Box.createRigidArea(new Dimension(0, 8)));
+		alignAndAddLabel(buttonPanel, hubBtnLabel);
+		buttonPanel.add(Box.createRigidArea(new Dimension(0, 4)));
+		alignAndAddButton(buttonPanel, pluginHubBtn);
 		buttonPanel.add(Box.createRigidArea(new Dimension(0, 16)));
 
 		// Group 1: Manage Setup Keys
@@ -263,6 +283,12 @@ public class SlayerBankTabPanel extends PluginPanel
 		button.setAlignmentX(Component.CENTER_ALIGNMENT);
 		button.setMaximumSize(new Dimension(Integer.MAX_VALUE, button.getPreferredSize().height));
 		panel.add(button);
+	}
+
+	private void alignAndAddLabel(JPanel panel, JLabel label) {
+		label.setAlignmentX(Component.CENTER_ALIGNMENT);
+		label.setMaximumSize(new Dimension(Integer.MAX_VALUE, label.getPreferredSize().height));
+		panel.add(label);
 	}
 
 	/**
@@ -571,8 +597,7 @@ public class SlayerBankTabPanel extends PluginPanel
 		return plugin.compileSpecificKey(hash, master, task, areaId);
 	}
 
-	private void updateSetupProjection()
-	{
+	private void updateSetupProjection() {
 		projectionContainer.removeAll();
 
 		String targetKey = getSelectedKey();
@@ -583,16 +608,39 @@ public class SlayerBankTabPanel extends PluginPanel
 		}
 
 		SlayerSetup setup = plugin.getSetupManager().getSetupForTask(targetKey);
+		int[] grid = null;
 
-		if (setup == null || setup.getGridLayout() == null || setup.getGridLayout().length == 0) {
+		// Project the UI cleanly using DEFAULT mode, regardless of the user's config
+		if (setup != null) {
+			if (setup.getEquipment() != null && setup.getInventory() != null) {
+				grid = SetupGridBuilder.buildDraftArray(setup.getEquipment(), setup.getInventory(), setup.getAuxiliary(), LayoutMode.DEFAULT);
+			} else {
+				// Fallback for legacy setups that haven't been upgraded to objects yet
+				grid = setup.getGridLayout();
+			}
+		}
+
+		// --- CRITICAL FALLBACK: Check ConfigManager if SetupManager JSON is missing ---
+		if (grid == null || grid.length == 0) {
+			String csv = plugin.getConfigManager().getConfiguration(PluginConstants.CONFIG_GROUP, "layout_" + targetKey);
+			if (csv != null && !csv.trim().isEmpty()) {
+				try {
+					grid = Arrays.stream(csv.split(","))
+						.map(String::trim)
+						.filter(s -> !s.isEmpty())
+						.mapToInt(Integer::parseInt)
+						.toArray();
+				} catch (Exception e) {
+					log.error("Failed to parse fallback CSV grid layout", e);
+				}
+			}
+		}
+
+		if (grid == null || grid.length == 0) {
 			renderEmptyState("No setup defined for this selection.");
-
-			statusLabel.setForeground(Color.RED);
-			statusLabel.setText("No setup is defined for " + taskCombo.getSelectedItem() + " by " + masterCombo.getSelectedItem());
 			return;
 		}
 
-		int[] grid = setup.getGridLayout();
 		boolean hasAnyItem = false;
 		for (int id : grid) {
 			if (id > 0) { hasAnyItem = true; break; }
@@ -604,7 +652,6 @@ public class SlayerBankTabPanel extends PluginPanel
 		}
 
 		JPanel canvas = createLayoutGridPanel(grid);
-
 		JScrollPane scrollPane = new JScrollPane(canvas, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
 		scrollPane.setBackground(ColorScheme.DARK_GRAY_COLOR);
 		scrollPane.getVerticalScrollBar().setPreferredSize(new Dimension(6, 0));
@@ -613,17 +660,6 @@ public class SlayerBankTabPanel extends PluginPanel
 		projectionContainer.add(scrollPane, BorderLayout.CENTER);
 		projectionContainer.revalidate();
 		projectionContainer.repaint();
-
-		if (taskCombo.getSelectedItem() == null)
-		{
-			statusLabel.setForeground(Color.GREEN);
-			statusLabel.setText("Showing setup for no active task");
-		}
-		else
-		{
-			statusLabel.setForeground(Color.GREEN);
-			statusLabel.setText("Showing " + taskCombo.getSelectedItem() + " by " + masterCombo.getSelectedItem());
-		}
 	}
 
 	private void renderEmptyState(String message)
@@ -638,11 +674,12 @@ public class SlayerBankTabPanel extends PluginPanel
 		projectionContainer.repaint();
 	}
 
-	private JPanel createLayoutGridPanel(int[] grid)
-	{
+	private JPanel createLayoutGridPanel(int[] grid) {
 		JPanel canvas = new JPanel();
 		canvas.setLayout(new BoxLayout(canvas, BoxLayout.Y_AXIS));
 		canvas.setBackground(ColorScheme.DARK_GRAY_COLOR);
+
+		int additionalItemsStartIndex = 56; // 7 rows * 8 columns
 
 		// 1. WORN EQUIPMENT SECTION: Top 7x4
 		JLabel equipTitle = new JLabel("Worn Equipment");
@@ -655,10 +692,8 @@ public class SlayerBankTabPanel extends PluginPanel
 		JPanel equipGrid = new JPanel(new GridLayout(7, 4, 2, 2));
 		equipGrid.setBackground(ColorScheme.DARK_GRAY_COLOR);
 
-		for (int r = 0; r < 7; r++)
-		{
-			for (int c = 0; c < 4; c++)
-			{
+		for (int r = 0; r < 7; r++) {
+			for (int c = 0; c < 4; c++) {
 				int bankIdx = (r * 8) + c;
 				int itemId = (bankIdx < grid.length) ? grid[bankIdx] : -1;
 				equipGrid.add(createItemSlot(itemId, true));
@@ -683,10 +718,8 @@ public class SlayerBankTabPanel extends PluginPanel
 		JPanel invGrid = new JPanel(new GridLayout(7, 4, 2, 2));
 		invGrid.setBackground(ColorScheme.DARK_GRAY_COLOR);
 
-		for (int r = 0; r < 7; r++)
-		{
-			for (int c = 0; c < 4; c++)
-			{
+		for (int r = 0; r < 7; r++) {
+			for (int c = 0; c < 4; c++) {
 				int bankIdx = (r * 8) + (4 + c);
 				int itemId = (bankIdx < grid.length) ? grid[bankIdx] : -1;
 				invGrid.add(createItemSlot(itemId, true));
@@ -702,8 +735,8 @@ public class SlayerBankTabPanel extends PluginPanel
 
 		// 3. ADDITIONAL ITEMS SECTION
 		List<Integer> extraItems = new ArrayList<>();
-		if (grid.length > 56) {
-			for (int i = 56; i < grid.length; i++) {
+		if (grid.length > additionalItemsStartIndex) {
+			for (int i = additionalItemsStartIndex; i < grid.length; i++) {
 				if (grid[i] > 0) {
 					extraItems.add(grid[i]);
 				}
@@ -743,10 +776,10 @@ public class SlayerBankTabPanel extends PluginPanel
 		return canvas;
 	}
 
-	private JPanel createItemSlot(int itemId, boolean drawBackground)
-	{
+	private JPanel createItemSlot(int itemId, boolean drawBackground) {
 		JPanel slot = new JPanel(new BorderLayout());
 
+		// Hardcode standard dimensions for the panel projection
 		Dimension square = new Dimension(32, 32);
 		slot.setPreferredSize(square);
 		slot.setMinimumSize(square);
@@ -759,16 +792,21 @@ public class SlayerBankTabPanel extends PluginPanel
 			slot.setBackground(ColorScheme.DARK_GRAY_COLOR);
 		}
 
-		if (itemId > 0 && plugin.getItemManager() != null)
-		{
+		if (itemId > 0 && plugin.getItemManager() != null) {
 			JLabel itemLabel = new JLabel();
 			itemLabel.setHorizontalAlignment(SwingConstants.CENTER);
 			itemLabel.setVerticalAlignment(SwingConstants.CENTER);
 
-			plugin.getItemManager().getImage(itemId).addTo(itemLabel);
+			net.runelite.client.util.AsyncBufferedImage img = plugin.getItemManager().getImage(itemId);
+			Runnable updateIcon = () -> {
+				java.awt.Image scaled = img.getScaledInstance(square.width, square.height, java.awt.Image.SCALE_SMOOTH);
+				itemLabel.setIcon(new javax.swing.ImageIcon(scaled));
+			};
 
-			if (plugin.getClientThread() != null)
-			{
+			img.onLoaded(updateIcon);
+			updateIcon.run();
+
+			if (plugin.getClientThread() != null) {
 				plugin.getClientThread().invokeLater(() -> {
 					String name = plugin.getItemManager().getItemComposition(itemId).getName();
 					SwingUtilities.invokeLater(() -> itemLabel.setToolTipText(name));

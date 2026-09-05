@@ -26,6 +26,7 @@
 package com.slayerbanktab;
 
 import static com.slayerbanktab.PluginConstants.CONFIG_GROUP;
+import com.slayerbanktab.models.LayoutMode;
 import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
@@ -107,7 +108,7 @@ public interface SlayerBankTabConfig extends Config {
 		name = "Notify on layout cache",
 		description =
 			"If 'Auto-assign undefined layouts' is enabled, you will be <br>" +
-			"notified that the current setup will be saved to the current <br>" +
+				"notified that the current setup will be saved to the current <br>" +
 				"task after making the first KC via a game message right after <br>" +
 				"closing the bank.",
 		position = 6,
@@ -122,13 +123,30 @@ public interface SlayerBankTabConfig extends Config {
 		name = "'Add item to tab' menu option",
 		description =
 			"If enabled, add a menu option to items in the bank <br>" +
-			"that may be used to add the right clicked item to <br>" +
+				"that may be used to add the right clicked item to <br>" +
 				"the currently active slayer tab",
 		position = 7,
 		section = generalSection
 	)
 	default boolean enableAddItemToSlayTabMenuOption() {
 		return false;
+	}
+
+	@ConfigItem(
+		keyName = "layoutMode",
+		name = "Layout mode",
+		description =
+			"The layout mode that is to be applied.<br>" +
+				"Default shows the equipment worn in the first 3 columns<br>" +
+				"and the inventory slots in the final 4 columns, whereas<br>" +
+				"the zigzag layout places the equipment items in the first 2 rows <br>" +
+				"and the inventory in the subsequent rows.<br>" +
+				"Additional rows will behave the same.",
+		position = 8,
+		section = generalSection
+	)
+	default LayoutMode layoutMode() {
+		return LayoutMode.DEFAULT;
 	}
 
 	// --- AUXILIARY TOGGLES ---
@@ -159,9 +177,9 @@ public interface SlayerBankTabConfig extends Config {
 		keyName = "autoAddLootingBagContents",
 		name = "Auto-add looting bag placeholders",
 		description = "Automatically adds the contents of the looting bag as <br>" +
-					  "additional items, to use as placeholders <br>" +
-					  "in the looting bag, provided there is a looting bag <br>" +
-						"in the inventory",
+			"additional items, to use as placeholders <br>" +
+			"in the looting bag, provided there is a looting bag <br>" +
+			"in the inventory",
 		position = 3,
 		section = additionalItemSection
 	)
@@ -173,7 +191,7 @@ public interface SlayerBankTabConfig extends Config {
 		keyName = "autoRefreshAdditionalItems",
 		name = "Auto refresh additional items",
 		description = "Automatically refresh the additional items upon loading the tab.<br>" +
-						"This can be done manually by right-clicking the slayer tab.",
+			"This can be done manually by right-clicking the slayer tab.",
 		position = 4,
 		section = additionalItemSection
 	)

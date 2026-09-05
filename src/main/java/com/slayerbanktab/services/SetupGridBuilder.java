@@ -27,47 +27,103 @@ package com.slayerbanktab.services;
 
 import static com.slayerbanktab.PluginConstants.MAX_TAB_ITEMS;
 import com.slayerbanktab.models.ExtendedEquipmentSlot;
+import com.slayerbanktab.models.LayoutMode;
 import java.awt.Point;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public class SetupGridBuilder {
-	public static int[] buildDraftArray(Map<ExtendedEquipmentSlot, Integer> equipment, Integer[] inventory, List<Integer> auxiliary) {
+
+	public static int[] buildDraftArray(Map<ExtendedEquipmentSlot, Integer> equipment, Integer[] inventory, List<Integer> auxiliary, LayoutMode layoutMode) {
 		int[] buffer = new int[MAX_TAB_ITEMS];
 		Arrays.fill(buffer, -1);
 		int highestIndex = -1;
+		int nRows = 0;
+
+		Set<Integer> existingItems = new HashSet<>();
 
 		if (equipment != null) {
-			for (Map.Entry<ExtendedEquipmentSlot, Integer> entry : equipment.entrySet()) {
-				Point p = getEquipmentCoordinate(entry.getKey());
-				if (p != null) {
-					int index = (p.y * 8) + p.x;
-					buffer[index] = entry.getValue();
-					highestIndex = Math.max(highestIndex, index);
+			int nEquipment = 0;
+			int maxEquipY = -1;
+
+			for (ExtendedEquipmentSlot slot : ExtendedEquipmentSlot.values()) {
+				Integer itemId = equipment.get(slot);
+				if (itemId != null && itemId > 0) {
+					existingItems.add(itemId);
+					Point p;
+					if (layoutMode == LayoutMode.ZIGZAG) {
+						p = getZigZagCoordinate(nEquipment, 0);
+					} else {
+						p = getEquipmentCoordinate(slot, layoutMode);
+					}
+
+					if (p != null) {
+						int index = (p.y * 8) + p.x;
+						buffer[index] = itemId;
+						highestIndex = Math.max(highestIndex, index);
+						maxEquipY = Math.max(maxEquipY, p.y);
+					}
+					nEquipment++;
 				}
 			}
+			nRows = maxEquipY + 1;
 		}
 
 		if (inventory != null) {
+			int maxInvY = nRows > 0 ? nRows - 1 : 0;
+			int zigZagIndex = 0;
+
 			for (int i = 0; i < inventory.length; i++) {
-				if (inventory[i] != null && inventory[i] > 0) {
-					Point p = getInventoryCoordinate(i);
+				int itemId = inventory[i] != null ? inventory[i] : -1;
+				if (itemId > 0) {
+					existingItems.add(itemId);
+					Point p;
+					if (layoutMode == LayoutMode.ZIGZAG) {
+						p = getZigZagCoordinate(zigZagIndex, nRows);
+						zigZagIndex++;
+					} else {
+						p = getInventoryCoordinate(i, layoutMode);
+					}
+
 					if (p != null) {
 						int index = (p.y * 8) + p.x;
-						buffer[index] = inventory[i];
+						buffer[index] = itemId;
 						highestIndex = Math.max(highestIndex, index);
+						maxInvY = Math.max(maxInvY, p.y);
 					}
 				}
 			}
+			nRows = maxInvY + 1;
 		}
 
 		if (auxiliary != null) {
+			int auxIndex = 0;
 			for (int i = 0; i < auxiliary.size(); i++) {
-				Point p = getAuxiliaryCoordinate(i);
-				int index = (p.y * 8) + p.x;
-				buffer[index] = auxiliary.get(i);
-				highestIndex = Math.max(highestIndex, index);
+				int auxId = auxiliary.get(i);
+
+				if (auxId <= 0 || existingItems.contains(auxId)) {
+					continue;
+				}
+				existingItems.add(auxId);
+
+				Point p;
+				if (layoutMode == LayoutMode.ZIGZAG) {
+					p = getZigZagCoordinate(auxIndex, nRows);
+				} else {
+					p = getAuxiliaryCoordinate(auxIndex, layoutMode);
+				}
+
+				if (p != null) {
+					int index = (p.y * 8) + p.x;
+					if (index < buffer.length) {
+						buffer[index] = auxId;
+						highestIndex = Math.max(highestIndex, index);
+					}
+				}
+				auxIndex++;
 			}
 		}
 
@@ -75,7 +131,7 @@ public class SetupGridBuilder {
 		return Arrays.copyOf(buffer, highestIndex + 1);
 	}
 
-	private static Point getEquipmentCoordinate(ExtendedEquipmentSlot slot) {
+	private static Point getEquipmentCoordinate(ExtendedEquipmentSlot slot, LayoutMode mode) {
 		switch (slot) {
 			case HEAD:   return new Point(1, 0);
 			case CAPE:   return new Point(0, 1);
@@ -93,15 +149,19 @@ public class SetupGridBuilder {
 		}
 	}
 
-	private static Point getInventoryCoordinate(int invIndex) {
+	private static Point getZigZagCoordinate(int i, int startRow) {
+		return new Point((i % 14) / 2, startRow + (i % 2) + (i / 14) * 2);
+	}
+
+	private static Point getInventoryCoordinate(int invIndex, LayoutMode mode) {
 		if (invIndex < 0 || invIndex > 27) return null;
 		int xOffset = 4 + (invIndex % 4);
 		int yOffset = invIndex / 4;
 		return new Point(xOffset, yOffset);
 	}
 
-	private static Point getAuxiliaryCoordinate(int auxListIndex) {
-		int startingRow = 8;
+	private static Point getAuxiliaryCoordinate(int auxListIndex, LayoutMode mode) {
+		int startingRow = (mode == LayoutMode.ZIGZAG) ? 6 : 8;
 		int xOffset = auxListIndex % 8;
 		int yOffset = startingRow + (auxListIndex / 8);
 		return new Point(xOffset, yOffset);

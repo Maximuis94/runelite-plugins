@@ -131,6 +131,7 @@ public class SlayerBankTabPlugin extends Plugin {
 	@Inject
 	private EventBus eventBus;
 
+	@Getter
 	@Inject
 	private SlayerSetupManager setupManager;
 
@@ -140,9 +141,11 @@ public class SlayerBankTabPlugin extends Plugin {
 	@Inject
 	private SlayerBankTabConfig config;
 
+	@Getter
 	@Inject
 	private ItemManager itemManager;
 
+	@Getter
 	@Inject
 	private ConfigManager configManager;
 
@@ -438,12 +441,27 @@ public class SlayerBankTabPlugin extends Plugin {
 		return currentLayoutCsv != null && !currentLayoutCsv.isEmpty();
 	}
 
+	public int[] getDynamicGrid(String key, SlayerSetup setup) {
+		if (setup == null) return new int[0];
+
+		if (setup.getEquipment() != null && setup.getInventory() != null) {
+			if (setup.getLayoutMode() != config.layoutMode()) {
+				int[] newGrid = SetupGridBuilder.buildDraftArray(setup.getEquipment(), setup.getInventory(), setup.getAuxiliary(), config.layoutMode());
+				setup.setLayoutMode(config.layoutMode());
+				setup.setGridLayout(newGrid);
+				setupManager.saveSetup(key, setup);
+				return newGrid;
+			}
+		}
+		return setup.getGridLayout() != null ? setup.getGridLayout() : new int[0];
+	}
+
 	private void syncLayoutToBankTags() {
 		if (slayerTab == null || slayerTabKey == null) return;
 		if (isSyncingConfig) return;
 		isSyncingConfig = true;
-		try {
 
+		try {
 			if (currentSetupKey == null) {
 				if (!lastSyncedBankTagsCsv.isEmpty()) {
 					configManager.unsetConfiguration("banktags", slayerTabKey);
@@ -451,18 +469,23 @@ public class SlayerBankTabPlugin extends Plugin {
 				}
 				return;
 			}
-			String taskConfigKey = "layout_" + currentSetupKey;
-			String currentLayoutCsv;
-			currentLayoutCsv = currentSetupExists() ? configManager.getConfiguration(PluginConstants.CONFIG_GROUP, taskConfigKey) : null;
 
+			String taskConfigKey = "layout_" + currentSetupKey;
+
+			SlayerSetup jsonSetup = setupManager.getSetupForTask(currentSetupKey);
+			if (jsonSetup != null && jsonSetup.getEquipment() != null && jsonSetup.getLayoutMode() != config.layoutMode()) {
+				int[] newGrid = getDynamicGrid(currentSetupKey, jsonSetup);
+				String newCsv = Arrays.stream(newGrid).mapToObj(String::valueOf).collect(Collectors.joining(","));
+				configManager.setConfiguration(PluginConstants.CONFIG_GROUP, taskConfigKey, newCsv);
+			}
+
+			String currentLayoutCsv = currentSetupExists() ? configManager.getConfiguration(PluginConstants.CONFIG_GROUP, taskConfigKey) : null;
 			if (currentLayoutCsv == null) {
-				SlayerSetup jsonSetup = setupManager.getSetupForTask(currentSetupKey);
 				if (jsonSetup != null && jsonSetup.getGridLayout() != null) {
 					currentLayoutCsv = Arrays.stream(jsonSetup.getGridLayout()).mapToObj(String::valueOf).collect(Collectors.joining(","));
 					configManager.setConfiguration(PluginConstants.CONFIG_GROUP, taskConfigKey, currentLayoutCsv);
 				} else {
 					currentLayoutCsv = "";
-					configManager.setConfiguration(PluginConstants.CONFIG_GROUP, taskConfigKey, currentLayoutCsv);
 				}
 			}
 
@@ -499,12 +522,10 @@ public class SlayerBankTabPlugin extends Plugin {
 					lastSyncedBankTagsCsv = liveWovenCsv;
 				}
 			}
-
 		} finally {
 			isSyncingConfig = false;
+			reloadTagTab();
 		}
-
-		reloadTagTab();
 	}
 
 	private String getFormattedTaskName() {
@@ -598,7 +619,15 @@ public class SlayerBankTabPlugin extends Plugin {
 	@Subscribe
 	public void onScriptPostFired(ScriptPostFired event) {
 		if (event.getScriptId() == ScriptID.BANKMAIN_BUILD) {
-			clientThread.invokeLater(this::updateBankTitleBar);
+			clientThread.invokeLater(() -> {
+				if (currentSetupKey != null) {
+					SlayerSetup setup = setupManager.getSetupForTask(currentSetupKey);
+					if (setup != null && setup.getEquipment() != null && setup.getLayoutMode() != config.layoutMode()) {
+						syncLayoutToBankTags();
+					}
+				}
+				updateBankTitleBar();
+			});
 		}
 	}
 
@@ -906,9 +935,7 @@ public class SlayerBankTabPlugin extends Plugin {
 	 */
 	private void addItemToCurrentSlayerTab(int rawItemId, boolean fromDrag) {
 		if (currentSetupKey == null) {
-			if (!fromDrag) {
-				sendChatMessage("You do not currently have an active Slayer task setup loaded.");
-			}
+			if (!fromDrag) sendChatMessage("You do not currently have an active Slayer task setup loaded.");
 			return;
 		}
 
@@ -923,45 +950,34 @@ public class SlayerBankTabPlugin extends Plugin {
 		stripGlobalItemTag(rawItemId, itemId);
 
 		SlayerSetup setup = setupManager.getSetupForTask(currentSetupKey);
-		int[] oldGrid = (setup != null && setup.getGridLayout() != null) ? setup.getGridLayout() : new int[0];
-		int[] buffer = new int[PluginConstants.MAX_TAB_ITEMS];
-		Arrays.fill(buffer, -1);
-		int highestOccupied = 64;
-		boolean alreadyExists = false;
 
-		for (int i = 0; i < oldGrid.length; i++) {
-			if (i < buffer.length) {
-				buffer[i] = oldGrid[i];
-				if (oldGrid[i] > 0) {
-					highestOccupied = Math.max(highestOccupied, i);
-					if (oldGrid[i] == itemId) {
-						alreadyExists = true;
-					}
-				}
-			}
+		if (setup == null || setup.getEquipment() == null || setup.getInventory() == null) {
+			if (!fromDrag) sendChatMessage("Cannot add items to a legacy array setup. Please save this layout from your current gear first.");
+			return;
 		}
+
+		boolean alreadyExists = false;
+		for (Integer eqId : setup.getEquipment().values()) if (eqId != null && eqId == itemId) alreadyExists = true;
+		for (Integer invId : setup.getInventory()) if (invId != null && invId == itemId) alreadyExists = true;
+		if (setup.getAuxiliary() != null && setup.getAuxiliary().contains(itemId)) alreadyExists = true;
 
 		if (alreadyExists) {
-			if (!fromDrag) {
-				sendChatMessage("That item is already saved in your active Slayer tab setup.");
-			}
+			if (!fromDrag) sendChatMessage("That item is already saved in your active Slayer tab setup.");
 			return;
 		}
 
-		final int coreGearBoundary = 64;
-		int insertIndex = Math.max(coreGearBoundary, highestOccupied + 1);
-		if (insertIndex >= buffer.length) {
-			if (!fromDrag) {
-				sendChatMessage("Your Slayer tab layout has reached the maximum item limit (" + PluginConstants.MAX_TAB_ITEMS + ").");
-			}
+		List<Integer> newAux = setup.getAuxiliary() != null ? new ArrayList<>(setup.getAuxiliary()) : new ArrayList<>();
+		newAux.add(itemId);
+
+		int[] newGrid = SetupGridBuilder.buildDraftArray(setup.getEquipment(), setup.getInventory(), newAux, config.layoutMode());
+		if (newGrid.length > PluginConstants.MAX_TAB_ITEMS) {
+			if (!fromDrag) sendChatMessage("Your Slayer tab layout has reached the maximum item limit.");
 			return;
 		}
 
-		buffer[insertIndex] = itemId;
-		highestOccupied = Math.max(highestOccupied, insertIndex);
+		SlayerSetup updatedSetup = new SlayerSetup(newGrid, setup.getEquipment(), setup.getInventory(), newAux, config.layoutMode());
+		setupManager.saveSetup(currentSetupKey, updatedSetup);
 
-		int[] newGrid = Arrays.copyOf(buffer, highestOccupied + 1);
-		setupManager.saveSetup(currentSetupKey, new SlayerSetup(newGrid));
 		String csv = Arrays.stream(newGrid).mapToObj(String::valueOf).collect(Collectors.joining(","));
 		configManager.setConfiguration(PluginConstants.CONFIG_GROUP, "layout_" + currentSetupKey, csv);
 		syncLayoutToBankTags();
@@ -1305,17 +1321,25 @@ public class SlayerBankTabPlugin extends Plugin {
 		}
 
 		SlayerSetup existingSetup = setupManager.getSetupForTask(setupKey);
-		if (existingSetup != null && existingSetup.getGridLayout() != null) {
-			int[] oldLayout = existingSetup.getGridLayout();
-			for (int i = 64; i < oldLayout.length; i++) {
-				if (oldLayout[i] > 0 && uniqueAuxItems.add(oldLayout[i])) {
-					finalAuxiliary.add(oldLayout[i]);
+		if (existingSetup != null) {
+			if (existingSetup.getAuxiliary() != null) {
+				for (int auxId : existingSetup.getAuxiliary()) {
+					if (auxId > 0 && uniqueAuxItems.add(auxId)) {
+						finalAuxiliary.add(auxId);
+					}
+				}
+			} else if (existingSetup.getGridLayout() != null) {
+				int[] oldLayout = existingSetup.getGridLayout();
+				for (int i = 64; i < oldLayout.length; i++) {
+					if (oldLayout[i] > 0 && uniqueAuxItems.add(oldLayout[i])) {
+						finalAuxiliary.add(oldLayout[i]);
+					}
 				}
 			}
 		}
 
-		int[] gridLayout = SetupGridBuilder.buildDraftArray(equipmentMap, inventoryArray, finalAuxiliary);
-		return new SlayerSetup(gridLayout);
+		int[] gridLayout = SetupGridBuilder.buildDraftArray(equipmentMap, inventoryArray, finalAuxiliary, config.layoutMode());
+		return new SlayerSetup(gridLayout, equipmentMap, inventoryArray, finalAuxiliary, config.layoutMode());
 	}
 
 	private boolean isQuiverVariant(int itemId) {
@@ -1363,74 +1387,66 @@ public class SlayerBankTabPlugin extends Plugin {
 	public boolean updateAdditionalItemsForSetup(String setupKey, boolean notify) {
 		if (setupKey == null) return false;
 		SlayerSetup oldSetup = setupManager.getSetupForTask(setupKey);
-		if (oldSetup == null || oldSetup.getGridLayout() == null) return false;
-		int[] oldGrid = oldSetup.getGridLayout();
-		int[] newGridBuffer = new int[PluginConstants.MAX_TAB_ITEMS];
-		Arrays.fill(newGridBuffer, -1);
+		if (oldSetup == null) return false;
+
 		Set<Integer> recalculatedAdditionalItems = new LinkedHashSet<>();
-		int highestOccupiedIndex = -1;
-		final int coreGearBoundary = 64;
-		int coreLimit = Math.min(oldGrid.length, coreGearBoundary);
 		boolean hasRunePouch = false;
 		boolean hasBoltPouch = false;
 		boolean hasLootBag = false;
 
-		for (int i = 0; i < coreLimit; i++) {
-			int itemId = oldGrid[i];
-			if (itemId > 0) {
-				newGridBuffer[i] = itemId;
-				highestOccupiedIndex = Math.max(highestOccupiedIndex, i);
-				recalculatedAdditionalItems.addAll(auxiliaryItemMapping.getAuxiliaryItems(itemId));
-				if (!hasRunePouch && isRunePouchVariant(itemId)) hasRunePouch = true;
-				else if (!hasBoltPouch && isBoltPouchVariant(itemId)) hasBoltPouch = true;
-				else if (!hasLootBag && isLootingBagVariant(itemId)) hasLootBag = true;
+		if (oldSetup.getEquipment() != null && oldSetup.getInventory() != null) {
+			for (Integer itemId : oldSetup.getEquipment().values()) {
+				if (itemId != null && itemId > 0) {
+					recalculatedAdditionalItems.addAll(auxiliaryItemMapping.getAuxiliaryItems(itemId));
+					if (!hasRunePouch && isRunePouchVariant(itemId)) hasRunePouch = true;
+					else if (!hasBoltPouch && isBoltPouchVariant(itemId)) hasBoltPouch = true;
+					else if (!hasLootBag && isLootingBagVariant(itemId)) hasLootBag = true;
+				}
 			}
-		}
-		if (config.autoAddRunePouchRunes() && hasRunePouch) {
-			recalculatedAdditionalItems.addAll(getRunePouchContents());
-		}
-		if (config.autoAddBoltPouchBolts() && hasBoltPouch) {
-			recalculatedAdditionalItems.addAll(getBoltPouchContents());
-		}
-		if (config.autoAddLootingBagContents() && hasLootBag) {
-			recalculatedAdditionalItems.addAll(getLootingBagContents());
-		}
-
-		for (int i = coreGearBoundary; i < oldGrid.length; i++) {
-			if (oldGrid[i] > 0) {
-				recalculatedAdditionalItems.add(oldGrid[i]);
+			for (Integer itemId : oldSetup.getInventory()) {
+				if (itemId != null && itemId > 0) {
+					recalculatedAdditionalItems.addAll(auxiliaryItemMapping.getAuxiliaryItems(itemId));
+					if (!hasRunePouch && isRunePouchVariant(itemId)) hasRunePouch = true;
+					else if (!hasBoltPouch && isBoltPouchVariant(itemId)) hasBoltPouch = true;
+					else if (!hasLootBag && isLootingBagVariant(itemId)) hasLootBag = true;
+				}
 			}
+
+			if (config.autoAddRunePouchRunes() && hasRunePouch) {
+				recalculatedAdditionalItems.addAll(getRunePouchContents());
+			}
+			if (config.autoAddBoltPouchBolts() && hasBoltPouch) {
+				recalculatedAdditionalItems.addAll(getBoltPouchContents());
+			}
+			if (config.autoAddLootingBagContents() && hasLootBag) {
+				recalculatedAdditionalItems.addAll(getLootingBagContents());
+			}
+
+			if (oldSetup.getAuxiliary() != null) {
+				for (int auxId : oldSetup.getAuxiliary()) {
+					if (auxId > 0) recalculatedAdditionalItems.add(auxId);
+				}
+			}
+
+			List<Integer> newAux = new ArrayList<>(recalculatedAdditionalItems);
+			if (oldSetup.getAuxiliary() != null && oldSetup.getAuxiliary().equals(newAux) && oldSetup.getLayoutMode() == config.layoutMode()) {
+				return false;
+			}
+
+			int[] newGrid = SetupGridBuilder.buildDraftArray(oldSetup.getEquipment(), oldSetup.getInventory(), newAux, config.layoutMode());
+			SlayerSetup updatedSetup = new SlayerSetup(newGrid, oldSetup.getEquipment(), oldSetup.getInventory(), newAux, config.layoutMode());
+			setupManager.saveSetup(setupKey, updatedSetup);
+
+			String csv = Arrays.stream(newGrid).mapToObj(String::valueOf).collect(Collectors.joining(","));
+			configManager.setConfiguration(PluginConstants.CONFIG_GROUP, "layout_" + setupKey, csv);
+
+			if (setupKey.equalsIgnoreCase(currentSetupKey)) {
+				syncLayoutToBankTags();
+			}
+			return true;
 		}
 
-		int currentPointer = coreGearBoundary;
-		for (int additionalId : recalculatedAdditionalItems) {
-			if (currentPointer >= PluginConstants.MAX_TAB_ITEMS) break;
-			newGridBuffer[currentPointer] = additionalId;
-			highestOccupiedIndex = Math.max(highestOccupiedIndex, currentPointer);
-			currentPointer++;
-		}
-		int[] finalGrid = highestOccupiedIndex == -1 ? new int[0] : Arrays.copyOf(newGridBuffer, highestOccupiedIndex + 1);
-
-		if (Arrays.equals(oldGrid, finalGrid)) {
-			return false;
-		}
-
-		SlayerSetup updatedSetup = new SlayerSetup(finalGrid);
-		setupManager.saveSetup(setupKey, updatedSetup);
-		String csv = Arrays.stream(finalGrid).mapToObj(String::valueOf).collect(Collectors.joining(","));
-		configManager.setConfiguration(PluginConstants.CONFIG_GROUP, "layout_" + setupKey, csv);
-		if (setupKey.equalsIgnoreCase(currentSetupKey)) {
-			syncLayoutToBankTags();
-		}
-		return true;
-	}
-
-	public SlayerSetupManager getSetupManager() {
-		return setupManager;
-	}
-
-	public ItemManager getItemManager() {
-		return itemManager;
+		return false;
 	}
 
 	public boolean duplicateSetup(String sourceKey, String targetKey) {
