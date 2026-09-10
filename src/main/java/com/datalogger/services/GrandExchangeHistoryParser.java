@@ -156,7 +156,7 @@ public class GrandExchangeHistoryParser
 
 	private boolean allowedToParseHistory()
 	{
-		if (!config.logGrandExchange() || accountHash == -1 || accountName == null || hasParsed) return false;
+		if (!config.logGrandExchange() || accountHash == -1 || hasParsed) return false;
 
 		if (System.currentTimeMillis() - lastParsed < COOLDOWN_MS) {
 			log.debug("Skipping GE history parse; history was parsed less than 5 minutes ago.");

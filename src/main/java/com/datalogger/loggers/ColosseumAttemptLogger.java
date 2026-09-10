@@ -223,7 +223,7 @@ public class ColosseumAttemptLogger extends AbstractLogger
 			return;
 		}
 
-		String message = Text.removeTags(event.getMessage());
+		String message = preprocessMessage(event.getMessage());
 
 		if (message.startsWith(DEATH_MESSAGE)) {
 			waveEndTick = client.getTickCount();

@@ -1,10 +1,11 @@
 # Changelog
 
 ## 1.2.2
-2026-08-13
+2026-09-10
 
 ### Summary
-- Minor fix in GE history parser 
+- Minor fix in GE history parser
+- Improved preprocessing of chatmessages
 
 ## 1.2.1
 2026-06-26

@@ -35,6 +35,7 @@ import net.runelite.api.Client;
 import net.runelite.api.GameState;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.client.eventbus.Subscribe;
+import net.runelite.client.util.Text;
 
 @Slf4j
 public abstract class AbstractLogger implements Loggable {
@@ -127,5 +128,57 @@ public abstract class AbstractLogger implements Loggable {
 			accountName = "unknown";
 			accountHashString = "-1";
 		}
+	}
+
+	/**
+	 * Removes OSRS '@' formatted tags (e.g. @mes_hl_red@, @blu@, @cr1@) from a message.
+	 * Highly optimized to prevent regex overhead and zero-allocation fast-failing.
+	 */
+	protected static String preprocessMessage(String message) {
+		if (message == null) {
+			return null;
+		}
+
+		String tagsRemoved = Text.removeTags(message);
+
+		if (tagsRemoved.indexOf('@') == -1) {
+			return tagsRemoved;
+		}
+
+		StringBuilder sb = new StringBuilder(tagsRemoved.length());
+		int currentIndex = 0;
+
+		while (currentIndex < tagsRemoved.length()) {
+			int start = tagsRemoved.indexOf('@', currentIndex);
+			if (start == -1) {
+				sb.append(tagsRemoved, currentIndex, tagsRemoved.length());
+				break;
+			}
+
+			int end = tagsRemoved.indexOf('@', start + 1);
+			if (end == -1) {
+				sb.append(tagsRemoved, currentIndex, tagsRemoved.length());
+				break;
+			}
+
+			boolean isTag = (end > start + 1);
+			for (int i = start + 1; i < end; i++) {
+				char c = tagsRemoved.charAt(i);
+				if (!Character.isLetterOrDigit(c) && c != '_') {
+					isTag = false;
+					break;
+				}
+			}
+
+			if (isTag) {
+				sb.append(tagsRemoved, currentIndex, start);
+				currentIndex = end + 1;
+			} else {
+				sb.append(tagsRemoved, currentIndex, start + 1);
+				currentIndex = start + 1;
+			}
+		}
+
+		return sb.toString();
 	}
 }
