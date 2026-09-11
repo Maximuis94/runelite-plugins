@@ -41,22 +41,20 @@ public final class Util
 	private Util() {}
 
 	/**
-	 * Copies a given string (URL or path) to the clipboard and notifies the user.
+	 * Copies a given string (URL or path) to the clipboard. Displays a pop-up after copying it.
 	 */
 	public static void copyToClipboard(String text) {
 		StringSelection stringSelection = new StringSelection(text);
 		Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
 		clipboard.setContents(stringSelection, null);
 
-		// Safely show the pop-up on the Event Dispatch Thread
 		SwingUtilities.invokeLater(() -> {
 			JOptionPane.showMessageDialog(null, "Copied " + text + " to clipboard!", "Copied", JOptionPane.INFORMATION_MESSAGE);
 		});
 	}
 
 	/**
-	 * Helper method to copy a directory path to the clipboard.
-	 * (Replaces the old copyDirectoryToClipboard method)
+	 * Helper method to copy a directory path to the clipboard. Displays a pop-up after copying it.
 	 */
 	public static void copyDirectoryToClipboard(File directory, ScheduledExecutorService executor) {
 		executor.submit(() -> {
@@ -69,8 +67,7 @@ public final class Util
 	}
 
 	/**
-	 * Overloaded helper method for string paths.
-	 * (Replaces the old copyDirectoryToClipboard and openUrl methods)
+	 * Overloaded helper method for string paths. Displays a pop-up after copying it.
 	 */
 	public static void copyToClipboard(String text, ScheduledExecutorService executor) {
 		executor.submit(() -> copyToClipboard(text));
