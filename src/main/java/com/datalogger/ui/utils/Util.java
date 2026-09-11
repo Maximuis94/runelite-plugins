@@ -25,10 +25,14 @@
 
 package com.datalogger.ui.utils;
 
+import java.awt.Toolkit;
+import java.awt.datatransfer.Clipboard;
+import java.awt.datatransfer.StringSelection;
 import java.io.File;
 import java.util.concurrent.ScheduledExecutorService;
+import javax.swing.JOptionPane;
+import javax.swing.SwingUtilities;
 import lombok.extern.slf4j.Slf4j;
-import net.runelite.client.util.LinkBrowser;
 
 @Slf4j
 public final class Util
@@ -37,32 +41,38 @@ public final class Util
 	private Util() {}
 
 	/**
-	 * Helper method to open a directory in the native OS file explorer.
+	 * Copies a given string (URL or path) to the clipboard and notifies the user.
 	 */
-	public static void openDirectory(String path, ScheduledExecutorService executor) {
-		executor.submit(() -> LinkBrowser.open(path));
+	public static void copyToClipboard(String text) {
+		StringSelection stringSelection = new StringSelection(text);
+		Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
+		clipboard.setContents(stringSelection, null);
+
+		// Safely show the pop-up on the Event Dispatch Thread
+		SwingUtilities.invokeLater(() -> {
+			JOptionPane.showMessageDialog(null, "Copied " + text + " to clipboard!", "Copied", JOptionPane.INFORMATION_MESSAGE);
+		});
 	}
 
 	/**
-	 * Helper method to open a directory in the native OS file explorer.
+	 * Helper method to copy a directory path to the clipboard.
+	 * (Replaces the old copyDirectoryToClipboard method)
 	 */
-	public static void openDirectory(File directory, ScheduledExecutorService executor) {
+	public static void copyDirectoryToClipboard(File directory, ScheduledExecutorService executor) {
 		executor.submit(() -> {
-
 			if (!directory.exists()) {
-				log.warn("Directory does not exist, attempting to create: {}", directory.getAbsolutePath());
+				log.warn("Directory does not exist: {}", directory.getAbsolutePath());
 			}
 
-			LinkBrowser.open(directory.getAbsolutePath());
+			copyToClipboard(directory.getAbsolutePath());
 		});
 	}
 
 	/**
-	 * Helper method to open a directory in the native OS file explorer.
+	 * Overloaded helper method for string paths.
+	 * (Replaces the old copyDirectoryToClipboard and openUrl methods)
 	 */
-	public static void openUrl(String url, ScheduledExecutorService executor) {
-		executor.submit(() -> {
-			LinkBrowser.browse(url);
-		});
+	public static void copyToClipboard(String text, ScheduledExecutorService executor) {
+		executor.submit(() -> copyToClipboard(text));
 	}
 }

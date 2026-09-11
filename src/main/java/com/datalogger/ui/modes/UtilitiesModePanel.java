@@ -42,7 +42,7 @@ import com.datalogger.ui.utils.Components;
 import static com.datalogger.ui.utils.Components.createStyledButton;
 import static com.datalogger.ui.utils.Components.showConfirmDialog;
 import com.datalogger.ui.utils.Models.AccountItem;
-import static com.datalogger.ui.utils.Util.openDirectory;
+import static com.datalogger.ui.utils.Util.copyDirectoryToClipboard;
 import com.datalogger.utils.migration.MigrationManager;
 import java.awt.BorderLayout;
 import java.awt.Dimension;
@@ -150,7 +150,7 @@ public class UtilitiesModePanel extends JPanel
 			controlsPanel.add(directorySelector);
 			controlsPanel.add(accountSelector);
 			log.debug("Accounts: {}", accountHashMapper.getAccountNames());
-			JButton openBtn = createStyledButton("Open directory", e -> {
+			JButton openBtn = createStyledButton("Copy directory path", e -> {
 				Directory selectedDir = (Directory) directorySelector.getSelectedItem();
 				if (selectedDir != null)
 				{
@@ -171,11 +171,11 @@ public class UtilitiesModePanel extends JPanel
 								targetDirectory = new File(targetDirectory, selectedAccount.toString().toLowerCase());
 							}
 							if (targetDirectory.exists()) {
-								openDirectory(targetDirectory, executor);
+								copyDirectoryToClipboard(targetDirectory, executor);
 							} else {
 								File parentDir = selectedDir.getDirectory();
 								if (parentDir.exists()) {
-									openDirectory(parentDir, executor);
+									copyDirectoryToClipboard(parentDir, executor);
 								}
 								else {
 									SwingUtilities.invokeLater(() -> {
@@ -192,10 +192,10 @@ public class UtilitiesModePanel extends JPanel
 					}
 
 					if (targetDirectory != null && targetDirectory.exists()) {
-						openDirectory(targetDirectory, executor);
+						copyDirectoryToClipboard(targetDirectory, executor);
 					} else if (targetDirectory != null && targetDirectory.exists()) {
 						File parentDir = selectedDir.getDirectory();
-						openDirectory(parentDir, executor);
+						copyDirectoryToClipboard(parentDir, executor);
 					}
 				}
 			});

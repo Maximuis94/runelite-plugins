@@ -38,7 +38,7 @@ import com.datalogger.models.enums.UIScrollSpeed;
 import com.datalogger.services.DiscordWebhookService;
 import com.datalogger.ui.utils.Components;
 import static com.datalogger.ui.utils.Components.createStyledButton;
-import static com.datalogger.ui.utils.Util.openUrl;
+import static com.datalogger.ui.utils.Util.copyToClipboard;
 import com.datalogger.webhook.ColosseumCustomDiscordFormatter;
 import com.datalogger.webhook.ColosseumDiscordBroadcaster;
 import com.google.gson.Gson;
@@ -119,7 +119,7 @@ public class WebhookTestModePanel extends JPanel
 		controlsPanel.setOpaque(false);
 
 		JLabel instructionsLabel = new JLabel("<html><div style='width: 200px; color: white; padding-bottom: 2px;'>Test various broadcasting options<br>here using existing trial submissions<br>For a more elaborate explanation, go <br>to the DataLogger README and head <br>to the Custom broadcasting <br>templates section</div></html>");
-		JButton pluginHubBtn = createStyledButton("Open DataLogger README", e -> {openUrl(PLUGIN_URL, executor);});
+		JButton pluginHubBtn = createStyledButton("Copy DataLogger README URL", e -> {copyToClipboard(PLUGIN_URL, executor);});
 		pluginHubBtn.setToolTipText("Click here to go to the DataLogger plugin hub page, in which the README can be found.");
 
 		JComboBox<String> trialSelector = Components.createComboBox();

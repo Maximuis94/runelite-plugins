@@ -6,10 +6,10 @@
  * modification, are permitted provided that the following conditions are met:
  *
  * 1. Redistributions of source code must retain the above copyright notice, this
- * list of conditions and the following disclaimer.
+ *    list of conditions and the following disclaimer.
  * 2. Redistributions in binary form must reproduce the above copyright notice,
- * this list of conditions and the following disclaimer in the documentation
- * and/or other materials provided with the distribution.
+ *    this list of conditions and the following disclaimer in the documentation
+ *    and/or other materials provided with the distribution.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
@@ -31,7 +31,8 @@ import com.datalogger.dto.ColosseumAttemptDTO;
 import com.datalogger.models.enums.ColosseumModifier;
 import static com.datalogger.ui.utils.Components.createStyledButton;
 import static com.datalogger.ui.utils.Components.wrapWithRuneLiteScrollbar;
-import static com.datalogger.ui.utils.Util.openDirectory;
+import static com.datalogger.ui.utils.Util.copyDirectoryToClipboard;
+import static com.datalogger.ui.utils.Util.copyDirectoryToClipboard;
 import com.google.gson.Gson;
 import java.awt.BorderLayout;
 import java.awt.Color;
@@ -435,7 +436,7 @@ public class ColosseumReviewModePanel extends JPanel
 			public void mouseClicked(java.awt.event.MouseEvent evt) {
 				if (SwingUtilities.isLeftMouseButton(evt)) {
 					if (attemptDir.exists() && attemptDir.isDirectory()) {
-						openDirectory(attemptDir, executor);
+						copyDirectoryToClipboard(attemptDir, executor);
 					}
 				}
 			}
