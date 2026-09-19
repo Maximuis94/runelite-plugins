@@ -22,11 +22,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
 package com.activitycounter;
-
-import java.io.File;
-import net.runelite.client.RuneLite;
 
 /**
  * Global constants used by the plugin
@@ -37,7 +33,4 @@ public final class PluginConstants {
 	public static final String PLUGIN_NAME = "Activity Counter";
 	public static final String CONFIG_GROUP = "activitycounter";
 	public static final String PLUGIN_DIR_NAME = "activity-counter";
-	public static final File PLUGIN_DIR = new File(RuneLite.RUNELITE_DIR, PLUGIN_DIR_NAME);
-
-
 }

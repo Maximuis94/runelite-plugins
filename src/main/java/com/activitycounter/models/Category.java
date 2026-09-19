@@ -27,5 +27,5 @@ package com.activitycounter.models;
 
 public enum Category
 {
-	BOSSES, CHESTS, OTHER, CLUE, SLAYER, AGILITY, EXPERIENCE
+	BOSSES, CHESTS, OTHER, CLUE, SLAYER, AGILITY, LEVELS, EXPERIENCE
 }

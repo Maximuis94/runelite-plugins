@@ -22,7 +22,6 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
 package com.activitycounter;
 
 import static com.activitycounter.PluginConstants.CONFIG_GROUP;
@@ -32,7 +31,7 @@ import com.activitycounter.models.Count;
 import com.activitycounter.models.Session;
 import com.google.inject.Provides;
 import java.awt.image.BufferedImage;
-import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.BooleanSupplier;
@@ -61,12 +60,14 @@ import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.ClientToolbar;
 import net.runelite.client.ui.NavigationButton;
+import net.runelite.client.util.Filepath;
 import net.runelite.client.util.ImageUtil;
 import net.runelite.client.util.Text;
 
 @Slf4j
 @PluginDescriptor(
 	name = PLUGIN_NAME,
+	internalName = PluginConstants.PLUGIN_DIR_NAME,
 	description = "Plugin that counts activities (e.g. bosses/agility laps) per manually defined session",
 	tags = {"session", "tracker", "counter", "kc", "killcount", "activity", "count", "lap"}
 )
@@ -92,6 +93,19 @@ public class ActivityCounterPlugin extends Plugin {
 		return configManager.getConfig(ActivityCounterConfig.class);
 	}
 
+	public Filepath getDirectory()
+	{
+		try
+		{
+			return this.getPluginDirectory();
+		}
+		catch (IOException e)
+		{
+			log.error("Failed to get plugin directory", e);
+			return null;
+		}
+	}
+
 	@Getter
 	private Session currentSession;
 	private ActivityCounterPanel panel;
@@ -101,10 +115,14 @@ public class ActivityCounterPlugin extends Plugin {
 
 	private boolean trackExperience = false;
 	private boolean trackChatMessages = false;
+	private boolean trackLevels = false;
 
 	@Getter
 	private boolean showSessionDuration = false;
 	private boolean requiresSaveAndRefresh = false;
+
+	private static final String SUPERIOR_SPAWN_MESSAGE = "A superior foe has appeared...";
+	private static final int SUPERIOR_SPAWNS = -7000;
 
 	private static final String FARMING_CONTRACT_MESSAGE = "You've completed a Farming Guild Contract. You should return to GuildMaster Jane.";
 	private static final int FARMING_CONTRACTS = -3000;
@@ -172,6 +190,34 @@ public class ActivityCounterPlugin extends Plugin {
 	private static final int XP_HUNTER = -5021;
 	private static final int XP_CONSTRUCTION = -5022;
 	private static final int XP_TOTAL = -5023;
+	private static final int XP_SAILING = -5024;
+
+	// Pseudo-IDs for Skill Levels (Negative to prevent collisions)
+	private static final int LVL_TOTAL = -6000;
+	private static final int LVL_ATTACK = -6001;
+	private static final int LVL_DEFENCE = -6002;
+	private static final int LVL_STRENGTH = -6003;
+	private static final int LVL_HITPOINTS = -6004;
+	private static final int LVL_RANGED = -6005;
+	private static final int LVL_PRAYER = -6006;
+	private static final int LVL_MAGIC = -6007;
+	private static final int LVL_COOKING = -6008;
+	private static final int LVL_WOODCUTTING = -6009;
+	private static final int LVL_FLETCHING = -6010;
+	private static final int LVL_FISHING = -6011;
+	private static final int LVL_FIREMAKING = -6012;
+	private static final int LVL_CRAFTING = -6013;
+	private static final int LVL_SMITHING = -6014;
+	private static final int LVL_MINING = -6015;
+	private static final int LVL_HERBLORE = -6016;
+	private static final int LVL_AGILITY = -6017;
+	private static final int LVL_THIEVING = -6018;
+	private static final int LVL_SLAYER = -6019;
+	private static final int LVL_FARMING = -6020;
+	private static final int LVL_RUNECRAFTING = -6021;
+	private static final int LVL_HUNTER = -6022;
+	private static final int LVL_CONSTRUCTION = -6023;
+	private static final int LVL_SAILING = -6024;
 
 	@AllArgsConstructor
 	private static class ActivityData
@@ -218,8 +264,16 @@ public class ActivityCounterPlugin extends Plugin {
 			config.trackCookingXp() || config.trackFiremakingXp() || config.trackWoodcuttingXp() ||
 			config.trackAgilityXp() || config.trackHerbloreXp() || config.trackThievingXp() ||
 			config.trackFletchingXp() || config.trackSlayerXp() || config.trackFarmingXp() ||
-			config.trackConstructionXp() || config.trackHunterXp();
-		trackChatMessages = config.trackAgilityLaps() || config.trackHunterRumours() || config.trackFarmingContracts() || config.trackMahoganyHomesContracts();
+			config.trackConstructionXp() || config.trackHunterXp() || config.trackSailingXp();
+		trackLevels = config.trackTotalLevel() || config.trackAttackLevel() || config.trackStrengthLevel() ||
+			config.trackDefenceLevel() || config.trackRangedLevel() || config.trackPrayerLevel() || config.trackMagicLevel() ||
+			config.trackRunecraftLevel() || config.trackHitpointsLevel() || config.trackCraftingLevel() ||
+			config.trackMiningLevel() || config.trackSmithingLevel() || config.trackFishingLevel() ||
+			config.trackCookingLevel() || config.trackFiremakingLevel() || config.trackWoodcuttingLevel() ||
+			config.trackAgilityLevel() || config.trackHerbloreLevel() || config.trackThievingLevel() ||
+			config.trackFletchingLevel() || config.trackSlayerLevel() || config.trackFarmingLevel() ||
+			config.trackConstructionLevel() || config.trackHunterLevel() || config.trackSailingLevel();
+		trackChatMessages = config.trackSuperiorSpawns() || config.trackAgilityLaps() || config.trackHunterRumours() || config.trackFarmingContracts() || config.trackMahoganyHomesContracts();
 		showSessionDuration = config.showSessionDuration();
 	}
 
@@ -292,7 +346,7 @@ public class ActivityCounterPlugin extends Plugin {
 		return storageManager.loadArchivedSessions(client.getAccountHash());
 	}
 
-	public void viewArchivedSession(File sessionFile) {
+	public void viewArchivedSession(Filepath sessionFile) {
 		Session loadedSession = storageManager.loadSession(sessionFile);
 		if (loadedSession != null) {
 			this.currentSession = loadedSession;
@@ -375,7 +429,7 @@ public class ActivityCounterPlugin extends Plugin {
 
 		if (newSessionKc > kc.getSessionKc()) {
 			kc.setSessionKc(newSessionKc);
-			requiresSaveAndRefresh = true; // Batched onto the GameTick for performance
+			requiresSaveAndRefresh = true;
 		}
 	}
 
@@ -463,11 +517,20 @@ public class ActivityCounterPlugin extends Plugin {
 				requiresSaveAndRefresh = true;
 			}
 		}
+
+		else if (message.equals(SUPERIOR_SPAWN_MESSAGE))
+		{
+			if (currentSession.isTracking(SUPERIOR_SPAWNS)) {
+				Count kc = currentSession.getKillCount(SUPERIOR_SPAWNS);
+				kc.setSessionKc(kc.getSessionKc() + 1);
+				requiresSaveAndRefresh = true;
+			}
+		}
 	}
 
 	@Subscribe
 	public void onStatChanged(StatChanged event) {
-		if (!trackExperience) return;
+		if (!trackExperience && !trackLevels) return;
 
 		if (currentSession == null || !currentSession.isInProgress()) return;
 
@@ -490,6 +553,16 @@ public class ActivityCounterPlugin extends Plugin {
 				.sum();
 
 			currentSession.getKillCount(XP_TOTAL).setSessionKc(totalGained);
+		}
+
+		if (trackLevels) {
+			int lvlTrackingId = getSkillLevelTrackingId(event.getSkill());
+			if (currentSession.isTracking(lvlTrackingId)) {
+				processActivityUpdate(lvlTrackingId, client.getRealSkillLevel(event.getSkill()));
+			}
+			if (currentSession.isTracking(LVL_TOTAL)) {
+				processActivityUpdate(LVL_TOTAL, client.getTotalLevel());
+			}
 		}
 	}
 
@@ -542,11 +615,20 @@ public class ActivityCounterPlugin extends Plugin {
 			for (Skill skill : Skill.values()) {
 				currentSession.initializeSkill(skill, client.getSkillExperience(skill));
 
-				// Set the baseline KC for the new XP ActivityData entries
-				int trackingId = getSkillTrackingId(skill);
-				if (currentSession.isTracking(trackingId)) {
-					currentSession.getKillCount(trackingId).setInitialKc(client.getSkillExperience(skill));
+				int xpTrackingId = getSkillTrackingId(skill);
+				if (currentSession.isTracking(xpTrackingId)) {
+					currentSession.getKillCount(xpTrackingId).setInitialKc(client.getSkillExperience(skill));
 				}
+
+				// --- NEW BASELINES ---
+				int lvlTrackingId = getSkillLevelTrackingId(skill);
+				if (currentSession.isTracking(lvlTrackingId)) {
+					currentSession.getKillCount(lvlTrackingId).setInitialKc(client.getRealSkillLevel(skill));
+				}
+			}
+
+			if (currentSession.isTracking(LVL_TOTAL)) {
+				currentSession.getKillCount(LVL_TOTAL).setInitialKc(client.getTotalLevel());
 			}
 		}
 	}
@@ -614,6 +696,37 @@ public class ActivityCounterPlugin extends Plugin {
 			case RUNECRAFT: return XP_RUNECRAFT;
 			case HUNTER: return XP_HUNTER;
 			case CONSTRUCTION: return XP_CONSTRUCTION;
+			case SAILING: return XP_SAILING;
+			default: return -1;
+		}
+	}
+
+	private int getSkillLevelTrackingId(Skill skill) {
+		switch (skill) {
+			case ATTACK: return LVL_ATTACK;
+			case DEFENCE: return LVL_DEFENCE;
+			case STRENGTH: return LVL_STRENGTH;
+			case HITPOINTS: return LVL_HITPOINTS;
+			case RANGED: return LVL_RANGED;
+			case PRAYER: return LVL_PRAYER;
+			case MAGIC: return LVL_MAGIC;
+			case COOKING: return LVL_COOKING;
+			case WOODCUTTING: return LVL_WOODCUTTING;
+			case FLETCHING: return LVL_FLETCHING;
+			case FISHING: return LVL_FISHING;
+			case FIREMAKING: return LVL_FIREMAKING;
+			case CRAFTING: return LVL_CRAFTING;
+			case SMITHING: return LVL_SMITHING;
+			case MINING: return LVL_MINING;
+			case HERBLORE: return LVL_HERBLORE;
+			case AGILITY: return LVL_AGILITY;
+			case THIEVING: return LVL_THIEVING;
+			case SLAYER: return LVL_SLAYER;
+			case FARMING: return LVL_FARMING;
+			case RUNECRAFT: return LVL_RUNECRAFTING;
+			case HUNTER: return LVL_HUNTER;
+			case CONSTRUCTION: return LVL_CONSTRUCTION;
+			case SAILING: return LVL_SAILING;
 			default: return -1;
 		}
 	}
@@ -740,6 +853,7 @@ public class ActivityCounterPlugin extends Plugin {
 		activityRegistry.add(new ActivityData("Slayer tasks", VarbitID.SLAYER_TASKS_COMPLETED + VARBIT_OFFSET, Category.SLAYER, config::trackSlayerTasks));
 		activityRegistry.add(new ActivityData("Slayer tasks (Wilderness)", VarbitID.SLAYER_WILDERNESS_TASKS_COMPLETED + VARBIT_OFFSET, Category.SLAYER, config::trackSlayerTasks));
 		activityRegistry.add(new ActivityData("Slayer tasks (Mortimer)", VarPlayerID.SLAYER_MORTIMER_TASKS_COMPLETED, Category.SLAYER, config::trackSlayerTasks));
+		activityRegistry.add(new ActivityData("Superior spawns", SUPERIOR_SPAWNS, Category.SLAYER, config::trackSuperiorSpawns));
 
 		// Agility Courses
 		activityRegistry.add(new ActivityData("Gnome Stronghold Laps", AGILITY_GNOME_STRONGHOLD, Category.AGILITY, config::trackAgilityLaps));
@@ -791,5 +905,33 @@ public class ActivityCounterPlugin extends Plugin {
 		activityRegistry.add(new ActivityData("Runecraft XP", XP_RUNECRAFT, Category.EXPERIENCE, config::trackRunecraftXp));
 		activityRegistry.add(new ActivityData("Hunter XP", XP_HUNTER, Category.EXPERIENCE, config::trackHunterXp));
 		activityRegistry.add(new ActivityData("Construction XP", XP_CONSTRUCTION, Category.EXPERIENCE, config::trackConstructionXp));
+		activityRegistry.add(new ActivityData("Sailing XP", XP_SAILING, Category.EXPERIENCE, config::trackSailingXp));
+
+		// Level Tracking
+		activityRegistry.add(new ActivityData("Total Level", LVL_TOTAL, Category.LEVELS, config::trackTotalLevel));
+		activityRegistry.add(new ActivityData("Attack Level", LVL_ATTACK, Category.LEVELS, config::trackAttackLevel));
+		activityRegistry.add(new ActivityData("Defence Level", LVL_DEFENCE, Category.LEVELS, config::trackDefenceLevel));
+		activityRegistry.add(new ActivityData("Strength Level", LVL_STRENGTH, Category.LEVELS, config::trackStrengthLevel));
+		activityRegistry.add(new ActivityData("Hitpoints Level", LVL_HITPOINTS, Category.LEVELS, config::trackHitpointsLevel));
+		activityRegistry.add(new ActivityData("Ranged Level", LVL_RANGED, Category.LEVELS, config::trackRangedLevel));
+		activityRegistry.add(new ActivityData("Prayer Level", LVL_PRAYER, Category.LEVELS, config::trackPrayerLevel));
+		activityRegistry.add(new ActivityData("Magic Level", LVL_MAGIC, Category.LEVELS, config::trackMagicLevel));
+		activityRegistry.add(new ActivityData("Cooking Level", LVL_COOKING, Category.LEVELS, config::trackCookingLevel));
+		activityRegistry.add(new ActivityData("Woodcutting Level", LVL_WOODCUTTING, Category.LEVELS, config::trackWoodcuttingLevel));
+		activityRegistry.add(new ActivityData("Fletching Level", LVL_FLETCHING, Category.LEVELS, config::trackFletchingLevel));
+		activityRegistry.add(new ActivityData("Fishing Level", LVL_FISHING, Category.LEVELS, config::trackFishingLevel));
+		activityRegistry.add(new ActivityData("Firemaking Level", LVL_FIREMAKING, Category.LEVELS, config::trackFiremakingLevel));
+		activityRegistry.add(new ActivityData("Crafting Level", LVL_CRAFTING, Category.LEVELS, config::trackCraftingLevel));
+		activityRegistry.add(new ActivityData("Smithing Level", LVL_SMITHING, Category.LEVELS, config::trackSmithingLevel));
+		activityRegistry.add(new ActivityData("Mining Level", LVL_MINING, Category.LEVELS, config::trackMiningLevel));
+		activityRegistry.add(new ActivityData("Herblore Level", LVL_HERBLORE, Category.LEVELS, config::trackHerbloreLevel));
+		activityRegistry.add(new ActivityData("Agility Level", LVL_AGILITY, Category.LEVELS, config::trackAgilityLevel));
+		activityRegistry.add(new ActivityData("Thieving Level", LVL_THIEVING, Category.LEVELS, config::trackThievingLevel));
+		activityRegistry.add(new ActivityData("Slayer Level", LVL_SLAYER, Category.LEVELS, config::trackSlayerLevel));
+		activityRegistry.add(new ActivityData("Farming Level", LVL_FARMING, Category.LEVELS, config::trackFarmingLevel));
+		activityRegistry.add(new ActivityData("Runecraft Level", LVL_RUNECRAFTING, Category.LEVELS, config::trackRunecraftLevel));
+		activityRegistry.add(new ActivityData("Hunter Level", LVL_HUNTER, Category.LEVELS, config::trackHunterLevel));
+		activityRegistry.add(new ActivityData("Construction Level", LVL_CONSTRUCTION, Category.LEVELS, config::trackConstructionLevel));
+		activityRegistry.add(new ActivityData("Sailing Level", LVL_SAILING, Category.LEVELS, config::trackSailingLevel));
 	}
 }

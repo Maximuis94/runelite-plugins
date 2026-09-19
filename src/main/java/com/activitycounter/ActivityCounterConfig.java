@@ -68,9 +68,16 @@ public interface ActivityCounterConfig extends Config {
 	String experienceSection = "experienceSection";
 
 	@ConfigSection(
+		name = "Levels",
+		description = "Tracked Skill Levels",
+		position = 4
+	)
+	String levelSection = "levelSection";
+
+	@ConfigSection(
 		name = "Other",
 		description = "Other tracked activities",
-		position = 4,
+		position = 5,
 		closedByDefault = true
 	)
 	String otherSection = "otherSection";
@@ -778,10 +785,20 @@ public interface ActivityCounterConfig extends Config {
 	default boolean trackSlayerTasks() { return true; }
 
 	@ConfigItem(
+		keyName = "trackSuperiorSpawns",
+		name = "Superior spawns",
+		description = "If checked, Superior spawns are tracked.<br>" +
+			"Non-wilderness, wilderness and Mortimer tasks are tracked separately.",
+		position = 12,
+		section = otherSection
+	)
+	default boolean trackSuperiorSpawns() { return true; }
+
+	@ConfigItem(
 		keyName = "trackAgilityLaps",
 		name = "Agility laps",
 		description = "If checked, completed agility course laps are tracked",
-		position = 12,
+		position = 13,
 		section = otherSection
 	)
 	default boolean trackAgilityLaps() { return true; }
@@ -1003,4 +1020,240 @@ public interface ActivityCounterConfig extends Config {
 		section = experienceSection
 	)
 	default boolean trackConstructionXp() { return true; }
+
+	@ConfigItem(
+		keyName = "trackSailingXp",
+		name = "Sailing XP",
+		description = "If checked, Sailing experience is tracked.",
+		position = 24,
+		section = experienceSection
+	)
+	default boolean trackSailingXp() { return true; }
+
+	// --- LEVELS ---
+
+	@ConfigItem(
+		keyName = "trackTotalLevel",
+		name = "Total Level",
+		description = "If checked, Total Level is tracked.",
+		position = 0, section =
+		levelSection
+	)
+	default boolean trackTotalLevel() { return true; }
+
+	@ConfigItem(
+		keyName = "trackAttackLevel",
+		name = "Attack Level",
+		description = "If checked, Attack level is tracked.",
+		position = 1,
+		section = levelSection
+	)
+	default boolean trackAttackLevel() { return true; }
+
+	@ConfigItem(
+		keyName = "trackDefenceLevel",
+		name = "Defence Level",
+		description = "If checked, Defence level is tracked.",
+		position = 2,
+		section = levelSection
+	)
+	default boolean trackDefenceLevel() { return true; }
+
+	@ConfigItem(
+		keyName = "trackStrengthLevel",
+		name = "Strength Level",
+		description = "If checked, Strength level is tracked.",
+		position = 3,
+		section = levelSection
+	)
+	default boolean trackStrengthLevel() { return true; }
+
+	@ConfigItem(
+		keyName = "trackHitpointsLevel",
+		name = "Hitpoints Level",
+		description = "If checked, Hitpoints level is tracked.",
+		position = 4,
+		section = levelSection
+	)
+	default boolean trackHitpointsLevel() { return true; }
+
+	@ConfigItem(
+		keyName = "trackRangedLevel",
+		name = "Ranged Level",
+		description = "If checked, Ranged level is tracked.",
+		position = 5,
+		section = levelSection
+	)
+	default boolean trackRangedLevel() { return true; }
+
+	@ConfigItem(
+		keyName = "trackPrayerLevel",
+		name = "Prayer Level",
+		description = "If checked, Prayer level is tracked.",
+		position = 6,
+		section = levelSection
+	)
+	default boolean trackPrayerLevel() { return true; }
+
+	@ConfigItem(
+		keyName = "trackMagicLevel",
+		name = "Magic Level",
+		description = "If checked, Magic level is tracked.",
+		position = 7,
+		section = levelSection
+	)
+	default boolean trackMagicLevel() { return true; }
+
+	@ConfigItem(
+		keyName = "trackCookingLevel",
+		name = "Cooking Level",
+		description = "If checked, Cooking level is tracked.",
+		position = 8,
+		section = levelSection
+	)
+	default boolean trackCookingLevel() { return true; }
+
+	@ConfigItem(
+		keyName = "trackWoodcuttingLevel",
+		name = "Woodcutting Level",
+		description = "If checked, Woodcutting level is tracked.",
+		position = 9,
+		section = levelSection
+	)
+	default boolean trackWoodcuttingLevel() { return true; }
+
+	@ConfigItem(
+		keyName = "trackFletchingLevel",
+		name = "Fletching Level",
+		description = "If checked, Fletching level is tracked.",
+		position = 10,
+		section = levelSection
+	)
+	default boolean trackFletchingLevel() { return true; }
+
+	@ConfigItem(
+		keyName = "trackFishingLevel",
+		name = "Fishing Level",
+		description = "If checked, Fishing level is tracked.",
+		position = 11,
+		section = levelSection
+	)
+	default boolean trackFishingLevel() { return true; }
+
+	@ConfigItem(
+		keyName = "trackFiremakingLevel",
+		name = "Firemaking Level",
+		description = "If checked, Firemaking level is tracked.",
+		position = 12,
+		section = levelSection
+	)
+	default boolean trackFiremakingLevel() { return true; }
+
+	@ConfigItem(
+		keyName = "trackCraftingLevel",
+		name = "Crafting Level",
+		description = "If checked, Crafting level is tracked.",
+		position = 13,
+		section = levelSection
+	)
+	default boolean trackCraftingLevel() { return true; }
+
+	@ConfigItem(
+		keyName = "trackSmithingLevel",
+		name = "Smithing Level",
+		description = "If checked, Smithing level is tracked.",
+		position = 14,
+		section = levelSection
+	)
+	default boolean trackSmithingLevel() { return true; }
+
+	@ConfigItem(
+		keyName = "trackMiningLevel",
+		name = "Mining Level",
+		description = "If checked, Mining level is tracked.",
+		position = 15,
+		section = levelSection
+	)
+	default boolean trackMiningLevel() { return true; }
+
+	@ConfigItem(
+		keyName = "trackHerbloreLevel",
+		name = "Herblore Level",
+		description = "If checked, Herblore level is tracked.",
+		position = 16,
+		section = levelSection
+	)
+	default boolean trackHerbloreLevel() { return true; }
+
+	@ConfigItem(
+		keyName = "trackAgilityLevel",
+		name = "Agility Level",
+		description = "If checked, Agility level is tracked.",
+		position = 17,
+		section = levelSection
+	)
+	default boolean trackAgilityLevel() { return true; }
+
+	@ConfigItem(
+		keyName = "trackThievingLevel",
+		name = "Thieving Level",
+		description = "If checked, Thieving level is tracked.",
+		position = 18,
+		section = levelSection
+	)
+	default boolean trackThievingLevel() { return true; }
+
+	@ConfigItem(
+		keyName = "trackSlayerLevel",
+		name = "Slayer Level",
+		description = "If checked, Slayer level is tracked.",
+		position = 19,
+		section = levelSection
+	)
+	default boolean trackSlayerLevel() { return true; }
+
+	@ConfigItem(
+		keyName = "trackFarmingLevel",
+		name = "Farming Level",
+		description = "If checked, Farming level is tracked.",
+		position = 20,
+		section = levelSection
+	)
+	default boolean trackFarmingLevel() { return true; }
+
+	@ConfigItem(
+		keyName = "trackRunecraftLevel",
+		name = "Runecraft Level",
+		description = "If checked, Runecraft level is tracked.",
+		position = 21,
+		section = levelSection
+	)
+	default boolean trackRunecraftLevel() { return true; }
+
+	@ConfigItem(
+		keyName = "trackHunterLevel",
+		name = "Hunter Level",
+		description = "If checked, Hunter level is tracked.",
+		position = 22,
+		section = levelSection
+	)
+	default boolean trackHunterLevel() { return true; }
+
+	@ConfigItem(
+		keyName = "trackConstructionLevel",
+		name = "Construction Level",
+		description = "If checked, Construction level is tracked.",
+		position = 23,
+		section = levelSection
+	)
+	default boolean trackConstructionLevel() { return true; }
+
+	@ConfigItem(
+		keyName = "trackSailingLevel",
+		name = "Sailing Level",
+		description = "If checked, Sailing level is tracked.",
+		position = 24,
+		section = levelSection
+	)
+	default boolean trackSailingLevel() { return true; }
 }

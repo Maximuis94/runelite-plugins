@@ -130,7 +130,7 @@ public class ActivityCounterPanel extends PluginPanel {
 		northWrapper.add(infoRow, BorderLayout.SOUTH);
 
 		add(northWrapper, BorderLayout.NORTH);
-		add(kcWrapper, BorderLayout.CENTER); // Add the wrapper instead of the raw container
+		add(kcWrapper, BorderLayout.CENTER);
 	}
 
 	public void forceActiveSessionSelection() {
@@ -233,7 +233,6 @@ public class ActivityCounterPanel extends PluginPanel {
 			}
 
 			if (sessionToDisplay != null) {
-				// Hide time only if the session is currently active AND the config is disabled
 				if (sessionToDisplay.isInProgress() && !plugin.isShowSessionDuration()) {
 					timePassedLabel.setText("");
 				} else {

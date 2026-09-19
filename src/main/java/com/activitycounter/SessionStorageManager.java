@@ -27,15 +27,17 @@ package com.activitycounter;
 
 import com.activitycounter.models.Session;
 import com.google.gson.Gson;
-import java.io.File;
-import java.io.FileReader;
-import java.io.FileWriter;
 import java.io.IOException;
+import java.io.Reader;
+import java.io.Writer;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import lombok.extern.slf4j.Slf4j;
+import net.runelite.client.util.Filepath;
 
 /**
  * Managing class for IO operations
@@ -47,31 +49,46 @@ public class SessionStorageManager {
 	@Inject
 	private Gson gson;
 
+	@Inject
+	private ActivityCounterPlugin plugin;
+
 	/**
-	 * Saves a session to the plugin's directory. Create said directory if it does not exist.
+	 * Saves a session to the plugin's directory. Creates said directory if it does not exist.
 	 */
 	public void saveSession(Session session) {
-		File accountDir = new File(PluginConstants.PLUGIN_DIR, String.valueOf(session.getAccountHash()));
-		if (accountDir.mkdirs())
-			log.debug("Created account directory '{}'", accountDir.getAbsolutePath());
+		Filepath accountDir = plugin.getDirectory().join(String.valueOf(session.getAccountHash()));
 
-		File sessionFile = new File(accountDir, session.getId() + ".json");
-		try (FileWriter writer = new FileWriter(sessionFile)) {
+		if (!accountDir.exists()) {
+			try
+			{
+				accountDir.createDirectories();
+				log.debug("Created account directory '{}'", accountDir.toString());
+			}
+			catch (IOException e)
+			{
+				log.error("Failed to create account directory '{}'", accountDir, e);
+				return;
+			}
+		}
+
+		Filepath sessionFile = accountDir.join(session.getId() + ".json");
+
+		try (Writer writer = sessionFile.openBufferedWriter()) {
 			gson.toJson(session, writer);
-		} catch (IOException e) {
+		} catch (Exception e) {
 			log.error("Failed to save session to file", e);
 		}
 	}
 
 	/**
-	 * Loads a session from a specified file.
+	 * Loads a session from a specified Filepath.
 	 */
-	public Session loadSession(File file) {
+	public Session loadSession(Filepath file) {
 		if (!file.exists()) return null;
 
-		try (FileReader reader = new FileReader(file)) {
+		try (Reader reader = file.openBufferedReader()) {
 			return gson.fromJson(reader, Session.class);
-		} catch (IOException e) {
+		} catch (Exception e) {
 			log.error("Failed to load session from file", e);
 			return null;
 		}
@@ -81,25 +98,34 @@ public class SessionStorageManager {
 	 * Scans the specific account's directory to find an in-progress session.
 	 */
 	public Session loadActiveSession(long accountHash) {
-		File accountDir = new File(PluginConstants.PLUGIN_DIR, String.valueOf(accountHash));
+		Filepath accountDir = plugin.getDirectory().join(String.valueOf(accountHash));
+
 		if (!accountDir.exists() || !accountDir.isDirectory()) {
 			log.debug("No directory exists for accountHash={}", accountHash);
 			return null;
 		}
 
-		File[] files = accountDir.listFiles((dir, name) -> name.endsWith(".json"));
-		if (files == null) {
-			log.debug("No potential session files exist for accountHash={}", accountHash);
-			return null;
+		try (Stream<Filepath> files = accountDir.walk(1)) {
+			List<Filepath> sessionFiles = files
+				.filter(f -> f.isFile() && f.getFileName().endsWith(".json"))
+				.collect(Collectors.toList());
+
+			if (sessionFiles.isEmpty()) {
+				log.debug("No potential session files exist for accountHash={}", accountHash);
+				return null;
+			}
+
+			for (Filepath file : sessionFiles) {
+				Session session = loadSession(file);
+				if (session != null && session.isInProgress()) {
+					log.debug("Loading active session {} from file '{}'", session.getId(), file.toString());
+					return session;
+				}
+			}
+		} catch (Exception e) {
+			log.error("Failed to scan for active sessions", e);
 		}
 
-		for (File file : files) {
-			Session session = loadSession(file);
-			if (session != null && session.isInProgress()) {
-				log.debug("Loading active session {} from file '{}'", session.getId(), file.getAbsolutePath());
-				return session;
-			}
-		}
 		log.debug("No active sessions found for accountHash={}, though archived sessions exists", accountHash);
 		return null;
 	}
@@ -109,7 +135,7 @@ public class SessionStorageManager {
 	 */
 	public List<Session> loadArchivedSessions(long accountHash) {
 		List<Session> archived = new ArrayList<>();
-		File accountDir = new File(PluginConstants.PLUGIN_DIR, String.valueOf(accountHash));
+		Filepath accountDir = plugin.getDirectory().join(String.valueOf(accountHash));
 
 		if (!accountDir.exists() || !accountDir.isDirectory()) {
 			return archived;
@@ -125,17 +151,20 @@ public class SessionStorageManager {
 	 */
 	public List<Session> loadAllArchivedSessions() {
 		List<Session> archived = new ArrayList<>();
-		File pluginDir = PluginConstants.PLUGIN_DIR;
+		Filepath pluginDir = plugin.getDirectory();
 
 		if (!pluginDir.exists() || !pluginDir.isDirectory()) {
 			return archived;
 		}
 
-		File[] accountDirs = pluginDir.listFiles(File::isDirectory);
-		if (accountDirs != null) {
-			for (File accountDir : accountDirs) {
-				archived.addAll(getAccountSessions(accountDir));
-			}
+		try (Stream<Filepath> dirs = pluginDir.walk(1)) {
+			dirs.filter(Filepath::isDirectory)
+				.filter(d -> !d.equals(pluginDir))
+				.forEach(accountDir -> {
+					archived.addAll(getAccountSessions(accountDir));
+				});
+		} catch (Exception e) {
+			log.error("Failed to load all archived sessions", e);
 		}
 
 		archived.sort((s1, s2) -> s2.getStartTime().compareTo(s1.getStartTime()));
@@ -150,31 +179,40 @@ public class SessionStorageManager {
 			return false;
 		}
 
-		File accountDir = new File(PluginConstants.PLUGIN_DIR, String.valueOf(session.getAccountHash()));
-		File sessionFile = new File(accountDir, session.getId() + ".json");
+		Filepath accountDir = plugin.getDirectory().join(String.valueOf(session.getAccountHash()));
+		Filepath sessionFile = accountDir.join(session.getId() + ".json");
 
 		if (sessionFile.exists()) {
-			return sessionFile.delete();
+			try {
+				sessionFile.delete();
+				return true;
+			} catch (Exception e) {
+				log.error("Failed to delete session file", e);
+				return false;
+			}
 		}
 
 		return false;
 	}
 
 	/**
-	 * Returns a list of all Sessions in the given accountDir
+	 * Returns a list of all Sessions in the given accountDir.
 	 */
-	private List<Session> getAccountSessions(File accountDir)
-	{
+	private List<Session> getAccountSessions(Filepath accountDir) {
 		List<Session> sessions = new ArrayList<>();
-		File[] files = accountDir.listFiles((dir, name) -> name.endsWith(".json"));
-		if (files != null) {
-			for (File file : files) {
-				Session session = loadSession(file);
-				if (session != null) {
-					sessions.add(session);
-				}
-			}
+
+		try (Stream<Filepath> files = accountDir.walk(1)) {
+			files.filter(f -> f.isFile() && f.getFileName().endsWith(".json"))
+				.forEach(file -> {
+					Session session = loadSession(file);
+					if (session != null) {
+						sessions.add(session);
+					}
+				});
+		} catch (Exception e) {
+			log.error("Failed to list account sessions in dir {}", accountDir.toString(), e);
 		}
+
 		return sessions;
 	}
 }
