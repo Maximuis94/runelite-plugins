@@ -598,6 +598,9 @@ public class ActivityCounterPlugin extends Plugin {
 			if (!currentSession.isTracking(act.trackingId)) {
 				Count kc = new Count(act.name, act.trackingId);
 
+				kc.setInitialKc(-1);
+				kc.setSessionKc(0);
+
 				if (client != null && client.getGameState() == GameState.LOGGED_IN) {
 					if (act.trackingId >= VARBIT_OFFSET) {
 						kc.setInitialKc(client.getVarbitValue(act.trackingId - VARBIT_OFFSET));
@@ -606,29 +609,35 @@ public class ActivityCounterPlugin extends Plugin {
 					}
 				}
 
-				kc.setSessionKc(0);
 				currentSession.addKillCount(kc);
 			}
 		}
 
 		if (client != null && client.getGameState() == GameState.LOGGED_IN) {
 			for (Skill skill : Skill.values()) {
-				currentSession.initializeSkill(skill, client.getSkillExperience(skill));
-
 				int xpTrackingId = getSkillTrackingId(skill);
 				if (currentSession.isTracking(xpTrackingId)) {
-					currentSession.getKillCount(xpTrackingId).setInitialKc(client.getSkillExperience(skill));
+					Count kc = currentSession.getKillCount(xpTrackingId);
+					if (kc.getInitialKc() == -1) {
+						kc.setInitialKc(client.getSkillExperience(skill));
+						currentSession.initializeSkill(skill, client.getSkillExperience(skill));
+					}
 				}
 
-				// --- NEW BASELINES ---
 				int lvlTrackingId = getSkillLevelTrackingId(skill);
 				if (currentSession.isTracking(lvlTrackingId)) {
-					currentSession.getKillCount(lvlTrackingId).setInitialKc(client.getRealSkillLevel(skill));
+					Count kc = currentSession.getKillCount(lvlTrackingId);
+					if (kc.getInitialKc() == -1) {
+						kc.setInitialKc(client.getRealSkillLevel(skill));
+					}
 				}
 			}
 
 			if (currentSession.isTracking(LVL_TOTAL)) {
-				currentSession.getKillCount(LVL_TOTAL).setInitialKc(client.getTotalLevel());
+				Count kc = currentSession.getKillCount(LVL_TOTAL);
+				if (kc.getInitialKc() == -1) {
+					kc.setInitialKc(client.getTotalLevel());
+				}
 			}
 		}
 	}
