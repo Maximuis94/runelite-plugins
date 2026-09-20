@@ -34,6 +34,7 @@ import java.awt.Dimension;
 import java.awt.Font;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -42,8 +43,11 @@ import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JLabel;
+import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.JPopupMenu;
+import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
 import net.runelite.client.ui.ColorScheme;
@@ -53,6 +57,7 @@ public class ActivityCounterPanel extends PluginPanel {
 
 	private final ActivityCounterPlugin plugin;
 	private final JButton toggleSessionButton = new JButton();
+	private final JButton renameSessionButton = new JButton("Rename");
 	private final JButton deleteSessionButton = new JButton("Delete");
 	private final JLabel timePassedLabel = new JLabel();
 	private final JComboBox<SessionNode> sessionComboBox = new JComboBox<>();
@@ -87,10 +92,52 @@ public class ActivityCounterPanel extends PluginPanel {
 		toggleSessionButton.setFocusable(false);
 		toggleSessionButton.addActionListener(e -> {
 			if (plugin.getCurrentSession() != null) {
-				plugin.closeSession();
+				if (plugin.isConfirmSessionTermination())
+				{
+					int confirm = JOptionPane.showConfirmDialog(
+						this,
+						"Are you sure you want to terminate the active session?",
+						"Terminate Session",
+						JOptionPane.YES_NO_OPTION,
+						JOptionPane.WARNING_MESSAGE
+					);
+
+					if (confirm == JOptionPane.YES_OPTION)
+					{
+						plugin.closeSession();
+					}
+				}
+				else plugin.closeSession();
 			} else {
 				forceNextReloadToActive = true;
 				plugin.startSession();
+			}
+		});
+
+		renameSessionButton.setFocusable(false);
+		renameSessionButton.setVisible(false);
+		renameSessionButton.addActionListener(e -> {
+			SessionNode selectedNode = (SessionNode) sessionComboBox.getSelectedItem();
+			if (selectedNode != null && selectedNode.session != null) {
+
+				String currentName = selectedNode.label;
+
+				JTextField nameInput = new JTextField(currentName);
+
+				int result = JOptionPane.showConfirmDialog(
+					this,
+					nameInput,
+					"Rename Session",
+					JOptionPane.OK_CANCEL_OPTION,
+					JOptionPane.PLAIN_MESSAGE
+				);
+
+				if (result == JOptionPane.OK_OPTION) {
+					String newName = nameInput.getText();
+					if (newName != null && !newName.trim().isEmpty()) {
+						plugin.renameSession(selectedNode.session, newName);
+					}
+				}
 			}
 		});
 
@@ -120,9 +167,15 @@ public class ActivityCounterPanel extends PluginPanel {
 		JPanel kcWrapper = new JPanel(new BorderLayout());
 		kcWrapper.add(kcContainer, BorderLayout.NORTH);
 
+		JPanel actionButtonsPanel = new JPanel();
+		actionButtonsPanel.setLayout(new BoxLayout(actionButtonsPanel, BoxLayout.X_AXIS));
+		actionButtonsPanel.add(renameSessionButton);
+		actionButtonsPanel.add(Box.createRigidArea(new Dimension(5, 0)));
+		actionButtonsPanel.add(deleteSessionButton);
+
 		JPanel infoRow = new JPanel(new BorderLayout());
-		infoRow.add(timePassedLabel, BorderLayout.WEST);
-		infoRow.add(deleteSessionButton, BorderLayout.EAST);
+		infoRow.add(actionButtonsPanel, BorderLayout.NORTH);
+		infoRow.add(timePassedLabel, BorderLayout.SOUTH);
 
 		JPanel northWrapper = new JPanel(new BorderLayout(0, 5));
 		northWrapper.add(toggleSessionButton, BorderLayout.NORTH);
@@ -142,12 +195,15 @@ public class ActivityCounterPanel extends PluginPanel {
 	 */
 	public void update(Session session) {
 		SwingUtilities.invokeLater(() -> {
+			boolean loggedIn = plugin.isLoggedIn();
+			toggleSessionButton.setEnabled(loggedIn);
+
 			if (session != null && session.isInProgress()) {
 				toggleSessionButton.setText("Stop Session");
-				toggleSessionButton.setBackground(ColorScheme.PROGRESS_ERROR_COLOR);
+				toggleSessionButton.setBackground(loggedIn ? ColorScheme.PROGRESS_ERROR_COLOR : ColorScheme.DARK_GRAY_COLOR);
 			} else {
 				toggleSessionButton.setText("Start Session");
-				toggleSessionButton.setBackground(ColorScheme.PROGRESS_COMPLETE_COLOR);
+				toggleSessionButton.setBackground(loggedIn ? ColorScheme.PROGRESS_COMPLETE_COLOR : ColorScheme.DARK_GRAY_COLOR);
 			}
 
 			if (session != null) {
@@ -195,11 +251,17 @@ public class ActivityCounterPanel extends PluginPanel {
 			List<Session> archived = plugin.getArchivedSessions();
 
 			for (Session s : archived) {
-				String accountPrefix = (s.getAccountName() != null && !s.getAccountName().isEmpty())
-					? s.getAccountName() + " - "
-					: "";
+				String label;
 
-				String label = accountPrefix + formatter.format(s.getStartTime());
+				if (s.getSessionName() != null && !s.getSessionName().trim().isEmpty()) {
+					label = s.getSessionName();
+				} else {
+					String accountPrefix = (s.getAccountName() != null && !s.getAccountName().isEmpty())
+						? s.getAccountName() + " - "
+						: "";
+					label = accountPrefix + formatter.format(s.getStartTime());
+				}
+
 				SessionNode node = new SessionNode(s, label);
 				sessionComboBox.addItem(node);
 
@@ -255,13 +317,16 @@ public class ActivityCounterPanel extends PluginPanel {
 	 */
 	public void refreshKcContainer() {
 		SwingUtilities.invokeLater(() -> {
+			boolean loggedIn = plugin.isLoggedIn();
+			toggleSessionButton.setEnabled(loggedIn);
+
 			Session activeSession = plugin.getCurrentSession();
 			if (activeSession != null && activeSession.isInProgress()) {
 				toggleSessionButton.setText("Stop Session");
-				toggleSessionButton.setBackground(ColorScheme.PROGRESS_ERROR_COLOR);
+				toggleSessionButton.setBackground(loggedIn ? ColorScheme.PROGRESS_ERROR_COLOR : ColorScheme.DARK_GRAY_COLOR);
 			} else {
 				toggleSessionButton.setText("Start Session");
-				toggleSessionButton.setBackground(ColorScheme.PROGRESS_COMPLETE_COLOR);
+				toggleSessionButton.setBackground(loggedIn ? ColorScheme.PROGRESS_COMPLETE_COLOR : ColorScheme.DARK_GRAY_COLOR);
 			}
 
 			SessionNode selectedNode = (SessionNode) sessionComboBox.getSelectedItem();
@@ -270,12 +335,15 @@ public class ActivityCounterPanel extends PluginPanel {
 			if (selectedNode != null) {
 				if (selectedNode.session == null) {
 					sessionToDisplay = plugin.getCurrentSession();
+					renameSessionButton.setVisible(false);
 					deleteSessionButton.setVisible(false);
 				} else {
 					sessionToDisplay = selectedNode.session;
+					renameSessionButton.setVisible(true);
 					deleteSessionButton.setVisible(true);
 				}
 			} else {
+				renameSessionButton.setVisible(false);
 				deleteSessionButton.setVisible(false);
 			}
 
@@ -291,13 +359,14 @@ public class ActivityCounterPanel extends PluginPanel {
 		kcContainer.removeAll();
 
 		if (sessionToDisplay != null) {
-			List<Count> visibleKcs = sessionToDisplay.getAllKillCounts().stream()
-				.filter(kc -> kc.getSessionKc() > 0 && plugin.isKcVisible(kc.getVarPlayerId()))
-				.collect(Collectors.toList());
+			List<Count> visibleKcs = plugin.getDisplayKcs(sessionToDisplay);
 
 			boolean isFirstCategory = true;
 
-			for (Category category : Category.values()) {
+			List<Category> sortedCategories = Arrays.asList(Category.values());
+			sortedCategories.sort(Comparator.comparingInt(plugin::getCategorySortOrder));
+
+			for (Category category : sortedCategories) {
 				List<Count> categoryKcs = visibleKcs.stream()
 					.filter(kc -> plugin.getActivityCategory(kc.getVarPlayerId()) == category)
 					.sorted(Comparator.comparingInt(kc -> plugin.getActivityOrder(kc.getVarPlayerId())))
@@ -328,6 +397,18 @@ public class ActivityCounterPanel extends PluginPanel {
 						JPanel kcPanel = new JPanel(new BorderLayout());
 						kcPanel.setBackground(ColorScheme.DARKER_GRAY_COLOR);
 						kcPanel.setBorder(new EmptyBorder(3, 15, 3, 5));
+						kcPanel.setToolTipText("Right-click to hide");
+
+						JPopupMenu popupMenu = new JPopupMenu();
+						JMenuItem hideItem = new JMenuItem("Hide " + kc.getName());
+						hideItem.addActionListener(e -> {
+							String configKey = plugin.getActivityConfigKey(kc.getVarPlayerId());
+							if (configKey != null) {
+								plugin.disableActivity(configKey);
+							}
+						});
+						popupMenu.add(hideItem);
+						kcPanel.setComponentPopupMenu(popupMenu);
 
 						JLabel nameLabel = new JLabel(kc.getName());
 						nameLabel.setForeground(Color.WHITE);

@@ -44,9 +44,17 @@ public interface ActivityCounterConfig extends Config {
 	String generalSection = "generalSection";
 
 	@ConfigSection(
+		name = "Category display order",
+		description = "Define the display order of categories in the panel (lower numbers appear first)",
+		position = 1,
+		closedByDefault = true
+	)
+	String categorySortingSection = "categorySortingSection";
+
+	@ConfigSection(
 		name = "Bosses",
 		description = "Tracked Bosses",
-		position = 1,
+		position = 2,
 		closedByDefault = true
 	)
 	String bossesSection = "bossesSection";
@@ -54,7 +62,7 @@ public interface ActivityCounterConfig extends Config {
 	@ConfigSection(
 		name = "Chests",
 		description = "Tracked Chests",
-		position = 2,
+		position = 3,
 		closedByDefault = true
 	)
 	String chestsSection = "chestsSection";
@@ -62,7 +70,7 @@ public interface ActivityCounterConfig extends Config {
 	@ConfigSection(
 		name = "Experience",
 		description = "Tracked Skill Experience",
-		position = 3,
+		position = 4,
 		closedByDefault = true
 	)
 	String experienceSection = "experienceSection";
@@ -70,14 +78,15 @@ public interface ActivityCounterConfig extends Config {
 	@ConfigSection(
 		name = "Levels",
 		description = "Tracked Skill Levels",
-		position = 4
+		position = 5,
+		closedByDefault = true
 	)
 	String levelSection = "levelSection";
 
 	@ConfigSection(
 		name = "Other",
 		description = "Other tracked activities",
-		position = 5,
+		position = 6,
 		closedByDefault = true
 	)
 	String otherSection = "otherSection";
@@ -92,6 +101,99 @@ public interface ActivityCounterConfig extends Config {
 		section = generalSection
 	)
 	default boolean showSessionDuration() { return true; }
+
+	@ConfigItem(
+		keyName = "confirmTerminateSession",
+		name = "Confirm session termination",
+		description = "If checked, ask for confirmation when attempting to terminate the active session<br>" +
+			"to prevent accidentally terminating a session.",
+		position = 1,
+		section = generalSection
+	)
+	default boolean confirmTerminateSession() { return false; }
+
+	@ConfigItem(
+		keyName = "mergeSlayerTaskCounts ",
+		name = "Merge Slayer task counts",
+		description = "If checked, show a single, merged slayer task count instead of 3.",
+		position = 2,
+		section = generalSection
+	)
+	default boolean mergeSlayerTaskCounts () { return false; }
+
+	// --- SORTING ---
+
+	@ConfigItem(
+		keyName = "sortBosses",
+		name = "Bosses",
+		description = "Sort position for Bosses",
+		position = 1,
+		section = categorySortingSection
+	)
+	default int sortBosses() { return 1; }
+
+	@ConfigItem(
+		keyName = "sortChests",
+		name = "Chests",
+		description = "Sort position for Chests",
+		position = 2,
+		section = categorySortingSection
+	)
+	default int sortChests() { return 2; }
+
+	@ConfigItem(
+		keyName = "sortClue",
+		name = "Clue Scrolls",
+		description = "Sort position for Clue Scrolls",
+		position = 3,
+		section = categorySortingSection
+	)
+	default int sortClue() { return 3; }
+
+	@ConfigItem(
+		keyName = "sortSlayer",
+		name = "Slayer",
+		description = "Sort position for Slayer",
+		position = 4,
+		section = categorySortingSection
+	)
+	default int sortSlayer() { return 4; }
+
+	@ConfigItem(
+		keyName = "sortAgility",
+		name = "Agility",
+		description = "Sort position for Agility",
+		position = 5,
+		section = categorySortingSection
+	)
+	default int sortAgility() { return 5; }
+
+	@ConfigItem(
+		keyName = "sortExperience",
+		name = "Experience",
+		description = "Sort position for Experience",
+		position = 6,
+		section = categorySortingSection
+	)
+	default int sortExperience() { return 6; }
+
+	@ConfigItem(
+		keyName = "sortLevels",
+		name = "Levels",
+		description = "Sort position for Levels",
+		position = 7,
+		section = categorySortingSection
+	)
+	default int sortLevels() { return 7; }
+
+	@ConfigItem(
+		keyName = "sortOther",
+		name = "Other",
+		description = "Sort position for Other activities",
+		position = 8,
+		section = categorySortingSection
+	)
+	default int sortOther() { return 8; }
 
 	// --- BOSSES ---
 
@@ -802,6 +904,96 @@ public interface ActivityCounterConfig extends Config {
 		section = otherSection
 	)
 	default boolean trackAgilityLaps() { return true; }
+
+	@ConfigItem(
+		keyName = "trackCollectionsLogged",
+		name = "Collections logged",
+		description = "If checked, new collections logged are tracked",
+		position = 14,
+		section = otherSection
+	)
+	default boolean trackCollectionsLogged() { return true; }
+
+	@ConfigItem(
+		keyName = "trackBirdEggOfferings",
+		name = "Bird egg offerings",
+		description = "If checked, bird egg offerings to the shrine in the woodcutting guild are tracked",
+		position = 15,
+		section = otherSection
+	)
+	default boolean trackBirdEggOfferings() { return true; }
+
+	@ConfigItem(
+		keyName = "trackPlayerDeaths",
+		name = "Player deaths",
+		description = "If checked, player deaths are tracked",
+		position = 16,
+		section = otherSection
+	)
+	default boolean trackPlayerDeaths() { return true; }
+
+	@ConfigItem(
+		keyName = "trackPlayerKills",
+		name = "Player kills",
+		description = "If checked, player kills are tracked",
+		position = 17,
+		section = otherSection
+	)
+	default boolean trackPlayerKills() { return true; }
+
+	@ConfigItem(
+		keyName = "trackMonsterKills",
+		name = "Monster kills",
+		description = "If checked, monster kills are tracked",
+		position = 18,
+		section = otherSection
+	)
+	default boolean trackMonsterKills() { return true; }
+
+	@ConfigItem(
+		keyName = "trackQuests",
+		name = "Quests",
+		description = "If checked, quests are tracked",
+		position = 19,
+		section = otherSection
+	)
+	default boolean trackQuests() { return true; }
+
+	@ConfigItem(
+		keyName = "trackCombatAchievements",
+		name = "Combat Achievements",
+		description = "If checked, Combat Achievement diaries are tracked",
+		position = 20,
+		section = otherSection
+	)
+	default boolean trackCombatAchievements() { return true; }
+
+	@ConfigItem(
+		keyName = "trackMixologyOrders",
+		name = "Mixology orders",
+		description = "If checked, completed Mixology orders are tracked",
+		position = 21,
+		section = otherSection
+	)
+	default boolean trackMixologyOrders() { return true; }
+
+	@ConfigItem(
+		keyName = "trackMusicUnlocked",
+		name = "Music tracks unlocked",
+		description = "If checked, newly unlocked music tracks are tracked",
+		position = 22,
+		section = otherSection
+	)
+	default boolean trackMusicUnlocked() { return true; }
+
+	@ConfigItem(
+		keyName = "trackLarransChests",
+		name = "Larran's chests unlocked",
+		description = "If checked, Larran's chests are tracked",
+		position = 23,
+		section = otherSection
+	)
+	default boolean trackLarransChests() { return true; }
 
 	// --- EXPERIENCE ---
 

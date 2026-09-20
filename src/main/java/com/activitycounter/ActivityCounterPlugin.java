@@ -37,6 +37,7 @@ import java.util.List;
 import java.util.function.BooleanSupplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import javax.inject.Inject;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -69,7 +70,7 @@ import net.runelite.client.util.Text;
 	name = PLUGIN_NAME,
 	internalName = PluginConstants.PLUGIN_DIR_NAME,
 	description = "Plugin that counts activities (e.g. bosses/agility laps) per manually defined session",
-	tags = {"session", "tracker", "counter", "kc", "killcount", "activity", "count", "lap"}
+	tags = {"session", "tracker", "counter", "kc", "killcount", "activity", "count", "lap", "minigame"}
 )
 public class ActivityCounterPlugin extends Plugin {
 
@@ -84,6 +85,9 @@ public class ActivityCounterPlugin extends Plugin {
 
 	@Inject
 	private ClientToolbar clientToolbar;
+
+	@Inject
+	private ConfigManager configManager;
 
 	@Inject
 	private SessionStorageManager storageManager;
@@ -119,10 +123,56 @@ public class ActivityCounterPlugin extends Plugin {
 
 	@Getter
 	private boolean showSessionDuration = false;
+	@Getter
+	private boolean confirmSessionTermination = false;
 	private boolean requiresSaveAndRefresh = false;
+
+	private int loginTicks = 0;
+
+	public boolean isLoggedIn() {
+		return client != null && client.getGameState() == GameState.LOGGED_IN;
+	}
 
 	private static final String SUPERIOR_SPAWN_MESSAGE = "A superior foe has appeared...";
 	private static final int SUPERIOR_SPAWNS = -7000;
+
+	private static final String BIRD_EGG_OFFERING_MESSAGE = "You offer your bird's egg to the shrine and receive a reward.";
+	private static final int BIRD_EGG_OFFERINGS = -7001;
+
+	private static final int CA_TASKS = -7002;
+	private static final String CA_PREFIX = "CA_ID:";
+//	private static final Pattern COMBAT_TASK_PATTERN = Pattern.compile("^Congratulations, you've completed an? (easy|medium|hard|elite|master|grandmaster) combat task: (.+) \\((\\d+) points?\\)\\.?$");
+
+	private static final int QUESTS_COMPLETED = -7003;
+	private static final String QUEST_COMPLETED_PREFIX = "Congratulations, you've completed a quest: ";
+
+	private static final int MUSIC_TRACK_UNLOCKS = -7004;
+	private static final String MUSIC_TRACK_UNLOCK_PREFIX = "You have unlocked a new music track: ";
+
+	private static final String LARRANS_PREFIX = "You have opened Larran's ";
+	private static final int LARRANS_SMALL_CHESTS = -7005;
+	private static final String LARRANS_SMALL_CHEST_PREFIX = "You have opened Larran's small chest ";
+
+	private static final int LARRANS_BIG_CHESTS = -7006;
+	private static final String LARRANS_BIG_CHEST_PREFIX = "You have opened Larran's big chest ";
+
+	private static final String SNEAKING_SUSPICION_PREFIX = "You have a sneaking suspicion that";
+
+	private static final String SNEAKING_SUSPICION_BEGINNER_AFFIX = " beginner scroll box.";
+	private static final int MISSED_BEGINNER_CLUES = -7010;
+
+	private static final String SNEAKING_SUSPICION_EASY_AFFIX = " easy scroll box.";
+	private static final int MISSED_EASY_CLUES = -7011;
+
+	private static final String SNEAKING_SUSPICION_MEDIUM_AFFIX = " medium scroll box.";
+	private static final int MISSED_MEDIUM_CLUES = -7012;
+
+	private static final String SNEAKING_SUSPICION_HARD_AFFIX = " hard scroll box.";
+	private static final int MISSED_HARD_CLUES = -7013;
+
+	private static final String SNEAKING_SUSPICION_ELITE_AFFIX = " elite scroll box.";
+	private static final int MISSED_ELITE_CLUES = -7014;
+
 
 	private static final String FARMING_CONTRACT_MESSAGE = "You've completed a Farming Guild Contract. You should return to GuildMaster Jane.";
 	private static final int FARMING_CONTRACTS = -3000;
@@ -226,6 +276,7 @@ public class ActivityCounterPlugin extends Plugin {
 		int trackingId;
 		Category category;
 		BooleanSupplier isVisible;
+		String configKey;
 	}
 
 	@Override
@@ -265,6 +316,7 @@ public class ActivityCounterPlugin extends Plugin {
 			config.trackAgilityXp() || config.trackHerbloreXp() || config.trackThievingXp() ||
 			config.trackFletchingXp() || config.trackSlayerXp() || config.trackFarmingXp() ||
 			config.trackConstructionXp() || config.trackHunterXp() || config.trackSailingXp();
+
 		trackLevels = config.trackTotalLevel() || config.trackAttackLevel() || config.trackStrengthLevel() ||
 			config.trackDefenceLevel() || config.trackRangedLevel() || config.trackPrayerLevel() || config.trackMagicLevel() ||
 			config.trackRunecraftLevel() || config.trackHitpointsLevel() || config.trackCraftingLevel() ||
@@ -273,8 +325,16 @@ public class ActivityCounterPlugin extends Plugin {
 			config.trackAgilityLevel() || config.trackHerbloreLevel() || config.trackThievingLevel() ||
 			config.trackFletchingLevel() || config.trackSlayerLevel() || config.trackFarmingLevel() ||
 			config.trackConstructionLevel() || config.trackHunterLevel() || config.trackSailingLevel();
-		trackChatMessages = config.trackSuperiorSpawns() || config.trackAgilityLaps() || config.trackHunterRumours() || config.trackFarmingContracts() || config.trackMahoganyHomesContracts();
+
+		trackChatMessages = config.trackSuperiorSpawns() || config.trackAgilityLaps() ||
+			config.trackHunterRumours() || config.trackFarmingContracts() ||
+			config.trackMahoganyHomesContracts() || config.trackMusicUnlocked() ||
+			config.trackClueScrolls() || config.trackLarransChests() ||
+			config.trackQuests() || config.trackCombatAchievements() ||
+			config.trackBirdEggOfferings();
+
 		showSessionDuration = config.showSessionDuration();
+		confirmSessionTermination = config.confirmTerminateSession();
 	}
 
 	@Subscribe
@@ -282,6 +342,8 @@ public class ActivityCounterPlugin extends Plugin {
 		GameState state = event.getGameState();
 
 		if (state == GameState.LOGGED_IN) {
+			loginTicks = 0;
+
 			long accountHash = client.getAccountHash();
 			if (accountHash == -1) return;
 
@@ -289,7 +351,7 @@ public class ActivityCounterPlugin extends Plugin {
 				Session activeSession = storageManager.loadActiveSession(accountHash);
 				if (activeSession != null) {
 					currentSession = activeSession;
-					initializeKillCounts();
+					initializeKillCounts(false);
 					log.debug("Resumed active session: {}", currentSession.getId());
 
 					panel.forceActiveSessionSelection();
@@ -309,6 +371,9 @@ public class ActivityCounterPlugin extends Plugin {
 		}
 	}
 
+	/**
+	 * Starts a new session
+	 */
 	public void startSession() {
 		clientThread.invokeLater(() -> {
 			if (client == null || client.getGameState() != GameState.LOGGED_IN) {
@@ -320,7 +385,7 @@ public class ActivityCounterPlugin extends Plugin {
 				: "Unknown";
 
 			currentSession = new Session(client.getAccountHash(), accountName);
-			initializeKillCounts();
+			initializeKillCounts(true);
 			storageManager.saveSession(currentSession);
 			log.debug("Session started.");
 
@@ -344,15 +409,6 @@ public class ActivityCounterPlugin extends Plugin {
 			return storageManager.loadAllArchivedSessions();
 		}
 		return storageManager.loadArchivedSessions(client.getAccountHash());
-	}
-
-	public void viewArchivedSession(Filepath sessionFile) {
-		Session loadedSession = storageManager.loadSession(sessionFile);
-		if (loadedSession != null) {
-			this.currentSession = loadedSession;
-			panel.update(currentSession);
-			log.debug("Loaded session: {}", loadedSession.getId());
-		}
 	}
 
 	public void deleteArchivedSession(Session session) {
@@ -380,6 +436,71 @@ public class ActivityCounterPlugin extends Plugin {
 			}
 		}
 		return Category.OTHER;
+	}
+
+	public int getCategorySortOrder(Category category) {
+		switch (category) {
+			case BOSSES: return config.sortBosses();
+			case CHESTS: return config.sortChests();
+			case CLUE: return config.sortClue();
+			case SLAYER: return config.sortSlayer();
+			case AGILITY: return config.sortAgility();
+			case EXPERIENCE: return config.sortExperience();
+			case LEVELS: return config.sortLevels();
+			case OTHER: return config.sortOther();
+			default: return 99;
+		}
+	}
+
+	public String getActivityConfigKey(int trackingId) {
+		for (ActivityData act : activityRegistry) {
+			if (act.trackingId == trackingId) {
+				return act.configKey;
+			}
+		}
+		return null;
+	}
+
+	public void disableActivity(String configKey) {
+		if (configKey != null) {
+			configManager.setConfiguration(PluginConstants.CONFIG_GROUP, configKey, false);
+		}
+	}
+
+	/**
+	 * Returns a processed list of counts to display in the UI, applying merges if configured.
+	 */
+	public List<Count> getDisplayKcs(Session session) {
+		if (session == null) return new ArrayList<>();
+
+		List<Count> visibleKcs = session.getAllKillCounts().stream()
+			.filter(kc -> kc.getSessionKc() > 0 && isKcVisible(kc.getVarPlayerId()))
+			.collect(Collectors.toList());
+
+		if (config.mergeSlayerTaskCounts()) {
+			int otherId = VarbitID.SLAYER_TASKS_COMPLETED + VARBIT_OFFSET;
+			int wildyId = VarbitID.SLAYER_WILDERNESS_TASKS_COMPLETED + VARBIT_OFFSET;
+			int mortimerId = VarPlayerID.SLAYER_MORTIMER_TASKS_COMPLETED;
+
+			int mergedSessionKc = 0;
+
+			java.util.Iterator<Count> iterator = visibleKcs.iterator();
+			while (iterator.hasNext()) {
+				Count kc = iterator.next();
+				if (kc.getVarPlayerId() == otherId || kc.getVarPlayerId() == wildyId || kc.getVarPlayerId() == mortimerId) {
+					mergedSessionKc += kc.getSessionKc();
+					iterator.remove();
+				}
+			}
+
+			if (mergedSessionKc > 0) {
+				Count mergedCount = new Count("Slayer tasks", otherId);
+				mergedCount.setSessionKc(mergedSessionKc);
+				visibleKcs.add(mergedCount);
+			}
+		}
+
+		return visibleKcs;
 	}
 
 	@Subscribe
@@ -433,6 +554,17 @@ public class ActivityCounterPlugin extends Plugin {
 		}
 	}
 
+	/**
+	 * Activity counter that adds 1 to the Count associated with the given trackingId, provided it's tracked
+	 */
+	private void incrementChatboxActivity(int trackingId) {
+		if (currentSession.isTracking(trackingId)) {
+			Count kc = currentSession.getKillCount(trackingId);
+			kc.setSessionKc(kc.getSessionKc() + 1);
+			requiresSaveAndRefresh = true;
+		}
+	}
+
 	@Subscribe
 	public void onChatMessage(ChatMessage event) {
 		if (!trackChatMessages) return;
@@ -447,18 +579,60 @@ public class ActivityCounterPlugin extends Plugin {
 
 		String message = Text.removeTags(event.getMessage());
 
-		if (message.startsWith(LAP_PREFIX))
-		{
-			Matcher matcher = LAP_PATTERN.matcher(message);
+		if (config.trackFarmingContracts() && message.equals(FARMING_CONTRACT_MESSAGE)) {
+			incrementChatboxActivity(FARMING_CONTRACTS);
+			return;
+		}
+		if (config.trackSuperiorSpawns() && message.equals(SUPERIOR_SPAWN_MESSAGE)) {
+			incrementChatboxActivity(SUPERIOR_SPAWNS);
+			return;
+		}
+		if (config.trackBirdEggOfferings() && message.equals(BIRD_EGG_OFFERING_MESSAGE)) {
+			incrementChatboxActivity(BIRD_EGG_OFFERINGS);
+			return;
+		}
 
-			if (matcher.find())
-			{
+		if (config.trackMusicUnlocked() && message.startsWith(MUSIC_TRACK_UNLOCK_PREFIX)) {
+			incrementChatboxActivity(MUSIC_TRACK_UNLOCKS);
+			return;
+		}
+
+		if (config.trackQuests() && message.startsWith(QUEST_COMPLETED_PREFIX)) {
+			incrementChatboxActivity(QUESTS_COMPLETED);
+			return;
+		}
+
+		if (config.trackLarransChests() && message.startsWith(LARRANS_PREFIX)) {
+			if (message.startsWith(LARRANS_SMALL_CHEST_PREFIX)) {
+				incrementChatboxActivity(LARRANS_SMALL_CHESTS);
+			} else if (message.startsWith(LARRANS_BIG_CHEST_PREFIX)) {
+				incrementChatboxActivity(LARRANS_BIG_CHESTS);
+			}
+			return;
+		}
+
+		if (config.trackClueScrolls() && message.startsWith(SNEAKING_SUSPICION_PREFIX)) {
+			if (message.endsWith(SNEAKING_SUSPICION_BEGINNER_AFFIX)) incrementChatboxActivity(MISSED_BEGINNER_CLUES);
+			else if (message.endsWith(SNEAKING_SUSPICION_EASY_AFFIX)) incrementChatboxActivity(MISSED_EASY_CLUES);
+			else if (message.endsWith(SNEAKING_SUSPICION_MEDIUM_AFFIX)) incrementChatboxActivity(MISSED_MEDIUM_CLUES);
+			else if (message.endsWith(SNEAKING_SUSPICION_HARD_AFFIX)) incrementChatboxActivity(MISSED_HARD_CLUES);
+			else if (message.endsWith(SNEAKING_SUSPICION_ELITE_AFFIX)) incrementChatboxActivity(MISSED_ELITE_CLUES);
+			return;
+		}
+
+		if (config.trackCombatAchievements() && message.startsWith(CA_PREFIX)) {
+			incrementChatboxActivity(CA_TASKS);
+			return;
+		}
+
+		if (config.trackAgilityLaps() && message.startsWith(LAP_PREFIX)) {
+			Matcher matcher = LAP_PATTERN.matcher(message);
+			if (matcher.find()) {
 				String courseName = matcher.group(1);
 				int newLapCount = Integer.parseInt(matcher.group(2).replace(",", ""));
-
 				int pseudoId = -1;
-				switch (courseName)
-				{
+
+				switch (courseName) {
 					case "Gnome Stronghold Agility lap": pseudoId = AGILITY_GNOME_STRONGHOLD; break;
 					case "Shayzien Basic Agility Course lap": pseudoId = AGILITY_SHAYZIEN_LOW; break;
 					case "Shayzien Advanced Agility Course lap": pseudoId = AGILITY_SHAYZIEN_HIGH; break;
@@ -484,46 +658,33 @@ public class ActivityCounterPlugin extends Plugin {
 					case "Agility Arena Total Ticket": pseudoId = AGILITY_BRIMHAVEN; break;
 				}
 
-				if (pseudoId != -1 && currentSession.isTracking(pseudoId))
-				{
+				if (pseudoId != -1 && currentSession.isTracking(pseudoId)) {
 					processChatboxUpdate(pseudoId, newLapCount);
 				}
 			}
+			return;
 		}
 
-		else if (message.startsWith(COMPLETED_PREFIX)) {
-			Matcher rumourMatcher = RUMOUR_PATTERN.matcher(message);
-			if (rumourMatcher.find()) {
-				int newRumourCount = Integer.parseInt(rumourMatcher.group(1).replace(",", ""));
-				if (currentSession.isTracking(HUNTER_RUMOURS)) {
-					processChatboxUpdate(HUNTER_RUMOURS, newRumourCount);
-				}
-				return;
-			}
-
-			Matcher mahoganyMatcher = MAHOGANY_HOMES_PATTERN.matcher(message);
-			if (mahoganyMatcher.find()) {
-				int newContractCount = Integer.parseInt(mahoganyMatcher.group(1).replace(",", ""));
-				if (currentSession.isTracking(MAHOGANY_HOMES)) {
-					processChatboxUpdate(MAHOGANY_HOMES, newContractCount);
+		if (message.startsWith(COMPLETED_PREFIX)) {
+			if (config.trackHunterRumours()) {
+				Matcher rumourMatcher = RUMOUR_PATTERN.matcher(message);
+				if (rumourMatcher.find()) {
+					int newRumourCount = Integer.parseInt(rumourMatcher.group(1).replace(",", ""));
+					if (currentSession.isTracking(HUNTER_RUMOURS)) {
+						processChatboxUpdate(HUNTER_RUMOURS, newRumourCount);
+					}
+					return;
 				}
 			}
-		}
 
-		else if (message.equals(FARMING_CONTRACT_MESSAGE)) {
-			if (currentSession.isTracking(FARMING_CONTRACTS)) {
-				Count kc = currentSession.getKillCount(FARMING_CONTRACTS);
-				kc.setSessionKc(kc.getSessionKc() + 1);
-				requiresSaveAndRefresh = true;
-			}
-		}
-
-		else if (message.equals(SUPERIOR_SPAWN_MESSAGE))
-		{
-			if (currentSession.isTracking(SUPERIOR_SPAWNS)) {
-				Count kc = currentSession.getKillCount(SUPERIOR_SPAWNS);
-				kc.setSessionKc(kc.getSessionKc() + 1);
-				requiresSaveAndRefresh = true;
+			if (config.trackMahoganyHomesContracts()) {
+				Matcher mahoganyMatcher = MAHOGANY_HOMES_PATTERN.matcher(message);
+				if (mahoganyMatcher.find()) {
+					int newContractCount = Integer.parseInt(mahoganyMatcher.group(1).replace(",", ""));
+					if (currentSession.isTracking(MAHOGANY_HOMES)) {
+						processChatboxUpdate(MAHOGANY_HOMES, newContractCount);
+					}
+				}
 			}
 		}
 	}
@@ -568,10 +729,83 @@ public class ActivityCounterPlugin extends Plugin {
 
 	@Subscribe
 	public void onGameTick(GameTick event) {
+		if (currentSession != null && currentSession.isInProgress()) {
+
+			if (loginTicks < 5) {
+				loginTicks++;
+			} else {
+				boolean baselinesUpdated = false;
+
+				for (ActivityData act : activityRegistry) {
+					if (currentSession.isTracking(act.trackingId)) {
+						Count kc = currentSession.getKillCount(act.trackingId);
+						if (kc.getInitialKc() == -1) {
+							if (act.trackingId >= VARBIT_OFFSET) {
+								kc.setInitialKc(client.getVarbitValue(act.trackingId - VARBIT_OFFSET));
+								baselinesUpdated = true;
+							} else if (act.trackingId > 0) {
+								kc.setInitialKc(client.getVarpValue(act.trackingId));
+								baselinesUpdated = true;
+							}
+						}
+					}
+				}
+
+				for (Skill skill : Skill.values()) {
+					int xpTrackingId = getSkillTrackingId(skill);
+					if (currentSession.isTracking(xpTrackingId)) {
+						Count kc = currentSession.getKillCount(xpTrackingId);
+						if (kc.getInitialKc() == -1) {
+							kc.setInitialKc(client.getSkillExperience(skill));
+							currentSession.initializeSkill(skill, client.getSkillExperience(skill));
+							baselinesUpdated = true;
+						}
+					}
+
+					int lvlTrackingId = getSkillLevelTrackingId(skill);
+					if (currentSession.isTracking(lvlTrackingId)) {
+						Count kc = currentSession.getKillCount(lvlTrackingId);
+						if (kc.getInitialKc() == -1) {
+							kc.setInitialKc(client.getRealSkillLevel(skill));
+							baselinesUpdated = true;
+						}
+					}
+				}
+
+				if (currentSession.isTracking(LVL_TOTAL)) {
+					Count kc = currentSession.getKillCount(LVL_TOTAL);
+					if (kc.getInitialKc() == -1) {
+						kc.setInitialKc(client.getTotalLevel());
+						baselinesUpdated = true;
+					}
+				}
+
+				if (baselinesUpdated) {
+					requiresSaveAndRefresh = true;
+				}
+			}
+		}
+
 		if (requiresSaveAndRefresh && currentSession != null) {
 			storageManager.saveSession(currentSession);
 			panel.refreshKcContainer();
 			requiresSaveAndRefresh = false;
+		}
+	}
+
+	public void renameSession(Session sessionToRename, String newName) {
+		if (sessionToRename != null && newName != null && !newName.trim().isEmpty()) {
+			String trimmedName = newName.trim();
+
+			sessionToRename.setSessionName(trimmedName);
+			storageManager.saveSession(sessionToRename);
+
+			if (currentSession != null && currentSession.getId().equals(sessionToRename.getId())) {
+				currentSession.setSessionName(trimmedName);
+			}
+
+			panel.reloadComboBox();
+			log.debug("Renamed session to: {}", trimmedName);
 		}
 	}
 
@@ -591,7 +825,7 @@ public class ActivityCounterPlugin extends Plugin {
 		}
 	}
 
-	private void initializeKillCounts() {
+	private void initializeKillCounts(boolean isManualStart) {
 		if (currentSession == null) return;
 
 		for (ActivityData act : activityRegistry) {
@@ -601,7 +835,7 @@ public class ActivityCounterPlugin extends Plugin {
 				kc.setInitialKc(-1);
 				kc.setSessionKc(0);
 
-				if (client != null && client.getGameState() == GameState.LOGGED_IN) {
+				if (isManualStart && client != null && client.getGameState() == GameState.LOGGED_IN) {
 					if (act.trackingId >= VARBIT_OFFSET) {
 						kc.setInitialKc(client.getVarbitValue(act.trackingId - VARBIT_OFFSET));
 					} else if (act.trackingId > 0) {
@@ -613,7 +847,7 @@ public class ActivityCounterPlugin extends Plugin {
 			}
 		}
 
-		if (client != null && client.getGameState() == GameState.LOGGED_IN) {
+		if (isManualStart && client != null && client.getGameState() == GameState.LOGGED_IN) {
 			for (Skill skill : Skill.values()) {
 				int xpTrackingId = getSkillTrackingId(skill);
 				if (currentSession.isTracking(xpTrackingId)) {
@@ -649,35 +883,6 @@ public class ActivityCounterPlugin extends Plugin {
 			}
 		}
 		return false;
-	}
-
-	public boolean isSkillVisible(Skill skill) {
-		switch (skill) {
-			case ATTACK: return config.trackAttackXp();
-			case DEFENCE: return config.trackDefenceXp();
-			case STRENGTH: return config.trackStrengthXp();
-			case HITPOINTS: return config.trackHitpointsXp();
-			case RANGED: return config.trackRangedXp();
-			case PRAYER: return config.trackPrayerXp();
-			case MAGIC: return config.trackMagicXp();
-			case COOKING: return config.trackCookingXp();
-			case WOODCUTTING: return config.trackWoodcuttingXp();
-			case FLETCHING: return config.trackFletchingXp();
-			case FISHING: return config.trackFishingXp();
-			case FIREMAKING: return config.trackFiremakingXp();
-			case CRAFTING: return config.trackCraftingXp();
-			case SMITHING: return config.trackSmithingXp();
-			case MINING: return config.trackMiningXp();
-			case HERBLORE: return config.trackHerbloreXp();
-			case AGILITY: return config.trackAgilityXp();
-			case THIEVING: return config.trackThievingXp();
-			case SLAYER: return config.trackSlayerXp();
-			case FARMING: return config.trackFarmingXp();
-			case RUNECRAFT: return config.trackRunecraftXp();
-			case HUNTER: return config.trackHunterXp();
-			case CONSTRUCTION: return config.trackConstructionXp();
-			default: return false;
-		}
 	}
 
 	private int getSkillTrackingId(Skill skill) {
@@ -754,193 +959,211 @@ public class ActivityCounterPlugin extends Plugin {
 
 	private void buildActivityRegistry() {
 		// Bosses Killed
-		activityRegistry.add(new ActivityData("Brutus", VarPlayerID.TOTAL_COWBOSS_KILLS, Category.BOSSES, config::trackCowBoss));
-		activityRegistry.add(new ActivityData("Obor", VarPlayerID.TOTAL_HILLGIANT_BOSS_KILLS, Category.BOSSES, config::trackObor));
-		activityRegistry.add(new ActivityData("Bryophyta", VarPlayerID.TOTAL_BRYOPHYTA_KILLS, Category.BOSSES, config::trackBryophyta));
-		activityRegistry.add(new ActivityData("Mimic", VarPlayerID.TOTAL_MIMIC_KILLS, Category.BOSSES, config::trackMimic));
-		activityRegistry.add(new ActivityData("Scurrius", VarPlayerID.TOTAL_RAT_BOSS_KILLS, Category.BOSSES, config::trackScurrius));
-		activityRegistry.add(new ActivityData("Chaos Fanatic", VarPlayerID.TOTAL_CHAOSFANATIC_KILLS, Category.BOSSES, config::trackChaosFanatic));
-		activityRegistry.add(new ActivityData("Crazy Archaeologist", VarPlayerID.TOTAL_CRAZYARCHAEOLOGIST_KILLS, Category.BOSSES, config::trackCrazyArchaeologist));
-		activityRegistry.add(new ActivityData("Scorpia", VarPlayerID.TOTAL_SCORPIA_KILLS, Category.BOSSES, config::trackScorpia));
-		activityRegistry.add(new ActivityData("Giant Mole", VarPlayerID.TOTAL_MOLE_KILLS, Category.BOSSES, config::trackGiantMole));
-		activityRegistry.add(new ActivityData("Shellbane Gryphon", VarPlayerID.TOTAL_GRYPHON_BOSS_KILLS, Category.BOSSES, config::trackGryphonBoss));
-		activityRegistry.add(new ActivityData("Grotesque Guardians", VarPlayerID.TOTAL_GARGBOSS_KILLS, Category.BOSSES, config::trackGrotesqueGuardians));
-		activityRegistry.add(new ActivityData("Amoxliatl", VarPlayerID.TOTAL_AMOXLIATL_KILLS, Category.BOSSES, config::trackAmoxliatl));
-		activityRegistry.add(new ActivityData("Calvar'ion", VarPlayerID.TOTAL_CALVARION_KILLS, Category.BOSSES, config::trackCalvarion));
-		activityRegistry.add(new ActivityData("King Black Dragon", VarPlayerID.TOTAL_KBD_KILLS, Category.BOSSES, config::trackKingBlackDragon));
-		activityRegistry.add(new ActivityData("Hespori", VarPlayerID.TOTAL_HESPORI_KILLS, Category.BOSSES, config::trackHespori));
-		activityRegistry.add(new ActivityData("Kraken", VarPlayerID.TOTAL_KRAKEN_BOSS_KILLS, Category.BOSSES, config::trackKraken));
-		activityRegistry.add(new ActivityData("Thermonuclear Smoke Devil", VarPlayerID.TOTAL_THERMY_KILLS, Category.BOSSES, config::trackThermonuclearSmokeDevil));
-		activityRegistry.add(new ActivityData("Spindel", VarPlayerID.TOTAL_SPINDEL_KILLS, Category.BOSSES, config::trackSpindel));
-		activityRegistry.add(new ActivityData("Dagannoth Prime", VarPlayerID.TOTAL_PRIME_KILLS, Category.BOSSES, config::trackDagannothPrime));
-		activityRegistry.add(new ActivityData("Dagannoth Rex", VarPlayerID.TOTAL_REX_KILLS, Category.BOSSES, config::trackDagannothRex));
-		activityRegistry.add(new ActivityData("Dagannoth Supreme", VarPlayerID.TOTAL_SUPREME_KILLS, Category.BOSSES, config::trackDagannothSupreme));
-		activityRegistry.add(new ActivityData("Cerberus", VarPlayerID.TOTAL_CERBERUS_KILLS, Category.BOSSES, config::trackCerberus));
-		activityRegistry.add(new ActivityData("Sarachnis", VarPlayerID.TOTAL_SARACHNIS_KILLS, Category.BOSSES, config::trackSarachnis));
-		activityRegistry.add(new ActivityData("Skotizo", VarPlayerID.TOTAL_CATA_BOSS_KILLS, Category.BOSSES, config::trackSkotizo));
-		activityRegistry.add(new ActivityData("Artio", VarPlayerID.TOTAL_ARTIO_KILLS, Category.BOSSES, config::trackArtio));
-		activityRegistry.add(new ActivityData("Kalphite Queen", VarPlayerID.TOTAL_KALPHITE_KILLS, Category.BOSSES, config::trackKalphiteQueen));
-		activityRegistry.add(new ActivityData("Abyssal Sire", VarPlayerID.TOTAL_ABYSSALSIRE_KILLS, Category.BOSSES, config::trackAbyssalSire));
-		activityRegistry.add(new ActivityData("Royal Titans", VarPlayerID.TOTAL_ROYAL_TITAN_KILLS, Category.BOSSES, config::trackRoyalTitan));
-		activityRegistry.add(new ActivityData("Alchemical Hydra", VarPlayerID.TOTAL_HYDRABOSS_KILLS, Category.BOSSES, config::trackAlchemicalHydra));
-		activityRegistry.add(new ActivityData("Vet'ion", VarPlayerID.TOTAL_VETION_KILLS, Category.BOSSES, config::trackVetion));
-		activityRegistry.add(new ActivityData("Venenatis", VarPlayerID.TOTAL_VENENATIS_KILLS, Category.BOSSES, config::trackVenenatis));
-		activityRegistry.add(new ActivityData("Callisto", VarPlayerID.TOTAL_CALLISTO_KILLS, Category.BOSSES, config::trackCallisto));
-		activityRegistry.add(new ActivityData("Chaos Elemental", VarPlayerID.TOTAL_CHAOSELE_KILLS, Category.BOSSES, config::trackChaosElemental));
-		activityRegistry.add(new ActivityData("Kree'arra", VarPlayerID.TOTAL_ARMADYL_KILLS, Category.BOSSES, config::trackArmadyl));
-		activityRegistry.add(new ActivityData("Mad Angel", VarPlayerID.TOTAL_MAD_ANGEL_KILLS, Category.BOSSES, config::trackMadAngel));
-		activityRegistry.add(new ActivityData("Commander Zilyana", VarPlayerID.TOTAL_SARADOMIN_KILLS, Category.BOSSES, config::trackSaradomin));
-		activityRegistry.add(new ActivityData("General Graardor", VarPlayerID.TOTAL_BANDOS_KILLS, Category.BOSSES, config::trackBandos));
-		activityRegistry.add(new ActivityData("The Hueycoatl", VarPlayerID.TOTAL_HUEY_KILLS, Category.BOSSES, config::trackTheHueycoatl));
-		activityRegistry.add(new ActivityData("K'ril Tsutsaroth", VarPlayerID.TOTAL_ZAMORAK_KILLS, Category.BOSSES, config::trackZamorak));
-		activityRegistry.add(new ActivityData("TzTok-Jad", VarPlayerID.TOTAL_JAD_KILLS, Category.BOSSES, config::trackTzTokJad));
-		activityRegistry.add(new ActivityData("Zulrah", VarPlayerID.TOTAL_SNAKEBOSS_KILLS, Category.BOSSES, config::trackZulrah));
-		activityRegistry.add(new ActivityData("Vorkath", VarPlayerID.TOTAL_VORKATH_KILLS, Category.BOSSES, config::trackVorkath));
-		activityRegistry.add(new ActivityData("Phantom Muspah", VarPlayerID.TOTAL_MUSPAH_KILLS, Category.BOSSES, config::trackPhantomMuspah));
-		activityRegistry.add(new ActivityData("Maggot King", VarPlayerID.TOTAL_MAGGOT_KING_KILLS, Category.BOSSES, config::trackMaggotKing));
-		activityRegistry.add(new ActivityData("Duke Sucellus", VarPlayerID.TOTAL_DUKE_SUCELLUS_KILLS, Category.BOSSES, config::trackDukeSucellus));
-		activityRegistry.add(new ActivityData("Vardorvis", VarPlayerID.TOTAL_VARDORVIS_KILLS, Category.BOSSES, config::trackVardorvis));
-		activityRegistry.add(new ActivityData("Corporeal Beast", VarPlayerID.TOTAL_CORP_KILLS, Category.BOSSES, config::trackCorporealBeast));
-		activityRegistry.add(new ActivityData("The Whisperer", VarPlayerID.TOTAL_WHISPERER_KILLS, Category.BOSSES, config::trackTheWhisperer));
-		activityRegistry.add(new ActivityData("The Leviathan", VarPlayerID.TOTAL_LEVIATHAN_KILLS, Category.BOSSES, config::trackTheLeviathan));
-		activityRegistry.add(new ActivityData("The Nightmare", VarPlayerID.TOTAL_NIGHTMARE_KILLS, Category.BOSSES, config::trackTheNightmare));
-		activityRegistry.add(new ActivityData("Araxxor", VarPlayerID.TOTAL_ARAXXOR_KILLS, Category.BOSSES, config::trackAraxxor));
-		activityRegistry.add(new ActivityData("Nex", VarPlayerID.TOTAL_NEX_KILLS, Category.BOSSES, config::trackNex));
-		activityRegistry.add(new ActivityData("Phosani's Nightmare", VarPlayerID.TOTAL_NIGHTMARE_CHALLENGE_KILLS, Category.BOSSES, config::trackPhosanisNightmare));
-		activityRegistry.add(new ActivityData("Duke Sucellus (Awakened)", VarPlayerID.TOTAL_DUKE_SUCELLUS_AWAKENED_KILLS, Category.BOSSES, config::trackDukeSucellus));
-		activityRegistry.add(new ActivityData("Vardorvis (Awakened)", VarPlayerID.TOTAL_VARDORVIS_AWAKENED_KILLS, Category.BOSSES, config::trackVardorvis));
-		activityRegistry.add(new ActivityData("The Whisperer (Awakened)", VarPlayerID.TOTAL_WHISPERER_AWAKENED_KILLS, Category.BOSSES, config::trackTheWhisperer));
-		activityRegistry.add(new ActivityData("The Leviathan (Awakened)", VarPlayerID.TOTAL_LEVIATHAN_AWAKENED_KILLS, Category.BOSSES, config::trackTheLeviathan));
-		activityRegistry.add(new ActivityData("Demonic Brutus", VarPlayerID.TOTAL_COWBOSS_HARDMODE_KILLS, Category.BOSSES, config::trackCowBossHardMode));
-		activityRegistry.add(new ActivityData("Yama", VarPlayerID.TOTAL_YAMA_KILLS, Category.BOSSES, config::trackYama));
-		activityRegistry.add(new ActivityData("TzKal-Zuk", VarPlayerID.TOTAL_ZUK_KILLS, Category.BOSSES, config::trackTzKalZuk));
-		activityRegistry.add(new ActivityData("Sol Heredit", VarPlayerID.TOTAL_SOL_KILLS, Category.BOSSES, config::trackColosseum));
-		activityRegistry.add(new ActivityData("Doom of Mokhaiotl levels", VarPlayerID.TOTAL_DOM_LEVELS, Category.BOSSES, config::trackDomLevels));
+		activityRegistry.add(new ActivityData("Brutus", VarPlayerID.TOTAL_COWBOSS_KILLS, Category.BOSSES, config::trackCowBoss, "trackCowBoss"));
+		activityRegistry.add(new ActivityData("Obor", VarPlayerID.TOTAL_HILLGIANT_BOSS_KILLS, Category.BOSSES, config::trackObor, "trackObor"));
+		activityRegistry.add(new ActivityData("Bryophyta", VarPlayerID.TOTAL_BRYOPHYTA_KILLS, Category.BOSSES, config::trackBryophyta, "trackBryophyta"));
+		activityRegistry.add(new ActivityData("Scurrius", VarPlayerID.TOTAL_RAT_BOSS_KILLS, Category.BOSSES, config::trackScurrius, "trackScurrius"));
+		activityRegistry.add(new ActivityData("Chaos Fanatic", VarPlayerID.TOTAL_CHAOSFANATIC_KILLS, Category.BOSSES, config::trackChaosFanatic, "trackChaosFanatic"));
+		activityRegistry.add(new ActivityData("Crazy Archaeologist", VarPlayerID.TOTAL_CRAZYARCHAEOLOGIST_KILLS, Category.BOSSES, config::trackCrazyArchaeologist, "trackCrazyArchaeologist"));
+		activityRegistry.add(new ActivityData("Scorpia", VarPlayerID.TOTAL_SCORPIA_KILLS, Category.BOSSES, config::trackScorpia, "trackScorpia"));
+		activityRegistry.add(new ActivityData("Giant Mole", VarPlayerID.TOTAL_MOLE_KILLS, Category.BOSSES, config::trackGiantMole, "trackGiantMole"));
+		activityRegistry.add(new ActivityData("Shellbane Gryphon", VarPlayerID.TOTAL_GRYPHON_BOSS_KILLS, Category.BOSSES, config::trackGryphonBoss, "trackGryphonBoss"));
+		activityRegistry.add(new ActivityData("Grotesque Guardians", VarPlayerID.TOTAL_GARGBOSS_KILLS, Category.BOSSES, config::trackGrotesqueGuardians, "trackGrotesqueGuardians"));
+		activityRegistry.add(new ActivityData("Amoxliatl", VarPlayerID.TOTAL_AMOXLIATL_KILLS, Category.BOSSES, config::trackAmoxliatl, "trackAmoxliatl"));
+		activityRegistry.add(new ActivityData("Calvar'ion", VarPlayerID.TOTAL_CALVARION_KILLS, Category.BOSSES, config::trackCalvarion, "trackCalvarion"));
+		activityRegistry.add(new ActivityData("King Black Dragon", VarPlayerID.TOTAL_KBD_KILLS, Category.BOSSES, config::trackKingBlackDragon, "trackKingBlackDragon"));
+		activityRegistry.add(new ActivityData("Hespori", VarPlayerID.TOTAL_HESPORI_KILLS, Category.BOSSES, config::trackHespori, "trackHespori"));
+		activityRegistry.add(new ActivityData("Kraken", VarPlayerID.TOTAL_KRAKEN_BOSS_KILLS, Category.BOSSES, config::trackKraken, "trackKraken"));
+		activityRegistry.add(new ActivityData("Thermonuclear Smoke Devil", VarPlayerID.TOTAL_THERMY_KILLS, Category.BOSSES, config::trackThermonuclearSmokeDevil, "trackThermonuclearSmokeDevil"));
+		activityRegistry.add(new ActivityData("Spindel", VarPlayerID.TOTAL_SPINDEL_KILLS, Category.BOSSES, config::trackSpindel, "trackSpindel"));
+		activityRegistry.add(new ActivityData("Dagannoth Prime", VarPlayerID.TOTAL_PRIME_KILLS, Category.BOSSES, config::trackDagannothPrime, "trackDagannothPrime"));
+		activityRegistry.add(new ActivityData("Dagannoth Rex", VarPlayerID.TOTAL_REX_KILLS, Category.BOSSES, config::trackDagannothRex, "trackDagannothRex"));
+		activityRegistry.add(new ActivityData("Dagannoth Supreme", VarPlayerID.TOTAL_SUPREME_KILLS, Category.BOSSES, config::trackDagannothSupreme, "trackDagannothSupreme"));
+		activityRegistry.add(new ActivityData("Cerberus", VarPlayerID.TOTAL_CERBERUS_KILLS, Category.BOSSES, config::trackCerberus, "trackCerberus"));
+		activityRegistry.add(new ActivityData("Sarachnis", VarPlayerID.TOTAL_SARACHNIS_KILLS, Category.BOSSES, config::trackSarachnis, "trackSarachnis"));
+		activityRegistry.add(new ActivityData("Skotizo", VarPlayerID.TOTAL_CATA_BOSS_KILLS, Category.BOSSES, config::trackSkotizo, "trackSkotizo"));
+		activityRegistry.add(new ActivityData("Artio", VarPlayerID.TOTAL_ARTIO_KILLS, Category.BOSSES, config::trackArtio, "trackArtio"));
+		activityRegistry.add(new ActivityData("Kalphite Queen", VarPlayerID.TOTAL_KALPHITE_KILLS, Category.BOSSES, config::trackKalphiteQueen, "trackKalphiteQueen"));
+		activityRegistry.add(new ActivityData("Abyssal Sire", VarPlayerID.TOTAL_ABYSSALSIRE_KILLS, Category.BOSSES, config::trackAbyssalSire, "trackAbyssalSire"));
+		activityRegistry.add(new ActivityData("Royal Titans", VarPlayerID.TOTAL_ROYAL_TITAN_KILLS, Category.BOSSES, config::trackRoyalTitan, "trackRoyalTitan"));
+		activityRegistry.add(new ActivityData("Alchemical Hydra", VarPlayerID.TOTAL_HYDRABOSS_KILLS, Category.BOSSES, config::trackAlchemicalHydra, "trackAlchemicalHydra"));
+		activityRegistry.add(new ActivityData("Vet'ion", VarPlayerID.TOTAL_VETION_KILLS, Category.BOSSES, config::trackVetion, "trackVetion"));
+		activityRegistry.add(new ActivityData("Venenatis", VarPlayerID.TOTAL_VENENATIS_KILLS, Category.BOSSES, config::trackVenenatis, "trackVenenatis"));
+		activityRegistry.add(new ActivityData("Callisto", VarPlayerID.TOTAL_CALLISTO_KILLS, Category.BOSSES, config::trackCallisto, "trackCallisto"));
+		activityRegistry.add(new ActivityData("Chaos Elemental", VarPlayerID.TOTAL_CHAOSELE_KILLS, Category.BOSSES, config::trackChaosElemental, "trackChaosElemental"));
+		activityRegistry.add(new ActivityData("Kree'arra", VarPlayerID.TOTAL_ARMADYL_KILLS, Category.BOSSES, config::trackArmadyl, "trackArmadyl"));
+		activityRegistry.add(new ActivityData("Mad Angel", VarPlayerID.TOTAL_MAD_ANGEL_KILLS, Category.BOSSES, config::trackMadAngel, "trackMadAngel"));
+		activityRegistry.add(new ActivityData("Commander Zilyana", VarPlayerID.TOTAL_SARADOMIN_KILLS, Category.BOSSES, config::trackSaradomin, "trackSaradomin"));
+		activityRegistry.add(new ActivityData("General Graardor", VarPlayerID.TOTAL_BANDOS_KILLS, Category.BOSSES, config::trackBandos, "trackBandos"));
+		activityRegistry.add(new ActivityData("The Hueycoatl", VarPlayerID.TOTAL_HUEY_KILLS, Category.BOSSES, config::trackTheHueycoatl, "trackTheHueycoatl"));
+		activityRegistry.add(new ActivityData("K'ril Tsutsaroth", VarPlayerID.TOTAL_ZAMORAK_KILLS, Category.BOSSES, config::trackZamorak, "trackZamorak"));
+		activityRegistry.add(new ActivityData("TzTok-Jad", VarPlayerID.TOTAL_JAD_KILLS, Category.BOSSES, config::trackTzTokJad, "trackTzTokJad"));
+		activityRegistry.add(new ActivityData("Zulrah", VarPlayerID.TOTAL_SNAKEBOSS_KILLS, Category.BOSSES, config::trackZulrah, "trackZulrah"));
+		activityRegistry.add(new ActivityData("Vorkath", VarPlayerID.TOTAL_VORKATH_KILLS, Category.BOSSES, config::trackVorkath, "trackVorkath"));
+		activityRegistry.add(new ActivityData("Phantom Muspah", VarPlayerID.TOTAL_MUSPAH_KILLS, Category.BOSSES, config::trackPhantomMuspah, "trackPhantomMuspah"));
+		activityRegistry.add(new ActivityData("Maggot King", VarPlayerID.TOTAL_MAGGOT_KING_KILLS, Category.BOSSES, config::trackMaggotKing, "trackMaggotKing"));
+		activityRegistry.add(new ActivityData("Duke Sucellus", VarPlayerID.TOTAL_DUKE_SUCELLUS_KILLS, Category.BOSSES, config::trackDukeSucellus, "trackDukeSucellus"));
+		activityRegistry.add(new ActivityData("Vardorvis", VarPlayerID.TOTAL_VARDORVIS_KILLS, Category.BOSSES, config::trackVardorvis, "trackVardorvis"));
+		activityRegistry.add(new ActivityData("Corporeal Beast", VarPlayerID.TOTAL_CORP_KILLS, Category.BOSSES, config::trackCorporealBeast, "trackCorporealBeast"));
+		activityRegistry.add(new ActivityData("The Whisperer", VarPlayerID.TOTAL_WHISPERER_KILLS, Category.BOSSES, config::trackTheWhisperer, "trackTheWhisperer"));
+		activityRegistry.add(new ActivityData("The Leviathan", VarPlayerID.TOTAL_LEVIATHAN_KILLS, Category.BOSSES, config::trackTheLeviathan, "trackTheLeviathan"));
+		activityRegistry.add(new ActivityData("The Nightmare", VarPlayerID.TOTAL_NIGHTMARE_KILLS, Category.BOSSES, config::trackTheNightmare, "trackTheNightmare"));
+		activityRegistry.add(new ActivityData("Araxxor", VarPlayerID.TOTAL_ARAXXOR_KILLS, Category.BOSSES, config::trackAraxxor, "trackAraxxor"));
+		activityRegistry.add(new ActivityData("Nex", VarPlayerID.TOTAL_NEX_KILLS, Category.BOSSES, config::trackNex, "trackNex"));
+		activityRegistry.add(new ActivityData("Phosani's Nightmare", VarPlayerID.TOTAL_NIGHTMARE_CHALLENGE_KILLS, Category.BOSSES, config::trackPhosanisNightmare, "trackPhosanisNightmare"));
+		activityRegistry.add(new ActivityData("Duke Sucellus (Awakened)", VarPlayerID.TOTAL_DUKE_SUCELLUS_AWAKENED_KILLS, Category.BOSSES, config::trackDukeSucellus, "trackDukeSucellus"));
+		activityRegistry.add(new ActivityData("Vardorvis (Awakened)", VarPlayerID.TOTAL_VARDORVIS_AWAKENED_KILLS, Category.BOSSES, config::trackVardorvis, "trackVardorvis"));
+		activityRegistry.add(new ActivityData("The Whisperer (Awakened)", VarPlayerID.TOTAL_WHISPERER_AWAKENED_KILLS, Category.BOSSES, config::trackTheWhisperer, "trackTheWhisperer"));
+		activityRegistry.add(new ActivityData("The Leviathan (Awakened)", VarPlayerID.TOTAL_LEVIATHAN_AWAKENED_KILLS, Category.BOSSES, config::trackTheLeviathan, "trackTheLeviathan"));
+		activityRegistry.add(new ActivityData("Demonic Brutus", VarPlayerID.TOTAL_COWBOSS_HARDMODE_KILLS, Category.BOSSES, config::trackCowBossHardMode, "trackCowBossHardMode"));
+		activityRegistry.add(new ActivityData("Yama", VarPlayerID.TOTAL_YAMA_KILLS, Category.BOSSES, config::trackYama, "trackYama"));
+		activityRegistry.add(new ActivityData("TzKal-Zuk", VarPlayerID.TOTAL_ZUK_KILLS, Category.BOSSES, config::trackTzKalZuk, "trackTzKalZuk"));
+		activityRegistry.add(new ActivityData("Sol Heredit", VarPlayerID.TOTAL_SOL_KILLS, Category.BOSSES, config::trackColosseum, "trackColosseum"));
+		activityRegistry.add(new ActivityData("Doom of Mokhaiotl levels", VarPlayerID.TOTAL_DOM_LEVELS, Category.BOSSES, config::trackDomLevels, "trackDomLevels"));
 
 		// Chests Looted
-		activityRegistry.add(new ActivityData("Barrows Chests", VarPlayerID.TOTAL_BARROWS_CHESTS, Category.CHESTS, config::trackBarrowsChests));
-		activityRegistry.add(new ActivityData("Chambers of Xeric", VarPlayerID.TOTAL_COMPLETED_XERICCHAMBERS, Category.CHESTS, config::trackChambersOfXeric));
-		activityRegistry.add(new ActivityData("Chambers of Xeric: Challenge Mode", VarPlayerID.TOTAL_COMPLETED_XERICCHAMBERS_CHALLENGE, Category.CHESTS, config::trackChambersOfXeric));
-		activityRegistry.add(new ActivityData("Theatre of Blood", VarPlayerID.TOTAL_COMPLETED_THEATREOFBLOOD, Category.CHESTS, config::trackTheatreOfBlood));
-		activityRegistry.add(new ActivityData("Theatre of Blood: Story Mode", VarPlayerID.TOTAL_COMPLETED_THEATREOFBLOOD_STORY, Category.CHESTS, config::trackTheatreOfBlood));
-		activityRegistry.add(new ActivityData("Theatre of Blood: Hard Mode", VarPlayerID.TOTAL_COMPLETED_THEATREOFBLOOD_HARD, Category.CHESTS, config::trackTheatreOfBlood));
-		activityRegistry.add(new ActivityData("The Gauntlet", VarPlayerID.TOTAL_COMPLETED_GAUNTLET, Category.CHESTS, config::trackTheGauntlet));
-		activityRegistry.add(new ActivityData("The Corrupted Gauntlet", VarPlayerID.TOTAL_COMPLETED_GAUNTLET_HM, Category.CHESTS, config::trackTheGauntlet));
-		activityRegistry.add(new ActivityData("Tombs of Amascut", VarPlayerID.TOTAL_COMPLETED_TOMBSOFAMASCUT, Category.CHESTS, config::trackTombsOfAmascut));
-		activityRegistry.add(new ActivityData("Tombs of Amascut: Entry Mode", VarPlayerID.TOTAL_COMPLETED_TOMBSOFAMASCUT_ENTRY, Category.CHESTS, config::trackTombsOfAmascut));
-		activityRegistry.add(new ActivityData("Tombs of Amascut: Expert Mode", VarPlayerID.TOTAL_COMPLETED_TOMBSOFAMASCUT_EXPERT, Category.CHESTS, config::trackTombsOfAmascut));
-		activityRegistry.add(new ActivityData("Perilous Moons Chests", VarPlayerID.TOTAL_PMOON_CHESTS, Category.CHESTS, config::trackPerilousMoonsChests));
+		activityRegistry.add(new ActivityData("Barrows Chests", VarPlayerID.TOTAL_BARROWS_CHESTS, Category.CHESTS, config::trackBarrowsChests, "trackBarrowsChests"));
+		activityRegistry.add(new ActivityData("Chambers of Xeric", VarPlayerID.TOTAL_COMPLETED_XERICCHAMBERS, Category.CHESTS, config::trackChambersOfXeric, "trackChambersOfXeric"));
+		activityRegistry.add(new ActivityData("Chambers of Xeric: Challenge Mode", VarPlayerID.TOTAL_COMPLETED_XERICCHAMBERS_CHALLENGE, Category.CHESTS, config::trackChambersOfXeric, "trackChambersOfXeric"));
+		activityRegistry.add(new ActivityData("Theatre of Blood", VarPlayerID.TOTAL_COMPLETED_THEATREOFBLOOD, Category.CHESTS, config::trackTheatreOfBlood, "trackTheatreOfBlood"));
+		activityRegistry.add(new ActivityData("Theatre of Blood: Story Mode", VarPlayerID.TOTAL_COMPLETED_THEATREOFBLOOD_STORY, Category.CHESTS, config::trackTheatreOfBlood, "trackTheatreOfBlood"));
+		activityRegistry.add(new ActivityData("Theatre of Blood: Hard Mode", VarPlayerID.TOTAL_COMPLETED_THEATREOFBLOOD_HARD, Category.CHESTS, config::trackTheatreOfBlood, "trackTheatreOfBlood"));
+		activityRegistry.add(new ActivityData("The Gauntlet", VarPlayerID.TOTAL_COMPLETED_GAUNTLET, Category.CHESTS, config::trackTheGauntlet, "trackTheGauntlet"));
+		activityRegistry.add(new ActivityData("The Corrupted Gauntlet", VarPlayerID.TOTAL_COMPLETED_GAUNTLET_HM, Category.CHESTS, config::trackTheGauntlet, "trackTheGauntlet"));
+		activityRegistry.add(new ActivityData("Tombs of Amascut", VarPlayerID.TOTAL_COMPLETED_TOMBSOFAMASCUT, Category.CHESTS, config::trackTombsOfAmascut, "trackTombsOfAmascut"));
+		activityRegistry.add(new ActivityData("Tombs of Amascut: Entry Mode", VarPlayerID.TOTAL_COMPLETED_TOMBSOFAMASCUT_ENTRY, Category.CHESTS, config::trackTombsOfAmascut, "trackTombsOfAmascut"));
+		activityRegistry.add(new ActivityData("Tombs of Amascut: Expert Mode", VarPlayerID.TOTAL_COMPLETED_TOMBSOFAMASCUT_EXPERT, Category.CHESTS, config::trackTombsOfAmascut, "trackTombsOfAmascut"));
+		activityRegistry.add(new ActivityData("Perilous Moons Chests", VarPlayerID.TOTAL_PMOON_CHESTS, Category.CHESTS, config::trackPerilousMoonsChests, "trackPerilousMoonsChests"));
 
 		// Other (Minigames & Misc)
-		activityRegistry.add(new ActivityData("Wintertodt", VarPlayerID.TOTAL_WINTERTODT_KILLS, Category.OTHER, config::trackWintertodt));
-		activityRegistry.add(new ActivityData("Zalcano", VarPlayerID.TOTAL_ZALCANO_KILLS, Category.OTHER, config::trackZalcano));
-		activityRegistry.add(new ActivityData("Tempoross", VarPlayerID.TOTAL_TEMPOROSS_KILLS, Category.OTHER, config::trackTempoross));
-		activityRegistry.add(new ActivityData("Guardians of the Rift", VarPlayerID.TOTAL_GOTR_KILLS, Category.OTHER, config::trackGuardiansOfTheRift));
-		activityRegistry.add(new ActivityData("Jad Challenge 1", VarPlayerID.JAD_CHALLENGE_1_COMPLETIONS, Category.OTHER, config::trackJadChallenges));
-		activityRegistry.add(new ActivityData("Jad Challenge 2", VarPlayerID.JAD_CHALLENGE_2_COMPLETIONS, Category.OTHER, config::trackJadChallenges));
-		activityRegistry.add(new ActivityData("Jad Challenge 3", VarPlayerID.JAD_CHALLENGE_3_COMPLETIONS, Category.OTHER, config::trackJadChallenges));
-		activityRegistry.add(new ActivityData("Jad Challenge 4", VarPlayerID.JAD_CHALLENGE_4_COMPLETIONS, Category.OTHER, config::trackJadChallenges));
-		activityRegistry.add(new ActivityData("Jad Challenge 5", VarPlayerID.JAD_CHALLENGE_5_COMPLETIONS, Category.OTHER, config::trackJadChallenges));
-		activityRegistry.add(new ActivityData("Jad Challenge 6", VarPlayerID.JAD_CHALLENGE_6_COMPLETIONS, Category.OTHER, config::trackJadChallenges));
-		activityRegistry.add(new ActivityData("Colosseum waves", VarPlayerID.TOTAL_COLOSSEUM_WAVES_COMPLETED, Category.OTHER, config::trackColosseum));
-		activityRegistry.add(new ActivityData("Gemstone Crab", VarPlayerID.TOTAL_GEMSTONE_CRAB_KILLS, Category.OTHER, config::trackGemstoneCrab));
-		activityRegistry.add(new ActivityData("Soul Wars wins", VarPlayerID.SOUL_WARS_TOTAL_WINS, Category.OTHER, config::trackSoulWars));
-		activityRegistry.add(new ActivityData("Soul Wars games", VarPlayerID.SOUL_WARS_TOTAL_GAMES, Category.OTHER, config::trackSoulWars));
-		activityRegistry.add(new ActivityData("Hunter Rumours", HUNTER_RUMOURS, Category.OTHER, config::trackHunterRumours));
-		activityRegistry.add(new ActivityData("Farming Contracts", FARMING_CONTRACTS, Category.OTHER, config::trackFarmingContracts));
-		activityRegistry.add(new ActivityData("Mahogany Homes", MAHOGANY_HOMES, Category.OTHER, config::trackMahoganyHomesContracts));
+		activityRegistry.add(new ActivityData("Wintertodt", VarPlayerID.TOTAL_WINTERTODT_KILLS, Category.OTHER, config::trackWintertodt, "trackWintertodt"));
+		activityRegistry.add(new ActivityData("Zalcano", VarPlayerID.TOTAL_ZALCANO_KILLS, Category.OTHER, config::trackZalcano, "trackZalcano"));
+		activityRegistry.add(new ActivityData("Tempoross", VarPlayerID.TOTAL_TEMPOROSS_KILLS, Category.OTHER, config::trackTempoross, "trackTempoross"));
+		activityRegistry.add(new ActivityData("Guardians of the Rift", VarPlayerID.TOTAL_GOTR_KILLS, Category.OTHER, config::trackGuardiansOfTheRift, "trackGuardiansOfTheRift"));
+		activityRegistry.add(new ActivityData("Jad Challenge 1", VarPlayerID.JAD_CHALLENGE_1_COMPLETIONS, Category.OTHER, config::trackJadChallenges, "trackJadChallenges"));
+		activityRegistry.add(new ActivityData("Jad Challenge 2", VarPlayerID.JAD_CHALLENGE_2_COMPLETIONS, Category.OTHER, config::trackJadChallenges, "trackJadChallenges"));
+		activityRegistry.add(new ActivityData("Jad Challenge 3", VarPlayerID.JAD_CHALLENGE_3_COMPLETIONS, Category.OTHER, config::trackJadChallenges, "trackJadChallenges"));
+		activityRegistry.add(new ActivityData("Jad Challenge 4", VarPlayerID.JAD_CHALLENGE_4_COMPLETIONS, Category.OTHER, config::trackJadChallenges, "trackJadChallenges"));
+		activityRegistry.add(new ActivityData("Jad Challenge 5", VarPlayerID.JAD_CHALLENGE_5_COMPLETIONS, Category.OTHER, config::trackJadChallenges, "trackJadChallenges"));
+		activityRegistry.add(new ActivityData("Jad Challenge 6", VarPlayerID.JAD_CHALLENGE_6_COMPLETIONS, Category.OTHER, config::trackJadChallenges, "trackJadChallenges"));
+		activityRegistry.add(new ActivityData("Colosseum waves", VarPlayerID.TOTAL_COLOSSEUM_WAVES_COMPLETED, Category.OTHER, config::trackColosseum, "trackColosseum"));
+		activityRegistry.add(new ActivityData("Gemstone Crab", VarPlayerID.TOTAL_GEMSTONE_CRAB_KILLS, Category.OTHER, config::trackGemstoneCrab, "trackGemstoneCrab"));
+		activityRegistry.add(new ActivityData("Soul Wars wins", VarPlayerID.SOUL_WARS_TOTAL_WINS, Category.OTHER, config::trackSoulWars, "trackSoulWars"));
+		activityRegistry.add(new ActivityData("Soul Wars games", VarPlayerID.SOUL_WARS_TOTAL_GAMES, Category.OTHER, config::trackSoulWars, "trackSoulWars"));
+		activityRegistry.add(new ActivityData("Hunter Rumours", HUNTER_RUMOURS, Category.OTHER, config::trackHunterRumours, "trackHunterRumours"));
+		activityRegistry.add(new ActivityData("Farming Contracts", FARMING_CONTRACTS, Category.OTHER, config::trackFarmingContracts, "trackFarmingContracts"));
+		activityRegistry.add(new ActivityData("Mahogany Homes", MAHOGANY_HOMES, Category.OTHER, config::trackMahoganyHomesContracts, "trackMahoganyHomesContracts"));
+		activityRegistry.add(new ActivityData("New collections logged", VarPlayerID.COLLECTION_COUNT, Category.OTHER, config::trackCollectionsLogged, "trackCollectionsLogged"));
+		activityRegistry.add(new ActivityData("Bird eggs offered", BIRD_EGG_OFFERINGS, Category.OTHER, config::trackBirdEggOfferings, "trackBirdEggOfferings"));
+		activityRegistry.add(new ActivityData("Player deaths", VarPlayerID.TRACKING_DEATHS, Category.OTHER, config::trackPlayerDeaths, "trackPlayerDeaths"));
+		activityRegistry.add(new ActivityData("Player kills", VarPlayerID.TRACKING_PLAYERS_KILLED, Category.OTHER, config::trackPlayerKills, "trackPlayerKills"));
+		activityRegistry.add(new ActivityData("Monster kills", VarPlayerID.TRACKING_MONSTERS_KILLED, Category.OTHER, config::trackMonsterKills, "trackMonsterKills"));
+		activityRegistry.add(new ActivityData("Quests", QUESTS_COMPLETED, Category.OTHER, config::trackQuests, "trackQuests"));
+		activityRegistry.add(new ActivityData("Quest points", VarPlayerID.QP, Category.OTHER, config::trackQuests, "trackQuests"));
+		activityRegistry.add(new ActivityData("CA Diary tasks", CA_TASKS, Category.OTHER, config::trackCombatAchievements, "trackCombatAchievements"));
+		activityRegistry.add(new ActivityData("CA Diary points", VarPlayerID.CA_GENERAL3, Category.OTHER, config::trackCombatAchievements, "trackCombatAchievements"));
+		activityRegistry.add(new ActivityData("Mixology orders", VarPlayerID.TOTAL_MIXOLOGY_ORDERS, Category.OTHER, config::trackMixologyOrders, "trackMixologyOrders"));
+		activityRegistry.add(new ActivityData("Music tracks unlocked", MUSIC_TRACK_UNLOCKS, Category.OTHER, config::trackMusicUnlocked, "trackMusicUnlocked"));
+		activityRegistry.add(new ActivityData("Larran's small chests", LARRANS_SMALL_CHESTS, Category.OTHER, config::trackLarransChests, "trackLarransChests"));
+		activityRegistry.add(new ActivityData("Larran's big chests", LARRANS_BIG_CHESTS, Category.OTHER, config::trackLarransChests, "trackLarransChests"));
 
 		// Clue Scrolls
-		activityRegistry.add(new ActivityData("Clue scroll (beginner)", VarPlayerID.COMPLETED_CLUES5, Category.CLUE, config::trackClueScrolls));
-		activityRegistry.add(new ActivityData("Clue scroll (easy)", VarPlayerID.COMPLETED_CLUES, Category.CLUE, config::trackClueScrolls));
-		activityRegistry.add(new ActivityData("Clue scroll (medium)", VarPlayerID.COMPLETED_CLUES1, Category.CLUE, config::trackClueScrolls));
-		activityRegistry.add(new ActivityData("Clue scroll (hard)", VarPlayerID.COMPLETED_CLUES2, Category.CLUE, config::trackClueScrolls));
-		activityRegistry.add(new ActivityData("Clue scroll (elite)", VarPlayerID.COMPLETED_CLUES3, Category.CLUE, config::trackClueScrolls));
-		activityRegistry.add(new ActivityData("Clue scroll (master)", VarPlayerID.COMPLETED_CLUES4, Category.CLUE, config::trackClueScrolls));
+		activityRegistry.add(new ActivityData("Completed beginner clue", VarPlayerID.COMPLETED_CLUES5, Category.CLUE, config::trackClueScrolls, "trackClueScrolls"));
+		activityRegistry.add(new ActivityData("Missed beginner clue", MISSED_BEGINNER_CLUES, Category.CLUE, config::trackClueScrolls, "trackClueScrolls"));
+		activityRegistry.add(new ActivityData("Completed easy clue", VarPlayerID.COMPLETED_CLUES, Category.CLUE, config::trackClueScrolls, "trackClueScrolls"));
+		activityRegistry.add(new ActivityData("Missed easy clue", MISSED_EASY_CLUES, Category.CLUE, config::trackClueScrolls, "trackClueScrolls"));
+		activityRegistry.add(new ActivityData("Completed medium clue", VarPlayerID.COMPLETED_CLUES1, Category.CLUE, config::trackClueScrolls, "trackClueScrolls"));
+		activityRegistry.add(new ActivityData("Missed medium clue", MISSED_MEDIUM_CLUES, Category.CLUE, config::trackClueScrolls, "trackClueScrolls"));
+		activityRegistry.add(new ActivityData("Completed hard clue", VarPlayerID.COMPLETED_CLUES2, Category.CLUE, config::trackClueScrolls, "trackClueScrolls"));
+		activityRegistry.add(new ActivityData("Missed hard clue", MISSED_HARD_CLUES, Category.CLUE, config::trackClueScrolls, "trackClueScrolls"));
+		activityRegistry.add(new ActivityData("Completed elite clue", VarPlayerID.COMPLETED_CLUES3, Category.CLUE, config::trackClueScrolls, "trackClueScrolls"));
+		activityRegistry.add(new ActivityData("Missed elite clue", MISSED_ELITE_CLUES, Category.CLUE, config::trackClueScrolls, "trackClueScrolls"));
+		activityRegistry.add(new ActivityData("Completed master clue", VarPlayerID.COMPLETED_CLUES4, Category.CLUE, config::trackClueScrolls, "trackClueScrolls"));
+		activityRegistry.add(new ActivityData("Mimic", VarPlayerID.TOTAL_MIMIC_KILLS, Category.CLUE, config::trackMimic, "trackMimic"));
 
 		// Slayer Tasks
-		activityRegistry.add(new ActivityData("Slayer tasks", VarbitID.SLAYER_TASKS_COMPLETED + VARBIT_OFFSET, Category.SLAYER, config::trackSlayerTasks));
-		activityRegistry.add(new ActivityData("Slayer tasks (Wilderness)", VarbitID.SLAYER_WILDERNESS_TASKS_COMPLETED + VARBIT_OFFSET, Category.SLAYER, config::trackSlayerTasks));
-		activityRegistry.add(new ActivityData("Slayer tasks (Mortimer)", VarPlayerID.SLAYER_MORTIMER_TASKS_COMPLETED, Category.SLAYER, config::trackSlayerTasks));
-		activityRegistry.add(new ActivityData("Superior spawns", SUPERIOR_SPAWNS, Category.SLAYER, config::trackSuperiorSpawns));
+		activityRegistry.add(new ActivityData("Slayer tasks (Other)", VarbitID.SLAYER_TASKS_COMPLETED + VARBIT_OFFSET, Category.SLAYER, config::trackSlayerTasks, "trackSlayerTasks"));
+		activityRegistry.add(new ActivityData("Slayer tasks (Wilderness)", VarbitID.SLAYER_WILDERNESS_TASKS_COMPLETED + VARBIT_OFFSET, Category.SLAYER, config::trackSlayerTasks, "trackSlayerTasks"));
+		activityRegistry.add(new ActivityData("Slayer tasks (Mortimer)", VarPlayerID.SLAYER_MORTIMER_TASKS_COMPLETED, Category.SLAYER, config::trackSlayerTasks, "trackSlayerTasks"));
+		activityRegistry.add(new ActivityData("Superior spawns", SUPERIOR_SPAWNS, Category.SLAYER, config::trackSuperiorSpawns, "trackSuperiorSpawns"));
 
 		// Agility Courses
-		activityRegistry.add(new ActivityData("Gnome Stronghold Laps", AGILITY_GNOME_STRONGHOLD, Category.AGILITY, config::trackAgilityLaps));
-		activityRegistry.add(new ActivityData("Shayzien Laps (Basic)", AGILITY_SHAYZIEN_LOW, Category.AGILITY, config::trackAgilityLaps));
-		activityRegistry.add(new ActivityData("Shayzien Laps (Advanced)", AGILITY_SHAYZIEN_HIGH, Category.AGILITY, config::trackAgilityLaps));
-		activityRegistry.add(new ActivityData("Penguin Laps", AGILITY_PENGUIN, Category.AGILITY, config::trackAgilityLaps));
-		activityRegistry.add(new ActivityData("Barbarian Outpost Laps", AGILITY_BARBARIAN_OUTPOST, Category.AGILITY, config::trackAgilityLaps));
-		activityRegistry.add(new ActivityData("Ape Atoll Laps", AGILITY_APE_ATOLL, Category.AGILITY, config::trackAgilityLaps));
-		activityRegistry.add(new ActivityData("Wilderness Laps", AGILITY_WILDERNESS, Category.AGILITY, config::trackAgilityLaps));
-		activityRegistry.add(new ActivityData("Colossal Wyrm Laps (Advanced)", AGILITY_COLOSSAL_WYRM_ADVANCED, Category.AGILITY, config::trackAgilityLaps));
-		activityRegistry.add(new ActivityData("Colossal Wyrm Laps (Basic)", AGILITY_COLOSSAL_WYRM_BASIC, Category.AGILITY, config::trackAgilityLaps));
-		activityRegistry.add(new ActivityData("Werewolf Laps", AGILITY_WEREWOLF, Category.AGILITY, config::trackAgilityLaps));
-		activityRegistry.add(new ActivityData("Prifddinas Laps", AGILITY_PRIFDDINAS, Category.AGILITY, config::trackAgilityLaps));
-		activityRegistry.add(new ActivityData("Draynor Village Rooftop Laps", AGILITY_DRAYNOR_ROOFTOP, Category.AGILITY, config::trackAgilityLaps));
-		activityRegistry.add(new ActivityData("Al Kharid Rooftop Laps", AGILITY_AL_KHARID_ROOFTOP, Category.AGILITY, config::trackAgilityLaps));
-		activityRegistry.add(new ActivityData("Varrock Rooftop Laps", AGILITY_VARROCK_ROOFTOP, Category.AGILITY, config::trackAgilityLaps));
-		activityRegistry.add(new ActivityData("Canifis Rooftop Laps", AGILITY_CANIFIS_ROOFTOP, Category.AGILITY, config::trackAgilityLaps));
-		activityRegistry.add(new ActivityData("Falador Rooftop Laps", AGILITY_FALADOR_ROOFTOP, Category.AGILITY, config::trackAgilityLaps));
-		activityRegistry.add(new ActivityData("Seers' Village Rooftop Laps", AGILITY_SEERS_ROOFTOP, Category.AGILITY, config::trackAgilityLaps));
-		activityRegistry.add(new ActivityData("Pollnivneach Rooftop Laps", AGILITY_POLLNIVNEACH_ROOFTOP, Category.AGILITY, config::trackAgilityLaps));
-		activityRegistry.add(new ActivityData("Rellekka Rooftop Laps", AGILITY_RELLEKKA_ROOFTOP, Category.AGILITY, config::trackAgilityLaps));
-		activityRegistry.add(new ActivityData("Ardougne Rooftop Laps", AGILITY_ARDOUGNE_ROOFTOP, Category.AGILITY, config::trackAgilityLaps));
-		activityRegistry.add(new ActivityData("Agility Pyramid Laps", AGILITY_PYRAMID, Category.AGILITY, config::trackAgilityLaps));
-		activityRegistry.add(new ActivityData("Dorgesh-Kaan Laps", AGILITY_DORGESH_KAAN, Category.AGILITY, config::trackAgilityLaps));
-		activityRegistry.add(new ActivityData("Brimhaven Agility Tickets", AGILITY_BRIMHAVEN, Category.AGILITY, config::trackAgilityLaps));
+		activityRegistry.add(new ActivityData("Gnome Stronghold Laps", AGILITY_GNOME_STRONGHOLD, Category.AGILITY, config::trackAgilityLaps, "trackAgilityLaps"));
+		activityRegistry.add(new ActivityData("Shayzien Laps (Basic)", AGILITY_SHAYZIEN_LOW, Category.AGILITY, config::trackAgilityLaps, "trackAgilityLaps"));
+		activityRegistry.add(new ActivityData("Shayzien Laps (Advanced)", AGILITY_SHAYZIEN_HIGH, Category.AGILITY, config::trackAgilityLaps, "trackAgilityLaps"));
+		activityRegistry.add(new ActivityData("Penguin Laps", AGILITY_PENGUIN, Category.AGILITY, config::trackAgilityLaps, "trackAgilityLaps"));
+		activityRegistry.add(new ActivityData("Barbarian Outpost Laps", AGILITY_BARBARIAN_OUTPOST, Category.AGILITY, config::trackAgilityLaps, "trackAgilityLaps"));
+		activityRegistry.add(new ActivityData("Ape Atoll Laps", AGILITY_APE_ATOLL, Category.AGILITY, config::trackAgilityLaps, "trackAgilityLaps"));
+		activityRegistry.add(new ActivityData("Wilderness Laps", AGILITY_WILDERNESS, Category.AGILITY, config::trackAgilityLaps, "trackAgilityLaps"));
+		activityRegistry.add(new ActivityData("Colossal Wyrm Laps (Advanced)", AGILITY_COLOSSAL_WYRM_ADVANCED, Category.AGILITY, config::trackAgilityLaps, "trackAgilityLaps"));
+		activityRegistry.add(new ActivityData("Colossal Wyrm Laps (Basic)", AGILITY_COLOSSAL_WYRM_BASIC, Category.AGILITY, config::trackAgilityLaps, "trackAgilityLaps"));
+		activityRegistry.add(new ActivityData("Werewolf Laps", AGILITY_WEREWOLF, Category.AGILITY, config::trackAgilityLaps, "trackAgilityLaps"));
+		activityRegistry.add(new ActivityData("Prifddinas Laps", AGILITY_PRIFDDINAS, Category.AGILITY, config::trackAgilityLaps, "trackAgilityLaps"));
+		activityRegistry.add(new ActivityData("Draynor Village Rooftop Laps", AGILITY_DRAYNOR_ROOFTOP, Category.AGILITY, config::trackAgilityLaps, "trackAgilityLaps"));
+		activityRegistry.add(new ActivityData("Al Kharid Rooftop Laps", AGILITY_AL_KHARID_ROOFTOP, Category.AGILITY, config::trackAgilityLaps, "trackAgilityLaps"));
+		activityRegistry.add(new ActivityData("Varrock Rooftop Laps", AGILITY_VARROCK_ROOFTOP, Category.AGILITY, config::trackAgilityLaps, "trackAgilityLaps"));
+		activityRegistry.add(new ActivityData("Canifis Rooftop Laps", AGILITY_CANIFIS_ROOFTOP, Category.AGILITY, config::trackAgilityLaps, "trackAgilityLaps"));
+		activityRegistry.add(new ActivityData("Falador Rooftop Laps", AGILITY_FALADOR_ROOFTOP, Category.AGILITY, config::trackAgilityLaps, "trackAgilityLaps"));
+		activityRegistry.add(new ActivityData("Seers' Village Rooftop Laps", AGILITY_SEERS_ROOFTOP, Category.AGILITY, config::trackAgilityLaps, "trackAgilityLaps"));
+		activityRegistry.add(new ActivityData("Pollnivneach Rooftop Laps", AGILITY_POLLNIVNEACH_ROOFTOP, Category.AGILITY, config::trackAgilityLaps, "trackAgilityLaps"));
+		activityRegistry.add(new ActivityData("Rellekka Rooftop Laps", AGILITY_RELLEKKA_ROOFTOP, Category.AGILITY, config::trackAgilityLaps, "trackAgilityLaps"));
+		activityRegistry.add(new ActivityData("Ardougne Rooftop Laps", AGILITY_ARDOUGNE_ROOFTOP, Category.AGILITY, config::trackAgilityLaps, "trackAgilityLaps"));
+		activityRegistry.add(new ActivityData("Agility Pyramid Laps", AGILITY_PYRAMID, Category.AGILITY, config::trackAgilityLaps, "trackAgilityLaps"));
+		activityRegistry.add(new ActivityData("Dorgesh-Kaan Laps", AGILITY_DORGESH_KAAN, Category.AGILITY, config::trackAgilityLaps, "trackAgilityLaps"));
+		activityRegistry.add(new ActivityData("Brimhaven Agility Tickets", AGILITY_BRIMHAVEN, Category.AGILITY, config::trackAgilityLaps, "trackAgilityLaps"));
 
 		// Experience Tracking
-		activityRegistry.add(new ActivityData("Total XP", XP_TOTAL, Category.EXPERIENCE, config::trackTotalXp));
-		activityRegistry.add(new ActivityData("Attack XP", XP_ATTACK, Category.EXPERIENCE, config::trackAttackXp));
-		activityRegistry.add(new ActivityData("Defence XP", XP_DEFENCE, Category.EXPERIENCE, config::trackDefenceXp));
-		activityRegistry.add(new ActivityData("Strength XP", XP_STRENGTH, Category.EXPERIENCE, config::trackStrengthXp));
-		activityRegistry.add(new ActivityData("Hitpoints XP", XP_HITPOINTS, Category.EXPERIENCE, config::trackHitpointsXp));
-		activityRegistry.add(new ActivityData("Ranged XP", XP_RANGED, Category.EXPERIENCE, config::trackRangedXp));
-		activityRegistry.add(new ActivityData("Prayer XP", XP_PRAYER, Category.EXPERIENCE, config::trackPrayerXp));
-		activityRegistry.add(new ActivityData("Magic XP", XP_MAGIC, Category.EXPERIENCE, config::trackMagicXp));
-		activityRegistry.add(new ActivityData("Cooking XP", XP_COOKING, Category.EXPERIENCE, config::trackCookingXp));
-		activityRegistry.add(new ActivityData("Woodcutting XP", XP_WOODCUTTING, Category.EXPERIENCE, config::trackWoodcuttingXp));
-		activityRegistry.add(new ActivityData("Fletching XP", XP_FLETCHING, Category.EXPERIENCE, config::trackFletchingXp));
-		activityRegistry.add(new ActivityData("Fishing XP", XP_FISHING, Category.EXPERIENCE, config::trackFishingXp));
-		activityRegistry.add(new ActivityData("Firemaking XP", XP_FIREMAKING, Category.EXPERIENCE, config::trackFiremakingXp));
-		activityRegistry.add(new ActivityData("Crafting XP", XP_CRAFTING, Category.EXPERIENCE, config::trackCraftingXp));
-		activityRegistry.add(new ActivityData("Smithing XP", XP_SMITHING, Category.EXPERIENCE, config::trackSmithingXp));
-		activityRegistry.add(new ActivityData("Mining XP", XP_MINING, Category.EXPERIENCE, config::trackMiningXp));
-		activityRegistry.add(new ActivityData("Herblore XP", XP_HERBLORE, Category.EXPERIENCE, config::trackHerbloreXp));
-		activityRegistry.add(new ActivityData("Agility XP", XP_AGILITY, Category.EXPERIENCE, config::trackAgilityXp));
-		activityRegistry.add(new ActivityData("Thieving XP", XP_THIEVING, Category.EXPERIENCE, config::trackThievingXp));
-		activityRegistry.add(new ActivityData("Slayer XP", XP_SLAYER, Category.EXPERIENCE, config::trackSlayerXp));
-		activityRegistry.add(new ActivityData("Farming XP", XP_FARMING, Category.EXPERIENCE, config::trackFarmingXp));
-		activityRegistry.add(new ActivityData("Runecraft XP", XP_RUNECRAFT, Category.EXPERIENCE, config::trackRunecraftXp));
-		activityRegistry.add(new ActivityData("Hunter XP", XP_HUNTER, Category.EXPERIENCE, config::trackHunterXp));
-		activityRegistry.add(new ActivityData("Construction XP", XP_CONSTRUCTION, Category.EXPERIENCE, config::trackConstructionXp));
-		activityRegistry.add(new ActivityData("Sailing XP", XP_SAILING, Category.EXPERIENCE, config::trackSailingXp));
+		activityRegistry.add(new ActivityData("Total XP", XP_TOTAL, Category.EXPERIENCE, config::trackTotalXp, "trackTotalXp"));
+		activityRegistry.add(new ActivityData("Attack XP", XP_ATTACK, Category.EXPERIENCE, config::trackAttackXp, "trackAttackXp"));
+		activityRegistry.add(new ActivityData("Defence XP", XP_DEFENCE, Category.EXPERIENCE, config::trackDefenceXp, "trackDefenceXp"));
+		activityRegistry.add(new ActivityData("Strength XP", XP_STRENGTH, Category.EXPERIENCE, config::trackStrengthXp, "trackStrengthXp"));
+		activityRegistry.add(new ActivityData("Hitpoints XP", XP_HITPOINTS, Category.EXPERIENCE, config::trackHitpointsXp, "trackHitpointsXp"));
+		activityRegistry.add(new ActivityData("Ranged XP", XP_RANGED, Category.EXPERIENCE, config::trackRangedXp, "trackRangedXp"));
+		activityRegistry.add(new ActivityData("Prayer XP", XP_PRAYER, Category.EXPERIENCE, config::trackPrayerXp, "trackPrayerXp"));
+		activityRegistry.add(new ActivityData("Magic XP", XP_MAGIC, Category.EXPERIENCE, config::trackMagicXp, "trackMagicXp"));
+		activityRegistry.add(new ActivityData("Cooking XP", XP_COOKING, Category.EXPERIENCE, config::trackCookingXp, "trackCookingXp"));
+		activityRegistry.add(new ActivityData("Woodcutting XP", XP_WOODCUTTING, Category.EXPERIENCE, config::trackWoodcuttingXp, "trackWoodcuttingXp"));
+		activityRegistry.add(new ActivityData("Fletching XP", XP_FLETCHING, Category.EXPERIENCE, config::trackFletchingXp, "trackFletchingXp"));
+		activityRegistry.add(new ActivityData("Fishing XP", XP_FISHING, Category.EXPERIENCE, config::trackFishingXp, "trackFishingXp"));
+		activityRegistry.add(new ActivityData("Firemaking XP", XP_FIREMAKING, Category.EXPERIENCE, config::trackFiremakingXp, "trackFiremakingXp"));
+		activityRegistry.add(new ActivityData("Crafting XP", XP_CRAFTING, Category.EXPERIENCE, config::trackCraftingXp, "trackCraftingXp"));
+		activityRegistry.add(new ActivityData("Smithing XP", XP_SMITHING, Category.EXPERIENCE, config::trackSmithingXp, "trackSmithingXp"));
+		activityRegistry.add(new ActivityData("Mining XP", XP_MINING, Category.EXPERIENCE, config::trackMiningXp, "trackMiningXp"));
+		activityRegistry.add(new ActivityData("Herblore XP", XP_HERBLORE, Category.EXPERIENCE, config::trackHerbloreXp, "trackHerbloreXp"));
+		activityRegistry.add(new ActivityData("Agility XP", XP_AGILITY, Category.EXPERIENCE, config::trackAgilityXp, "trackAgilityXp"));
+		activityRegistry.add(new ActivityData("Thieving XP", XP_THIEVING, Category.EXPERIENCE, config::trackThievingXp, "trackThievingXp"));
+		activityRegistry.add(new ActivityData("Slayer XP", XP_SLAYER, Category.EXPERIENCE, config::trackSlayerXp, "trackSlayerXp"));
+		activityRegistry.add(new ActivityData("Farming XP", XP_FARMING, Category.EXPERIENCE, config::trackFarmingXp, "trackFarmingXp"));
+		activityRegistry.add(new ActivityData("Runecraft XP", XP_RUNECRAFT, Category.EXPERIENCE, config::trackRunecraftXp, "trackRunecraftXp"));
+		activityRegistry.add(new ActivityData("Hunter XP", XP_HUNTER, Category.EXPERIENCE, config::trackHunterXp, "trackHunterXp"));
+		activityRegistry.add(new ActivityData("Construction XP", XP_CONSTRUCTION, Category.EXPERIENCE, config::trackConstructionXp, "trackConstructionXp"));
+		activityRegistry.add(new ActivityData("Sailing XP", XP_SAILING, Category.EXPERIENCE, config::trackSailingXp, "trackSailingXp"));
 
 		// Level Tracking
-		activityRegistry.add(new ActivityData("Total Level", LVL_TOTAL, Category.LEVELS, config::trackTotalLevel));
-		activityRegistry.add(new ActivityData("Attack Level", LVL_ATTACK, Category.LEVELS, config::trackAttackLevel));
-		activityRegistry.add(new ActivityData("Defence Level", LVL_DEFENCE, Category.LEVELS, config::trackDefenceLevel));
-		activityRegistry.add(new ActivityData("Strength Level", LVL_STRENGTH, Category.LEVELS, config::trackStrengthLevel));
-		activityRegistry.add(new ActivityData("Hitpoints Level", LVL_HITPOINTS, Category.LEVELS, config::trackHitpointsLevel));
-		activityRegistry.add(new ActivityData("Ranged Level", LVL_RANGED, Category.LEVELS, config::trackRangedLevel));
-		activityRegistry.add(new ActivityData("Prayer Level", LVL_PRAYER, Category.LEVELS, config::trackPrayerLevel));
-		activityRegistry.add(new ActivityData("Magic Level", LVL_MAGIC, Category.LEVELS, config::trackMagicLevel));
-		activityRegistry.add(new ActivityData("Cooking Level", LVL_COOKING, Category.LEVELS, config::trackCookingLevel));
-		activityRegistry.add(new ActivityData("Woodcutting Level", LVL_WOODCUTTING, Category.LEVELS, config::trackWoodcuttingLevel));
-		activityRegistry.add(new ActivityData("Fletching Level", LVL_FLETCHING, Category.LEVELS, config::trackFletchingLevel));
-		activityRegistry.add(new ActivityData("Fishing Level", LVL_FISHING, Category.LEVELS, config::trackFishingLevel));
-		activityRegistry.add(new ActivityData("Firemaking Level", LVL_FIREMAKING, Category.LEVELS, config::trackFiremakingLevel));
-		activityRegistry.add(new ActivityData("Crafting Level", LVL_CRAFTING, Category.LEVELS, config::trackCraftingLevel));
-		activityRegistry.add(new ActivityData("Smithing Level", LVL_SMITHING, Category.LEVELS, config::trackSmithingLevel));
-		activityRegistry.add(new ActivityData("Mining Level", LVL_MINING, Category.LEVELS, config::trackMiningLevel));
-		activityRegistry.add(new ActivityData("Herblore Level", LVL_HERBLORE, Category.LEVELS, config::trackHerbloreLevel));
-		activityRegistry.add(new ActivityData("Agility Level", LVL_AGILITY, Category.LEVELS, config::trackAgilityLevel));
-		activityRegistry.add(new ActivityData("Thieving Level", LVL_THIEVING, Category.LEVELS, config::trackThievingLevel));
-		activityRegistry.add(new ActivityData("Slayer Level", LVL_SLAYER, Category.LEVELS, config::trackSlayerLevel));
-		activityRegistry.add(new ActivityData("Farming Level", LVL_FARMING, Category.LEVELS, config::trackFarmingLevel));
-		activityRegistry.add(new ActivityData("Runecraft Level", LVL_RUNECRAFTING, Category.LEVELS, config::trackRunecraftLevel));
-		activityRegistry.add(new ActivityData("Hunter Level", LVL_HUNTER, Category.LEVELS, config::trackHunterLevel));
-		activityRegistry.add(new ActivityData("Construction Level", LVL_CONSTRUCTION, Category.LEVELS, config::trackConstructionLevel));
-		activityRegistry.add(new ActivityData("Sailing Level", LVL_SAILING, Category.LEVELS, config::trackSailingLevel));
+		activityRegistry.add(new ActivityData("Total Level", LVL_TOTAL, Category.LEVELS, config::trackTotalLevel, "trackTotalLevel"));
+		activityRegistry.add(new ActivityData("Attack Level", LVL_ATTACK, Category.LEVELS, config::trackAttackLevel, "trackAttackLevel"));
+		activityRegistry.add(new ActivityData("Defence Level", LVL_DEFENCE, Category.LEVELS, config::trackDefenceLevel, "trackDefenceLevel"));
+		activityRegistry.add(new ActivityData("Strength Level", LVL_STRENGTH, Category.LEVELS, config::trackStrengthLevel, "trackStrengthLevel"));
+		activityRegistry.add(new ActivityData("Hitpoints Level", LVL_HITPOINTS, Category.LEVELS, config::trackHitpointsLevel, "trackHitpointsLevel"));
+		activityRegistry.add(new ActivityData("Ranged Level", LVL_RANGED, Category.LEVELS, config::trackRangedLevel, "trackRangedLevel"));
+		activityRegistry.add(new ActivityData("Prayer Level", LVL_PRAYER, Category.LEVELS, config::trackPrayerLevel, "trackPrayerLevel"));
+		activityRegistry.add(new ActivityData("Magic Level", LVL_MAGIC, Category.LEVELS, config::trackMagicLevel, "trackMagicLevel"));
+		activityRegistry.add(new ActivityData("Cooking Level", LVL_COOKING, Category.LEVELS, config::trackCookingLevel, "trackCookingLevel"));
+		activityRegistry.add(new ActivityData("Woodcutting Level", LVL_WOODCUTTING, Category.LEVELS, config::trackWoodcuttingLevel, "trackWoodcuttingLevel"));
+		activityRegistry.add(new ActivityData("Fletching Level", LVL_FLETCHING, Category.LEVELS, config::trackFletchingLevel, "trackFletchingLevel"));
+		activityRegistry.add(new ActivityData("Fishing Level", LVL_FISHING, Category.LEVELS, config::trackFishingLevel, "trackFishingLevel"));
+		activityRegistry.add(new ActivityData("Firemaking Level", LVL_FIREMAKING, Category.LEVELS, config::trackFiremakingLevel, "trackFiremakingLevel"));
+		activityRegistry.add(new ActivityData("Crafting Level", LVL_CRAFTING, Category.LEVELS, config::trackCraftingLevel, "trackCraftingLevel"));
+		activityRegistry.add(new ActivityData("Smithing Level", LVL_SMITHING, Category.LEVELS, config::trackSmithingLevel, "trackSmithingLevel"));
+		activityRegistry.add(new ActivityData("Mining Level", LVL_MINING, Category.LEVELS, config::trackMiningLevel, "trackMiningLevel"));
+		activityRegistry.add(new ActivityData("Herblore Level", LVL_HERBLORE, Category.LEVELS, config::trackHerbloreLevel, "trackHerbloreLevel"));
+		activityRegistry.add(new ActivityData("Agility Level", LVL_AGILITY, Category.LEVELS, config::trackAgilityLevel, "trackAgilityLevel"));
+		activityRegistry.add(new ActivityData("Thieving Level", LVL_THIEVING, Category.LEVELS, config::trackThievingLevel, "trackThievingLevel"));
+		activityRegistry.add(new ActivityData("Slayer Level", LVL_SLAYER, Category.LEVELS, config::trackSlayerLevel, "trackSlayerLevel"));
+		activityRegistry.add(new ActivityData("Farming Level", LVL_FARMING, Category.LEVELS, config::trackFarmingLevel, "trackFarmingLevel"));
+		activityRegistry.add(new ActivityData("Runecraft Level", LVL_RUNECRAFTING, Category.LEVELS, config::trackRunecraftLevel, "trackRunecraftLevel"));
+		activityRegistry.add(new ActivityData("Hunter Level", LVL_HUNTER, Category.LEVELS, config::trackHunterLevel, "trackHunterLevel"));
+		activityRegistry.add(new ActivityData("Construction Level", LVL_CONSTRUCTION, Category.LEVELS, config::trackConstructionLevel, "trackConstructionLevel"));
+		activityRegistry.add(new ActivityData("Sailing Level", LVL_SAILING, Category.LEVELS, config::trackSailingLevel, "trackSailingLevel"));
 	}
 }

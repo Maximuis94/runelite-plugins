@@ -31,6 +31,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 import net.runelite.api.Skill;
 
 /**
@@ -39,6 +41,11 @@ import net.runelite.api.Skill;
 @Data
 public class Session {
 	private String id;
+
+	@Getter
+	@Setter
+	private String sessionName;
+
 	private long accountHash;
 	private String accountName;
 	private Instant startTime;
