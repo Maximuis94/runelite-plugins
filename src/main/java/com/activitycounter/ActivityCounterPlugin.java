@@ -70,7 +70,7 @@ import net.runelite.client.util.Text;
 	name = PLUGIN_NAME,
 	internalName = PluginConstants.PLUGIN_DIR_NAME,
 	description = "Plugin that counts activities (e.g. bosses/agility laps) per manually defined session",
-	tags = {"session", "tracker", "counter", "kc", "killcount", "activity", "count", "lap", "minigame"}
+	tags = {"session", "tracker", "counter", "kc", "killcount", "activity", "count", "lap"}
 )
 public class ActivityCounterPlugin extends Plugin {
 
@@ -120,6 +120,8 @@ public class ActivityCounterPlugin extends Plugin {
 	private boolean trackExperience = false;
 	private boolean trackChatMessages = false;
 	private boolean trackLevels = false;
+	private boolean trackCannonballs = false;
+	private boolean trackNightmareZone = false;
 
 	@Getter
 	private boolean showSessionDuration = false;
@@ -172,6 +174,14 @@ public class ActivityCounterPlugin extends Plugin {
 
 	private static final String SNEAKING_SUSPICION_ELITE_AFFIX = " elite scroll box.";
 	private static final int MISSED_ELITE_CLUES = -7014;
+
+	private int cannonBallsLoaded = 0;
+	private static final int CANNON_BALLS_VARPLAYERID = VarPlayerID.ROCKTHROWER;
+	private static final int CANNON_BALLS = -7015;
+
+	private int nmzPoints = 0;
+	private static final int NIGHTMARE_ZONE_POINTS_SESSION_VARBITID = VarbitID.NZONE_CURRENTPOINTS;
+	private static final int NMZ_POINTS = -7016;
 
 
 	private static final String FARMING_CONTRACT_MESSAGE = "You've completed a Farming Guild Contract. You should return to GuildMaster Jane.";
@@ -335,6 +345,8 @@ public class ActivityCounterPlugin extends Plugin {
 
 		showSessionDuration = config.showSessionDuration();
 		confirmSessionTermination = config.confirmTerminateSession();
+		trackCannonballs = config.trackCannonballs();
+		trackNightmareZone = config.trackNightmareZonePoints();
 	}
 
 	@Subscribe
@@ -510,6 +522,38 @@ public class ActivityCounterPlugin extends Plugin {
 		panel.refreshKcContainer();
 	}
 
+	/**
+	 * Updates cannonballs, provided the previous count is higher and the difference is minimal
+	 */
+	private void updateCannonBalls()
+	{
+		int newCannonBalls = client.getVarpValue(CANNON_BALLS_VARPLAYERID);
+		int deltaCb = cannonBallsLoaded-newCannonBalls;
+		if (deltaCb > 0 && deltaCb < 3)
+		{
+			Count kc = currentSession.getKillCount(CANNON_BALLS);
+			kc.setSessionKc(kc.getSessionKc() + deltaCb);
+			currentSession.addKillCount(kc);
+		}
+		cannonBallsLoaded = newCannonBalls;
+	}
+
+	/**
+	 * Updates Nightmare zone points
+	 */
+	private void updateNmzPoints()
+	{
+		int newNmzPoints = client.getVarbitValue(NIGHTMARE_ZONE_POINTS_SESSION_VARBITID);
+		int deltaNmz = newNmzPoints - nmzPoints;
+		if (deltaNmz > 0)
+		{
+			Count kc = currentSession.getKillCount(NMZ_POINTS);
+			kc.setSessionKc(kc.getSessionKc() + deltaNmz);
+			currentSession.addKillCount(kc);
+		}
+		nmzPoints = newNmzPoints;
+	}
+
 	@Subscribe
 	public void onVarbitChanged(VarbitChanged event) {
 		if (currentSession == null || !currentSession.isInProgress()) return;
@@ -529,12 +573,22 @@ public class ActivityCounterPlugin extends Plugin {
 		if (currentSession.isTracking(varpId)) {
 			processActivityUpdate(varpId, event.getValue());
 		}
+		else if (varpId == CANNON_BALLS_VARPLAYERID)
+		{
+			if (trackCannonballs) updateCannonBalls();
+			return;
+		}
 
 		// 2. Process Varbit-based changes safely using the offset
 		if (varbitId != -1) {
 			int trackedVarbitId = varbitId + VARBIT_OFFSET;
 			if (currentSession.isTracking(trackedVarbitId)) {
 				processActivityUpdate(trackedVarbitId, client.getVarbitValue(varbitId));
+			}
+			else if (varbitId == NIGHTMARE_ZONE_POINTS_SESSION_VARBITID)
+			{
+				if (trackNightmareZone) updateNmzPoints();
+				return;
 			}
 		}
 	}
@@ -828,6 +882,8 @@ public class ActivityCounterPlugin extends Plugin {
 	private void initializeKillCounts(boolean isManualStart) {
 		if (currentSession == null) return;
 
+		nmzPoints = 0;
+
 		for (ActivityData act : activityRegistry) {
 			if (!currentSession.isTracking(act.trackingId)) {
 				Count kc = new Count(act.name, act.trackingId);
@@ -964,6 +1020,7 @@ public class ActivityCounterPlugin extends Plugin {
 		activityRegistry.add(new ActivityData("Bryophyta", VarPlayerID.TOTAL_BRYOPHYTA_KILLS, Category.BOSSES, config::trackBryophyta, "trackBryophyta"));
 		activityRegistry.add(new ActivityData("Scurrius", VarPlayerID.TOTAL_RAT_BOSS_KILLS, Category.BOSSES, config::trackScurrius, "trackScurrius"));
 		activityRegistry.add(new ActivityData("Chaos Fanatic", VarPlayerID.TOTAL_CHAOSFANATIC_KILLS, Category.BOSSES, config::trackChaosFanatic, "trackChaosFanatic"));
+		activityRegistry.add(new ActivityData("Deranged Archaeologist", VarPlayerID.TOTAL_DERANGEDARCHAEOLOGIST_KILLS, Category.BOSSES, config::trackDerangedArchaeologist, "trackDerangedArchaeologist"));
 		activityRegistry.add(new ActivityData("Crazy Archaeologist", VarPlayerID.TOTAL_CRAZYARCHAEOLOGIST_KILLS, Category.BOSSES, config::trackCrazyArchaeologist, "trackCrazyArchaeologist"));
 		activityRegistry.add(new ActivityData("Scorpia", VarPlayerID.TOTAL_SCORPIA_KILLS, Category.BOSSES, config::trackScorpia, "trackScorpia"));
 		activityRegistry.add(new ActivityData("Giant Mole", VarPlayerID.TOTAL_MOLE_KILLS, Category.BOSSES, config::trackGiantMole, "trackGiantMole"));
@@ -1066,6 +1123,19 @@ public class ActivityCounterPlugin extends Plugin {
 		activityRegistry.add(new ActivityData("Music tracks unlocked", MUSIC_TRACK_UNLOCKS, Category.OTHER, config::trackMusicUnlocked, "trackMusicUnlocked"));
 		activityRegistry.add(new ActivityData("Larran's small chests", LARRANS_SMALL_CHESTS, Category.OTHER, config::trackLarransChests, "trackLarransChests"));
 		activityRegistry.add(new ActivityData("Larran's big chests", LARRANS_BIG_CHESTS, Category.OTHER, config::trackLarransChests, "trackLarransChests"));
+		activityRegistry.add(new ActivityData("Damage dealt to NPCs", VarPlayerID.TRACKING_DAMAGE_DEALT_TO_NPCS, Category.OTHER, config::trackNpcDamage, "trackNpcDamage"));
+		activityRegistry.add(new ActivityData("Special attacks used", VarPlayerID.TRACKING_SPECIAL_ATTACKS_USED, Category.OTHER, config::trackSpecialAttacks, "trackSpecialAttacks"));
+		activityRegistry.add(new ActivityData("Damage taken from NPCs", VarPlayerID.TRACKING_DAMAGE_TAKEN_FROM_NPCS, Category.OTHER, config::trackNpcDamage, "trackNpcDamage"));
+		activityRegistry.add(new ActivityData("Fish caught", VarPlayerID.TRACKING_FISH_CAUGHT, Category.OTHER, config::trackResourcesGathered, "trackResourcesGathered"));
+		activityRegistry.add(new ActivityData("Logs chopped", VarPlayerID.TRACKING_LOGS_CHOPPED, Category.OTHER, config::trackResourcesGathered, "trackResourcesGathered"));
+		activityRegistry.add(new ActivityData("Ore mined", VarPlayerID.TRACKING_ORE_MINED, Category.OTHER, config::trackResourcesGathered, "trackResourcesGathered"));
+		activityRegistry.add(new ActivityData("Potions sipped", VarPlayerID.TRACKING_POTIONS_SIPPED, Category.OTHER, config::trackSuppliesConsumed, "trackSuppliesConsumed"));
+		activityRegistry.add(new ActivityData("Food eaten", VarPlayerID.TRACKING_FOOD_EATEN, Category.OTHER, config::trackSuppliesConsumed, "trackSuppliesConsumed"));
+		activityRegistry.add(new ActivityData("Coins gained", VarPlayerID.TRACKING_COINS_GAINED, Category.OTHER, config::trackCoins, "trackCoins"));
+		activityRegistry.add(new ActivityData("Coins lost", VarPlayerID.TRACKING_COINS_LOST, Category.OTHER, config::trackCoins, "trackCoins"));
+		activityRegistry.add(new ActivityData("Cannonballs fired", CANNON_BALLS, Category.OTHER, config::trackCannonballs, "trackCannonballs"));
+		activityRegistry.add(new ActivityData("NMZ points", NMZ_POINTS, Category.OTHER, config::trackNightmareZonePoints, "trackNightmareZonePoints"));
+
 
 		// Clue Scrolls
 		activityRegistry.add(new ActivityData("Completed beginner clue", VarPlayerID.COMPLETED_CLUES5, Category.CLUE, config::trackClueScrolls, "trackClueScrolls"));

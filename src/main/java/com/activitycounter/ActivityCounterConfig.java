@@ -261,6 +261,15 @@ public interface ActivityCounterConfig extends Config {
 	default boolean trackCrazyArchaeologist() { return true; }
 
 	@ConfigItem(
+		keyName = "trackDerangedArchaeologist",
+		name = "Deranged Archaeologist",
+		description = "If checked, Deranged Archaeologist kills are tracked",
+		position = 6,
+		section = bossesSection
+	)
+	default boolean trackDerangedArchaeologist() { return true; }
+
+	@ConfigItem(
 		keyName = "trackScorpia",
 		name = "Scorpia",
 		description = "If checked, Scorpia kills are tracked",
@@ -994,6 +1003,69 @@ public interface ActivityCounterConfig extends Config {
 		section = otherSection
 	)
 	default boolean trackLarransChests() { return true; }
+
+	@ConfigItem(
+		keyName = "trackNpcDamage",
+		name = "NPC damage",
+		description = "If checked, damage dealt to and taken from NPCs is tracked",
+		position = 24,
+		section = otherSection
+	)
+	default boolean trackNpcDamage() { return true; }
+
+	@ConfigItem(
+		keyName = "trackSpecialAttacks",
+		name = "Special attacks used",
+		description = "If checked, special attacks are tracked",
+		position = 25,
+		section = otherSection
+	)
+	default boolean trackSpecialAttacks() { return true; }
+
+	@ConfigItem(
+		keyName = "trackResourcesGathered",
+		name = "Resources gathered",
+		description = "If checked, gathered resources (fish, logs, ore) are tracked",
+		position = 26,
+		section = otherSection
+	)
+	default boolean trackResourcesGathered() { return true; }
+
+	@ConfigItem(
+		keyName = "trackSuppliesConsumed",
+		name = "Supplies consumed",
+		description = "If checked, consumed supplies (food, potions) are tracked",
+		position = 27,
+		section = otherSection
+	)
+	default boolean trackSuppliesConsumed() { return true; }
+
+	@ConfigItem(
+		keyName = "trackCoins",
+		name = "Coins tracking",
+		description = "If checked, coins gained and lost are tracked",
+		position = 28,
+		section = otherSection
+	)
+	default boolean trackCoins() { return true; }
+
+	@ConfigItem(
+		keyName = "trackCannonballs",
+		name = "Cannonballs fired",
+		description = "If checked, cannonballs fired by the cannon are tracked",
+		position = 29,
+		section = otherSection
+	)
+	default boolean trackCannonballs() { return true; }
+
+	@ConfigItem(
+		keyName = "trackNightmareZonePoints",
+		name = "NMZ points",
+		description = "If checked, Nightmare Zone points are tracked",
+		position = 30,
+		section = otherSection
+	)
+	default boolean trackNightmareZonePoints() { return true; }
 
 	// --- EXPERIENCE ---
 

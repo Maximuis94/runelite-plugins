@@ -11,6 +11,7 @@ Tracked activities can be disabled/hidden on an individual/group basis via the p
 - Bryophyta
 - Scurrius
 - Chaos Fanatic
+- Deranged Archaeologist
 - Crazy Archaeologist
 - Scorpia
 - Giant Mole
@@ -115,6 +116,12 @@ Tracked activities can be disabled/hidden on an individual/group basis via the p
 - Music tracks unlocked
 - Larran's small chests
 - Larran's big chests
+- NPC damage incoming/outgoing
+- Resources gathered
+- Coins gained/lost
+- Supplies consumed
+- NMZ points earmed
+- Cannonballs fired
 
 
 
