@@ -49,8 +49,10 @@ public class Session {
 	private long accountHash;
 	private String accountName;
 	private Instant startTime;
+	private Instant endTime = null;
 	private boolean inProgress;
 	private int secondsPassed;
+	private String notes;
 
 	private Map<Integer, Count> trackedKills;
 	private Map<Skill, Integer> initialXp;
@@ -86,18 +88,18 @@ public class Session {
 		trackedKills.put(kc.getVarPlayerId(), kc);
 	}
 
-	public Count getKillCount(int varpId) {
+	public Count getKillCount(int activityId) {
 		if (trackedKills == null) trackedKills = new HashMap<>();
-		return trackedKills.get(varpId);
+		return trackedKills.get(activityId);
 	}
 
 	public void addSecond() {
 		secondsPassed++;
 	}
 
-	public boolean isTracking(int varpId) {
+	public boolean isTracking(int id) {
 		if (trackedKills == null) trackedKills = new HashMap<>();
-		return trackedKills.containsKey(varpId);
+		return trackedKills.containsKey(id);
 	}
 
 	public Collection<Count> getAllKillCounts() {

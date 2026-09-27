@@ -25,7 +25,7 @@
 
 package com.activitycounter.models;
 
-public enum Category
+public enum TrackerType
 {
-	BOSSES, CHESTS, OTHER, CLUE, SLAYER, AGILITY, BOLTS, LEVELS, EXPERIENCE, RAIDS, MINIGAMES
+	VARBIT_VALUE, VARPLAYER_VALUE, CHAT_MESSAGE, STAT_CHANGE, CUSTOM, SOUND_EFFECT
 }

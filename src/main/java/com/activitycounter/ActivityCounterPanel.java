@@ -25,15 +25,23 @@
 
 package com.activitycounter;
 
+import com.activitycounter.listeners.SoundEffectListener;
 import com.activitycounter.models.Category;
 import com.activitycounter.models.Count;
 import com.activitycounter.models.Session;
+import com.activitycounter.models.TrackedActivity;
 import java.awt.BorderLayout;
 import java.awt.Color;
+import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Font;
+import java.awt.event.FocusAdapter;
+import java.awt.event.FocusEvent;
+import java.time.Duration;
+import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
@@ -47,8 +55,11 @@ import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
+import javax.swing.JScrollPane;
+import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
+import javax.swing.Timer;
 import javax.swing.border.EmptyBorder;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.PluginPanel;
@@ -59,10 +70,18 @@ public class ActivityCounterPanel extends PluginPanel {
 	private final JButton toggleSessionButton = new JButton();
 	private final JButton renameSessionButton = new JButton("Rename");
 	private final JButton deleteSessionButton = new JButton("Delete");
-	private final JLabel timePassedLabel = new JLabel();
 	private final JComboBox<SessionNode> sessionComboBox = new JComboBox<>();
 
+	// Session Info Components
+	private final JLabel timePassedLabel = new JLabel();
+	private final JLabel startTimeLabel = new JLabel();
+	private final JLabel endTimeLabel = new JLabel();
+	private final JLabel warningLabel = new JLabel();
+	private final JTextArea notesArea = new JTextArea();
+	private final JScrollPane notesScrollPane = new JScrollPane(notesArea);
+
 	private final JPanel kcContainer = new JPanel();
+	private final SoundEffectListener soundEffectListener;
 
 	private volatile boolean forceNextReloadToActive = false;
 	private final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MMM dd, yyyy - HH:mm")
@@ -83,8 +102,9 @@ public class ActivityCounterPanel extends PluginPanel {
 		}
 	}
 
-	public ActivityCounterPanel(ActivityCounterPlugin plugin) {
+	public ActivityCounterPanel(ActivityCounterPlugin plugin, SoundEffectListener soundEffectListener) {
 		this.plugin = plugin;
+		this.soundEffectListener = soundEffectListener;
 
 		setLayout(new BorderLayout(0, 10));
 		setBorder(new EmptyBorder(10, 10, 10, 10));
@@ -92,8 +112,7 @@ public class ActivityCounterPanel extends PluginPanel {
 		toggleSessionButton.setFocusable(false);
 		toggleSessionButton.addActionListener(e -> {
 			if (plugin.getCurrentSession() != null) {
-				if (plugin.isConfirmSessionTermination())
-				{
+				if (plugin.isConfirmSessionTermination()) {
 					int confirm = JOptionPane.showConfirmDialog(
 						this,
 						"Are you sure you want to terminate the active session?",
@@ -102,12 +121,10 @@ public class ActivityCounterPanel extends PluginPanel {
 						JOptionPane.WARNING_MESSAGE
 					);
 
-					if (confirm == JOptionPane.YES_OPTION)
-					{
+					if (confirm == JOptionPane.YES_OPTION) {
 						plugin.closeSession();
 					}
-				}
-				else plugin.closeSession();
+				} else plugin.closeSession();
 			} else {
 				forceNextReloadToActive = true;
 				plugin.startSession();
@@ -119,11 +136,8 @@ public class ActivityCounterPanel extends PluginPanel {
 		renameSessionButton.addActionListener(e -> {
 			SessionNode selectedNode = (SessionNode) sessionComboBox.getSelectedItem();
 			if (selectedNode != null && selectedNode.session != null) {
-
 				String currentName = selectedNode.label;
-
 				JTextField nameInput = new JTextField(currentName);
-
 				int result = JOptionPane.showConfirmDialog(
 					this,
 					nameInput,
@@ -167,15 +181,59 @@ public class ActivityCounterPanel extends PluginPanel {
 		JPanel kcWrapper = new JPanel(new BorderLayout());
 		kcWrapper.add(kcContainer, BorderLayout.NORTH);
 
+		// Action Buttons Panel
 		JPanel actionButtonsPanel = new JPanel();
 		actionButtonsPanel.setLayout(new BoxLayout(actionButtonsPanel, BoxLayout.X_AXIS));
 		actionButtonsPanel.add(renameSessionButton);
 		actionButtonsPanel.add(Box.createRigidArea(new Dimension(5, 0)));
 		actionButtonsPanel.add(deleteSessionButton);
 
-		JPanel infoRow = new JPanel(new BorderLayout());
-		infoRow.add(actionButtonsPanel, BorderLayout.NORTH);
-		infoRow.add(timePassedLabel, BorderLayout.SOUTH);
+		// Setup Warning Label
+		warningLabel.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
+		warningLabel.setVisible(false);
+
+		// Setup Notes Area
+		notesArea.setLineWrap(true);
+		notesArea.setWrapStyleWord(true);
+		notesArea.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+		notesArea.setForeground(Color.WHITE);
+		notesArea.setToolTipText("Session notes (auto-saves when you click away)");
+		notesScrollPane.setPreferredSize(new Dimension(PluginPanel.PANEL_WIDTH - 20, 85));
+		notesScrollPane.setVisible(false);
+
+		notesArea.addFocusListener(new FocusAdapter() {
+			@Override
+			public void focusLost(FocusEvent e) {
+				SessionNode selectedNode = (SessionNode) sessionComboBox.getSelectedItem();
+				Session active = (selectedNode != null && selectedNode.session != null)
+					? selectedNode.session
+					: plugin.getCurrentSession();
+
+				if (active != null) {
+					active.setNotes(notesArea.getText());
+					plugin.saveSession(active);
+				}
+			}
+		});
+
+		actionButtonsPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+		timePassedLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+		startTimeLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+		endTimeLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+		warningLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+		notesScrollPane.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+		JPanel infoRow = new JPanel();
+		infoRow.setLayout(new BoxLayout(infoRow, BoxLayout.Y_AXIS));
+		infoRow.add(actionButtonsPanel);
+		infoRow.add(Box.createRigidArea(new Dimension(0, 5)));
+		infoRow.add(timePassedLabel);
+		infoRow.add(startTimeLabel);
+		infoRow.add(endTimeLabel);
+		infoRow.add(Box.createRigidArea(new Dimension(0, 5)));
+		infoRow.add(warningLabel);
+		infoRow.add(Box.createRigidArea(new Dimension(0, 5)));
+		infoRow.add(notesScrollPane);
 
 		JPanel northWrapper = new JPanel(new BorderLayout(0, 5));
 		northWrapper.add(toggleSessionButton, BorderLayout.NORTH);
@@ -184,49 +242,16 @@ public class ActivityCounterPanel extends PluginPanel {
 
 		add(northWrapper, BorderLayout.NORTH);
 		add(kcWrapper, BorderLayout.CENTER);
+
+		// Start a background timer to naturally update the duration and hide the warning label
+		Timer updateTimer = new Timer(1000, e -> updateTime());
+		updateTimer.start();
 	}
 
 	public void forceActiveSessionSelection() {
 		forceNextReloadToActive = true;
 	}
 
-	/**
-	 * Update the displayed data in the panel with the given Session data
-	 */
-	public void update(Session session) {
-		SwingUtilities.invokeLater(() -> {
-			boolean loggedIn = plugin.isLoggedIn();
-			toggleSessionButton.setEnabled(loggedIn);
-
-			if (session != null && session.isInProgress()) {
-				toggleSessionButton.setText("Stop Session");
-				toggleSessionButton.setBackground(loggedIn ? ColorScheme.PROGRESS_ERROR_COLOR : ColorScheme.DARK_GRAY_COLOR);
-			} else {
-				toggleSessionButton.setText("Start Session");
-				toggleSessionButton.setBackground(loggedIn ? ColorScheme.PROGRESS_COMPLETE_COLOR : ColorScheme.DARK_GRAY_COLOR);
-			}
-
-			if (session != null) {
-				if (session.isInProgress() && !plugin.isShowSessionDuration()) {
-					timePassedLabel.setText("");
-				} else {
-					int totalSeconds = session.getSecondsPassed();
-					int hours = totalSeconds / 3600;
-					int minutes = (totalSeconds % 3600) / 60;
-					int seconds = totalSeconds % 60;
-					timePassedLabel.setText(String.format("Time passed: %02d:%02d:%02d", hours, minutes, seconds));
-				}
-			} else {
-				timePassedLabel.setText("Time passed: NA");
-			}
-
-			buildKcContainer(session);
-		});
-	}
-
-	/**
-	 * Fill the Combobox with previously archived Sessions
-	 */
 	public void reloadComboBox() {
 		SwingUtilities.invokeLater(() -> {
 			String selectedId = null;
@@ -278,9 +303,6 @@ public class ActivityCounterPanel extends PluginPanel {
 		});
 	}
 
-	/**
-	 * Update the label that displays the current time
-	 */
 	public void updateTime() {
 		SwingUtilities.invokeLater(() -> {
 			SessionNode selectedNode = (SessionNode) sessionComboBox.getSelectedItem();
@@ -295,26 +317,120 @@ public class ActivityCounterPanel extends PluginPanel {
 			}
 
 			if (sessionToDisplay != null) {
-				if (sessionToDisplay.isInProgress() && !plugin.isShowSessionDuration()) {
+				ActivityCounterConfig config = plugin.getConfig();
+
+				// Duration
+				if (sessionToDisplay.isInProgress() && !config.showSessionDuration()) {
 					timePassedLabel.setText("");
 				} else {
 					int totalSeconds = sessionToDisplay.getSecondsPassed();
 					int hours = totalSeconds / 3600;
 					int minutes = (totalSeconds % 3600) / 60;
 					int seconds = totalSeconds % 60;
-
-					String formattedTime = String.format("%02d:%02d:%02d", hours, minutes, seconds);
-					timePassedLabel.setText("Time passed: " + formattedTime);
+					timePassedLabel.setText(String.format("Time passed: %02d:%02d:%02d", hours, minutes, seconds));
 				}
+
+				// Start Time
+				if (config.showStartTime() && sessionToDisplay.getStartTime() != null) {
+					startTimeLabel.setText("Started: " + formatter.format(sessionToDisplay.getStartTime()));
+					startTimeLabel.setVisible(true);
+				} else {
+					startTimeLabel.setVisible(false);
+				}
+
+				// End Time
+				if (config.showEndTime() && sessionToDisplay.getEndTime() != null && !sessionToDisplay.isInProgress()) {
+					endTimeLabel.setText("Ended: " + formatter.format(sessionToDisplay.getEndTime()));
+					endTimeLabel.setVisible(true);
+				} else {
+					endTimeLabel.setVisible(false);
+				}
+
+				// Notes
+				if (config.showNotes()) {
+					if (!notesArea.hasFocus()) {
+						notesArea.setText(sessionToDisplay.getNotes() != null ? sessionToDisplay.getNotes() : "");
+					}
+					notesScrollPane.setVisible(true);
+				} else {
+					notesScrollPane.setVisible(false);
+				}
+
+				// Warning / Status Label
+				if (sessionToDisplay.isInProgress()) {
+					long secondsSinceStart = sessionToDisplay.getStartTime() != null
+						? Duration.between(sessionToDisplay.getStartTime(), Instant.now()).getSeconds()
+						: 0;
+
+					boolean hasKc = sessionToDisplay.getAllKillCounts().stream().anyMatch(c -> c.getSessionKc() > 0);
+
+
+
+					// Stay visible for 8 seconds, or indefinitely until the first count is acquired
+					if (secondsSinceStart < 8 || !hasKc) {
+						int hiddenIndividualCount = 0;
+						for (TrackedActivity act : TrackedActivity.values()) {
+							if (!plugin.isKcVisible(act)) {
+								hiddenIndividualCount++;
+							}
+						}
+
+						List<String> disabledGroups = new ArrayList<>();
+						if (!config.enableBoltProcListener()) {
+							disabledGroups.add("Enchanted bolt proc counters");
+						}
+						// Can easily append other disabled groups here in the future
+
+						StringBuilder sb = new StringBuilder();
+						sb.append("<html><div style='margin-top: 5px; margin-bottom: 5px;'>");
+						sb.append("<b style='color: #40ff40;'>Counter is ");
+
+						if (hiddenIndividualCount > 0 || !disabledGroups.isEmpty()) {
+							sb.append("partially ");
+						}
+						sb.append("active!</b><br><br>");
+
+						if (hiddenIndividualCount > 0) {
+							sb.append("A total of <b>").append(hiddenIndividualCount)
+								.append("</b> individual counters have been disabled/hidden. ")
+								.append("They can be made visible by removing the key from the list in the textbox at the bottom of the plugin config panel.<br><br>");
+						}
+
+						if (!soundEffectListener.isHasSoundEffects())
+						{
+							sb.append("Sound effects are currently muted. This may impact the performance of some counters like the teletab/enchanted bolt proc counters. " +
+								"If you wish to use these counters, consider setting the volume to 1 instead.<br><br>");
+						}
+
+						if (!disabledGroups.isEmpty()) {
+							sb.append("The following groups have been completely disabled:<br>");
+							for (String group : disabledGroups) {
+								sb.append("- ").append(group).append("<br>");
+							}
+							sb.append("They can be re-enabled by checking their respective boxes in the 'Group filters' config section.");
+						}
+
+						sb.append("</div></html>");
+
+						warningLabel.setText(sb.toString());
+						warningLabel.setVisible(true);
+					} else {
+						warningLabel.setVisible(false);
+					}
+				} else {
+					warningLabel.setVisible(false);
+				}
+
 			} else {
 				timePassedLabel.setText("Time passed: NA");
+				startTimeLabel.setVisible(false);
+				endTimeLabel.setVisible(false);
+				warningLabel.setVisible(false);
+				notesScrollPane.setVisible(false);
 			}
 		});
 	}
 
-	/**
-	 * Refresh values displayed in the container in the sidebar panel
-	 */
 	public void refreshKcContainer() {
 		SwingUtilities.invokeLater(() -> {
 			boolean loggedIn = plugin.isLoggedIn();
@@ -352,9 +468,6 @@ public class ActivityCounterPanel extends PluginPanel {
 		});
 	}
 
-	/**
-	 * Fill the count container with the given Session data
-	 */
 	private void buildKcContainer(Session sessionToDisplay) {
 		kcContainer.removeAll();
 
@@ -402,9 +515,9 @@ public class ActivityCounterPanel extends PluginPanel {
 						JPopupMenu popupMenu = new JPopupMenu();
 						JMenuItem hideItem = new JMenuItem("Hide " + kc.getName());
 						hideItem.addActionListener(e -> {
-							String configKey = plugin.getActivityConfigKey(kc.getVarPlayerId());
-							if (configKey != null) {
-								plugin.disableActivity(configKey);
+							TrackedActivity activityToHide = plugin.getActivityById(kc.getVarPlayerId());
+							if (activityToHide != null) {
+								plugin.disableActivity(activityToHide);
 							}
 						});
 						popupMenu.add(hideItem);
