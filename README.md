@@ -239,63 +239,10 @@ The labels at the top that show the time / session start+end / notes can also be
 </details>
 
 <details>
-<summary><b>Experience</b></summary>
+<summary><b>Skills</b></summary>
 
-- Total XP
-- Attack XP
-- Defence XP
-- Strength XP
-- Hitpoints XP
-- Ranged XP
-- Prayer XP
-- Magic XP
-- Cooking XP
-- Woodcutting XP
-- Fletching XP
-- Fishing XP
-- Firemaking XP
-- Crafting XP
-- Smithing XP
-- Mining XP
-- Herblore XP
-- Agility XP
-- Thieving XP
-- Slayer XP
-- Farming XP
-- Runecraft XP
-- Hunter XP
-- Construction XP
-- Sailing XP
-</details>
-
-<details>
-<summary><b>Levels</b></summary>
-
-- Total Level
-- Attack Level
-- Defence Level
-- Strength Level
-- Hitpoints Level
-- Ranged Level
-- Prayer Level
-- Magic Level
-- Cooking Level
-- Woodcutting Level
-- Fletching Level
-- Fishing Level
-- Firemaking Level
-- Crafting Level
-- Smithing Level
-- Mining Level
-- Herblore Level
-- Agility Level
-- Thieving Level
-- Slayer Level
-- Farming Level
-- Runecraft Level
-- Hunter Level
-- Construction Level
-- Sailing Level
+- XP gained
+- Levels gained
 </details>
 
 <details>
