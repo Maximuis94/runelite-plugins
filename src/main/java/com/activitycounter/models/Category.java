@@ -25,7 +25,28 @@
 
 package com.activitycounter.models;
 
+import lombok.Getter;
+
+@Getter
 public enum Category
 {
-	BOSSES, CHESTS, OTHER, CLUE, SLAYER, AGILITY, BOLTS, LEVELS, EXPERIENCE, RAIDS, MINIGAMES
+	BOSSES, CHESTS, OTHER, CLUE, SLAYER, AGILITY, BOLTS, LEVELS, EXPERIENCE,
+	RAIDS, MINI_GAMES, MAGIC_SPELLS, COMBAT, SUPPLIES, SKILLING, ACHIEVEMENTS,
+	SAILING, TERTIARY_DROPS, RANDOM_EVENTS;
+
+	private final String header;
+
+	Category()
+	{
+		String[] words = this.name().toLowerCase().split("_");
+		StringBuilder sb = new StringBuilder();
+
+		for (String word : words) {
+			sb.append(Character.toUpperCase(word.charAt(0)))
+				.append(word.substring(1))
+				.append(" ");
+		}
+
+		this.header = sb.toString().trim();
+	}
 }

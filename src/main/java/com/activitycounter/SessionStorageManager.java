@@ -25,13 +25,17 @@
 
 package com.activitycounter;
 
+import com.activitycounter.models.Count;
 import com.activitycounter.models.Session;
+import com.activitycounter.models.TrackedActivity;
 import com.google.gson.Gson;
 import java.io.IOException;
 import java.io.Reader;
 import java.io.Writer;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.inject.Inject;
@@ -84,14 +88,81 @@ public class SessionStorageManager {
 	 * Loads a session from a specified Filepath.
 	 */
 	public Session loadSession(Filepath file) {
-		if (!file.exists()) return null;
+		if (!file.exists()) {
+			return null;
+		}
 
 		try (Reader reader = file.openBufferedReader()) {
-			return gson.fromJson(reader, Session.class);
+			Session session = gson.fromJson(reader, Session.class);
+
+			if (session != null) {
+				// Check if the session is using old IDs and migrate if necessary
+				if (migrateSessionData(session)) {
+					// Save the newly migrated data back to disk immediately
+					saveSession(session);
+				}
+			}
+
+			return session;
 		} catch (Exception e) {
 			log.error("Failed to load session from file", e);
 			return null;
 		}
+	}
+
+	/**
+	 * Migrates old Session JSONs (using volatile Varbit/Negative pseudo-IDs)
+	 * to the new immutable Storage ID architecture.
+	 * Returns true if the session was modified and needs saving.
+	 */
+	private boolean migrateSessionData(Session session) {
+		if (session.getTrackedKills() == null || session.getTrackedKills().isEmpty()) {
+			return false;
+		}
+
+		boolean migrated = false;
+		Map<Integer, Count> newTrackedKills = new HashMap<>();
+
+		for (Map.Entry<Integer, Count> entry : session.getTrackedKills().entrySet()) {
+			int currentKey = entry.getKey();
+			Count count = entry.getValue();
+
+			// Find the matching TrackedActivity by its string name (which hasn't changed)
+			TrackedActivity matchedActivity = null;
+			for (TrackedActivity act : TrackedActivity.values()) {
+				if (act.getName().equals(count.getName())) {
+					matchedActivity = act;
+					break;
+				}
+			}
+
+			if (matchedActivity != null) {
+				int newStorageId = matchedActivity.getId();
+
+				// If the key doesn't match the new Storage ID, it is an old save file
+				if (currentKey != newStorageId) {
+					Count updatedCount = new Count(count.getName(), newStorageId);
+					updatedCount.setInitialKc(count.getInitialKc());
+					updatedCount.setSessionKc(count.getSessionKc());
+
+					newTrackedKills.put(newStorageId, updatedCount);
+					migrated = true;
+				} else {
+					// Already migrated, keep as is
+					newTrackedKills.put(currentKey, count);
+				}
+			} else {
+				// Orphaned activity (e.g. removed from the plugin entirely). Keep it just in case.
+				newTrackedKills.put(currentKey, count);
+			}
+		}
+
+		if (migrated) {
+			session.setTrackedKills(newTrackedKills);
+			log.info("Migrated session '{}' to new Storage ID architecture.", session.getId());
+		}
+
+		return migrated;
 	}
 
 	/**

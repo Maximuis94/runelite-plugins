@@ -27,6 +27,7 @@ package com.activitycounter.listeners;
 
 import com.activitycounter.ActivityCounterPlugin;
 import com.activitycounter.PluginConstants;
+import static com.activitycounter.PluginConstants.EQUIPPED_ITEM_CONTAINER_ID;
 import com.activitycounter.models.Count;
 import com.activitycounter.models.CrossbowBoltEffect;
 import com.activitycounter.models.Session;
@@ -46,7 +47,6 @@ import net.runelite.api.events.GraphicChanged;
 import net.runelite.api.events.ItemContainerChanged;
 import net.runelite.api.events.SoundEffectPlayed;
 import net.runelite.api.events.VarbitChanged;
-import net.runelite.api.gameval.InventoryID;
 import net.runelite.api.gameval.VarPlayerID;
 import net.runelite.api.gameval.VarbitID;
 import net.runelite.client.eventbus.Subscribe;
@@ -82,7 +82,6 @@ public class BoltProcListener
 	private boolean sawSpotAnimThisTick = false;
 	private boolean heardSoundThisTick = false;
 
-	private static final int EQUIPPED_ITEM_CONTAINER_ID = InventoryID.WORN;
 	private static final int CROSSBOW_WEAPON_CATEGORY = 5;
 	private static final int COMBAT_WEAPON_CATEGORY_VARBIT_ID = VarbitID.COMBAT_WEAPON_CATEGORY;
 	private static final int QUIVER_AMMO_TYPE_VARP_ID = VarPlayerID.DIZANAS_QUIVER_TEMP_AMMO;
@@ -110,7 +109,7 @@ public class BoltProcListener
 	@Subscribe
 	public void onItemContainerChanged(ItemContainerChanged event)
 	{
-		if (event.getContainerId() == EQUIPPED_ITEM_CONTAINER_ID)
+		if (event.getContainerId() == PluginConstants.EQUIPPED_ITEM_CONTAINER_ID)
 		{
 			Item ammoItem = event.getItemContainer().getItem(AMMO_EQUIPMENT_SLOT_IDX);
 			int ammoItemId = ammoItem != null ? ammoItem.getId() : -1;

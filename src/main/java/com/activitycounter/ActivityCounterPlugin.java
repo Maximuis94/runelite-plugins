@@ -285,18 +285,17 @@ public class ActivityCounterPlugin extends Plugin
 		});
 	}
 
-	public void closeSession()
-	{
-		if (currentSession != null)
-		{
-			currentSession.setInProgress(false);
-			currentSession.setEndTime(Instant.now());
-			storageManager.saveSession(currentSession);
-			log.debug("Session closed and archived.");
-			currentSession = null;
-
-			panel.reloadComboBox();
-		}
+	public void closeSession() {
+		clientThread.invokeLater(() -> {
+			if (currentSession != null) {
+				currentSession.setInProgress(false);
+				currentSession.setEndTime(Instant.now());
+				storageManager.saveSession(currentSession);
+				log.debug("Session closed and archived.");
+				currentSession = null;
+				panel.reloadComboBox();
+			}
+		});
 	}
 
 	public List<Session> getArchivedSessions()
@@ -662,5 +661,19 @@ public class ActivityCounterPlugin extends Plugin
 		else {
 			log.warn("Unable to unregister Bolt Proc Listener; it has not been registered");
 		}
+	}
+
+	/**
+	 * Increases the count of the specified counter by one and set a flag for an update/refresh
+	 */
+	public void increaseCountByOne(int activityId)
+	{
+		Session session = getCurrentSession();
+		if (session != null && session.isTracking(activityId)) {
+			Count kc = session.getKillCount(activityId);
+			kc.setSessionKc(kc.getSessionKc() + 1);
+			setRequiresSaveAndRefresh(true);
+		}
+
 	}
 }

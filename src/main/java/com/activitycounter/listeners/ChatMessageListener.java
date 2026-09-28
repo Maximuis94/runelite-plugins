@@ -54,6 +54,9 @@ public class ChatMessageListener {
 	private ActivityCounterPlugin plugin;
 
 	@Inject
+	private ChaosAltarPrayerListener chaosAltarPrayerListener;
+
+	@Inject
 	private Client client;
 
 	private int tickCountPestControlPoints = -1;
@@ -325,7 +328,7 @@ public class ChatMessageListener {
 	/**
 	 * Return the message without the styling tags like <></> and @mes_hl_red@.
 	 */
-	private static String preprocessMessage(String message) {
+	public static String preprocessMessage(String message) {
 		if (message == null) {
 			return null;
 		}

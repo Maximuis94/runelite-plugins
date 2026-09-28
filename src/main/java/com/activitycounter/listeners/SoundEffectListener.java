@@ -27,8 +27,6 @@ package com.activitycounter.listeners;
 
 import com.activitycounter.ActivityCounterPlugin;
 import com.activitycounter.PluginConstants;
-import com.activitycounter.models.Count;
-import com.activitycounter.models.Session;
 import com.activitycounter.models.TrackedActivity;
 import java.util.ArrayList;
 import java.util.List;
@@ -44,7 +42,8 @@ import net.runelite.api.gameval.VarPlayerID;
 import net.runelite.client.eventbus.Subscribe;
 
 /**
- * Listeners that count whenever a specific sound is played.
+ * Listeners that count whenever a specific sound is played. Aside from handling singular soundEffectListeners, it also
+ * manages the volume options and notifies other classes that rely on soundEffects accordingly, if need be.
  */
 @Slf4j
 @Singleton
@@ -55,6 +54,9 @@ public class SoundEffectListener
 
 	@Inject
 	private ActivityCounterPlugin plugin;
+
+	@Inject
+	private ChaosAltarPrayerListener chaosAltarPrayerListener;
 
 	@Getter
 	private boolean hasAnySound = false;
@@ -97,17 +99,6 @@ public class SoundEffectListener
 		}
 	}
 
-	private void increaseCountByOne(int activityId)
-	{
-		Session session = plugin.getCurrentSession();
-		if (session != null && session.isTracking(activityId)) {
-			Count kc = session.getKillCount(activityId);
-			kc.setSessionKc(kc.getSessionKc() + 1);
-			plugin.setRequiresSaveAndRefresh(true);
-		}
-
-	}
-
 	@Subscribe
 	public void onSoundEffectPlayed(SoundEffectPlayed event)
 	{
@@ -117,14 +108,15 @@ public class SoundEffectListener
 		TrackedActivity activity;
 		switch (soundId)
 		{
-			case PluginConstants.ActivityID.TELEPORT_TABLETS_USED:
+			case PluginConstants.SoundID.TELEPORT_TABLET:
 				activity = TrackedActivity.TELEPORT_TABLETS_USED;
-				increaseCountByOne(activity.getId());
+				plugin.increaseCountByOne(activity.getId());
 				break;
-			case 2522:
-			case 2524:
+
+			case PluginConstants.SoundID.SCYTHE_SLASH:
+			case PluginConstants.SoundID.SCYTHE_CRUSH:
 				activity = TrackedActivity.SCYTHE_SWIPE;
-				increaseCountByOne(activity.getId());
+				plugin.increaseCountByOne(activity.getId());
 				break;
 
 

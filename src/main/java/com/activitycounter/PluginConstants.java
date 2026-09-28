@@ -24,6 +24,7 @@
  */
 package com.activitycounter;
 
+import net.runelite.api.gameval.InventoryID;
 import net.runelite.api.gameval.VarPlayerID;
 import net.runelite.api.gameval.VarbitID;
 
@@ -40,6 +41,15 @@ public final class PluginConstants {
 	public static final int VARBIT_OFFSET = 100000;
 	public static final int SOUND_EFFECT_OFFSET = 200000;
 	public static final int SPOT_ANIM_OFFSET = 300000;
+
+	public static final int EQUIPPED_ITEM_CONTAINER_ID = InventoryID.WORN;
+	public static final int ALTAR_OFFER_SOUND_ID = 958;
+
+	public static final class SoundID {
+		public static final int TELEPORT_TABLET = 965;
+		public static final int SCYTHE_SLASH = 2522;
+		public static final int SCYTHE_CRUSH = 2524;
+	}
 
 
 	public static final class ActivityID {
@@ -271,16 +281,18 @@ public final class PluginConstants {
 		public static final int TITHE_FARM_POINTS = VarbitID.HOSIDIUS_TITHE_REWARDPOINTS;
 
 		public static final int GIANTS_FOUNDRY_POINTS = VarPlayerID.GIANTS_FOUNDRY_REWARD_SHOP_POINTS;
-
 		public static final int BA_ATTACKER_POINTS = VarbitID.BARBASSAULT_POINTS_ATTACKER_BASE;
-
 		public static final int BA_COLLECTOR_POINTS = VarbitID.BARBASSAULT_POINTS_COLLECTOR_BASE;
-
 		public static final int BA_DEFENDER_POINTS = VarbitID.BARBASSAULT_POINTS_DEFENDER_BASE;
-
 		public static final int BA_HEALER_POINTS = VarbitID.BARBASSAULT_POINTS_HEALER_BASE;
-
 		public static final int VARROCK_MUSEUM_KUDOS = VarbitID.VM_KUDOS;
+
+		// A pile of bones is sacrificed, but not really
+		public static final int SACRIFICES_SPARED = -7030;
+
+		// Aaand it's gone
+		public static final int SACRIFICES_MADE = -7031;
+		public static final int SACRIFICES_MADE_POH = -7032;
 
 		// Bolts
 		public static final int BOLT_OPAL = -7100;
@@ -293,6 +305,27 @@ public final class PluginConstants {
 		public static final int BOLT_DIAMOND = -7107;
 		public static final int BOLT_DRAGONSTONE = -7108;
 		public static final int BOLT_ONYX = -7109;
+
+		// --- SPELLS ---
+
+		// Regular spellbook
+		public static final int BOLT_GOLD = -7110;
+
+
+
+
+		// Ancient spellbook
+
+
+
+		// Lunar spellbook
+
+
+
+
+		// Arceeus spellbook
+
+
 
 		// Clue Scrolls
 		public static final int COMPLETED_BEGINNER_CLUE = VarPlayerID.COMPLETED_CLUES5;
