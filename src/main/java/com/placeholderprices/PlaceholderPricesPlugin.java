@@ -35,8 +35,8 @@ import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.overlay.OverlayManager;
 
 @PluginDescriptor(
-	name = "Bank Placeholder Prices",
-	description = "Adds GE and HA price tooltips to unowned bank placeholders",
+	name = "Placeholder Prices",
+	description = "Adds GE+HA price tooltips to unowned bank placeholders. Tooltips inherit styling from owned item tooltips.",
 	tags = {"bank", "placeholder", "price", "value", "tooltip", "ge", "grand exchange", "ha", "alchemy"}
 )
 public class PlaceholderPricesPlugin extends Plugin

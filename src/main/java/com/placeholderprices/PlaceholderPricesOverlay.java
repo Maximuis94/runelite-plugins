@@ -134,7 +134,7 @@ public class PlaceholderPricesOverlay extends Overlay
 
 		if (showGE)
 		{
-			int gePrice = itemManager.getItemPrice(realItemId);
+			long gePrice = itemManager.getItemPrice(realItemId);
 			if (gePrice > 0)
 			{
 				tooltipStr.append("</br>GE: ").append(ColorUtil.wrapWithColorTag(QuantityFormatter.quantityToStackSize(gePrice) + " gp", Color.LIGHT_GRAY));
