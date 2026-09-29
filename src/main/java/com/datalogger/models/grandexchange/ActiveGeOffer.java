@@ -41,15 +41,15 @@ public class ActiveGeOffer {
 
 	private int totalQuantity;
 	private int quantitySold;
-	private int offerPrice;
-	private int spent;
+	private long offerPrice;
+	private long spent;
 
 	/**
 	 * GP from incomplete buy offers that has not yet been spent
 	 */
-	public int getStuckGP() {
+	public long getStuckGP() {
 		if (isBuy && state != GrandExchangeOfferState.EMPTY) {
-			int totalReservedCash = totalQuantity * offerPrice;
+			long totalReservedCash = (long) totalQuantity * offerPrice;
 			return totalReservedCash - spent;
 		}
 		return 0;

@@ -192,10 +192,10 @@ public class EyeOfAyakParser extends AbstractItemChargeParser
 
 			if (exportType.getInputItem() != null)
 			{
-				for (Map.Entry<Integer, Integer> entry : exportType.getInputItem().entrySet())
+				for (Map.Entry<Integer, Long> entry : exportType.getInputItem().entrySet())
 				{
 					int inputItemId = entry.getKey();
-					int quantityPerBatch = entry.getValue();
+					long quantityPerBatch = entry.getValue();
 
 					long totalQty = (long) currentCharges * quantityPerBatch / exportType.getNCharges();
 

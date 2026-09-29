@@ -129,7 +129,7 @@ public class ColosseumTrialMigrationCsvV0V1 implements DataMigration {
 			String attemptAccount = resolveAccount(rawFileName);
 			String attemptId = resolveAttemptId(attemptAccount, attemptTimestamp, rawFileName);
 
-			Map<Integer, Integer> priceMap = preWarmPriceCache(lines, headerMap);
+			Map<Integer, Long> priceMap = preWarmPriceCache(lines, headerMap);
 
 			Map<String, ValuedItemStack> totalRewardsLedger = new LinkedHashMap<>();
 			Map<String, String> activeModsMap = new LinkedHashMap<>();
@@ -171,17 +171,17 @@ public class ColosseumTrialMigrationCsvV0V1 implements DataMigration {
 				}
 
 				ItemBundle rngLoot = extractRngItemBundle(getCol);
-				int waveRngGp = 0;
+				long waveRngGp = 0L;
 
 				if (rngLoot != null) {
-					int itemGp = rngLoot.getQuantity() * priceMap.getOrDefault(rngLoot.getItemId(), 0);
+					long itemGp = rngLoot.getQuantity() * priceMap.getOrDefault(rngLoot.getItemId(), 0L);
 					recordReward(totalRewardsLedger, rngLoot, itemGp);
 					waveRngGp = itemGp;
 				}
 
 				if (waveNum == 12) {
 					ItemBundle quiver = config.logQuiverAsSplinters() ? DIZANAS_QUIVER_SWAPPED_REWARD : DIZANAS_QUIVER_REWARD;
-					int quiverGp = quiver.getQuantity() * priceMap.getOrDefault(quiver.getItemId(), 0);
+					long quiverGp = quiver.getQuantity() * priceMap.getOrDefault(quiver.getItemId(), 0L);
 					recordReward(totalRewardsLedger, quiver, quiverGp);
 				}
 
@@ -234,7 +234,7 @@ public class ColosseumTrialMigrationCsvV0V1 implements DataMigration {
 				v1Waves.add(waveDto);
 			}
 
-			int grandTotalGp = totalRewardsLedger.values().stream().mapToInt(ValuedItemStack::getTotalValueInGp).sum();
+			long grandTotalGp = totalRewardsLedger.values().stream().mapToLong(ValuedItemStack::getTotalValueInGp).sum();
 			int grandTotalGlory = v1Waves.isEmpty() ? 0 : v1Waves.get(v1Waves.size() - 1).getTotalGlory();
 			double grandTotalDuration = v1Waves.isEmpty() ? 0.0 : v1Waves.get(v1Waves.size() - 1).getTotalTimeTaken();
 
@@ -284,7 +284,7 @@ public class ColosseumTrialMigrationCsvV0V1 implements DataMigration {
 		} catch (NumberFormatException ignored) { return null; }
 	}
 
-	private void recordReward(Map<String, ValuedItemStack> ledger, ItemBundle bundle, int calculatedGp) {
+	private void recordReward(Map<String, ValuedItemStack> ledger, ItemBundle bundle, long calculatedGp) {
 		ValuedItemStack existing = ledger.getOrDefault(bundle.getItemName(), new ValuedItemStack(0, 0));
 		ledger.put(bundle.getItemName(), new ValuedItemStack(
 			existing.getCount() + bundle.getQuantity(),
@@ -292,7 +292,7 @@ public class ColosseumTrialMigrationCsvV0V1 implements DataMigration {
 		));
 	}
 
-	private Map<Integer, Integer> preWarmPriceCache(List<String> lines, Map<String, Integer> headerMap) {
+	private Map<Integer, Long> preWarmPriceCache(List<String> lines, Map<String, Integer> headerMap) {
 		Set<Integer> uniqueIds = new HashSet<>();
 		uniqueIds.add(DIZANAS_QUIVER_REWARD.getItemId());
 		uniqueIds.add(DIZANAS_QUIVER_SWAPPED_REWARD.getItemId());
@@ -312,7 +312,7 @@ public class ColosseumTrialMigrationCsvV0V1 implements DataMigration {
 			}
 		}
 
-		Map<Integer, Integer> prices = new HashMap<>();
+		Map<Integer, Long> prices = new HashMap<>();
 		CompletableFuture<Void> sync = new CompletableFuture<>();
 		clientThread.invoke(() -> {
 			uniqueIds.forEach(id -> prices.put(id, itemManager.getItemPrice(id)));

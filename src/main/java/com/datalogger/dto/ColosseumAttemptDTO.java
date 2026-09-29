@@ -47,7 +47,7 @@ public class ColosseumAttemptDTO {
 	private String accountName;
 	@NonNull
 	private String result;
-	private int rewardsValue;
+	private long rewardsValue;
 
 	@Builder.Default
 	private String gameMode = DEFAULT_GAMEMODE_DTO;

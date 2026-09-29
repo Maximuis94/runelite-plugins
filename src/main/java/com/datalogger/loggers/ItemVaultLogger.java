@@ -26,8 +26,8 @@
 package com.datalogger.loggers;
 
 import com.datalogger.DataLoggerConfig;
-import static com.datalogger.constants.PluginConstants.ITEM_VAULT_DIR;
 import static com.datalogger.constants.PluginConstants.INTERNAL_VAULT_DIR;
+import static com.datalogger.constants.PluginConstants.ITEM_VAULT_DIR;
 import com.datalogger.events.DataLoggerConfigChanged;
 import com.datalogger.framework.AbstractLogger;
 import com.datalogger.framework.LogType;
@@ -287,8 +287,8 @@ public class ItemVaultLogger extends AbstractLogger
 					int id = entry.getKey();
 					long totalQty = entry.getValue();
 					String name = itemManager.getItemComposition(id).getMembersName();
-					int gePrice = itemManager.getItemPrice(id);
-					int price = gePrice > 0 ? gePrice : itemManager.getItemComposition(id).getHaPrice();
+					long gePrice = itemManager.getItemPrice(id);
+					long price = gePrice > 0 ? gePrice : itemManager.getItemComposition(id).getHaPrice();
 
 					if (price > 0) {
 						mergedItemCounts.add(new ValuedItemBundle(id, name, totalQty, price));

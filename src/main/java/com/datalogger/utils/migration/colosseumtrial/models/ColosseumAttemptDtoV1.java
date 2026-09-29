@@ -47,12 +47,12 @@ public class ColosseumAttemptDtoV1 {
 	private String gameMode;
 	@NonNull
 	private String result;
-	private int rewardsValue;
+	private long rewardsValue;
 
 	@Builder.Default
 	private Map<String, ValuedItemStack> rewards = new LinkedHashMap<>();
 
-	private int consumedSupplyValue;
+	private long consumedSupplyValue;
 	private TrackedSuppliesDTO consumedSupplies;
 	private int totalGlory;
 	private double totalTime;

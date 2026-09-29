@@ -34,5 +34,5 @@ import lombok.Value;
 public class ValuedItemStack
 {
 	int count;
-	int totalValueInGp;
+	long totalValueInGp;
 }

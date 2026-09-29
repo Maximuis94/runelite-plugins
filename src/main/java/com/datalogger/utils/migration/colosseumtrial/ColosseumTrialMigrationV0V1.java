@@ -131,7 +131,7 @@ public class ColosseumTrialMigrationV0V1 implements DataMigration {
 		String attemptId = resolveAttemptId(accountName, timestamp, sourceName);
 		String globalTag = v0.getTag() != null ? v0.getTag() : "";
 
-		Map<Integer, Integer> priceMap = getBatchPrices(v0);
+		Map<Integer, Long> priceMap = getBatchPrices(v0);
 
 		Map<String, ValuedItemStack> totalRewards = new LinkedHashMap<>();
 		Map<String, String> activeModifiers = new LinkedHashMap<>();
@@ -148,7 +148,7 @@ public class ColosseumTrialMigrationV0V1 implements DataMigration {
 				}
 
 				ItemBundle rngLootToLog = null;
-				int waveRngGp = 0;
+				long waveRngGp = 0L;
 
 				List<ItemBundle> lootList = w0.getEarnedLoot();
 				if (lootList != null && !lootList.isEmpty()) {
@@ -166,14 +166,14 @@ public class ColosseumTrialMigrationV0V1 implements DataMigration {
 					recordReward(totalRewards, rngLootToLog, priceMap);
 
 					// RULE: Wave GP value is strictly the RNG drop's GP value
-					waveRngGp = rngLootToLog.getQuantity() * priceMap.getOrDefault(rngLootToLog.getItemId(), 0);
+					waveRngGp = rngLootToLog.getQuantity() * priceMap.getOrDefault(rngLootToLog.getItemId(), 0L);
 				}
 
 				v1Waves.add(convertWave(w0, new ArrayList<>(activeModifiers.values()), rngLootToLog, waveRngGp, waveTag));
 			}
 		}
 
-		int grandTotalGp = totalRewards.values().stream().mapToInt(ValuedItemStack::getTotalValueInGp).sum();
+		long grandTotalGp = totalRewards.values().stream().mapToLong(ValuedItemStack::getTotalValueInGp).sum();
 		double totalDuration = v1Waves.isEmpty() ? 0.0 : v1Waves.get(v1Waves.size() - 1).getTotalTimeTaken();
 
 		return ColosseumAttemptDtoV1.builder()
@@ -194,7 +194,7 @@ public class ColosseumTrialMigrationV0V1 implements DataMigration {
 			.build();
 	}
 
-	private ColosseumWaveDtoV1 convertWave(ColosseumWaveDtoV0 w0, List<String> currentMods, ItemBundle loot, int lootGp, String tag) {
+	private ColosseumWaveDtoV1 convertWave(ColosseumWaveDtoV0 w0, List<String> currentMods, ItemBundle loot, long lootGp, String tag) {
 		boolean canHaveManticore = w0.getWave() >= 4;
 
 		return ColosseumWaveDtoV1.builder()
@@ -242,9 +242,9 @@ public class ColosseumTrialMigrationV0V1 implements DataMigration {
 			.build();
 	}
 
-	private void recordReward(Map<String, ValuedItemStack> ledger, ItemBundle bundle, Map<Integer, Integer> prices) {
+	private void recordReward(Map<String, ValuedItemStack> ledger, ItemBundle bundle, Map<Integer, Long> prices) {
 		if (bundle == null) return;
-		int addGp = prices.getOrDefault(bundle.getItemId(), 0) * bundle.getQuantity();
+		long addGp = prices.getOrDefault(bundle.getItemId(), 0L) * bundle.getQuantity();
 
 		ValuedItemStack existing = ledger.getOrDefault(bundle.getItemName(), new ValuedItemStack(0, 0));
 		ledger.put(bundle.getItemName(), new ValuedItemStack(
@@ -253,7 +253,7 @@ public class ColosseumTrialMigrationV0V1 implements DataMigration {
 		));
 	}
 
-	private Map<Integer, Integer> getBatchPrices(ColosseumAttemptDtoV0 v0) {
+	private Map<Integer, Long> getBatchPrices(ColosseumAttemptDtoV0 v0) {
 		Set<Integer> uniqueIds = new HashSet<>();
 		uniqueIds.add(DIZANAS_QUIVER_REWARD.getItemId());
 		uniqueIds.add(DIZANAS_QUIVER_SWAPPED_REWARD.getItemId());
@@ -265,7 +265,7 @@ public class ColosseumTrialMigrationV0V1 implements DataMigration {
 				.forEach(b -> uniqueIds.add(b.getItemId()));
 		}
 
-		Map<Integer, Integer> prices = new HashMap<>();
+		Map<Integer, Long> prices = new HashMap<>();
 		CompletableFuture<Void> sync = new CompletableFuture<>();
 		clientThread.invoke(() -> {
 			uniqueIds.forEach(id -> prices.put(id, itemManager.getItemPrice(id)));

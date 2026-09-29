@@ -39,36 +39,36 @@ import net.runelite.client.game.ItemVariationMapping;
 
 public enum ItemCharge
 {
-	SCYTHE_OF_VITUR(ItemID.SCYTHE_OF_VITUR, 100, Map.of(ItemID.VIAL_BLOOD, 1, ItemID.BLOODRUNE, 200), null),
-	TUMEKENS_SHADOW(ItemID.TUMEKENS_SHADOW, 1, Map.of(ItemID.SOULRUNE, 2, ItemID.CHAOSRUNE, 5), null),
-	SANGUINESTI_STAFF(ItemID.SANGUINESTI_STAFF, 1, Map.of(ItemID.BLOODRUNE, 3), null),
-	AMULET_OF_BLOOD_FURY(ItemID.BLOOD_AMULET, 10000, Map.of(ItemID.BLOOD_SHARD, 1), Map.of()),
-	TOXIC_BLOWPIPE(ItemID.TOXIC_BLOWPIPE_LOADED, 1, Map.of(ItemID.SNAKEBOSS_SCALE, 1), null),
-	SERPENTINE_HELMET(ItemID.SERPENTINE_HELM_CHARGED, 1, Map.of(ItemID.SNAKEBOSS_SCALE, 1), null),
-	TOXIC_STAFF_OF_THE_DEAD(ItemID.TOXIC_SOTD_CHARGED, 1, Map.of(ItemID.SNAKEBOSS_SCALE, 1), null),
-	TOXIC_TRIDENT(ItemID.TOXIC_TOTS_CHARGED, 1, Map.of(ItemID.DEATHRUNE, 1, ItemID.CHAOSRUNE, 1, ItemID.FIRERUNE, 5, ItemID.SNAKEBOSS_SCALE, 1), null),
-	TOXIC_TRIDENT_E(ItemID.TOXIC_TOTS_I_CHARGED, 1, Map.of(ItemID.DEATHRUNE, 1, ItemID.CHAOSRUNE, 1, ItemID.FIRERUNE, 5, ItemID.SNAKEBOSS_SCALE, 1), null),
-	TRIDENT_OF_THE_SEAS(ItemID.TOTS, 1, Map.of(ItemID.DEATHRUNE, 1, ItemID.CHAOSRUNE, 1, ItemID.FIRERUNE, 5, ItemID.COINS, 10), Map.of(ItemID.DEATHRUNE, 1, ItemID.CHAOSRUNE, 1, ItemID.FIRERUNE, 5)),
-	TRIDENT_OF_THE_SEAS_E(ItemID.TOTS_I_CHARGED, 1, Map.of(ItemID.DEATHRUNE, 1, ItemID.CHAOSRUNE, 1, ItemID.FIRERUNE, 5, ItemID.COINS, 10), Map.of(ItemID.DEATHRUNE, 1, ItemID.CHAOSRUNE, 1, ItemID.FIRERUNE, 5)),
-	VENATOR_BOW(ItemID.VENATOR_BOW, 1, Map.of(ItemID.ANCIENT_ESSENCE, 1), null),
-	TONALZTICS_OF_RALOS(ItemID.TONALZTICS_OF_RALOS_CHARGED, 1, Map.of(ItemID.SUNFIRESPLINTER, 1), null),
-	WARPED_SCEPTRE(ItemID.WARPED_SCEPTRE, 1, Map.of(ItemID.CHAOSRUNE, 2, ItemID.EARTHRUNE, 5), null),
-	VIGGORAS_CHAINMACE(ItemID.WILD_CAVE_CHAINMACE_CHARGED, 1, Map.of(ItemID.WILD_CAVE_SHARD, 1), null),
-	URSINE_CHAINMACE(ItemID.WILD_CAVE_URSINE_CHARGED, 1, Map.of(ItemID.WILD_CAVE_SHARD, 1), null),
-	CRAWS_BOW(ItemID.WILD_CAVE_BOW_CHARGED, 1, Map.of(ItemID.WILD_CAVE_SHARD, 1), null),
-	WEBWEAVER_BOW(ItemID.WILD_CAVE_WEBWEAVER_CHARGED, 1, Map.of(ItemID.WILD_CAVE_SHARD, 1), null),
-	THAMMARONS_SCEPTRE(ItemID.WILD_CAVE_SCEPTRE_CHARGED, 1, Map.of(ItemID.WILD_CAVE_SHARD, 1), null),
-	ACCURSED_SCEPTRE(ItemID.WILD_CAVE_ACCURSED_CHARGED, 1, Map.of(ItemID.WILD_CAVE_SHARD, 1), null),
-	BRACELET_OF_ETHEREUM(ItemID.WILD_CAVE_BRACELET_CHARGED, 1, Map.of(ItemID.WILD_CAVE_SHARD, 1), null),
-	TOME_OF_FIRE(ItemID.TOME_OF_FIRE, 20, Map.of(ItemID.WINT_BURNT_PAGE, 1), null),
-	TOME_OF_EARTH(ItemID.TOME_OF_EARTH, 20, Map.of(ItemID.SOILED_PAGE, 1), null),
-	TOME_OF_WATER(ItemID.TOME_OF_WATER, 20, Map.of(ItemID.SOAKED_PAGE, 1), null),
+	SCYTHE_OF_VITUR(ItemID.SCYTHE_OF_VITUR, 100, Map.of(ItemID.VIAL_BLOOD, 1L, ItemID.BLOODRUNE, 200L), null),
+	TUMEKENS_SHADOW(ItemID.TUMEKENS_SHADOW, 1, Map.of(ItemID.SOULRUNE, 2L, ItemID.CHAOSRUNE, 5L), null),
+	SANGUINESTI_STAFF(ItemID.SANGUINESTI_STAFF, 1, Map.of(ItemID.BLOODRUNE, 3L), null),
+	AMULET_OF_BLOOD_FURY(ItemID.BLOOD_AMULET, 10000, Map.of(ItemID.BLOOD_SHARD, 1L), Map.of()),
+	TOXIC_BLOWPIPE(ItemID.TOXIC_BLOWPIPE_LOADED, 1, Map.of(ItemID.SNAKEBOSS_SCALE, 1L), null),
+	SERPENTINE_HELMET(ItemID.SERPENTINE_HELM_CHARGED, 1, Map.of(ItemID.SNAKEBOSS_SCALE, 1L), null),
+	TOXIC_STAFF_OF_THE_DEAD(ItemID.TOXIC_SOTD_CHARGED, 1, Map.of(ItemID.SNAKEBOSS_SCALE, 1L), null),
+	TOXIC_TRIDENT(ItemID.TOXIC_TOTS_CHARGED, 1, Map.of(ItemID.DEATHRUNE, 1L, ItemID.CHAOSRUNE, 1L, ItemID.FIRERUNE, 5L, ItemID.SNAKEBOSS_SCALE, 1L), null),
+	TOXIC_TRIDENT_E(ItemID.TOXIC_TOTS_I_CHARGED, 1, Map.of(ItemID.DEATHRUNE, 1L, ItemID.CHAOSRUNE, 1L, ItemID.FIRERUNE, 5L, ItemID.SNAKEBOSS_SCALE, 1L), null),
+	TRIDENT_OF_THE_SEAS(ItemID.TOTS, 1, Map.of(ItemID.DEATHRUNE, 1L, ItemID.CHAOSRUNE, 1L, ItemID.FIRERUNE, 5L, ItemID.COINS, 10L), Map.of(ItemID.DEATHRUNE, 1L, ItemID.CHAOSRUNE, 1L, ItemID.FIRERUNE, 5L)),
+	TRIDENT_OF_THE_SEAS_E(ItemID.TOTS_I_CHARGED, 1, Map.of(ItemID.DEATHRUNE, 1L, ItemID.CHAOSRUNE, 1L, ItemID.FIRERUNE, 5L, ItemID.COINS, 10L), Map.of(ItemID.DEATHRUNE, 1L, ItemID.CHAOSRUNE, 1L, ItemID.FIRERUNE, 5L)),
+	VENATOR_BOW(ItemID.VENATOR_BOW, 1, Map.of(ItemID.ANCIENT_ESSENCE, 1L), null),
+	TONALZTICS_OF_RALOS(ItemID.TONALZTICS_OF_RALOS_CHARGED, 1, Map.of(ItemID.SUNFIRESPLINTER, 1L), null),
+	WARPED_SCEPTRE(ItemID.WARPED_SCEPTRE, 1, Map.of(ItemID.CHAOSRUNE, 2L, ItemID.EARTHRUNE, 5L), null),
+	VIGGORAS_CHAINMACE(ItemID.WILD_CAVE_CHAINMACE_CHARGED, 1, Map.of(ItemID.WILD_CAVE_SHARD, 1L), null),
+	URSINE_CHAINMACE(ItemID.WILD_CAVE_URSINE_CHARGED, 1, Map.of(ItemID.WILD_CAVE_SHARD, 1L), null),
+	CRAWS_BOW(ItemID.WILD_CAVE_BOW_CHARGED, 1, Map.of(ItemID.WILD_CAVE_SHARD, 1L), null),
+	WEBWEAVER_BOW(ItemID.WILD_CAVE_WEBWEAVER_CHARGED, 1, Map.of(ItemID.WILD_CAVE_SHARD, 1L), null),
+	THAMMARONS_SCEPTRE(ItemID.WILD_CAVE_SCEPTRE_CHARGED, 1, Map.of(ItemID.WILD_CAVE_SHARD, 1L), null),
+	ACCURSED_SCEPTRE(ItemID.WILD_CAVE_ACCURSED_CHARGED, 1, Map.of(ItemID.WILD_CAVE_SHARD, 1L), null),
+	BRACELET_OF_ETHEREUM(ItemID.WILD_CAVE_BRACELET_CHARGED, 1, Map.of(ItemID.WILD_CAVE_SHARD, 1L), null),
+	TOME_OF_FIRE(ItemID.TOME_OF_FIRE, 20, Map.of(ItemID.WINT_BURNT_PAGE, 1L), null),
+	TOME_OF_EARTH(ItemID.TOME_OF_EARTH, 20, Map.of(ItemID.SOILED_PAGE, 1L), null),
+	TOME_OF_WATER(ItemID.TOME_OF_WATER, 20, Map.of(ItemID.SOAKED_PAGE, 1L), null),
 
-	EYE_OF_AYAK(ItemID.EYE_OF_AYAK, 1, Map.of(ItemID.DEMON_TEAR, 1), null),
+	EYE_OF_AYAK(ItemID.EYE_OF_AYAK, 1, Map.of(ItemID.DEMON_TEAR, 1L), null),
 
 	// NB TEARS and RUNES variant are used by ItemChargesParser
-	EYE_OF_AYAK_TEARS(IGNORED_ENUM_ID, 1, Map.of(ItemID.DEMON_TEAR, 1), null),
-	EYE_OF_AYAK_RUNES(IGNORED_ENUM_ID, 1, Map.of(ItemID.CHAOSRUNE, 1, ItemID.DEATHRUNE, 2), null);
+	EYE_OF_AYAK_TEARS(IGNORED_ENUM_ID, 1, Map.of(ItemID.DEMON_TEAR, 1L), null),
+	EYE_OF_AYAK_RUNES(IGNORED_ENUM_ID, 1, Map.of(ItemID.CHAOSRUNE, 1L, ItemID.DEATHRUNE, 2L), null);
 
 	@Getter
 	private final int baseId;
@@ -77,12 +77,12 @@ public enum ItemCharge
 	@Getter
 	private final int nCharges;
 	@Getter
-	private final Map<Integer, Integer> inputItem;
+	private final Map<Integer, Long> inputItem;
 	@Getter
-	private final Map<Integer, Integer> outputItem;
+	private final Map<Integer, Long> outputItem;
 
-	private Integer chargeValue = null;
-	private Integer unchargeValue = null;
+	private Long chargeValue = null;
+	private Long unchargeValue = null;
 	private Instant cacheUpdateTime = null;
 
 	private static final Map<Integer, ItemCharge> BY_BASE_ID = Arrays.stream(values())
@@ -102,7 +102,7 @@ public enum ItemCharge
 		ItemCharge.itemManager = itemManager;
 	}
 
-	ItemCharge(int baseId, int nCharges, Map<Integer, Integer> inputItem, Map<Integer, Integer> outputItem)
+	ItemCharge(int baseId, int nCharges, Map<Integer, Long> inputItem, Map<Integer, Long> outputItem)
 	{
 		this.baseId = baseId;
 		this.nCharges = nCharges;
@@ -114,7 +114,7 @@ public enum ItemCharge
 	/**
 	 * Compute the value per charge, cache it and return it. Or return the cached value, if it is still viable.
 	 */
-	public int getChargeValue()
+	public long getChargeValue()
 	{
 		if (itemManager == null)
 		{
@@ -133,7 +133,7 @@ public enum ItemCharge
 	/**
 	 * Compute the value per returned charge, cache it and return it. Or return the cached value, if it is still viable.
 	 */
-	public int getUnchargeValue()
+	public long getUnchargeValue()
 	{
 		if (itemManager == null)
 		{
@@ -157,16 +157,16 @@ public enum ItemCharge
 	/**
 	 * Compute the value of the items and quantities in the given mapping
 	 */
-	private int computeValue(Map<Integer, Integer> items)
+	private long computeValue(Map<Integer, Long> items)
 	{
-		int totalCost = 0;
+		long totalCost = 0;
 
-		for (Map.Entry<Integer, Integer> entry : items.entrySet())
+		for (Map.Entry<Integer, Long> entry : items.entrySet())
 		{
 			int itemId = entry.getKey();
-			int quantityRequired = entry.getValue();
+			long quantityRequired = entry.getValue();
 
-			int gePrice = itemId != ItemID.COINS ? itemManager.getItemPrice(itemId) : 1;
+			long gePrice = itemId != ItemID.COINS ? itemManager.getItemPrice(itemId) : 1;
 
 			totalCost += (gePrice * quantityRequired);
 		}

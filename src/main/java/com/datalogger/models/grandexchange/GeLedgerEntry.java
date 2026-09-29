@@ -43,8 +43,8 @@ public class GeLedgerEntry {
 
 	private boolean isBuy;
 	private int quantity;
-	private int price;
-	private int value;
+	private long price;
+	private long value;
 	private int tax;
 
 	private String accountName;
@@ -59,5 +59,5 @@ public class GeLedgerEntry {
 	private long parseTime;
 
 	private int originalOfferQuantity;
-	private int originalOfferPrice;
+	private long originalOfferPrice;
 }

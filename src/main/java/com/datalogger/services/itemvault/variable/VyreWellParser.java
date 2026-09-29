@@ -64,10 +64,10 @@ public class VyreWellParser extends AbstractVariableVaultParser
 		if (varbitValue <= 0) return items;
 
 		log.debug("Vyre well varbit value is {}", varbitValue);
-		for (Map.Entry<Integer, Integer> entry : vyreWellCharge.getInputItem().entrySet())
+		for (Map.Entry<Integer, Long> entry : vyreWellCharge.getInputItem().entrySet())
 		{
 			int itemId = entry.getKey();
-			int quantityPerBatch = entry.getValue();
+			long quantityPerBatch = entry.getValue();
 
 			long totalQuantity = (long) varbitValue * quantityPerBatch;
 

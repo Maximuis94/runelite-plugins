@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.3
+2026-09-29
+
+### Summary
+- Updated several int to long in anticipation of the GE update 30th of September
+
 ## 1.2.2
 2026-09-10
 

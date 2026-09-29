@@ -127,9 +127,9 @@ public enum ConsumableItemGroup
 	private final String baseItemName;
 	private final int[] itemIds;
 	private final int referenceItemId;
-	private final int maxDoses;
+	private final long maxDoses;
 
-	private Integer doseValue = null;
+	private Long doseValue = null;
 	private Instant cacheUpdateTime = null;
 
 	private static final Map<Integer, ConsumableItemGroup> ITEM_TO_GROUP = new HashMap<>();
@@ -216,7 +216,7 @@ public enum ConsumableItemGroup
 	/**
 	 * Compute the value per dose, cache it and return it. Or return the cached value, if it is still viable.
 	 */
-	public int getDoseValue()
+	public long getDoseValue()
 	{
 		if (itemManager == null) return 0;
 
@@ -226,7 +226,7 @@ public enum ConsumableItemGroup
 			return doseValue;
 		}
 
-		int price = itemManager.getItemPrice(referenceItemId);
+		long price = itemManager.getItemPrice(referenceItemId);
 		if (price > 0)
 			doseValue = price / maxDoses;
 		else {

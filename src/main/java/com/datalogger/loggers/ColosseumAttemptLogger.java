@@ -524,16 +524,16 @@ public class ColosseumAttemptLogger extends AbstractLogger
 	 */
 	private void preprocessAttemptRewards()
 	{
-		int[] totalValue = {0};
+		long[] totalValue = {0};
 
 		Map<Integer, Integer> rewards = currentAttempt.getRewards();
 		Map<String, ValuedItemStack> namedRewards = new HashMap<>();
 		if (rewards != null) {
 			rewards.keySet().forEach(itemId -> {
 				ItemComposition comp = itemManager.getItemComposition(itemId);
-				int price = itemManager.getItemPrice(itemId);
+				long price = itemManager.getItemPrice(itemId);
 				int qty = rewards.getOrDefault(itemId, 0);
-				int value = price * qty;
+				long value = price * qty;
 
 				totalValue[0] += value;
 				namedRewards.put(comp.getName(), new ValuedItemStack(qty, value));
@@ -700,10 +700,10 @@ public class ColosseumAttemptLogger extends AbstractLogger
 	 */
 	private ColosseumWave.ColosseumWaveBuilder buildBaseWave() {
 		ItemBundle potentialLoot = getPotentialLoot();
-		int value;
+		long value;
 		if (potentialLoot != null) {
 			int itemId = potentialLoot.getItemId();
-			int price = itemManager.getItemPrice(itemId);
+			long price = itemManager.getItemPrice(itemId);
 			value = price * potentialLoot.getQuantity();
 
 		}

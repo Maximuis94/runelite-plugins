@@ -32,7 +32,6 @@ import com.datalogger.models.enums.ColosseumModifier;
 import static com.datalogger.ui.utils.Components.createStyledButton;
 import static com.datalogger.ui.utils.Components.wrapWithRuneLiteScrollbar;
 import static com.datalogger.ui.utils.Util.copyDirectoryToClipboard;
-import static com.datalogger.ui.utils.Util.copyDirectoryToClipboard;
 import com.google.gson.Gson;
 import java.awt.BorderLayout;
 import java.awt.Color;
@@ -217,7 +216,7 @@ public class ColosseumReviewModePanel extends JPanel
 				comp = Comparator.comparingInt(ColosseumAttemptDTO::getTotalGlory);
 				break;
 			case REWARD:
-				comp = Comparator.comparingInt(ColosseumAttemptDTO::getRewardsValue);
+				comp = Comparator.comparingLong(ColosseumAttemptDTO::getRewardsValue);
 				break;
 			case SUPPLIES:
 				comp = Comparator.comparingInt(ColosseumAttemptDTO::getConsumedSupplyValue);
@@ -341,7 +340,7 @@ public class ColosseumReviewModePanel extends JPanel
 		wavesLabel.setForeground(Color.WHITE);
 
 
-		int rewardValue = attempt.getRewardsValue();
+		long rewardValue = attempt.getRewardsValue();
 		JLabel rewardsLabel = new JLabel(String.format("Reward value: %s", QuantityFormatter.quantityToStackSize(rewardValue)));
 		rewardsLabel.setForeground(Color.WHITE);
 

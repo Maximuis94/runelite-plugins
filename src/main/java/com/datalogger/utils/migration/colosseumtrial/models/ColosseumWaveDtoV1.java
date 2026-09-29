@@ -44,7 +44,7 @@ public class ColosseumWaveDtoV1
 	private String gameMode;
 
 	private ItemBundle earnedLoot;
-	private int lootValue;
+	private long lootValue;
 
 	private List<String> modifierChoices;
 	private String chosenModifier;

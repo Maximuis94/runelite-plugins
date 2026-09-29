@@ -104,7 +104,7 @@ public class ItemsModePanel extends JPanel
 	// Global Cache
 	private final List<VaultRecord> rawVaultData = new ArrayList<>();
 	private final Map<Integer, String> itemNameCache = new HashMap<>();
-	private final Map<Integer, Integer> itemPriceCache = new HashMap<>();
+	private final Map<Integer, Long> itemPriceCache = new HashMap<>();
 
 	private ItemTable itemTableWrapper;
 	private JScrollBar scrollBar = null;
@@ -306,7 +306,7 @@ public class ItemsModePanel extends JPanel
 						itemPriceCache.put(id, itemManager.getItemPrice(id));
 					} catch (Exception ignored) {
 						itemNameCache.put(id, "Unknown Item");
-						itemPriceCache.put(id, 0);
+						itemPriceCache.put(id, 0L);
 					}
 				}
 
@@ -506,7 +506,7 @@ public class ItemsModePanel extends JPanel
 
 		for (VaultRecord record : rawVaultData)
 		{
-			int price = itemPriceCache.getOrDefault(record.itemId, 0);
+			long price = itemPriceCache.getOrDefault(record.itemId, 0L);
 			if (hideZeroPriceItems && price <= 0) {
 				continue;
 			}
@@ -638,14 +638,14 @@ public class ItemsModePanel extends JPanel
 	{
 		private final int itemId;
 		private final String name;
-		private final int gePrice;
+		private final long gePrice;
 		private long quantity = 0;
 		private long stackValue = 0;
 
 		private final Set<String> accounts = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
 		private final Set<String> sources = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
 
-		public ItemStat(int itemId, String name, int gePrice) {
+		public ItemStat(int itemId, String name, long gePrice) {
 			this.itemId = itemId;
 			this.name = name;
 			this.gePrice = gePrice;

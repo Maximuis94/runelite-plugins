@@ -34,7 +34,6 @@ import com.datalogger.models.enums.UIScrollSpeed;
 import com.datalogger.models.itemvault.ItemBundle;
 import com.datalogger.ui.utils.Components;
 import static com.datalogger.ui.utils.Util.copyDirectoryToClipboard;
-import static com.datalogger.ui.utils.Util.copyDirectoryToClipboard;
 import com.datalogger.ui.utils.table.ColosseumModifierTable;
 import com.google.gson.Gson;
 import java.awt.BorderLayout;
@@ -579,8 +578,8 @@ public class ColosseumStatisticsModePanel extends JPanel
 					ItemBundle bundle = stats.getRewardBundles().get(entry.getKey());
 					int frequency = entry.getValue();
 
-					int price = itemManager.getItemPrice(bundle.getItemId());
-					totalValue += (long) price * bundle.getQuantity() * frequency;
+					long price = itemManager.getItemPrice(bundle.getItemId());
+					totalValue += price * bundle.getQuantity() * frequency;
 				}
 				stats.setTotalGpValue(totalValue);
 				this.currentStats = stats;
@@ -933,7 +932,7 @@ public class ColosseumStatisticsModePanel extends JPanel
 					comp = Comparator.comparingInt(ColosseumAttemptDTO::getTotalGlory);
 					break;
 				case REWARD:
-					comp = Comparator.comparingInt(ColosseumAttemptDTO::getRewardsValue);
+					comp = Comparator.comparingLong(ColosseumAttemptDTO::getRewardsValue);
 					break;
 				case SUPPLIES:
 					comp = Comparator.comparingInt(ColosseumAttemptDTO::getConsumedSupplyValue);
@@ -1212,7 +1211,7 @@ public class ColosseumStatisticsModePanel extends JPanel
 		JLabel wavesLabel = new JLabel(String.format("Waves: %s | Status: %s", waves, status));
 		wavesLabel.setForeground(Color.WHITE);
 
-		int rewardValue = attempt.getRewardsValue();
+		long rewardValue = attempt.getRewardsValue();
 		JLabel rewardsLabel = new JLabel(String.format("Reward value: %s", QuantityFormatter.quantityToStackSize(rewardValue)));
 		rewardsLabel.setForeground(Color.WHITE);
 
@@ -1484,6 +1483,11 @@ public class ColosseumStatisticsModePanel extends JPanel
 		return QuantityFormatter.quantityToStackSize(gp) + " gp";
 	}
 
+	private static String formatGp(long gp)
+	{
+		return QuantityFormatter.quantityToStackSize(gp) + " gp";
+	}
+
 	@Getter
 	public static class WaveStat
 	{
@@ -1498,7 +1502,7 @@ public class ColosseumStatisticsModePanel extends JPanel
 		private final List<Integer> modifierGlory = new ArrayList<>();
 		private final List<Integer> totalGlory = new ArrayList<>();
 		private final List<Integer> waveGlory = new ArrayList<>();
-		private final List<Integer> rewardValue = new ArrayList<>();
+		private final List<Long> rewardValue = new ArrayList<>();
 
 		// NEW: Track damage and modifier preferences
 		private final List<Integer> damageTaken = new ArrayList<>();
@@ -1541,7 +1545,7 @@ public class ColosseumStatisticsModePanel extends JPanel
 						break;
 				}
 			}
-			int lootValue = waveDTO.getLootValue();
+			long lootValue = waveDTO.getLootValue();
 			if (lootValue > 0)
 			{
 				rewardValue.add(lootValue);
@@ -1732,45 +1736,45 @@ public class ColosseumStatisticsModePanel extends JPanel
 		}
 
 		// --- Reward & Damage Metrics ---
-		public int getMinRewardValue() { return rewardValue.isEmpty() ? 0 : rewardValue.get(0); }
-		public int getMaxRewardValue() { return rewardValue.isEmpty() ? 0 : rewardValue.get(rewardValue.size() - 1); }
+		public long getMinRewardValue() { return rewardValue.isEmpty() ? 0 : rewardValue.get(0); }
+		public long getMaxRewardValue() { return rewardValue.isEmpty() ? 0 : rewardValue.get(rewardValue.size() - 1); }
 
-		public int getP05RewardValue()
+		public long getP05RewardValue()
 		{
-			if (rewardValue.isEmpty()) return 0;
+			if (rewardValue.isEmpty()) return 0L;
 			return rewardValue.get(Math.max(0, (int) (rewardValue.size() * 0.05)));
 		}
 
-		public int getQ1RewardValue()
+		public long getQ1RewardValue()
 		{
 			if (rewardValue.isEmpty()) return 0;
 			return rewardValue.get(Math.max(0, (int) (rewardValue.size() * 0.25)));
 		}
 
-		public int getMedianRewardValue()
+		public long getMedianRewardValue()
 		{
 			if (rewardValue.isEmpty()) return 0;
 			return rewardValue.get(Math.max(0, (int) (rewardValue.size() * 0.5)));
 		}
 
-		public int getQ3RewardValue()
+		public long getQ3RewardValue()
 		{
 			if (rewardValue.isEmpty()) return 0;
 			return rewardValue.get(Math.max(0, (int) (rewardValue.size() * 0.75)));
 		}
 
-		public int getP95RewardValue()
+		public long getP95RewardValue()
 		{
 			if (rewardValue.isEmpty()) return 0;
 			return rewardValue.get(Math.min(rewardValue.size() - 1, (int) (rewardValue.size() * 0.95)));
 		}
 
-		public int getAverageRewardValue()
+		public long getAverageRewardValue()
 		{
 			if (rewardValue.isEmpty()) return 0;
 			long sum = 0;
-			for (int val : rewardValue) sum += val;
-			return (int) (sum / rewardValue.size());
+			for (long val : rewardValue) sum += val;
+			return (sum / rewardValue.size());
 		}
 
 		public double getAverageDamageTaken()

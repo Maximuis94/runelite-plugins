@@ -39,18 +39,18 @@ public class ValuedItemBundle
 	long quantity;
 	long value;
 
-	public ValuedItemBundle(int itemId, String itemName, int quantity, int price) {
+	public ValuedItemBundle(int itemId, String itemName, int quantity, long price) {
 		this.itemId = itemId;
 		this.itemName = itemName;
 		this.quantity = quantity;
-		this.value = (long) price * quantity;
+		this.value = price * quantity;
 	}
 
-	public ValuedItemBundle(int itemId, String itemName, long quantity, int price) {
+	public ValuedItemBundle(int itemId, String itemName, long quantity, long price) {
 		this.itemId = itemId;
 		this.itemName = itemName;
 		this.quantity = quantity;
-		this.value = (long) price * quantity;
+		this.value = price * quantity;
 	}
 
 	/**
@@ -59,7 +59,7 @@ public class ValuedItemBundle
 	 * @param itemComp The ItemComposition fetched from the ItemManager.
 	 * @param quantity The amount of this item.
 	 */
-	public static ValuedItemBundle fromComp(ItemComposition itemComp, int quantity, int price)
+	public static ValuedItemBundle fromComp(ItemComposition itemComp, int quantity, long price)
 	{
 		return new ValuedItemBundle(itemComp.getId(), itemComp.getName(), quantity, price);
 	}

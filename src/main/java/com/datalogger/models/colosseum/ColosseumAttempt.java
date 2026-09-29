@@ -68,7 +68,7 @@ public class ColosseumAttempt
 
 	private TrackedSupplies consumedSupplies;
 
-	private int totalRewardsValue;
+	private long totalRewardsValue;
 
 	private final Map<Integer, Integer> rewards = new HashMap<>();
 
@@ -115,7 +115,7 @@ public class ColosseumAttempt
 	/**
 	 * Define the namedRewards and the summed rewards attributes that are to be used in the DTO
 	 */
-	public void setNamedRewards(Map<String, ValuedItemStack> namedRewards, int totalValue)
+	public void setNamedRewards(Map<String, ValuedItemStack> namedRewards, long totalValue)
 	{
 		this.namedRewards = namedRewards;
 		this.totalRewardsValue = totalValue;

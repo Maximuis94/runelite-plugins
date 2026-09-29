@@ -337,8 +337,8 @@ public class SupplyTracker
 				log.debug("Consumed item: {} x{}", itemComposition.getName(), diff);
 				consumedItems.put(item, diff);
 
-				int price = itemManager.getItemPrice(item);
-				long value = (long) diff * (price > 0 ? price : itemComposition.getHaPrice());
+				long price = itemManager.getItemPrice(item);
+				long value = diff * (price > 0 ? price : itemComposition.getHaPrice());
 				totalValue += value;
 
 				namedItems.put(itemComposition.getName(), new ValuedItemStack(diff, (int) value));
@@ -358,7 +358,7 @@ public class SupplyTracker
 				log.debug("Consumed dose: {} x{}", itemGroup.getBaseItemName(), diff);
 				consumedDoses.put(itemGroup, diff);
 
-				long value = (long) itemGroup.getDoseValue() * diff;
+				long value = itemGroup.getDoseValue() * diff;
 				totalValue += value;
 
 				namedDoses.put(itemGroup.getBaseItemName(), new ValuedItemStack(diff, (int) value));
@@ -374,7 +374,7 @@ public class SupplyTracker
 			{
 				ItemCharge charge = entry.getKey();
 				int qty = entry.getValue();
-				long value = (long) charge.getChargeValue() * qty;
+				long value = charge.getChargeValue() * qty;
 
 				totalValue += value;
 				namedCharges.put(charge.getFormattedName(), new ValuedItemStack(qty, (int) value));

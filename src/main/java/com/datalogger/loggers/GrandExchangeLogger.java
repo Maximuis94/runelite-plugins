@@ -394,7 +394,7 @@ public class GrandExchangeLogger extends AbstractLogger
 			return;
 		}
 
-		int totalSpent = offer.getSpent();
+		long totalSpent = offer.getSpent();
 		int price = (int) Math.floor((double) totalSpent / quantity);
 		boolean isBuy = isBuy(offer.getState());
 		int estimatedTaxPaid = approximateTax(isBuy, price);

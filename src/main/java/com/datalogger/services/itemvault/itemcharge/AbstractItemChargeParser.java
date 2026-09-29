@@ -76,7 +76,7 @@ public abstract class AbstractItemChargeParser extends AbstractVaultParser
 		BankedItem item = loadedItems.get(0);
 		ItemCharge chargeType = getItemChargeType();
 		int batchSize = chargeType.getNCharges();
-		Integer qtyPerBatch = chargeType.getOutputItem().get(item.getItemId());
+		Long qtyPerBatch = chargeType.getOutputItem().get(item.getItemId());
 
 		if (qtyPerBatch != null && qtyPerBatch > 0)
 		{
@@ -193,10 +193,10 @@ public abstract class AbstractItemChargeParser extends AbstractVaultParser
 
 		if (type.getOutputItem() != null)
 		{
-			for (Map.Entry<Integer, Integer> entry : type.getOutputItem().entrySet())
+			for (Map.Entry<Integer, Long> entry : type.getOutputItem().entrySet())
 			{
 				int itemId = entry.getKey();
-				int qtyPerBatch = entry.getValue();
+				long qtyPerBatch = entry.getValue();
 
 				long totalQty = (long) charges * qtyPerBatch / batchSize;
 

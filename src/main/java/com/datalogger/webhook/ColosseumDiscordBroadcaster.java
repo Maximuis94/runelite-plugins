@@ -230,11 +230,11 @@ public class ColosseumDiscordBroadcaster
 	/**
 	 * Return true if the finished trial should be broadcast.
 	 */
-	private boolean shouldBroadcastAttempt(ColosseumWaveDTO finalWave, int totalReward, boolean statusConditionMet)
+	private boolean shouldBroadcastAttempt(ColosseumWaveDTO finalWave, long totalReward, boolean statusConditionMet)
 	{
 		WaveStatus status = WaveStatus.fromString(finalWave.getStatus());
 		boolean hasSucceeded = status != WaveStatus.FAILED && status != WaveStatus.LOGGED_OUT;
-		int netReward = status != WaveStatus.COMPLETED ? 0 : totalReward + finalWave.getLootValue();
+		long netReward = status != WaveStatus.COMPLETED ? 0 : totalReward + finalWave.getLootValue();
 		boolean result = (netReward > minRewardValue || finalWave.getWave() >= minWave);
 
 		log.debug("CurrentAttempt has {}; waveNumber and rewardsValue conditions have {}been met; {}broadcasting run", hasSucceeded ? "succeeded" : "failed", result ? "" : "not ", statusConditionMet&&result ? "" : "not ");

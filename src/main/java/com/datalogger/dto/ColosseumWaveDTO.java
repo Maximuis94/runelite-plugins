@@ -43,7 +43,7 @@ public class ColosseumWaveDTO {
 	private String tag;
 
 	private ItemBundle earnedLoot;
-	private int lootValue;
+	private long lootValue;
 
 	@Builder.Default
 	private String gameMode = DEFAULT_GAMEMODE_DTO;

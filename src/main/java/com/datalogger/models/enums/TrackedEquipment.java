@@ -123,7 +123,7 @@ public enum TrackedEquipment
 	/**
 	 * Returns the value of one ItemCharge associated with this TrackedEquipment
 	 */
-	public int getChargeValue()
+	public long getChargeValue()
 	{
 		return itemCharge.getChargeValue();
 	}

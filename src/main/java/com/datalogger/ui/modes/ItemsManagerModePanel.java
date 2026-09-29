@@ -344,7 +344,7 @@ public class ItemsManagerModePanel extends JPanel
 					if (item.getQuantity() <= 0) continue;
 
 					if (hideZeroPrice) {
-						int price = itemManager.getItemPrice(item.getItemId());
+						long price = itemManager.getItemPrice(item.getItemId());
 						if (price <= 0) continue;
 					}
 

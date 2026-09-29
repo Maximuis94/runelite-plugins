@@ -59,7 +59,7 @@ public class ColosseumWave implements DataRow
 	private GameMode gameMode;
 
 	private ItemBundle earnedLoot;
-	private int lootValue;
+	private long lootValue;
 
 	@Singular
 	private List<ColosseumModifier> modifierChoices;
