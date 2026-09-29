@@ -516,7 +516,7 @@ public enum TrackedActivity {
 	MASTER_REANIMATION(3344, "Master Reanimation", Category.MAGIC_SPELLS, TrackerType.CUSTOM, -844),
 	SINISTER_OFFERING(3345, "Sinister Offering", Category.MAGIC_SPELLS, TrackerType.CUSTOM, -845),
 
-	SPLASH_CAST(3399, "Splash cast (miss)", Category.MAGIC_SPELLS, TrackerType.SOUND_EFFECT, 227),
+	SPLASH_CAST(3399, "Splash cast (miss)", Category.MAGIC_SPELLS, TrackerType.CUSTOM, 227),
 
 	// --- OTHER (9000+) ---
 	GE_TAX_PAID(9000, "", Category.OTHER, TrackerType.CUSTOM, -1),

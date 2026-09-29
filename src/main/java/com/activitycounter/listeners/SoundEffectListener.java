@@ -75,16 +75,17 @@ public class SoundEffectListener
 	private static final int SOUND_MUSIC_VOLUME_VARPLAYERID = VarPlayerID.OPTION_MUSIC;
 	private static final int SOUND_MASTER_VOLUME_VARPLAYERID = VarPlayerID.OPTION_MASTER_VOLUME;
 
-	private final Map<Integer, List<TrackedActivity>> soundMap = new HashMap<>();
+	private final Map<Integer, List<TrackedActivity>> areaSoundMap = new HashMap<>();
+	private final Map<Integer, List<TrackedActivity>> soundEffectMap = new HashMap<>();
 
 	public SoundEffectListener() {
 		for (TrackedActivity act : TrackedActivity.values()) {
 			if (act.getTrackerType() == TrackerType.SOUND_EFFECT && act.getGameSourceId() > 0) {
-				soundMap.computeIfAbsent(act.getGameSourceId(), k -> new ArrayList<>()).add(act);
+				soundEffectMap.computeIfAbsent(act.getGameSourceId(), k -> new ArrayList<>()).add(act);
 			}
 		}
 
-		soundMap.computeIfAbsent(PluginConstants.SoundID.SCYTHE_CRUSH, k -> new ArrayList<>()).add(TrackedActivity.SCYTHE_SWIPE);
+		soundEffectMap.computeIfAbsent(PluginConstants.SoundID.SCYTHE_CRUSH, k -> new ArrayList<>()).add(TrackedActivity.SCYTHE_SWIPE);
 	}
 
 	@Subscribe
@@ -118,7 +119,7 @@ public class SoundEffectListener
 
 		int soundId = event.getSoundId();
 
-		List<TrackedActivity> activities = soundMap.get(soundId);
+		List<TrackedActivity> activities = soundEffectMap.get(soundId);
 		if (activities != null) {
 			for (TrackedActivity activity : activities) {
 				plugin.increaseCountByOne(activity.getId());
@@ -136,7 +137,7 @@ public class SoundEffectListener
 
 		int soundId = event.getSoundId();
 
-		List<TrackedActivity> activities = soundMap.get(soundId);
+		List<TrackedActivity> activities = areaSoundMap.get(soundId);
 		if (activities != null) {
 			for (TrackedActivity activity : activities) {
 				plugin.increaseCountByOne(activity.getId());
