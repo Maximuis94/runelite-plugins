@@ -54,9 +54,6 @@ public class ChatMessageListener {
 	private ActivityCounterPlugin plugin;
 
 	@Inject
-	private ChaosAltarPrayerListener chaosAltarPrayerListener;
-
-	@Inject
 	private Client client;
 
 	private int tickCountPestControlPoints = -1;
@@ -65,6 +62,7 @@ public class ChatMessageListener {
 	private static final String CANNON_LOST_AND_FOUND_MESSAGE = "The dwarf gives you a new cannon.";
 	private static final String SUPERIOR_SPAWN_MESSAGE = "A superior foe has appeared...";
 	private static final String BIRD_EGG_OFFERING_MESSAGE = "You offer your bird's egg to the shrine and receive a reward.";
+	private static final String BONES_SPARED_MESSAGE = "The Dark Lord spares your sacrifice but still rewards you for your efforts.";
 	private static final String CA_PREFIX = "CA_ID:";
 //	private static final String QUEST_COMPLETED_PREFIX = "Congratulations, you've completed a quest: ";
 	private static final String MUSIC_TRACK_UNLOCK_PREFIX = "You have unlocked a new music track: ";
@@ -197,6 +195,11 @@ public class ChatMessageListener {
 		if (messageType == ChatMessageType.MESBOX)
 		{
 			processMesboxMessage(message);
+			return;
+		}
+
+		if (plugin.isKcVisible(TrackedActivity.SACRIFICES_SPARED) && message.equals(BONES_SPARED_MESSAGE)) {
+			incrementChatboxActivity(TrackedActivity.SACRIFICES_SPARED);
 			return;
 		}
 

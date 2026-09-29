@@ -25,8 +25,6 @@
 
 package com.activitycounter.models;
 
-import static com.activitycounter.PluginConstants.SOUND_EFFECT_OFFSET;
-import static com.activitycounter.PluginConstants.SPOT_ANIM_OFFSET;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -118,8 +116,8 @@ public enum CrossbowBoltEffect
 			this.itemIds.add(id);
 		}
 
-		this.spotAnimId = spotAnimId + SPOT_ANIM_OFFSET;
-		this.soundEffectId = soundEffectId + SOUND_EFFECT_OFFSET;
+		this.spotAnimId = spotAnimId;
+		this.soundEffectId = soundEffectId;
 		this.trackedActivity = trackedActivity;
 	}
 

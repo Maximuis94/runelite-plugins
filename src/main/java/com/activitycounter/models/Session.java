@@ -85,7 +85,7 @@ public class Session {
 
 	public void addKillCount(Count kc) {
 		if (trackedKills == null) trackedKills = new HashMap<>();
-		trackedKills.put(kc.getVarPlayerId(), kc);
+		trackedKills.put(kc.getTrackingId(), kc);
 	}
 
 	public Count getKillCount(int activityId) {

@@ -43,12 +43,12 @@ public final class PluginConstants {
 	public static final int SPOT_ANIM_OFFSET = 300000;
 
 	public static final int EQUIPPED_ITEM_CONTAINER_ID = InventoryID.WORN;
-	public static final int ALTAR_OFFER_SOUND_ID = 958;
 
 	public static final class SoundID {
 		public static final int TELEPORT_TABLET = 965;
 		public static final int SCYTHE_SLASH = 2522;
 		public static final int SCYTHE_CRUSH = 2524;
+		public static final int ALTAR_OFFER_SOUND_ID = 958;
 	}
 
 
@@ -342,8 +342,8 @@ public final class PluginConstants {
 		public static final int MIMIC = VarPlayerID.TOTAL_MIMIC_KILLS;
 
 		// Slayer Tasks
-		public static final int SLAYER_TASKS_OTHER = VarbitID.SLAYER_TASKS_COMPLETED + VARBIT_OFFSET;
-		public static final int SLAYER_TASKS_WILDERNESS = VarbitID.SLAYER_WILDERNESS_TASKS_COMPLETED + VARBIT_OFFSET;
+		public static final int SLAYER_TASKS_OTHER = VarbitID.SLAYER_TASKS_COMPLETED;
+		public static final int SLAYER_TASKS_WILDERNESS = VarbitID.SLAYER_WILDERNESS_TASKS_COMPLETED;
 		public static final int SLAYER_TASKS_MORTIMER = VarPlayerID.SLAYER_MORTIMER_TASKS_COMPLETED;
 		public static final int SUPERIOR_SPAWNS = -7000;
 	}

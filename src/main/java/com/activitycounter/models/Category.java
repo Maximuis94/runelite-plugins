@@ -47,6 +47,6 @@ public enum Category
 				.append(" ");
 		}
 
-		this.header = sb.toString().trim();
+		this.header = sb.toString().trim().replace("_", " ");
 	}
 }

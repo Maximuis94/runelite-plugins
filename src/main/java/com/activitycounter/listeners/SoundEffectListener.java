@@ -28,13 +28,17 @@ package com.activitycounter.listeners;
 import com.activitycounter.ActivityCounterPlugin;
 import com.activitycounter.PluginConstants;
 import com.activitycounter.models.TrackedActivity;
+import com.activitycounter.models.TrackerType;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
+import net.runelite.api.events.AreaSoundEffectPlayed;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.SoundEffectPlayed;
 import net.runelite.api.events.VarbitChanged;
@@ -42,8 +46,8 @@ import net.runelite.api.gameval.VarPlayerID;
 import net.runelite.client.eventbus.Subscribe;
 
 /**
- * Listeners that count whenever a specific sound is played. Aside from handling singular soundEffectListeners, it also
- * manages the volume options and notifies other classes that rely on soundEffects accordingly, if need be.
+ * Listeners that count whenever a specific sound is played.
+ * Automatically maps any TrackedActivity with TrackerType.SOUND_EFFECT.
  */
 @Slf4j
 @Singleton
@@ -55,9 +59,6 @@ public class SoundEffectListener
 	@Inject
 	private ActivityCounterPlugin plugin;
 
-	@Inject
-	private ChaosAltarPrayerListener chaosAltarPrayerListener;
-
 	@Getter
 	private boolean hasAnySound = false;
 	@Getter
@@ -67,13 +68,24 @@ public class SoundEffectListener
 	@Getter
 	private boolean hasMusic = false;
 
-	// Tick scheduling for debouncing logs
 	private int scheduledLogTick = -1;
 
 	private static final int SOUND_EFFECT_VOLUME_VARPLAYERID = VarPlayerID.OPTION_SOUNDS;
 	private static final int SOUND_AREA_VOLUME_VARPLAYERID = VarPlayerID.OPTION_AREASOUNDS;
 	private static final int SOUND_MUSIC_VOLUME_VARPLAYERID = VarPlayerID.OPTION_MUSIC;
 	private static final int SOUND_MASTER_VOLUME_VARPLAYERID = VarPlayerID.OPTION_MASTER_VOLUME;
+
+	private final Map<Integer, List<TrackedActivity>> soundMap = new HashMap<>();
+
+	public SoundEffectListener() {
+		for (TrackedActivity act : TrackedActivity.values()) {
+			if (act.getTrackerType() == TrackerType.SOUND_EFFECT && act.getGameSourceId() > 0) {
+				soundMap.computeIfAbsent(act.getGameSourceId(), k -> new ArrayList<>()).add(act);
+			}
+		}
+
+		soundMap.computeIfAbsent(PluginConstants.SoundID.SCYTHE_CRUSH, k -> new ArrayList<>()).add(TrackedActivity.SCYTHE_SWIPE);
+	}
 
 	@Subscribe
 	public void onVarbitChanged(VarbitChanged event)
@@ -105,35 +117,35 @@ public class SoundEffectListener
 		if (!hasSoundEffects) return;
 
 		int soundId = event.getSoundId();
-		TrackedActivity activity;
-		switch (soundId)
-		{
-			case PluginConstants.SoundID.TELEPORT_TABLET:
-				activity = TrackedActivity.TELEPORT_TABLETS_USED;
+
+		List<TrackedActivity> activities = soundMap.get(soundId);
+		if (activities != null) {
+			for (TrackedActivity activity : activities) {
 				plugin.increaseCountByOne(activity.getId());
-				break;
-
-			case PluginConstants.SoundID.SCYTHE_SLASH:
-			case PluginConstants.SoundID.SCYTHE_CRUSH:
-				activity = TrackedActivity.SCYTHE_SWIPE;
-				plugin.increaseCountByOne(activity.getId());
-				break;
-
-
-			default:
-				log.debug("Unknown soundId={}", soundId);
-				return;
+				log.debug("Successfully recognized 2D sound for counter={}", activity.getName());
+			}
+		} else {
+			log.debug("Unknown 2D soundId={}", soundId);
 		}
-
-		log.debug("Successfully recognized sound for counter={}", activity.getName());
-
 	}
 
-//	@Subscribe
-//	public void onAreaSoundEffectPlayed(AreaSoundEffectPlayed event)
-//	{
-//		if (!hasAreaSound) return;
-//	}
+	@Subscribe
+	public void onAreaSoundEffectPlayed(AreaSoundEffectPlayed event)
+	{
+		if (!hasAreaSound) return;
+
+		int soundId = event.getSoundId();
+
+		List<TrackedActivity> activities = soundMap.get(soundId);
+		if (activities != null) {
+			for (TrackedActivity activity : activities) {
+				plugin.increaseCountByOne(activity.getId());
+				log.debug("Successfully recognized Area (3D) sound for counter={}", activity.getName());
+			}
+		} else {
+			log.debug("Unknown Area soundId={}", soundId);
+		}
+	}
 
 	@Subscribe
 	public void onGameTick(GameTick event)
@@ -178,10 +190,7 @@ public class SoundEffectListener
 
 		List<String> muted = new ArrayList<>();
 
-		if (!hasAnySound)
-		{
-			muted.add("Master Volume (which mutes the rest)");
-		}
+		if (!hasAnySound) muted.add("Master Volume (which mutes the rest)");
 		if (!hasSoundEffects) muted.add("Sound Effects");
 		if (!hasAreaSound) muted.add("Area Sounds");
 		if (!hasMusic) muted.add("Music");

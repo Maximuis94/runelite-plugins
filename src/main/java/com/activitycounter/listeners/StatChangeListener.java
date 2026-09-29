@@ -26,9 +26,9 @@
 package com.activitycounter.listeners;
 
 import com.activitycounter.ActivityCounterPlugin;
-import static com.activitycounter.PluginConstants.ActivityID.*;
 import com.activitycounter.models.Count;
 import com.activitycounter.models.Session;
+import com.activitycounter.models.TrackedActivity;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import net.runelite.api.Client;
@@ -46,71 +46,77 @@ public class StatChangeListener {
 	@Inject
 	private ActivityCounterPlugin plugin;
 
+	/**
+	 * Maps an OSRS Skill to its corresponding Experience TrackedActivity Storage ID.
+	 */
 	public int getSkillTrackingId(Skill skill) {
 		switch (skill) {
-			case ATTACK: return XP_ATTACK;
-			case DEFENCE: return XP_DEFENCE;
-			case STRENGTH: return XP_STRENGTH;
-			case HITPOINTS: return XP_HITPOINTS;
-			case RANGED: return XP_RANGED;
-			case PRAYER: return XP_PRAYER;
-			case MAGIC: return XP_MAGIC;
-			case COOKING: return XP_COOKING;
-			case WOODCUTTING: return XP_WOODCUTTING;
-			case FLETCHING: return XP_FLETCHING;
-			case FISHING: return XP_FISHING;
-			case FIREMAKING: return XP_FIREMAKING;
-			case CRAFTING: return XP_CRAFTING;
-			case SMITHING: return XP_SMITHING;
-			case MINING: return XP_MINING;
-			case HERBLORE: return XP_HERBLORE;
-			case AGILITY: return XP_AGILITY;
-			case THIEVING: return XP_THIEVING;
-			case SLAYER: return XP_SLAYER;
-			case FARMING: return XP_FARMING;
-			case RUNECRAFT: return XP_RUNECRAFT;
-			case HUNTER: return XP_HUNTER;
-			case CONSTRUCTION: return XP_CONSTRUCTION;
-			case SAILING: return XP_SAILING;
+			case ATTACK: return TrackedActivity.XP_ATTACK.getId();
+			case DEFENCE: return TrackedActivity.XP_DEFENCE.getId();
+			case STRENGTH: return TrackedActivity.XP_STRENGTH.getId();
+			case HITPOINTS: return TrackedActivity.XP_HITPOINTS.getId();
+			case RANGED: return TrackedActivity.XP_RANGED.getId();
+			case PRAYER: return TrackedActivity.XP_PRAYER.getId();
+			case MAGIC: return TrackedActivity.XP_MAGIC.getId();
+			case COOKING: return TrackedActivity.XP_COOKING.getId();
+			case WOODCUTTING: return TrackedActivity.XP_WOODCUTTING.getId();
+			case FLETCHING: return TrackedActivity.XP_FLETCHING.getId();
+			case FISHING: return TrackedActivity.XP_FISHING.getId();
+			case FIREMAKING: return TrackedActivity.XP_FIREMAKING.getId();
+			case CRAFTING: return TrackedActivity.XP_CRAFTING.getId();
+			case SMITHING: return TrackedActivity.XP_SMITHING.getId();
+			case MINING: return TrackedActivity.XP_MINING.getId();
+			case HERBLORE: return TrackedActivity.XP_HERBLORE.getId();
+			case AGILITY: return TrackedActivity.XP_AGILITY.getId();
+			case THIEVING: return TrackedActivity.XP_THIEVING.getId();
+			case SLAYER: return TrackedActivity.XP_SLAYER.getId();
+			case FARMING: return TrackedActivity.XP_FARMING.getId();
+			case RUNECRAFT: return TrackedActivity.XP_RUNECRAFT.getId();
+			case HUNTER: return TrackedActivity.XP_HUNTER.getId();
+			case CONSTRUCTION: return TrackedActivity.XP_CONSTRUCTION.getId();
+			case SAILING: return TrackedActivity.XP_SAILING.getId();
 			default: return -1;
 		}
 	}
 
+	/**
+	 * Maps an OSRS Skill to its corresponding Level TrackedActivity Storage ID.
+	 */
 	public int getSkillLevelTrackingId(Skill skill) {
 		switch (skill) {
-			case ATTACK: return LVL_ATTACK;
-			case DEFENCE: return LVL_DEFENCE;
-			case STRENGTH: return LVL_STRENGTH;
-			case HITPOINTS: return LVL_HITPOINTS;
-			case RANGED: return LVL_RANGED;
-			case PRAYER: return LVL_PRAYER;
-			case MAGIC: return LVL_MAGIC;
-			case COOKING: return LVL_COOKING;
-			case WOODCUTTING: return LVL_WOODCUTTING;
-			case FLETCHING: return LVL_FLETCHING;
-			case FISHING: return LVL_FISHING;
-			case FIREMAKING: return LVL_FIREMAKING;
-			case CRAFTING: return LVL_CRAFTING;
-			case SMITHING: return LVL_SMITHING;
-			case MINING: return LVL_MINING;
-			case HERBLORE: return LVL_HERBLORE;
-			case AGILITY: return LVL_AGILITY;
-			case THIEVING: return LVL_THIEVING;
-			case SLAYER: return LVL_SLAYER;
-			case FARMING: return LVL_FARMING;
-			case RUNECRAFT: return LVL_RUNECRAFTING;
-			case HUNTER: return LVL_HUNTER;
-			case CONSTRUCTION: return LVL_CONSTRUCTION;
-			case SAILING: return LVL_SAILING;
+			case ATTACK: return TrackedActivity.LVL_ATTACK.getId();
+			case DEFENCE: return TrackedActivity.LVL_DEFENCE.getId();
+			case STRENGTH: return TrackedActivity.LVL_STRENGTH.getId();
+			case HITPOINTS: return TrackedActivity.LVL_HITPOINTS.getId();
+			case RANGED: return TrackedActivity.LVL_RANGED.getId();
+			case PRAYER: return TrackedActivity.LVL_PRAYER.getId();
+			case MAGIC: return TrackedActivity.LVL_MAGIC.getId();
+			case COOKING: return TrackedActivity.LVL_COOKING.getId();
+			case WOODCUTTING: return TrackedActivity.LVL_WOODCUTTING.getId();
+			case FLETCHING: return TrackedActivity.LVL_FLETCHING.getId();
+			case FISHING: return TrackedActivity.LVL_FISHING.getId();
+			case FIREMAKING: return TrackedActivity.LVL_FIREMAKING.getId();
+			case CRAFTING: return TrackedActivity.LVL_CRAFTING.getId();
+			case SMITHING: return TrackedActivity.LVL_SMITHING.getId();
+			case MINING: return TrackedActivity.LVL_MINING.getId();
+			case HERBLORE: return TrackedActivity.LVL_HERBLORE.getId();
+			case AGILITY: return TrackedActivity.LVL_AGILITY.getId();
+			case THIEVING: return TrackedActivity.LVL_THIEVING.getId();
+			case SLAYER: return TrackedActivity.LVL_SLAYER.getId();
+			case FARMING: return TrackedActivity.LVL_FARMING.getId();
+			case RUNECRAFT: return TrackedActivity.LVL_RUNECRAFTING.getId();
+			case HUNTER: return TrackedActivity.LVL_HUNTER.getId();
+			case CONSTRUCTION: return TrackedActivity.LVL_CONSTRUCTION.getId();
+			case SAILING: return TrackedActivity.LVL_SAILING.getId();
 			default: return -1;
 		}
 	}
 
-	private void processActivityUpdate(int trackingId, int currentValue) {
+	private void processActivityUpdate(int storageId, int currentValue) {
 		Session session = plugin.getCurrentSession();
 		if (session == null) return;
 
-		Count kc = session.getKillCount(trackingId);
+		Count kc = session.getKillCount(storageId);
 		if (kc == null) return;
 
 		if (kc.getInitialKc() == -1) {
@@ -142,11 +148,11 @@ public class StatChangeListener {
 			isXpUpdated = true;
 		}
 
-		if (isXpUpdated && currentSession.isTracking(XP_TOTAL)) {
+		if (isXpUpdated && currentSession.isTracking(TrackedActivity.XP_TOTAL.getId())) {
 			int totalGained = currentSession.getGainedXpMap().values().stream()
 				.mapToInt(Integer::intValue)
 				.sum();
-			currentSession.getKillCount(XP_TOTAL).setSessionKc(totalGained);
+			currentSession.getKillCount(TrackedActivity.XP_TOTAL.getId()).setSessionKc(totalGained);
 		}
 
 		int lvlTrackingId = getSkillLevelTrackingId(event.getSkill());
@@ -154,8 +160,8 @@ public class StatChangeListener {
 			processActivityUpdate(lvlTrackingId, client.getRealSkillLevel(event.getSkill()));
 		}
 
-		if (currentSession.isTracking(LVL_TOTAL)) {
-			processActivityUpdate(LVL_TOTAL, client.getTotalLevel());
+		if (currentSession.isTracking(TrackedActivity.LVL_TOTAL.getId())) {
+			processActivityUpdate(TrackedActivity.LVL_TOTAL.getId(), client.getTotalLevel());
 		}
 	}
 
@@ -188,8 +194,8 @@ public class StatChangeListener {
 			}
 		}
 
-		if (currentSession.isTracking(LVL_TOTAL)) {
-			Count kc = currentSession.getKillCount(LVL_TOTAL);
+		if (currentSession.isTracking(TrackedActivity.LVL_TOTAL.getId())) {
+			Count kc = currentSession.getKillCount(TrackedActivity.LVL_TOTAL.getId());
 			if (kc != null && kc.getInitialKc() == -1) {
 				kc.setInitialKc(client.getTotalLevel());
 				baselinesUpdated = true;

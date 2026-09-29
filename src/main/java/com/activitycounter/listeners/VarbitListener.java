@@ -26,12 +26,14 @@
 package com.activitycounter.listeners;
 
 import com.activitycounter.ActivityCounterPlugin;
-import static com.activitycounter.PluginConstants.VARBIT_OFFSET;
 import com.activitycounter.models.Count;
 import com.activitycounter.models.Session;
 import com.activitycounter.models.TrackedActivity;
 import com.activitycounter.models.TrackerType;
+import java.util.ArrayList;
 import java.util.EnumMap;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -42,7 +44,6 @@ import net.runelite.api.events.GameTick;
 import net.runelite.api.events.VarbitChanged;
 import net.runelite.api.gameval.VarPlayerID;
 import net.runelite.api.gameval.VarbitID;
-import static net.runelite.api.gameval.VarbitID.HOSIDIUS_TITHE_REWARDPOINTS;
 import net.runelite.client.eventbus.Subscribe;
 
 @Slf4j
@@ -63,32 +64,35 @@ public class VarbitListener {
 
 	private final Map<TrackedActivity, Integer> previousValues = new EnumMap<>(TrackedActivity.class);
 
-	/**
-	 * Establishes a baseline/reference value that accounts for logging in and hopping.
-	 */
-	private Integer initialCount(TrackedActivity activity, int newCount)
-	{
-		Integer prev = previousValues.get(activity);
+	private final Map<Integer, List<TrackedActivity>> varpMap = new HashMap<>();
+	private final Map<Integer, List<TrackedActivity>> varbitMap = new HashMap<>();
 
+	public VarbitListener() {
+		for (TrackedActivity act : TrackedActivity.values()) {
+			if (act.getGameSourceId() <= 0) continue;
+
+			if (act.getTrackerType() == TrackerType.VARPLAYER_VALUE) {
+				varpMap.computeIfAbsent(act.getGameSourceId(), k -> new ArrayList<>()).add(act);
+			} else if (act.getTrackerType() == TrackerType.VARBIT_VALUE) {
+				varbitMap.computeIfAbsent(act.getGameSourceId(), k -> new ArrayList<>()).add(act);
+			}
+		}
+	}
+
+	private Integer initialCount(TrackedActivity activity, int newCount) {
+		Integer prev = previousValues.get(activity);
 		if (prev == null || plugin.getLoginTicks() < 5) {
 			previousValues.put(activity, newCount);
 			return null;
 		}
-
 		return prev;
 	}
 
-	/**
-	 * Updates a varbit/varplayer-based counter that acts as a currency as well (i.e. the value may drop by spending)
-	 * maxDelta acts as an upperbound to help detect massive increments
-	 */
 	private void updateCurrency(Session currentSession, TrackedActivity activity, int newValue, int maxDelta) {
 		Integer prev = initialCount(activity, newValue);
-
 		if (prev == null) return;
 
 		int delta = newValue - prev;
-
 		if (delta > 0 && delta <= maxDelta) {
 			Count kc = currentSession.getKillCount(activity.getId());
 			if (kc != null) {
@@ -99,21 +103,15 @@ public class VarbitListener {
 				plugin.setRequiresSaveAndRefresh(true);
 			}
 		}
-
 		previousValues.put(activity, newValue);
 	}
 
-	/**
-	 * Tracker for Cannonballs. Value counted is the decrease rather than the increase.
-	 */
 	private void updateCannonBalls(Session currentSession) {
 		int newCannonBalls = client.getVarpValue(CANNON_BALLS_VARPLAYERID);
 		Integer prev = initialCount(TrackedActivity.CANNONBALLS_FIRED, newCannonBalls);
-
 		if (prev == null) return;
 
 		int deltaCb = prev - newCannonBalls;
-
 		if (deltaCb > 0 && deltaCb <= 2) {
 			Count kc = currentSession.getKillCount(TrackedActivity.CANNONBALLS_FIRED.getId());
 			if (kc != null) {
@@ -125,26 +123,20 @@ public class VarbitListener {
 		previousValues.put(TrackedActivity.CANNONBALLS_FIRED, newCannonBalls);
 	}
 
-	/**
-	 * Generic processor for monotonically increasing stats (Boss KCs, Clues, Agility laps).
-	 */
-	private void processActivityUpdate(int trackingId, int currentValue)
-	{
+	private void processActivityUpdate(int storageId, int currentValue) {
 		Session session = plugin.getCurrentSession();
 		if (session == null) return;
 		if (plugin.getLoginTicks() < 5) return;
 
-		Count kc = session.getKillCount(trackingId);
+		Count kc = session.getKillCount(storageId);
 		if (kc == null) return;
 
-		if (kc.getInitialKc() == -1)
-		{
+		if (kc.getInitialKc() == -1) {
 			kc.setInitialKc(currentValue);
 		}
 
 		int newSessionKc = currentValue - kc.getInitialKc();
-		if (newSessionKc > kc.getSessionKc())
-		{
+		if (newSessionKc > kc.getSessionKc()) {
 			kc.setSessionKc(newSessionKc);
 			plugin.setRequiresSaveAndRefresh(true);
 		}
@@ -155,7 +147,7 @@ public class VarbitListener {
 			previousValues.put(TrackedActivity.CANNONBALLS_FIRED, client.getVarpValue(VarPlayerID.ROCKTHROWER));
 			previousValues.put(TrackedActivity.NMZ_POINTS, client.getVarbitValue(VarbitID.NZONE_CURRENTPOINTS));
 			previousValues.put(TrackedActivity.SLAYER_POINTS, client.getVarbitValue(VarbitID.SLAYER_POINTS));
-			previousValues.put(TrackedActivity.TITHE_FARM_POINTS, client.getVarbitValue(HOSIDIUS_TITHE_REWARDPOINTS));
+			previousValues.put(TrackedActivity.TITHE_FARM_POINTS, client.getVarbitValue(TITHE_FARM_VARBITID));
 			previousValues.put(TrackedActivity.GIANTS_FOUNDRY_POINTS, client.getVarpValue(VarPlayerID.GIANTS_FOUNDRY_REWARD_SHOP_POINTS));
 		}
 	}
@@ -177,30 +169,40 @@ public class VarbitListener {
 		}
 
 		if (varpId != -1) {
+			List<TrackedActivity> varpActivities = varpMap.get(varpId);
+			if (varpActivities != null) {
+				for (TrackedActivity act : varpActivities) {
+					if (!session.isTracking(act.getId())) continue;
+
+					if (varpId == GIANTS_FOUNDRY_POINTS_VARPLAYERID) {
+						updateCurrency(session, act, client.getVarpValue(varpId), 50000);
+					} else {
+						processActivityUpdate(act.getId(), client.getVarpValue(varpId));
+					}
+				}
+			}
+
 			if (varpId == CANNON_BALLS_VARPLAYERID && session.isTracking(TrackedActivity.CANNONBALLS_FIRED.getId())) {
 				updateCannonBalls(session);
-			}
-
-			else if (varpId == GIANTS_FOUNDRY_POINTS_VARPLAYERID && session.isTracking(TrackedActivity.GIANTS_FOUNDRY_POINTS.getId())) {
-				updateCurrency(session, TrackedActivity.GIANTS_FOUNDRY_POINTS, client.getVarpValue(varpId), 50000);
-			}
-
-			else if (session.isTracking(varpId)) {
-				processActivityUpdate(varpId, client.getVarpValue(varpId));
 			}
 		}
 
 		if (varbitId != -1) {
-			int trackedVarbitId = varbitId + VARBIT_OFFSET;
+			List<TrackedActivity> varbitActivities = varbitMap.get(varbitId);
+			if (varbitActivities != null) {
+				for (TrackedActivity act : varbitActivities) {
+					if (!session.isTracking(act.getId())) continue;
 
-			if (varbitId == SLAYER_POINTS_VARBITID && session.isTracking(TrackedActivity.SLAYER_POINTS.getId())) {
-				updateCurrency(session, TrackedActivity.SLAYER_POINTS, client.getVarbitValue(varbitId), 1500);
-			} else if (varbitId == NIGHTMARE_ZONE_POINTS_SESSION_VARBITID && session.isTracking(TrackedActivity.NMZ_POINTS.getId())) {
-				updateCurrency(session, TrackedActivity.NMZ_POINTS, client.getVarbitValue(varbitId), 2000000);
-			} else if (varbitId == TITHE_FARM_VARBITID && session.isTracking(TrackedActivity.TITHE_FARM_POINTS.getId())) {
-				updateCurrency(session, TrackedActivity.TITHE_FARM_POINTS, client.getVarbitValue(varbitId), 500);
-			} else if (session.isTracking(trackedVarbitId)) {
-				processActivityUpdate(trackedVarbitId, client.getVarbitValue(varbitId));
+					if (varbitId == SLAYER_POINTS_VARBITID) {
+						updateCurrency(session, act, client.getVarbitValue(varbitId), 1500);
+					} else if (varbitId == NIGHTMARE_ZONE_POINTS_SESSION_VARBITID) {
+						updateCurrency(session, act, client.getVarbitValue(varbitId), 2000000);
+					} else if (varbitId == TITHE_FARM_VARBITID) {
+						updateCurrency(session, act, client.getVarbitValue(varbitId), 500);
+					} else {
+						processActivityUpdate(act.getId(), client.getVarbitValue(varbitId));
+					}
+				}
 			}
 		}
 	}
@@ -213,33 +215,22 @@ public class VarbitListener {
 
 		boolean baselinesUpdated = false;
 
-		for (TrackedActivity act : TrackedActivity.values()) {
-			if (session.isTracking(act.getId())) {
-				Count kc = session.getKillCount(act.getId());
+		for (Count count : session.getAllKillCounts()) {
+			if (count.getInitialKc() != -1) continue;
 
-				if (kc != null && kc.getInitialKc() == -1) {
-					if (act.getTrackerType() == TrackerType.VARPLAYER_VALUE) {
-						try
-						{
-							kc.setInitialKc(client.getVarpValue(act.getId()));
-							baselinesUpdated = true;
-						}
-						catch (IndexOutOfBoundsException e)
-						{
-							log.debug("Invalid Varp Value {} for TrackerActivity {} of type={}", act.getId(), act.getName(), act.getTrackerType(), e);
-						}
-					} else if (act.getTrackerType() == TrackerType.VARBIT_VALUE) {
-						try
-						{
-							kc.setInitialKc(client.getVarbitValue(act.getId() - VARBIT_OFFSET));
-							baselinesUpdated = true;
-						}
-						catch (IndexOutOfBoundsException e)
-						{
-							log.debug("Invalid Varbit Value {} for TrackerActivity {} of type={}", act.getId(), act.getName(), act.getTrackerType(), e);
-						}
-					}
+			TrackedActivity act = TrackedActivity.getByStorageId(count.getTrackingId());
+			if (act == null || act.getGameSourceId() <= 0) continue;
+
+			try {
+				if (act.getTrackerType() == TrackerType.VARPLAYER_VALUE) {
+					count.setInitialKc(client.getVarpValue(act.getGameSourceId()));
+					baselinesUpdated = true;
+				} else if (act.getTrackerType() == TrackerType.VARBIT_VALUE) {
+					count.setInitialKc(client.getVarbitValue(act.getGameSourceId()));
+					baselinesUpdated = true;
 				}
+			} catch (IndexOutOfBoundsException e) {
+				log.debug("Invalid Value {} for TrackerActivity {}", act.getGameSourceId(), act.getName(), e);
 			}
 		}
 

@@ -128,6 +128,15 @@ public interface ActivityCounterConfig extends Config {
 
 	// --- Tracker groups ---
 
+	@ConfigItem(
+		keyName = "enableBoltProcListener",
+		name = "Count enchanted bolt procs",
+		description = "If checked, enchanted bolt effect procs are counted.",
+		position = 0,
+		section = categoryFilterSection
+	)
+	default boolean enableBoltProcListener() { return true; }
+
 
 
 	// --- SORTING ---
@@ -214,13 +223,94 @@ public interface ActivityCounterConfig extends Config {
 	default int sortOther() { return 9; }
 
 	@ConfigItem(
-		keyName = "enableBoltProcListener",
-		name = "Count enchanted bolt procs",
-		description = "If checked, enchanted bolt effect procs are counted.",
-		position = 0,
-		section = categoryFilterSection
+		keyName = "sortRaids",
+		name = "Raids",
+		description = "Sort position for Raids",
+		position = 10,
+		section = categorySortingSection
 	)
-	default boolean enableBoltProcListener() { return true; }
+	default int sortRaids() { return 10; }
+
+	@ConfigItem(
+		keyName = "sortMiniGames",
+		name = "Mini Games",
+		description = "Sort position for Mini Games",
+		position = 11,
+		section = categorySortingSection
+	)
+	default int sortMiniGames() { return 11; }
+
+	@ConfigItem(
+		keyName = "sortMagicSpells",
+		name = "Magic Spells",
+		description = "Sort position for Magic Spells",
+		position = 12,
+		section = categorySortingSection
+	)
+	default int sortMagicSpells() { return 12; }
+
+	@ConfigItem(
+		keyName = "sortCombat",
+		name = "Combat",
+		description = "Sort position for Combat",
+		position = 13,
+		section = categorySortingSection
+	)
+	default int sortCombat() { return 13; }
+
+	@ConfigItem(
+		keyName = "sortSupplies",
+		name = "Supplies",
+		description = "Sort position for Supplies",
+		position = 14,
+		section = categorySortingSection
+	)
+	default int sortSupplies() { return 14; }
+
+	@ConfigItem(
+		keyName = "sortSkilling",
+		name = "Skilling",
+		description = "Sort position for Skilling",
+		position = 15,
+		section = categorySortingSection
+	)
+	default int sortSkilling() { return 15; }
+
+	@ConfigItem(
+		keyName = "sortAchievements",
+		name = "Achievements",
+		description = "Sort position for Achievements",
+		position = 16,
+		section = categorySortingSection
+	)
+	default int sortAchievements() { return 16; }
+
+	@ConfigItem(
+		keyName = "sortSailing",
+		name = "Sailing",
+		description = "Sort position for Sailing",
+		position = 17,
+		section = categorySortingSection
+	)
+	default int sortSailing() { return 17; }
+
+	@ConfigItem(
+		keyName = "sortTertiaryDrops",
+		name = "Tertiary Drops",
+		description = "Sort position for Tertiary Drops",
+		position = 18,
+		section = categorySortingSection
+	)
+	default int sortTertiaryDrops() { return 18; }
+
+	@ConfigItem(
+		keyName = "sortRandomEvents",
+		name = "Random Events",
+		description = "Sort position for Random Events",
+		position = 19,
+		section = categorySortingSection
+	)
+	default int sortRandomEvents() { return 19; }
 
 
 

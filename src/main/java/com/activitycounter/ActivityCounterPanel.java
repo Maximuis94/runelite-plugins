@@ -356,7 +356,6 @@ public class ActivityCounterPanel extends PluginPanel {
 					notesScrollPane.setVisible(false);
 				}
 
-				// Warning / Status Label
 				if (sessionToDisplay.isInProgress()) {
 					long secondsSinceStart = sessionToDisplay.getStartTime() != null
 						? Duration.between(sessionToDisplay.getStartTime(), Instant.now()).getSeconds()
@@ -364,9 +363,6 @@ public class ActivityCounterPanel extends PluginPanel {
 
 					boolean hasKc = sessionToDisplay.getAllKillCounts().stream().anyMatch(c -> c.getSessionKc() > 0);
 
-
-
-					// Stay visible for 8 seconds, or indefinitely until the first count is acquired
 					if (secondsSinceStart < 8 || !hasKc) {
 						int hiddenIndividualCount = 0;
 						for (TrackedActivity act : TrackedActivity.values()) {
@@ -379,7 +375,6 @@ public class ActivityCounterPanel extends PluginPanel {
 						if (!config.enableBoltProcListener()) {
 							disabledGroups.add("Enchanted bolt proc counters");
 						}
-						// Can easily append other disabled groups here in the future
 
 						StringBuilder sb = new StringBuilder();
 						sb.append("<html><div style='margin-top: 5px; margin-bottom: 5px;'>");
@@ -481,8 +476,8 @@ public class ActivityCounterPanel extends PluginPanel {
 
 			for (Category category : sortedCategories) {
 				List<Count> categoryKcs = visibleKcs.stream()
-					.filter(kc -> plugin.getActivityCategory(kc.getVarPlayerId()) == category)
-					.sorted(Comparator.comparingInt(kc -> plugin.getActivityOrder(kc.getVarPlayerId())))
+					.filter(kc -> plugin.getActivityCategory(kc.getTrackingId()) == category)
+					.sorted(Comparator.comparingInt(kc -> plugin.getActivityOrder(kc.getTrackingId())))
 					.collect(Collectors.toList());
 
 				if (!categoryKcs.isEmpty()) {
@@ -495,8 +490,7 @@ public class ActivityCounterPanel extends PluginPanel {
 					categoryHeader.setBackground(ColorScheme.DARKER_GRAY_COLOR.darker());
 					categoryHeader.setBorder(new EmptyBorder(5, 5, 5, 5));
 
-					String catName = category.name().substring(0, 1).toUpperCase() + category.name().substring(1).toLowerCase();
-					JLabel categoryLabel = new JLabel(catName);
+					JLabel categoryLabel = new JLabel(category.getHeader());
 					categoryLabel.setForeground(Color.WHITE);
 					categoryLabel.setFont(categoryLabel.getFont().deriveFont(Font.BOLD));
 
@@ -515,7 +509,7 @@ public class ActivityCounterPanel extends PluginPanel {
 						JPopupMenu popupMenu = new JPopupMenu();
 						JMenuItem hideItem = new JMenuItem("Hide " + kc.getName());
 						hideItem.addActionListener(e -> {
-							TrackedActivity activityToHide = plugin.getActivityById(kc.getVarPlayerId());
+							TrackedActivity activityToHide = plugin.getActivityById(kc.getTrackingId());
 							if (activityToHide != null) {
 								plugin.disableActivity(activityToHide);
 							}

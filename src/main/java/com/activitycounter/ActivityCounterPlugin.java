@@ -357,6 +357,26 @@ public class ActivityCounterPlugin extends Plugin
 				return config.sortBoltProcs();
 			case OTHER:
 				return config.sortOther();
+			case RAIDS:
+				return config.sortRaids();
+			case MINI_GAMES:
+				return config.sortMiniGames();
+			case MAGIC_SPELLS:
+				return config.sortMagicSpells();
+			case COMBAT:
+				return config.sortCombat();
+			case SUPPLIES:
+				return config.sortSupplies();
+			case SKILLING:
+				return config.sortSkilling();
+			case ACHIEVEMENTS:
+				return config.sortAchievements();
+			case SAILING:
+				return config.sortSailing();
+			case TERTIARY_DROPS:
+				return config.sortTertiaryDrops();
+			case RANDOM_EVENTS:
+				return config.sortRandomEvents();
 			default:
 				return 99;
 		}
@@ -415,7 +435,7 @@ public class ActivityCounterPlugin extends Plugin
 		if (session == null) return new ArrayList<>();
 
 		List<Count> visibleKcs = session.getAllKillCounts().stream()
-			.filter(kc -> kc.getSessionKc() > 0 && isKcVisible(kc.getVarPlayerId()))
+			.filter(kc -> kc.getSessionKc() > 0 && isKcVisible(kc.getTrackingId()))
 			.collect(Collectors.toList());
 
 		if (config.mergeSlayerTaskCounts())
@@ -430,7 +450,8 @@ public class ActivityCounterPlugin extends Plugin
 			while (iterator.hasNext())
 			{
 				Count kc = iterator.next();
-				if (kc.getVarPlayerId() == otherId || kc.getVarPlayerId() == wildyId || kc.getVarPlayerId() == mortimerId)
+				int trackingId = kc.getTrackingId();
+				if (trackingId == otherId || trackingId == wildyId || trackingId == mortimerId)
 				{
 					mergedSessionKc += kc.getSessionKc();
 					iterator.remove();
@@ -530,25 +551,30 @@ public class ActivityCounterPlugin extends Plugin
 			{
 				Count kc = new Count(act.getName(), act.getId());
 				kc.setSessionKc(0);
-
 				kc.setInitialKc(-1);
 
-				int actId = act.getId();
 				if (isManualStart && client != null && client.getGameState() == GameState.LOGGED_IN) {
-					switch (act.getTrackerType()) {
-						case VARPLAYER_VALUE:
-							kc.setInitialKc(actId > 0 ? client.getVarpValue(act.getId()) : 0);
-							break;
-						case VARBIT_VALUE:
-							kc.setInitialKc(actId > 0 ? client.getVarbitValue(act.getId() - PluginConstants.VARBIT_OFFSET) : 0);
-							break;
-						case CHAT_MESSAGE:
-						case SOUND_EFFECT:
-						case CUSTOM:
-							kc.setInitialKc(0);
-							break;
-						case STAT_CHANGE:
-							break;
+					try
+					{
+						switch (act.getTrackerType())
+						{
+							case VARPLAYER_VALUE:
+								kc.setInitialKc(act.getGameSourceId() > 0 ? client.getVarpValue(act.getGameSourceId()) : 0);
+								break;
+							case VARBIT_VALUE:
+								kc.setInitialKc(act.getGameSourceId() > 0 ? client.getVarbitValue(act.getGameSourceId()) : 0);
+								break;
+							case CHAT_MESSAGE:
+							case SOUND_EFFECT:
+							case CUSTOM:
+								kc.setInitialKc(0);
+								break;
+							case STAT_CHANGE:
+								break;
+						}
+					} catch (IndexOutOfBoundsException e) {
+						log.error("{} for TrackedActivity {} {} {}", e.getClass(), act.getName(), act.getId(), act.getConfigId());
+
 					}
 				}
 				else if (act.getTrackerType() == TrackerType.CHAT_MESSAGE || act.getTrackerType() == TrackerType.CUSTOM)

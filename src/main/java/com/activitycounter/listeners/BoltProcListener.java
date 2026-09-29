@@ -35,6 +35,7 @@ import com.activitycounter.models.TrackedActivity;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import lombok.extern.slf4j.Slf4j;
+import net.runelite.api.Actor;
 import net.runelite.api.ActorSpotAnim;
 import net.runelite.api.Client;
 import net.runelite.api.EquipmentInventorySlot;
@@ -130,12 +131,11 @@ public class BoltProcListener
 		Player localPlayer = client.getLocalPlayer();
 		if (localPlayer == null || event.getActor() == null) return;
 
-		// We only care if the graphic is playing on the target we are currently attacking
 		if (event.getActor() == localPlayer.getInteracting())
 		{
 			for (ActorSpotAnim spotAnim : event.getActor().getSpotAnims())
 			{
-				if ((spotAnim.getId() + PluginConstants.SPOT_ANIM_OFFSET) == applicableSpotAnimId)
+				if ((spotAnim.getId()) == applicableSpotAnimId)
 				{
 					sawSpotAnimThisTick = true;
 					break;
@@ -149,8 +149,13 @@ public class BoltProcListener
 	{
 		if (disableSoundAndAnimListeners) return;
 
-		if ((event.getSoundId() + PluginConstants.SOUND_EFFECT_OFFSET) == applicableSoundId)
+
+
+		if ((event.getSoundId()) == applicableSoundId)
 		{
+			Actor source = event.getSource();
+
+			log.debug("delay is {}", event.getDelay());
 			heardSoundThisTick = true;
 		}
 	}

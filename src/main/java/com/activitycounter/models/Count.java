@@ -25,30 +25,26 @@
 
 package com.activitycounter.models;
 
+import com.google.gson.annotations.SerializedName;
 import lombok.Data;
 
-/**
- * Model class for a Count, which is a represents a count of something
- */
 @Data
-public class Count
-{
+public class Count {
 	private final String name;
-	private final int varPlayerId;
+
+	@SerializedName(value = "trackingId", alternate = {"varPlayerId"})
+	private final int trackingId;
 
 	private int initialKc;
 	private int sessionKc;
 
-	public Count(String name, int varPlayerId) {
+	public Count(String name, int trackingId) {
 		this.name = name;
-		this.varPlayerId = varPlayerId;
+		this.trackingId = trackingId;
 		this.initialKc = -1;
 		this.sessionKc = 0;
 	}
 
-	/**
-	 * Resets the tracking state for a new session.
-	 */
 	public void reset() {
 		this.initialKc = -1;
 		this.sessionKc = 0;
