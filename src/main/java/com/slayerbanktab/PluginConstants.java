@@ -24,9 +24,6 @@
  */
 package com.slayerbanktab;
 
-import java.io.File;
-import net.runelite.client.RuneLite;
-
 /**
  * Global constants used by the Slayer bank tab plugin
  */
@@ -41,7 +38,6 @@ public final class PluginConstants {
 	public static final String PLUGIN_NAME = "Slayer Bank Tab";
 	public static final String CONFIG_GROUP = "slayerbanktab";
 	public static final String PLUGIN_DIR_NAME = "slayer-bank-tab";
-	public static final File PLUGIN_DIR = new File(RuneLite.RUNELITE_DIR, PLUGIN_DIR_NAME);
 
 	public static final String NO_TASK_KEY_SUFFIX = "_0_0_0_0_0";
 	public static final int N_TASK_KEY_PARTS = 6;

@@ -27,39 +27,42 @@ package com.slayerbanktab.services;
 
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
+import com.slayerbanktab.PluginConstants;
+import com.slayerbanktab.SlayerBankTabPlugin;
 import com.slayerbanktab.models.SlayerSetup;
-import java.io.File;
-import java.io.FileReader;
-import java.io.FileWriter;
+import java.io.IOException;
+import java.io.Reader;
+import java.io.Writer;
 import java.lang.reflect.Type;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import lombok.extern.slf4j.Slf4j;
-import net.runelite.client.RuneLite;
+import net.runelite.client.config.ConfigManager;
+import net.runelite.client.util.Filepath;
 
 @Slf4j
 @Singleton
 public class SlayerSetupManager {
 
 	private final Gson gson;
-	private final File setupFile;
+	private final SlayerBankTabPlugin plugin;
+	private final ConfigManager configManager;
+	private Filepath setupFile;
 
 	private final Map<String, SlayerSetup> taskSetups = new HashMap<>();
 
 	private final ExecutorService fileWriteExecutor = Executors.newSingleThreadExecutor();
 
 	@Inject
-	public SlayerSetupManager(Gson gson) {
+	public SlayerSetupManager(Gson gson, SlayerBankTabPlugin plugin, ConfigManager configManager) {
 		this.gson = gson;
-
-		File dir = new File(RuneLite.RUNELITE_DIR, "slayer-bank-tabs");
-		dir.mkdirs();
-
-		this.setupFile = new File(dir, "global-setups.json");
+		this.plugin = plugin;
+		this.configManager = configManager;
 	}
 
 	/**
@@ -67,10 +70,35 @@ public class SlayerSetupManager {
 	 * Called during plugin startUp().
 	 */
 	public void loadSetups() {
+		Filepath dirPath = plugin.getDirectory();
+		if (dirPath == null) {
+			log.error("Failed to resolve plugin directory. Cannot load setups.");
+			return;
+		}
+
+		if (!dirPath.exists()) {
+			try {
+				dirPath.createDirectories();
+				log.debug("Created plugin directory '{}'", dirPath);
+			} catch (IOException e) {
+				log.error("Failed to create plugin directory '{}'", dirPath, e);
+				return;
+			}
+		}
+
+		this.setupFile = dirPath.join("global-setups.json");
+
+		// MIGRATION CHECK: If file doesn't exist, scrape ConfigManager for old data
+		if (!setupFile.exists()) {
+			migrateFromConfigManager();
+		}
+
+		// If it still doesn't exist (e.g. migration yielded 0 results and didn't write), exit early
 		if (!setupFile.exists()) {
 			return;
 		}
-		try (FileReader reader = new FileReader(setupFile)) {
+
+		try (Reader reader = setupFile.openBufferedReader()) {
 			Type type = new TypeToken<Map<String, SlayerSetup>>(){}.getType();
 			Map<String, SlayerSetup> loaded = gson.fromJson(reader, type);
 			if (loaded != null) {
@@ -80,6 +108,54 @@ public class SlayerSetupManager {
 			}
 		} catch (Exception e) {
 			log.error("Failed to load slayer setups from local file", e);
+		}
+	}
+
+	/**
+	 * Scrapes the RuneLite ConfigManager for old JSON setups, saves them to memory,
+	 * unsets them from the config profile, and dumps them to the new file.
+	 */
+	private void migrateFromConfigManager() {
+		log.debug("global-setups.json not found. Scanning ConfigManager for old setups...");
+		boolean migratedAny = false;
+
+		String prefix = PluginConstants.CONFIG_GROUP + ".";
+		List<String> keys = configManager.getConfigurationKeys(prefix);
+
+		for (String fullKey : keys) {
+			String key = fullKey.substring(prefix.length());
+
+			if (!key.startsWith("layout_")) {
+				continue;
+			}
+
+			String rawValue = configManager.getConfiguration(PluginConstants.CONFIG_GROUP, key);
+			if (rawValue != null && !rawValue.isEmpty()) {
+				try {
+
+					plugin.updateJsonFallback(key, rawValue);
+
+					migratedAny = true;
+
+					// Delete the giant string from the user's config profile to clean up memory
+					// configManager.unsetConfiguration(PluginConstants.CONFIG_GROUP, key);
+
+				} catch (Exception e) {
+					log.debug("Failed to migrate setup key: {}", key, e);
+				}
+			}
+		}
+
+		// Because updateJsonFallback calls saveSetup(), the fileWriteExecutor is already queuing saves.
+		// We perform one final synchronous dump here to ensure the complete map is written instantly
+		// before loadSetups() finishes executing, avoiding any race conditions on startup.
+		if (migratedAny) {
+			try (Writer writer = setupFile.openBufferedWriter()) {
+				gson.toJson(taskSetups, writer);
+				log.debug("Successfully migrated {} setups from ConfigManager to global-setups.json", taskSetups.size());
+			} catch (IOException e) {
+				log.error("Failed to dump migrated setups to file", e);
+			}
 		}
 	}
 
@@ -106,10 +182,15 @@ public class SlayerSetupManager {
 	 * Serializes the map to JSON and saves it to the local file asynchronously.
 	 */
 	private void saveAsync() {
+		if (setupFile == null) {
+			log.error("Cannot save setups: setupFile path is null");
+			return;
+		}
+
 		Map<String, SlayerSetup> snapshot = new HashMap<>(taskSetups);
 
 		fileWriteExecutor.submit(() -> {
-			try (FileWriter writer = new FileWriter(setupFile)) {
+			try (Writer writer = setupFile.openBufferedWriter()) {
 				gson.toJson(snapshot, writer);
 			} catch (Exception e) {
 				log.error("Failed to serialize and save slayer setups to file", e);
@@ -131,8 +212,7 @@ public class SlayerSetupManager {
 	/**
 	 * Returns a detached snapshot of all currently saved task setups.
 	 */
-	public Map<String, SlayerSetup> getAllSetups()
-	{
+	public Map<String, SlayerSetup> getAllSetups() {
 		return new HashMap<>(taskSetups);
 	}
 }

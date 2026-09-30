@@ -105,12 +105,14 @@ import net.runelite.client.plugins.bank.BankSearch;
 import net.runelite.client.plugins.banktags.BankTagsPlugin;
 import net.runelite.client.ui.ClientToolbar;
 import net.runelite.client.ui.NavigationButton;
+import net.runelite.client.util.Filepath;
 import net.runelite.client.util.ImageUtil;
 import net.runelite.client.util.Text;
 
 @Slf4j
 @PluginDescriptor(
-	name = "Slayer Bank Tab",
+	name = PLUGIN_NAME,
+	internalName = PluginConstants.PLUGIN_DIR_NAME,
 	description = "Plugin that manages a dedicated bank tag tab to show a user-defined, task-specific layout based on your active Slayer task",
 	tags = {"bank", "tag", "tab", "slayer", "equipment", "inventory"}
 )
@@ -229,6 +231,15 @@ public class SlayerBankTabPlugin extends Plugin {
 			.map(BankTagsPlugin.class::cast)
 			.findFirst()
 			.orElse(null);
+	}
+
+	public Filepath getDirectory() {
+		try {
+			return this.getPluginDirectory();
+		} catch (java.io.IOException e) {
+			log.error("Failed to get plugin directory", e);
+			return null;
+		}
 	}
 
 	@Override
@@ -881,7 +892,7 @@ public class SlayerBankTabPlugin extends Plugin {
 		slayerTabKey = null;
 	}
 
-	private void updateJsonFallback(String key, String csv) {
+	public void updateJsonFallback(String key, String csv) {
 		if (csv == null || csv.trim().isEmpty()) {
 			setupManager.saveSetup(key, new SlayerSetup(new int[0]));
 			return;
