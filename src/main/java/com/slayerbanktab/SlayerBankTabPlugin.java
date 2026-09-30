@@ -100,6 +100,7 @@ import net.runelite.client.game.chatbox.ChatboxPanelManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDependency;
 import net.runelite.client.plugins.PluginDescriptor;
+import net.runelite.client.plugins.PluginManager;
 import net.runelite.client.plugins.bank.BankSearch;
 import net.runelite.client.plugins.banktags.BankTagsPlugin;
 import net.runelite.client.ui.ClientToolbar;
@@ -167,8 +168,10 @@ public class SlayerBankTabPlugin extends Plugin {
 	@Inject
 	private AccountHashManager accountHashManager;
 
-	@Inject
 	private BankTagsPlugin bankTagsPlugin;
+
+	@Inject
+	private PluginManager pluginManager;
 
 	@Inject
 	private DBTableScraper dbTableScraper;
@@ -219,8 +222,27 @@ public class SlayerBankTabPlugin extends Plugin {
 		return clipboard;
 	}
 
+	private BankTagsPlugin findBankTagsPlugin()
+	{
+		return pluginManager.getPlugins().stream()
+			.filter(BankTagsPlugin.class::isInstance)
+			.map(BankTagsPlugin.class::cast)
+			.findFirst()
+			.orElse(null);
+	}
+
 	@Override
 	protected void startUp() {
+		bankTagsPlugin = findBankTagsPlugin();
+
+		if (bankTagsPlugin == null)
+		{
+			log.error("Unable to load bank tags plugin, shutting down...");
+			sendChatMessage("[SlayerBankTab] Unable to load bankTagsPlugin. Forcing shutdown.");
+			this.shutDown();
+			return;
+		}
+
 		accountHashManager.load();
 		updateConfigurationVariables();
 		setupManager.loadSetups();
@@ -260,10 +282,15 @@ public class SlayerBankTabPlugin extends Plugin {
 	}
 
 	@Override
-	protected void shutDown() {
-		eventBus.unregister(taskTracker);
-		if (navButton != null) {
-			clientToolbar.removeNavigation(navButton);
+	protected void shutDown()
+	{
+		if (bankTagsPlugin != null)
+		{
+			eventBus.unregister(taskTracker);
+			if (navButton != null)
+			{
+				clientToolbar.removeNavigation(navButton);
+			}
 		}
 	}
 
