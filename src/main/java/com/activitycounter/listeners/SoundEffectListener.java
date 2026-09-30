@@ -28,7 +28,6 @@ package com.activitycounter.listeners;
 import com.activitycounter.ActivityCounterPlugin;
 import com.activitycounter.PluginConstants;
 import com.activitycounter.models.TrackedActivity;
-import com.activitycounter.models.TrackerType;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -38,9 +37,14 @@ import javax.inject.Singleton;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
+import net.runelite.api.Hitsplat;
+import net.runelite.api.HitsplatID;
+import net.runelite.api.Skill;
 import net.runelite.api.events.AreaSoundEffectPlayed;
 import net.runelite.api.events.GameTick;
+import net.runelite.api.events.HitsplatApplied;
 import net.runelite.api.events.SoundEffectPlayed;
+import net.runelite.api.events.StatChanged;
 import net.runelite.api.events.VarbitChanged;
 import net.runelite.api.gameval.VarPlayerID;
 import net.runelite.client.eventbus.Subscribe;
@@ -70,22 +74,37 @@ public class SoundEffectListener
 
 	private int scheduledLogTick = -1;
 
+	private int magicTick = 0;
+	private int hitSplatTick = 0;
+
 	private static final int SOUND_EFFECT_VOLUME_VARPLAYERID = VarPlayerID.OPTION_SOUNDS;
 	private static final int SOUND_AREA_VOLUME_VARPLAYERID = VarPlayerID.OPTION_AREASOUNDS;
 	private static final int SOUND_MUSIC_VOLUME_VARPLAYERID = VarPlayerID.OPTION_MUSIC;
 	private static final int SOUND_MASTER_VOLUME_VARPLAYERID = VarPlayerID.OPTION_MASTER_VOLUME;
 
-	private final Map<Integer, List<TrackedActivity>> areaSoundMap = new HashMap<>();
-	private final Map<Integer, List<TrackedActivity>> soundEffectMap = new HashMap<>();
+	private final Map<Integer, List<TrackedActivity>> areaSoundEffectMap;
+	private final Map<Integer, List<TrackedActivity>> soundEffectMap;
 
 	public SoundEffectListener() {
+		areaSoundEffectMap = new HashMap<>();
+		soundEffectMap = new HashMap<>();
+
 		for (TrackedActivity act : TrackedActivity.values()) {
-			if (act.getTrackerType() == TrackerType.SOUND_EFFECT && act.getGameSourceId() > 0) {
-				soundEffectMap.computeIfAbsent(act.getGameSourceId(), k -> new ArrayList<>()).add(act);
+			if (act.getGameSourceId() <= 0) continue;
+
+			switch (act.getTrackerType()) {
+				case SOUND_EFFECT:
+					soundEffectMap.computeIfAbsent(act.getGameSourceId(), k -> new ArrayList<>()).add(act);
+					break;
+				case AREA_SOUND:
+					areaSoundEffectMap.computeIfAbsent(act.getGameSourceId(), k -> new ArrayList<>()).add(act);
+					break;
+
 			}
 		}
 
 		soundEffectMap.computeIfAbsent(PluginConstants.SoundID.SCYTHE_CRUSH, k -> new ArrayList<>()).add(TrackedActivity.SCYTHE_SWIPE);
+		soundEffectMap.computeIfAbsent(PluginConstants.SoundID.SCYTHE_SLASH, k -> new ArrayList<>()).add(TrackedActivity.SCYTHE_SWIPE);
 	}
 
 	@Subscribe
@@ -113,6 +132,17 @@ public class SoundEffectListener
 	}
 
 	@Subscribe
+	public void onHitSplatApplied(HitsplatApplied event)
+	{
+		Hitsplat hitsplat = event.getHitsplat();
+		int type = hitsplat.getHitsplatType();
+		if (type == HitsplatID.DAMAGE_MAX_ME || type == HitsplatID.DAMAGE_ME)
+		{
+			hitSplatTick = client.getTickCount();
+		}
+	}
+
+	@Subscribe
 	public void onSoundEffectPlayed(SoundEffectPlayed event)
 	{
 		if (!hasSoundEffects) return;
@@ -123,10 +153,20 @@ public class SoundEffectListener
 		if (activities != null) {
 			for (TrackedActivity activity : activities) {
 				plugin.increaseCountByOne(activity.getId());
-				log.debug("Successfully recognized 2D sound for counter={}", activity.getName());
+//				log.debug("Successfully SoundEffect for counter={}", activity.getName());
+				log.debug("[TICK={}] Successfully sound effect for counter={} ",client.getTickCount(), activity.getName());
 			}
 		} else {
 			log.debug("Unknown 2D soundId={}", soundId);
+		}
+	}
+
+	@Subscribe
+	public void onStatChanged(StatChanged event)
+	{
+		if (event.getSkill() == Skill.MAGIC)
+		{
+			log.debug("[TICK={}] Magic stat changed event={}", client.getTickCount(), event);
 		}
 	}
 
@@ -137,14 +177,14 @@ public class SoundEffectListener
 
 		int soundId = event.getSoundId();
 
-		List<TrackedActivity> activities = areaSoundMap.get(soundId);
+ 		List<TrackedActivity> activities = areaSoundEffectMap.get(soundId);
 		if (activities != null) {
 			for (TrackedActivity activity : activities) {
 				plugin.increaseCountByOne(activity.getId());
-				log.debug("Successfully recognized Area (3D) sound for counter={}", activity.getName());
+				log.debug("[TICK={}] Successfully area sound for counter={} ",client.getTickCount(), activity.getName());
 			}
 		} else {
-			log.debug("Unknown Area soundId={}", soundId);
+			log.debug("Unknown 2D soundId={}", soundId);
 		}
 	}
 
