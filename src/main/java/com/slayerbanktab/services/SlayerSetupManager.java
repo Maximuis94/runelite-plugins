@@ -52,7 +52,9 @@ public class SlayerSetupManager {
 	private final Gson gson;
 	private final SlayerBankTabPlugin plugin;
 	private final ConfigManager configManager;
-	private Filepath setupFile;
+
+	private final Filepath fileDir;
+	private final Filepath setupFile;
 
 	private final Map<String, SlayerSetup> taskSetups = new HashMap<>();
 
@@ -63,6 +65,9 @@ public class SlayerSetupManager {
 		this.gson = gson;
 		this.plugin = plugin;
 		this.configManager = configManager;
+
+		this.fileDir = plugin.getDirectory();
+		this.setupFile = fileDir.join("global-setups.json");
 	}
 
 	/**
@@ -70,30 +75,26 @@ public class SlayerSetupManager {
 	 * Called during plugin startUp().
 	 */
 	public void loadSetups() {
-		Filepath dirPath = plugin.getDirectory();
-		if (dirPath == null) {
+		if (fileDir == null) {
 			log.error("Failed to resolve plugin directory. Cannot load setups.");
 			return;
 		}
 
-		if (!dirPath.exists()) {
+		if (!fileDir.exists()) {
 			try {
-				dirPath.createDirectories();
-				log.debug("Created plugin directory '{}'", dirPath);
+				fileDir.createDirectories();
+				log.debug("Created plugin directory '{}'", fileDir);
 			} catch (IOException e) {
-				log.error("Failed to create plugin directory '{}'", dirPath, e);
+				log.error("Failed to create plugin directory '{}'", fileDir, e);
 				return;
 			}
 		}
 
-		this.setupFile = dirPath.join("global-setups.json");
 
-		// MIGRATION CHECK: If file doesn't exist, scrape ConfigManager for old data
 		if (!setupFile.exists()) {
 			migrateFromConfigManager();
 		}
 
-		// If it still doesn't exist (e.g. migration yielded 0 results and didn't write), exit early
 		if (!setupFile.exists()) {
 			return;
 		}
@@ -101,9 +102,18 @@ public class SlayerSetupManager {
 		try (Reader reader = setupFile.openBufferedReader()) {
 			Type type = new TypeToken<Map<String, SlayerSetup>>(){}.getType();
 			Map<String, SlayerSetup> loaded = gson.fromJson(reader, type);
+
 			if (loaded != null) {
 				taskSetups.clear();
-				taskSetups.putAll(loaded);
+
+				for (Map.Entry<String, SlayerSetup> entry : loaded.entrySet()) {
+					String cleanKey = entry.getKey();
+					if (cleanKey.toLowerCase().startsWith("layout_")) {
+						cleanKey = cleanKey.substring(7);
+					}
+					taskSetups.put(cleanKey.toLowerCase(), entry.getValue());
+				}
+
 				log.debug("Successfully loaded {} global slayer setups from file.", taskSetups.size());
 			}
 		} catch (Exception e) {
@@ -118,13 +128,11 @@ public class SlayerSetupManager {
 	private void migrateFromConfigManager() {
 		log.debug("global-setups.json not found. Scanning ConfigManager for old setups...");
 		boolean migratedAny = false;
-
 		String prefix = PluginConstants.CONFIG_GROUP + ".";
 		List<String> keys = configManager.getConfigurationKeys(prefix);
 
 		for (String fullKey : keys) {
 			String key = fullKey.substring(prefix.length());
-
 			if (!key.startsWith("layout_")) {
 				continue;
 			}
@@ -132,13 +140,9 @@ public class SlayerSetupManager {
 			String rawValue = configManager.getConfiguration(PluginConstants.CONFIG_GROUP, key);
 			if (rawValue != null && !rawValue.isEmpty()) {
 				try {
-
-					plugin.updateJsonFallback(key, rawValue);
-
+					String taskKey = key.substring(7);
+					plugin.updateJsonFallback(taskKey, rawValue);
 					migratedAny = true;
-
-					// Delete the giant string from the user's config profile to clean up memory
-					// configManager.unsetConfiguration(PluginConstants.CONFIG_GROUP, key);
 
 				} catch (Exception e) {
 					log.debug("Failed to migrate setup key: {}", key, e);
@@ -146,9 +150,6 @@ public class SlayerSetupManager {
 			}
 		}
 
-		// Because updateJsonFallback calls saveSetup(), the fileWriteExecutor is already queuing saves.
-		// We perform one final synchronous dump here to ensure the complete map is written instantly
-		// before loadSetups() finishes executing, avoiding any race conditions on startup.
 		if (migratedAny) {
 			try (Writer writer = setupFile.openBufferedWriter()) {
 				gson.toJson(taskSetups, writer);
