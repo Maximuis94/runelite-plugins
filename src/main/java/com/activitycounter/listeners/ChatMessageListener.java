@@ -28,6 +28,7 @@ package com.activitycounter.listeners;
 import com.activitycounter.ActivityCounterPlugin;
 import static com.activitycounter.PluginConstants.ActivityID.HUNTER_RUMOURS;
 import static com.activitycounter.PluginConstants.ActivityID.MAHOGANY_HOMES;
+import static com.activitycounter.PluginConstants.SoundID.STUNNED_SOUND_EFFECT_ID;
 import com.activitycounter.models.Count;
 import com.activitycounter.models.Session;
 import com.activitycounter.models.TrackedActivity;
@@ -39,6 +40,7 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
 import net.runelite.api.events.ChatMessage;
+import net.runelite.api.events.SoundEffectPlayed;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.util.Text;
 
@@ -66,10 +68,11 @@ public class ChatMessageListener {
 	private static final String CA_PREFIX = "CA_ID:";
 //	private static final String QUEST_COMPLETED_PREFIX = "Congratulations, you've completed a quest: ";
 	private static final String MUSIC_TRACK_UNLOCK_PREFIX = "You have unlocked a new music track: ";
-	private static final String LARRANS_PREFIX = "You have opened Larran's ";
+	private static final String CHESTS_PREFIX = "You have opened ";
 	private static final String LARRANS_SMALL_CHEST_PREFIX = "You have opened Larran's small chest ";
 	private static final String LARRANS_BIG_CHEST_PREFIX = "You have opened Larran's big chest ";
 	private static final String BRIMSTONE_CHEST_PREFIX = "You have opened the Brimstone chest";
+	private static final String ZOMBIE_PIRATE_LOCKER_PREFIX = "You've opened the Zombie Pirate's ";
 	private static final String SNEAKING_SUSPICION_PREFIX = "You have a sneaking suspicion that";
 	private static final String SNEAKING_SUSPICION_BEGINNER_AFFIX = " beginner scroll box.";
 	private static final String SNEAKING_SUSPICION_EASY_AFFIX = " easy scroll box.";
@@ -78,7 +81,7 @@ public class ChatMessageListener {
 	private static final String SNEAKING_SUSPICION_ELITE_AFFIX = " elite scroll box.";
 	private static final String FARMING_CONTRACT_MESSAGE = "You've completed a Farming Guild Contract. You should return to GuildMaster Jane.";
 	private static final Pattern RUMOUR_PATTERN = Pattern.compile("You have completed ([\\d,]+) rumours for the Hunter Guild\\.");
-	private static final String COMPLETED_PREFIX = "You have completed ";
+	private static final String YOU_HAVE_COMPLETED_PREFIX = "You have completed ";
 	private static final Pattern MAHOGANY_HOMES_PATTERN = Pattern.compile("You have completed ([\\d,]+) contracts with a total of [\\d,]+ points\\.");
 	private static final Pattern LAP_PATTERN = Pattern.compile("Your (.+) count is: ([\\d,]+)\\.");
 
@@ -86,6 +89,9 @@ public class ChatMessageListener {
 
 	private static final Pattern PEST_CONTROL_POINTS_PATTERN = Pattern.compile("We've awarded you (\\d+) Void Knight Commendation points\\.");
 	private static final String PEST_CONTROL_POINTS_PREFIX = "Squire|Congratulations! You managed to destroy all the portals!";
+
+	private static final String PICKPOCKET_FAILED_PREFIX = "You fail to pick";
+	private int pickpocketFailMsgTick = -1;
 
 	private static final String LAP_PREFIX = "Your ";
 
@@ -191,7 +197,6 @@ public class ChatMessageListener {
 			return;
 		}
 
-
 		if (messageType == ChatMessageType.MESBOX)
 		{
 			processMesboxMessage(message);
@@ -228,17 +233,17 @@ public class ChatMessageListener {
 //			return;
 //		}
 
-		if (message.startsWith(BRIMSTONE_CHEST_PREFIX) && plugin.isKcVisible(TrackedActivity.BRIMSTONE_CHESTS))
-		{
-			incrementChatboxActivity(TrackedActivity.BRIMSTONE_CHESTS);
-			return;
-		}
 
-		if (message.startsWith(LARRANS_PREFIX)) {
+
+		if (message.startsWith(CHESTS_PREFIX)) {
 			if (message.startsWith(LARRANS_SMALL_CHEST_PREFIX) && plugin.isKcVisible(TrackedActivity.LARRANS_SMALL_CHESTS)) {
 				incrementChatboxActivity(TrackedActivity.LARRANS_SMALL_CHESTS);
 			} else if (message.startsWith(LARRANS_BIG_CHEST_PREFIX) && plugin.isKcVisible(TrackedActivity.LARRANS_BIG_CHESTS)) {
 				incrementChatboxActivity(TrackedActivity.LARRANS_BIG_CHESTS);
+			} else if (message.startsWith(BRIMSTONE_CHEST_PREFIX) && plugin.isKcVisible(TrackedActivity.BRIMSTONE_CHESTS)) {
+				incrementChatboxActivity(TrackedActivity.BRIMSTONE_CHESTS);
+			} else if (message.startsWith(ZOMBIE_PIRATE_LOCKER_PREFIX) && plugin.isKcVisible(TrackedActivity.ZOMBIE_PIRATE_CHESTS)) {
+				incrementChatboxActivity(TrackedActivity.ZOMBIE_PIRATE_CHESTS);
 			}
 			return;
 		}
@@ -255,6 +260,12 @@ public class ChatMessageListener {
 		if (plugin.isKcVisible(TrackedActivity.CA_DIARY_TASKS) && message.startsWith(CA_PREFIX)) {
 			incrementChatboxActivity(TrackedActivity.CA_DIARY_TASKS);
 			return;
+		}
+
+		if (plugin.isKcVisible(TrackedActivity.PICKPOCKET_FAIL) && message.startsWith(PICKPOCKET_FAILED_PREFIX)) {
+			int tick = client.getTickCount();
+			if (pickpocketFailMsgTick == tick) incrementChatboxActivity(TrackedActivity.PICKPOCKET_FAIL);
+			pickpocketFailMsgTick = client.getTickCount();
 		}
 
 		if (message.startsWith(LAP_PREFIX)) {
@@ -297,7 +308,7 @@ public class ChatMessageListener {
 			return;
 		}
 
-		if (message.startsWith(COMPLETED_PREFIX)) {
+		if (message.startsWith(YOU_HAVE_COMPLETED_PREFIX)) {
 			if (plugin.isKcVisible(TrackedActivity.HUNTER_RUMOURS)) {
 				Matcher rumourMatcher = RUMOUR_PATTERN.matcher(message);
 				if (rumourMatcher.find()) {
@@ -376,5 +387,19 @@ public class ChatMessageListener {
 			}
 		}
 		return sb.toString();
+	}
+
+
+	@Subscribe
+	public void onSoundEffectPlayed(SoundEffectPlayed event) {
+		int tick = client.getTickCount();
+		int soundId = event.getSoundId();
+
+		if (plugin.isKcVisible(TrackedActivity.PICKPOCKET_FAIL) && soundId == STUNNED_SOUND_EFFECT_ID) {
+			if (pickpocketFailMsgTick == tick)
+				incrementChatboxActivity(TrackedActivity.PICKPOCKET_FAIL);
+			pickpocketFailMsgTick = client.getTickCount();
+		}
+
 	}
 }

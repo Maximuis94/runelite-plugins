@@ -132,7 +132,7 @@ public class SoundEffectListener
 	}
 
 	@Subscribe
-	public void onHitSplatApplied(HitsplatApplied event)
+	public void onHitsplatApplied(HitsplatApplied event)
 	{
 		Hitsplat hitsplat = event.getHitsplat();
 		int type = hitsplat.getHitsplatType();

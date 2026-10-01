@@ -49,6 +49,7 @@ public final class PluginConstants {
 		public static final int SCYTHE_SLASH = 2522;
 		public static final int SCYTHE_CRUSH = 2524;
 		public static final int ALTAR_OFFER_SOUND_ID = 958;
+		public static final int STUNNED_SOUND_EFFECT_ID = 2727;
 	}
 
 
@@ -279,6 +280,9 @@ public final class PluginConstants {
 		public static final int SLAYER_POINTS = -7017;
 		public static final int PEST_CONTROL_POINTS = -7018;
 		public static final int TITHE_FARM_POINTS = VarbitID.HOSIDIUS_TITHE_REWARDPOINTS;
+		public static final int ZOMBIE_PIRATE_CHESTS = -7019;
+		public static final int PICKPOCKET_SUCCESS = 2581;
+		public static final int PICKPOCKET_FAIL = -7020;
 
 		public static final int GIANTS_FOUNDRY_POINTS = VarPlayerID.GIANTS_FOUNDRY_REWARD_SHOP_POINTS;
 		public static final int BA_ATTACKER_POINTS = VarbitID.BARBASSAULT_POINTS_ATTACKER_BASE;

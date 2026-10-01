@@ -29,6 +29,7 @@ import com.activitycounter.PluginConstants;
 import java.util.HashMap;
 import java.util.Map;
 import lombok.Getter;
+import net.runelite.api.gameval.VarbitID;
 
 @Getter
 public enum TrackedActivity {
@@ -113,6 +114,7 @@ public enum TrackedActivity {
 	LARRANS_SMALL_CHESTS(1503, "Larran's small chests", Category.CHESTS, TrackerType.CHAT_MESSAGE, PluginConstants.ActivityID.LARRANS_SMALL_CHESTS),
 	LARRANS_BIG_CHESTS(1504, "Larran's big chests", Category.CHESTS, TrackerType.CHAT_MESSAGE, PluginConstants.ActivityID.LARRANS_BIG_CHESTS),
 	BRIMSTONE_CHESTS(1505, "Brimstone chests", Category.CHESTS, TrackerType.CHAT_MESSAGE, PluginConstants.ActivityID.BRIMSTONE_CHESTS),
+	ZOMBIE_PIRATE_CHESTS(1506, "Zombie pirate lockers", Category.CHESTS, TrackerType.CHAT_MESSAGE, PluginConstants.ActivityID.ZOMBIE_PIRATE_CHESTS),
 
 	// --- RAIDS (1600 - 1699) ---
 	CHAMBERS_OF_XERIC(1601, "Chambers of Xeric", Category.RAIDS, TrackerType.VARPLAYER_VALUE, PluginConstants.ActivityID.CHAMBERS_OF_XERIC),
@@ -261,6 +263,9 @@ public enum TrackedActivity {
 	WINTERTODT(2315, "Wintertodt", Category.MINI_GAMES, TrackerType.VARPLAYER_VALUE, PluginConstants.ActivityID.WINTERTODT),
 	ZALCANO(2316, "Zalcano", Category.MINI_GAMES, TrackerType.VARPLAYER_VALUE, PluginConstants.ActivityID.ZALCANO),
 	TEMPOROSS(2317, "Tempoross", Category.MINI_GAMES, TrackerType.VARPLAYER_VALUE, PluginConstants.ActivityID.TEMPOROSS),
+	TEMPOROSS_PERMITS(2318, "Reward permits", Category.MINI_GAMES, TrackerType.VARBIT_VALUE, VarbitID.TEMPOROSS_REWARDPERMITS),
+	PICKPOCKET_SUCCESS(2319, "Pickpockets succeeded", Category.SKILLING, TrackerType.SOUND_EFFECT, PluginConstants.ActivityID.PICKPOCKET_SUCCESS),
+	PICKPOCKET_FAIL(2320, "Pickpockets failed", Category.SKILLING, TrackerType.CUSTOM, PluginConstants.ActivityID.PICKPOCKET_FAIL),
 
 	// --- SUPPLIES (2400 - 2499) ---
 	POTIONS_SIPPED(2401, "Potions sipped", Category.SUPPLIES, TrackerType.VARPLAYER_VALUE, PluginConstants.ActivityID.POTIONS_SIPPED),
