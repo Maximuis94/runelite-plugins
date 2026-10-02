@@ -32,7 +32,9 @@ import com.activitycounter.models.TrackedActivity;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import net.runelite.api.Client;
+import net.runelite.api.GameState;
 import net.runelite.api.Skill;
+import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.StatChanged;
 import net.runelite.client.eventbus.Subscribe;
@@ -45,6 +47,10 @@ public class StatChangeListener {
 
 	@Inject
 	private ActivityCounterPlugin plugin;
+
+	private boolean trackExperience = false;
+	private boolean trackLevels = false;
+	private boolean statsLoaded = false;
 
 	/**
 	 * Maps an OSRS Skill to its corresponding Experience TrackedActivity Storage ID.
@@ -132,36 +138,53 @@ public class StatChangeListener {
 
 	@Subscribe
 	public void onStatChanged(StatChanged event) {
+		if (!trackExperience && !trackLevels) return;
 		Session currentSession = plugin.getCurrentSession();
 		if (currentSession == null || !currentSession.isInProgress()) return;
 
-		boolean isXpUpdated = false;
+		if (!statsLoaded) {
+			for (Skill s : Skill.values()) {
+				if (client.getRealSkillLevel(s) == 0) return;
+			}
+			statsLoaded = true;
+		}
 
-		if (currentSession.updateSkillXp(event.getSkill(), event.getXp())) {
+		if (plugin.getLoginTicks() < 5) return;
+
+		boolean isXpUpdated = false;
+		Skill skill = event.getSkill();
+		int xp = event.getXp();
+
+		if (currentSession.updateSkillXp(skill, xp)) {
 			plugin.setRequiresSaveAndRefresh(true);
 			isXpUpdated = true;
 		}
 
-		int trackingId = getSkillTrackingId(event.getSkill());
+		int trackingId = getSkillTrackingId(skill);
 		if (currentSession.isTracking(trackingId)) {
-			processActivityUpdate(trackingId, event.getXp());
+			processActivityUpdate(trackingId, xp);
 			isXpUpdated = true;
 		}
 
-		if (isXpUpdated && currentSession.isTracking(TrackedActivity.XP_TOTAL.getId())) {
-			int totalGained = currentSession.getGainedXpMap().values().stream()
-				.mapToInt(Integer::intValue)
-				.sum();
-			currentSession.getKillCount(TrackedActivity.XP_TOTAL.getId()).setSessionKc(totalGained);
-		}
+		// 2. STRICTLY nest Total XP and Levels inside isXpUpdated to ignore potions
+		if (isXpUpdated) {
+			if (currentSession.isTracking(TrackedActivity.XP_TOTAL.getId())) {
+				int totalGained = currentSession.getGainedXpMap().values().stream()
+					.mapToInt(Integer::intValue)
+					.sum();
+				currentSession.getKillCount(TrackedActivity.XP_TOTAL.getId()).setSessionKc(totalGained);
+			}
 
-		int lvlTrackingId = getSkillLevelTrackingId(event.getSkill());
-		if (currentSession.isTracking(lvlTrackingId)) {
-			processActivityUpdate(lvlTrackingId, client.getRealSkillLevel(event.getSkill()));
-		}
+			if (trackLevels) {
+				int lvlTrackingId = getSkillLevelTrackingId(skill);
+				if (currentSession.isTracking(lvlTrackingId)) {
+					processActivityUpdate(lvlTrackingId, client.getRealSkillLevel(skill));
+				}
 
-		if (currentSession.isTracking(TrackedActivity.LVL_TOTAL.getId())) {
-			processActivityUpdate(TrackedActivity.LVL_TOTAL.getId(), client.getTotalLevel());
+				if (currentSession.isTracking(TrackedActivity.LVL_TOTAL.getId())) {
+					processActivityUpdate(TrackedActivity.LVL_TOTAL.getId(), client.getTotalLevel());
+				}
+			}
 		}
 	}
 
@@ -169,6 +192,12 @@ public class StatChangeListener {
 	public void onGameTick(GameTick event) {
 		Session currentSession = plugin.getCurrentSession();
 		if (currentSession == null || !currentSession.isInProgress()) return;
+
+		// 1. Guarantee ALL skills are fully loaded before capturing baselines
+		for (Skill s : Skill.values()) {
+			if (s != Skill.OVERALL && client.getRealSkillLevel(s) == 0) return;
+		}
+
 		if (plugin.getLoginTicks() < 5) return;
 
 		boolean baselinesUpdated = false;
@@ -204,6 +233,14 @@ public class StatChangeListener {
 
 		if (baselinesUpdated) {
 			plugin.setRequiresSaveAndRefresh(true);
+		}
+	}
+
+	@Subscribe
+	public void onGameStateChanged(GameStateChanged event) {
+		int state = event.getGameState().getState();
+		if (state == GameState.LOGGED_IN.getState() || state == GameState.HOPPING.getState()) {
+			statsLoaded = false;
 		}
 	}
 }
