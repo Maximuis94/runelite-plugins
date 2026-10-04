@@ -35,7 +35,6 @@ import com.activitycounter.models.TrackedActivity;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import lombok.extern.slf4j.Slf4j;
-import net.runelite.api.Actor;
 import net.runelite.api.ActorSpotAnim;
 import net.runelite.api.Client;
 import net.runelite.api.EquipmentInventorySlot;
@@ -149,12 +148,8 @@ public class BoltProcListener
 	{
 		if (disableSoundAndAnimListeners) return;
 
-
-
 		if ((event.getSoundId()) == applicableSoundId)
 		{
-			Actor source = event.getSource();
-
 			log.debug("delay is {}", event.getDelay());
 			heardSoundThisTick = true;
 		}

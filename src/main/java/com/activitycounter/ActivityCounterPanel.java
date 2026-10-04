@@ -25,6 +25,7 @@
 
 package com.activitycounter;
 
+import com.activitycounter.listeners.ConfigListener;
 import com.activitycounter.listeners.SoundEffectListener;
 import com.activitycounter.models.Category;
 import com.activitycounter.models.Count;
@@ -67,6 +68,10 @@ import net.runelite.client.ui.PluginPanel;
 public class ActivityCounterPanel extends PluginPanel {
 
 	private final ActivityCounterPlugin plugin;
+	private final SoundEffectListener soundEffectListener;
+	private final ConfigListener configListener;
+	private final ActivityCounterConfig config;
+
 	private final JButton toggleSessionButton = new JButton();
 	private final JButton renameSessionButton = new JButton("Rename");
 	private final JButton deleteSessionButton = new JButton("Delete");
@@ -81,7 +86,6 @@ public class ActivityCounterPanel extends PluginPanel {
 	private final JScrollPane notesScrollPane = new JScrollPane(notesArea);
 
 	private final JPanel kcContainer = new JPanel();
-	private final SoundEffectListener soundEffectListener;
 
 	private volatile boolean forceNextReloadToActive = false;
 	private final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MMM dd, yyyy - HH:mm")
@@ -102,9 +106,11 @@ public class ActivityCounterPanel extends PluginPanel {
 		}
 	}
 
-	public ActivityCounterPanel(ActivityCounterPlugin plugin, SoundEffectListener soundEffectListener) {
+	public ActivityCounterPanel(ActivityCounterPlugin plugin, SoundEffectListener soundEffectListener, ConfigListener configListener) {
 		this.plugin = plugin;
 		this.soundEffectListener = soundEffectListener;
+		this.configListener = configListener;
+		this.config = plugin.getConfig();
 
 		setLayout(new BorderLayout(0, 10));
 		setBorder(new EmptyBorder(10, 10, 10, 10));
@@ -243,7 +249,6 @@ public class ActivityCounterPanel extends PluginPanel {
 		add(northWrapper, BorderLayout.NORTH);
 		add(kcWrapper, BorderLayout.CENTER);
 
-		// Start a background timer to naturally update the duration and hide the warning label
 		Timer updateTimer = new Timer(1000, e -> updateTime());
 		updateTimer.start();
 	}
@@ -317,7 +322,6 @@ public class ActivityCounterPanel extends PluginPanel {
 			}
 
 			if (sessionToDisplay != null) {
-				ActivityCounterConfig config = plugin.getConfig();
 
 				// Duration
 				if (sessionToDisplay.isInProgress() && !config.showSessionDuration()) {
@@ -366,7 +370,7 @@ public class ActivityCounterPanel extends PluginPanel {
 					if (secondsSinceStart < 8 || !hasKc) {
 						int hiddenIndividualCount = 0;
 						for (TrackedActivity act : TrackedActivity.values()) {
-							if (!plugin.isKcVisible(act)) {
+							if (!configListener.isKcVisible(act)) {
 								hiddenIndividualCount++;
 							}
 						}
@@ -472,7 +476,7 @@ public class ActivityCounterPanel extends PluginPanel {
 			boolean isFirstCategory = true;
 
 			List<Category> sortedCategories = Arrays.asList(Category.values());
-			sortedCategories.sort(Comparator.comparingInt(plugin::getCategorySortOrder));
+			sortedCategories.sort(Comparator.comparingInt(configListener::getCategorySortOrder));
 
 			for (Category category : sortedCategories) {
 				List<Count> categoryKcs = visibleKcs.stream()

@@ -28,7 +28,6 @@ package com.activitycounter.listeners;
 import com.activitycounter.ActivityCounterPlugin;
 import static com.activitycounter.PluginConstants.ActivityID.HUNTER_RUMOURS;
 import static com.activitycounter.PluginConstants.ActivityID.MAHOGANY_HOMES;
-import static com.activitycounter.PluginConstants.SoundID.STUNNED_SOUND_EFFECT_ID;
 import com.activitycounter.models.Count;
 import com.activitycounter.models.Session;
 import com.activitycounter.models.TrackedActivity;
@@ -39,14 +38,15 @@ import javax.inject.Singleton;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
+import net.runelite.api.Skill;
 import net.runelite.api.events.ChatMessage;
-import net.runelite.api.events.SoundEffectPlayed;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.util.Text;
 
 /**
  * Listener that processes messages related to specific counters that tend to be updated after parsing a single,
  * specific message that meets certain criteria.
+ * Due to preprocessing, this is the only class with the onChatMessageListener.
  */
 @Slf4j
 @Singleton
@@ -58,6 +58,18 @@ public class ChatMessageListener {
 	@Inject
 	private Client client;
 
+	@Inject
+	private ConfigListener configListener;
+
+	@Inject
+	private ExperienceDropListener experienceDropListener;
+
+	@Inject
+	private SoundEffectListener soundEffectListener;
+
+	@Inject
+	private FarmingListener farmingListener;
+
 	private int tickCountPestControlPoints = -1;
 	private static final int PEST_CONTROL_POINTS_COOLDOWN = 100;
 
@@ -66,13 +78,19 @@ public class ChatMessageListener {
 	private static final String BIRD_EGG_OFFERING_MESSAGE = "You offer your bird's egg to the shrine and receive a reward.";
 	private static final String BONES_SPARED_MESSAGE = "The Dark Lord spares your sacrifice but still rewards you for your efforts.";
 	private static final String CA_PREFIX = "CA_ID:";
-//	private static final String QUEST_COMPLETED_PREFIX = "Congratulations, you've completed a quest: ";
+	//	private static final String QUEST_COMPLETED_PREFIX = "Congratulations, you've completed a quest: ";
 	private static final String MUSIC_TRACK_UNLOCK_PREFIX = "You have unlocked a new music track: ";
 	private static final String CHESTS_PREFIX = "You have opened ";
 	private static final String LARRANS_SMALL_CHEST_PREFIX = "You have opened Larran's small chest ";
 	private static final String LARRANS_BIG_CHEST_PREFIX = "You have opened Larran's big chest ";
 	private static final String BRIMSTONE_CHEST_PREFIX = "You have opened the Brimstone chest";
 	private static final String ZOMBIE_PIRATE_LOCKER_PREFIX = "You've opened the Zombie Pirate's ";
+	private static final String ELVEN_CRYSTAL_CHESTS_PREFIX = "You have opened the crystal chest ";
+
+	private static final int CRYSTAL_CHESTS = -7017;
+	private static final String CRYSTAL_CHESTS_MESSAGE = "You find some treasure in the chest!";
+	private static final int CRYSTAL_CHEST_REGION_ID = 11573;
+
 	private static final String SNEAKING_SUSPICION_PREFIX = "You have a sneaking suspicion that";
 	private static final String SNEAKING_SUSPICION_BEGINNER_AFFIX = " beginner scroll box.";
 	private static final String SNEAKING_SUSPICION_EASY_AFFIX = " easy scroll box.";
@@ -90,10 +108,17 @@ public class ChatMessageListener {
 	private static final Pattern PEST_CONTROL_POINTS_PATTERN = Pattern.compile("We've awarded you (\\d+) Void Knight Commendation points\\.");
 	private static final String PEST_CONTROL_POINTS_PREFIX = "Squire|Congratulations! You managed to destroy all the portals!";
 
+	private static final String PICKPOCKET_START_PREFIX = "You attempt to pick";
 	private static final String PICKPOCKET_FAILED_PREFIX = "You fail to pick";
 	private int pickpocketFailMsgTick = -1;
 
 	private static final String LAP_PREFIX = "Your ";
+
+	private static final String POTIONS_MIXED_PREFIX = "You mix";
+	private static final String ALCHEMIST_AMULET_PROC_PREFIX = "Your Alchemist's amulet helps you create";
+	private static final String CHEMISTRY_AMULET_PROC_PREFIX = "Your amulet of chemistry helps you create";
+
+	private static final String DRUNKEN_DWARF_RANDOM_EVENT = "Drunken Dwarf|I 'new it were you matey! I remember your kebab stories! 'Ere, have some ob the good stuff!";
 
 	private void incrementChatboxActivity(TrackedActivity activity) {
 		Session session = plugin.getCurrentSession();
@@ -160,9 +185,15 @@ public class ChatMessageListener {
 	private void processDialogueMessage(String message)
 	{
 		// Pest Control points
-		if (plugin.isKcVisible(TrackedActivity.PEST_CONTROL_POINTS) && message.startsWith(PEST_CONTROL_POINTS_PREFIX)) {
+		if (configListener.isKcVisible(TrackedActivity.PEST_CONTROL_POINTS) && message.startsWith(PEST_CONTROL_POINTS_PREFIX)) {
 			pestControlPointsMessage(message);
-//			return;
+			return;
+		}
+
+		if (configListener.isKcVisible(TrackedActivity.DRUNKEN_DWARF) && message.startsWith(DRUNKEN_DWARF_RANDOM_EVENT))
+		{
+			incrementChatboxActivity(TrackedActivity.DRUNKEN_DWARF);
+			return;
 		}
 
 	}
@@ -172,13 +203,33 @@ public class ChatMessageListener {
 	 */
 	private void processMesboxMessage(String message)
 	{
-		if (plugin.isKcVisible(TrackedActivity.CANNONS_LOST) && message.equals(CANNON_LOST_AND_FOUND_MESSAGE)) {
+		if (configListener.isKcVisible(TrackedActivity.CANNONS_LOST) && message.equals(CANNON_LOST_AND_FOUND_MESSAGE)) {
 			incrementChatboxActivity(TrackedActivity.CANNONS_LOST);
 //			return;
 		}
 
 	}
 
+	private boolean processHerbloreActivity(String message)
+	{
+		if (configListener.isKcVisible(TrackedActivity.ALCHEMISTS_AMULET_PROCS) && (message.startsWith(ALCHEMIST_AMULET_PROC_PREFIX) || message.startsWith(CHEMISTRY_AMULET_PROC_PREFIX)))
+		{
+			incrementChatboxActivity(TrackedActivity.ALCHEMISTS_AMULET_PROCS);
+			return true;
+		}
+		if (configListener.isKcVisible(TrackedActivity.POTIONS_MIXED) && message.startsWith(POTIONS_MIXED_PREFIX))
+		{
+			incrementChatboxActivity(TrackedActivity.POTIONS_MIXED);
+			return true;
+		}
+		return false;
+	}
+
+	/**
+	 * Preprocesses a chatmessage and forwards it to other subscribers.
+	 * NB In order to prevent preprocessing the same message multiple times, this should be the only onChatMessage
+	 * subscriber.
+	 */
 	@Subscribe
 	public void onChatMessage(ChatMessage event) {
 		ChatMessageType messageType = event.getType();
@@ -203,69 +254,81 @@ public class ChatMessageListener {
 			return;
 		}
 
-		if (plugin.isKcVisible(TrackedActivity.SACRIFICES_SPARED) && message.equals(BONES_SPARED_MESSAGE)) {
+		if (farmingListener.onChatMessage(message, messageType)) return;
+
+		int regionId = client.getLocalPlayer().getWorldLocation().getRegionID();
+
+		if (configListener.isKcVisible(TrackedActivity.CRYSTAL_CHESTS) && regionId == CRYSTAL_CHEST_REGION_ID && message.equals(CRYSTAL_CHESTS_MESSAGE) ) {
+			incrementChatboxActivity(TrackedActivity.CRYSTAL_CHESTS);
+			return;
+		}
+
+		if (configListener.isKcVisible(TrackedActivity.SACRIFICES_SPARED) && message.equals(BONES_SPARED_MESSAGE)) {
 			incrementChatboxActivity(TrackedActivity.SACRIFICES_SPARED);
 			return;
 		}
 
-		if (plugin.isKcVisible(TrackedActivity.FARMING_CONTRACTS) && message.equals(FARMING_CONTRACT_MESSAGE)) {
+		if (configListener.isKcVisible(TrackedActivity.FARMING_CONTRACTS) && message.equals(FARMING_CONTRACT_MESSAGE)) {
 			incrementChatboxActivity(TrackedActivity.FARMING_CONTRACTS);
 			return;
 		}
-		if (plugin.isKcVisible(TrackedActivity.BIRD_HOUSES) && message.equals(BIRD_HOUSE_MESSAGE)) {
+		if (configListener.isKcVisible(TrackedActivity.BIRD_HOUSES) && message.equals(BIRD_HOUSE_MESSAGE)) {
 			incrementChatboxActivity(TrackedActivity.BIRD_HOUSES);
 			return;
 		}
-		if (plugin.isKcVisible(TrackedActivity.SUPERIOR_SPAWNS) && message.equals(SUPERIOR_SPAWN_MESSAGE)) {
+		if (configListener.isKcVisible(TrackedActivity.SUPERIOR_SPAWNS) && message.equals(SUPERIOR_SPAWN_MESSAGE)) {
 			incrementChatboxActivity(TrackedActivity.SUPERIOR_SPAWNS);
 			return;
 		}
-		if (plugin.isKcVisible(TrackedActivity.BIRD_EGGS_OFFERED) && message.equals(BIRD_EGG_OFFERING_MESSAGE)) {
+		if (configListener.isKcVisible(TrackedActivity.BIRD_EGGS_OFFERED) && message.equals(BIRD_EGG_OFFERING_MESSAGE)) {
 			incrementChatboxActivity(TrackedActivity.BIRD_EGGS_OFFERED);
 			return;
 		}
-		if (plugin.isKcVisible(TrackedActivity.MUSIC_TRACKS_UNLOCKED) && message.startsWith(MUSIC_TRACK_UNLOCK_PREFIX)) {
+		if (configListener.isKcVisible(TrackedActivity.MUSIC_TRACKS_UNLOCKED) && message.startsWith(MUSIC_TRACK_UNLOCK_PREFIX)) {
 			incrementChatboxActivity(TrackedActivity.MUSIC_TRACKS_UNLOCKED);
 			return;
 		}
-//		if (plugin.isKcVisible(TrackedActivity.QUESTS) && message.startsWith(QUEST_COMPLETED_PREFIX)) {
-//			incrementChatboxActivity(TrackedActivity.QUESTS);
-//			return;
-//		}
+
+		if (experienceDropListener.getLastSkillExpGained() == Skill.HERBLORE)
+		{
+			if (processHerbloreActivity(message)) return;
+		}
 
 
 
 		if (message.startsWith(CHESTS_PREFIX)) {
-			if (message.startsWith(LARRANS_SMALL_CHEST_PREFIX) && plugin.isKcVisible(TrackedActivity.LARRANS_SMALL_CHESTS)) {
+			if (message.startsWith(LARRANS_SMALL_CHEST_PREFIX) && configListener.isKcVisible(TrackedActivity.LARRANS_SMALL_CHESTS)) {
 				incrementChatboxActivity(TrackedActivity.LARRANS_SMALL_CHESTS);
-			} else if (message.startsWith(LARRANS_BIG_CHEST_PREFIX) && plugin.isKcVisible(TrackedActivity.LARRANS_BIG_CHESTS)) {
+			} else if (message.startsWith(LARRANS_BIG_CHEST_PREFIX) && configListener.isKcVisible(TrackedActivity.LARRANS_BIG_CHESTS)) {
 				incrementChatboxActivity(TrackedActivity.LARRANS_BIG_CHESTS);
-			} else if (message.startsWith(BRIMSTONE_CHEST_PREFIX) && plugin.isKcVisible(TrackedActivity.BRIMSTONE_CHESTS)) {
+			} else if (message.startsWith(BRIMSTONE_CHEST_PREFIX) && configListener.isKcVisible(TrackedActivity.BRIMSTONE_CHESTS)) {
 				incrementChatboxActivity(TrackedActivity.BRIMSTONE_CHESTS);
-			} else if (message.startsWith(ZOMBIE_PIRATE_LOCKER_PREFIX) && plugin.isKcVisible(TrackedActivity.ZOMBIE_PIRATE_CHESTS)) {
+			} else if (message.startsWith(ZOMBIE_PIRATE_LOCKER_PREFIX) && configListener.isKcVisible(TrackedActivity.ZOMBIE_PIRATE_CHESTS)) {
 				incrementChatboxActivity(TrackedActivity.ZOMBIE_PIRATE_CHESTS);
+			} else if (message.startsWith(ELVEN_CRYSTAL_CHESTS_PREFIX) && configListener.isKcVisible(TrackedActivity.ELVEN_CRYSTAL_CHESTS)) {
+				incrementChatboxActivity(TrackedActivity.ELVEN_CRYSTAL_CHESTS);
 			}
 			return;
 		}
 
 		if (message.startsWith(SNEAKING_SUSPICION_PREFIX)) {
-			if (message.endsWith(SNEAKING_SUSPICION_BEGINNER_AFFIX) && plugin.isKcVisible(TrackedActivity.MISSED_BEGINNER_CLUE)) incrementChatboxActivity(TrackedActivity.MISSED_BEGINNER_CLUE);
-			else if (message.endsWith(SNEAKING_SUSPICION_EASY_AFFIX) && plugin.isKcVisible(TrackedActivity.MISSED_EASY_CLUE)) incrementChatboxActivity(TrackedActivity.MISSED_EASY_CLUE);
-			else if (message.endsWith(SNEAKING_SUSPICION_MEDIUM_AFFIX) && plugin.isKcVisible(TrackedActivity.MISSED_MEDIUM_CLUE)) incrementChatboxActivity(TrackedActivity.MISSED_MEDIUM_CLUE);
-			else if (message.endsWith(SNEAKING_SUSPICION_HARD_AFFIX) && plugin.isKcVisible(TrackedActivity.MISSED_HARD_CLUE)) incrementChatboxActivity(TrackedActivity.MISSED_HARD_CLUE);
-			else if (message.endsWith(SNEAKING_SUSPICION_ELITE_AFFIX) && plugin.isKcVisible(TrackedActivity.MISSED_ELITE_CLUE)) incrementChatboxActivity(TrackedActivity.MISSED_ELITE_CLUE);
+			if (message.endsWith(SNEAKING_SUSPICION_BEGINNER_AFFIX) && configListener.isKcVisible(TrackedActivity.MISSED_BEGINNER_CLUE)) incrementChatboxActivity(TrackedActivity.MISSED_BEGINNER_CLUE);
+			else if (message.endsWith(SNEAKING_SUSPICION_EASY_AFFIX) && configListener.isKcVisible(TrackedActivity.MISSED_EASY_CLUE)) incrementChatboxActivity(TrackedActivity.MISSED_EASY_CLUE);
+			else if (message.endsWith(SNEAKING_SUSPICION_MEDIUM_AFFIX) && configListener.isKcVisible(TrackedActivity.MISSED_MEDIUM_CLUE)) incrementChatboxActivity(TrackedActivity.MISSED_MEDIUM_CLUE);
+			else if (message.endsWith(SNEAKING_SUSPICION_HARD_AFFIX) && configListener.isKcVisible(TrackedActivity.MISSED_HARD_CLUE)) incrementChatboxActivity(TrackedActivity.MISSED_HARD_CLUE);
+			else if (message.endsWith(SNEAKING_SUSPICION_ELITE_AFFIX) && configListener.isKcVisible(TrackedActivity.MISSED_ELITE_CLUE)) incrementChatboxActivity(TrackedActivity.MISSED_ELITE_CLUE);
 			return;
 		}
 
-		if (plugin.isKcVisible(TrackedActivity.CA_DIARY_TASKS) && message.startsWith(CA_PREFIX)) {
+		if (configListener.isKcVisible(TrackedActivity.CA_DIARY_TASKS) && message.startsWith(CA_PREFIX)) {
 			incrementChatboxActivity(TrackedActivity.CA_DIARY_TASKS);
 			return;
 		}
 
-		if (plugin.isKcVisible(TrackedActivity.PICKPOCKET_FAIL) && message.startsWith(PICKPOCKET_FAILED_PREFIX)) {
-			int tick = client.getTickCount();
-			if (pickpocketFailMsgTick == tick) incrementChatboxActivity(TrackedActivity.PICKPOCKET_FAIL);
-			pickpocketFailMsgTick = client.getTickCount();
+		if (message.startsWith(PICKPOCKET_START_PREFIX))
+		{
+			soundEffectListener.startPickpocketing();
+			return;
 		}
 
 		if (message.startsWith(LAP_PREFIX)) {
@@ -301,7 +364,7 @@ public class ChatMessageListener {
 					case "Agility Arena Total Ticket": lapActivity = TrackedActivity.AGILITY_BRIMHAVEN; break;
 				}
 
-				if (lapActivity != null && plugin.isKcVisible(lapActivity) && session.isTracking(lapActivity.getId())) {
+				if (lapActivity != null && configListener.isKcVisible(lapActivity) && session.isTracking(lapActivity.getId())) {
 					processChatboxUpdate(lapActivity.getId(), newLapCount);
 				}
 			}
@@ -309,7 +372,7 @@ public class ChatMessageListener {
 		}
 
 		if (message.startsWith(YOU_HAVE_COMPLETED_PREFIX)) {
-			if (plugin.isKcVisible(TrackedActivity.HUNTER_RUMOURS)) {
+			if (configListener.isKcVisible(TrackedActivity.HUNTER_RUMOURS)) {
 				Matcher rumourMatcher = RUMOUR_PATTERN.matcher(message);
 				if (rumourMatcher.find()) {
 					int newRumourCount = Integer.parseInt(rumourMatcher.group(1).replace(",", ""));
@@ -320,7 +383,7 @@ public class ChatMessageListener {
 				}
 			}
 
-			if (plugin.isKcVisible(TrackedActivity.MAHOGANY_HOMES)) {
+			if (configListener.isKcVisible(TrackedActivity.MAHOGANY_HOMES)) {
 				Matcher mahoganyMatcher = MAHOGANY_HOMES_PATTERN.matcher(message);
 				if (mahoganyMatcher.find()) {
 					int newContractCount = Integer.parseInt(mahoganyMatcher.group(1).replace(",", ""));
@@ -387,19 +450,5 @@ public class ChatMessageListener {
 			}
 		}
 		return sb.toString();
-	}
-
-
-	@Subscribe
-	public void onSoundEffectPlayed(SoundEffectPlayed event) {
-		int tick = client.getTickCount();
-		int soundId = event.getSoundId();
-
-		if (plugin.isKcVisible(TrackedActivity.PICKPOCKET_FAIL) && soundId == STUNNED_SOUND_EFFECT_ID) {
-			if (pickpocketFailMsgTick == tick)
-				incrementChatboxActivity(TrackedActivity.PICKPOCKET_FAIL);
-			pickpocketFailMsgTick = client.getTickCount();
-		}
-
 	}
 }

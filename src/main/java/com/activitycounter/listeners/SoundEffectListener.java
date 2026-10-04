@@ -29,7 +29,7 @@ import com.activitycounter.ActivityCounterPlugin;
 import com.activitycounter.PluginConstants;
 import com.activitycounter.models.TrackedActivity;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import javax.inject.Inject;
@@ -49,10 +49,6 @@ import net.runelite.api.events.VarbitChanged;
 import net.runelite.api.gameval.VarPlayerID;
 import net.runelite.client.eventbus.Subscribe;
 
-/**
- * Listeners that count whenever a specific sound is played.
- * Automatically maps any TrackedActivity with TrackerType.SOUND_EFFECT.
- */
 @Slf4j
 @Singleton
 public class SoundEffectListener
@@ -62,6 +58,19 @@ public class SoundEffectListener
 
 	@Inject
 	private ActivityCounterPlugin plugin;
+
+	@Inject
+	private ExperienceDropListener xpDropListener;
+
+	// Map specific activities to the Skill they grant XP in
+	private final Map<TrackedActivity, Skill> activitySkillMap = new EnumMap<>(TrackedActivity.class);
+
+	// Add this to your initializeRoutingCaches() or Constructor:
+	private void buildSkillMap() {
+		activitySkillMap.put(TrackedActivity.PICKPOCKET_SUCCESS, Skill.THIEVING);
+		activitySkillMap.put(TrackedActivity.CROPS_HARVESTED, Skill.FARMING); // Revert to whichever enum handles the sound
+		// Add any future XP-generating sound activities here
+	}
 
 	@Getter
 	private boolean hasAnySound = false;
@@ -73,38 +82,115 @@ public class SoundEffectListener
 	private boolean hasMusic = false;
 
 	private int scheduledLogTick = -1;
-
-	private int magicTick = 0;
 	private int hitSplatTick = 0;
+
+	private int pickpocketTick = 0;
+	private static final int PICKPOCKET_TICK_WINDOW = 5;
 
 	private static final int SOUND_EFFECT_VOLUME_VARPLAYERID = VarPlayerID.OPTION_SOUNDS;
 	private static final int SOUND_AREA_VOLUME_VARPLAYERID = VarPlayerID.OPTION_AREASOUNDS;
 	private static final int SOUND_MUSIC_VOLUME_VARPLAYERID = VarPlayerID.OPTION_MUSIC;
 	private static final int SOUND_MASTER_VOLUME_VARPLAYERID = VarPlayerID.OPTION_MASTER_VOLUME;
 
-	private final Map<Integer, List<TrackedActivity>> areaSoundEffectMap;
-	private final Map<Integer, List<TrackedActivity>> soundEffectMap;
+	private static final int MAX_SOUND_ID = 10000;
 
-	public SoundEffectListener() {
-		areaSoundEffectMap = new HashMap<>();
-		soundEffectMap = new HashMap<>();
+	@SuppressWarnings("unchecked")
+	private final List<TrackedActivity>[] soundEffectArray = new List[MAX_SOUND_ID];
 
+	@SuppressWarnings("unchecked")
+	private final List<TrackedActivity>[] areaSoundEffectArray = new List[MAX_SOUND_ID];
+
+	private boolean isInitialized = false;
+
+	/**
+	 * Sets up routing caches for sound listeners
+	 */
+	public void initializeRoutingCaches() {
+		if (isInitialized) return;
+		buildSkillMap();
 		for (TrackedActivity act : TrackedActivity.values()) {
-			if (act.getGameSourceId() <= 0) continue;
+			int[] sourceIds = act.getGameSourceIds();
+			if (sourceIds == null) continue;
 
-			switch (act.getTrackerType()) {
-				case SOUND_EFFECT:
-					soundEffectMap.computeIfAbsent(act.getGameSourceId(), k -> new ArrayList<>()).add(act);
-					break;
-				case AREA_SOUND:
-					areaSoundEffectMap.computeIfAbsent(act.getGameSourceId(), k -> new ArrayList<>()).add(act);
-					break;
+			for (int soundId : sourceIds) {
+				if (soundId <= 0 || soundId >= MAX_SOUND_ID) continue;
 
+				switch (act.getTrackerType()) {
+					case SOUND_EFFECT:
+						if (soundEffectArray[soundId] == null) {
+							soundEffectArray[soundId] = new ArrayList<>();
+						}
+						soundEffectArray[soundId].add(act);
+						break;
+					case AREA_SOUND:
+						if (areaSoundEffectArray[soundId] == null) {
+							areaSoundEffectArray[soundId] = new ArrayList<>();
+						}
+						areaSoundEffectArray[soundId].add(act);
+						break;
+				}
+			}
+		}
+		isInitialized = true;
+	}
+
+	@Subscribe
+	public void onSoundEffectPlayed(SoundEffectPlayed event) {
+		int soundId = event.getSoundId();
+		if (soundId < 0 || soundId >= MAX_SOUND_ID) return;
+
+		if (client.getTickCount() < pickpocketTick) {
+			if (soundId == PluginConstants.ActivityID.PICKPOCKET_SUCCESS)
+			{
+				plugin.increaseCountByOne(TrackedActivity.PICKPOCKET_SUCCESS.getId());
+				pickpocketTick = 0;
+				return;
+			}
+			if (soundId == PluginConstants.SoundID.STUNNED_SOUND_EFFECT_ID)
+			{
+				plugin.increaseCountByOne(TrackedActivity.PICKPOCKET_FAIL.getId());
+				pickpocketTick = 0;
+				return;
 			}
 		}
 
-		soundEffectMap.computeIfAbsent(PluginConstants.SoundID.SCYTHE_CRUSH, k -> new ArrayList<>()).add(TrackedActivity.SCYTHE_SWIPE);
-		soundEffectMap.computeIfAbsent(PluginConstants.SoundID.SCYTHE_SLASH, k -> new ArrayList<>()).add(TrackedActivity.SCYTHE_SWIPE);
+		List<TrackedActivity> activities = soundEffectArray[soundId];
+		if (activities == null || activities.isEmpty()) return;
+
+		if (activities.size() == 1) {
+			plugin.increaseCountByOne(activities.get(0).getId());
+			return;
+		}
+
+		Skill[] competingSkills = new Skill[activities.size()];
+		for (int i = 0; i < activities.size(); i++) {
+			competingSkills[i] = activitySkillMap.get(activities.get(i));
+		}
+
+		Skill winningSkill = xpDropListener.getMostRecentDrop(competingSkills);
+
+		if (winningSkill != null) {
+			for (TrackedActivity act : activities) {
+				if (activitySkillMap.get(act) == winningSkill) {
+					plugin.increaseCountByOne(act.getId());
+					break;
+				}
+			}
+		}
+	}
+
+	@Subscribe
+	public void onAreaSoundEffectPlayed(AreaSoundEffectPlayed event) {
+		int soundId = event.getSoundId();
+
+		if (soundId < 0 || soundId >= MAX_SOUND_ID) return;
+
+		List<TrackedActivity> activities = areaSoundEffectArray[soundId];
+		if (activities != null) {
+			for (TrackedActivity act : activities) {
+				plugin.increaseCountByOne(act.getId());
+			}
+		}
 	}
 
 	@Subscribe
@@ -143,48 +229,11 @@ public class SoundEffectListener
 	}
 
 	@Subscribe
-	public void onSoundEffectPlayed(SoundEffectPlayed event)
-	{
-		if (!hasSoundEffects) return;
-
-		int soundId = event.getSoundId();
-
-		List<TrackedActivity> activities = soundEffectMap.get(soundId);
-		if (activities != null) {
-			for (TrackedActivity activity : activities) {
-				plugin.increaseCountByOne(activity.getId());
-//				log.debug("Successfully SoundEffect for counter={}", activity.getName());
-				log.debug("[TICK={}] Successfully sound effect for counter={} ",client.getTickCount(), activity.getName());
-			}
-		} else {
-			log.debug("Unknown 2D soundId={}", soundId);
-		}
-	}
-
-	@Subscribe
 	public void onStatChanged(StatChanged event)
 	{
 		if (event.getSkill() == Skill.MAGIC)
 		{
 			log.debug("[TICK={}] Magic stat changed event={}", client.getTickCount(), event);
-		}
-	}
-
-	@Subscribe
-	public void onAreaSoundEffectPlayed(AreaSoundEffectPlayed event)
-	{
-		if (!hasAreaSound) return;
-
-		int soundId = event.getSoundId();
-
- 		List<TrackedActivity> activities = areaSoundEffectMap.get(soundId);
-		if (activities != null) {
-			for (TrackedActivity activity : activities) {
-				plugin.increaseCountByOne(activity.getId());
-				log.debug("[TICK={}] Successfully area sound for counter={} ",client.getTickCount(), activity.getName());
-			}
-		} else {
-			log.debug("Unknown 2D soundId={}", soundId);
 		}
 	}
 
@@ -198,10 +247,6 @@ public class SoundEffectListener
 		}
 	}
 
-	/**
-	 * Parse the sound settings and update flags accordingly. If a volume is 0, no call is made if the sound would have
-	 * been played, which will severely impair this listener.
-	 */
 	public void parseCurrentState()
 	{
 		hasAnySound = client.getVarpValue(SOUND_MASTER_VOLUME_VARPLAYERID) > 0;
@@ -211,17 +256,11 @@ public class SoundEffectListener
 		scheduleNoSoundActiveLog();
 	}
 
-	/**
-	 * Pushes the target log tick 5 ticks into the future.
-	 */
 	private void scheduleNoSoundActiveLog()
 	{
 		scheduledLogTick = client.getTickCount() + 5;
 	}
 
-	/**
-	 * Logs which audio channels are currently muted.
-	 */
 	private void executeNoSoundActiveLog()
 	{
 		if (hasAnySound && hasSoundEffects && hasAreaSound && hasMusic)
@@ -230,12 +269,19 @@ public class SoundEffectListener
 		}
 
 		List<String> muted = new ArrayList<>();
-
 		if (!hasAnySound) muted.add("Master Volume (which mutes the rest)");
 		if (!hasSoundEffects) muted.add("Sound Effects");
 		if (!hasAreaSound) muted.add("Area Sounds");
 		if (!hasMusic) muted.add("Music");
 
 		log.warn("The following audio channels are muted: {}", String.join(", ", muted));
+	}
+
+	/**
+	 * Sets pickpocket status
+	 */
+	public void startPickpocketing()
+	{
+		pickpocketTick = client.getTickCount() + PICKPOCKET_TICK_WINDOW ;
 	}
 }

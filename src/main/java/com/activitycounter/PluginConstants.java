@@ -27,6 +27,7 @@ package com.activitycounter;
 import net.runelite.api.gameval.InventoryID;
 import net.runelite.api.gameval.VarPlayerID;
 import net.runelite.api.gameval.VarbitID;
+import static net.runelite.api.gameval.VarbitID.*;
 
 /**
  * Global constants used by the plugin
@@ -181,14 +182,13 @@ public final class PluginConstants {
 		public static final int JAD_CHALLENGE_6 = VarPlayerID.JAD_CHALLENGE_6_COMPLETIONS;
 		public static final int COLOSSEUM_WAVES = VarPlayerID.TOTAL_COLOSSEUM_WAVES_COMPLETED;
 		public static final int GEMSTONE_CRAB = VarPlayerID.TOTAL_GEMSTONE_CRAB_KILLS;
+		public static final int SPELLBOOK_CHANGES = VarbitID.SPELLBOOK;
 		public static final int SOUL_WARS_WINS = VarPlayerID.SOUL_WARS_TOTAL_WINS;
 		public static final int SOUL_WARS_GAMES = VarPlayerID.SOUL_WARS_TOTAL_GAMES;
 
 		public static final int HUNTER_RUMOURS = -2000;
 		public static final int FARMING_CONTRACTS = -3000;
 		public static final int MAHOGANY_HOMES = -4000;
-
-
 
 		// Pseudo-IDs for Skill Experience (Negative to prevent collisions)
 		public static final int XP_ATTACK = -5000;
@@ -281,8 +281,20 @@ public final class PluginConstants {
 		public static final int PEST_CONTROL_POINTS = -7018;
 		public static final int TITHE_FARM_POINTS = VarbitID.HOSIDIUS_TITHE_REWARDPOINTS;
 		public static final int ZOMBIE_PIRATE_CHESTS = -7019;
+		public static final int FARMING_COMPOST = 2427;
+		public static final int SEEDS_PLANTED = 2432;
+		public static final int CROPS_PICKED_SPADE = 1470;
+		public static final int CROPS_PICKED_FRUIT_TREE = 2437;
+		public static final int WEEDS_RAKED = 2442;
 		public static final int PICKPOCKET_SUCCESS = 2581;
 		public static final int PICKPOCKET_FAIL = -7020;
+		public static final int CRYSTAL_CHESTS = -7021;
+		public static final int ELVEN_CRYSTAL_CHESTS = -7022;
+		public static final int LOGS_BURNT = 2596;
+		public static final int HERBS_HARVESTED = -7023;
+		public static final int FOOD_COOKED = 2596;
+		public static final int FOOD_BURNT = 2596;
+
 
 		public static final int GIANTS_FOUNDRY_POINTS = VarPlayerID.GIANTS_FOUNDRY_REWARD_SHOP_POINTS;
 		public static final int BA_ATTACKER_POINTS = VarbitID.BARBASSAULT_POINTS_ATTACKER_BASE;
@@ -290,6 +302,18 @@ public final class PluginConstants {
 		public static final int BA_DEFENDER_POINTS = VarbitID.BARBASSAULT_POINTS_DEFENDER_BASE;
 		public static final int BA_HEALER_POINTS = VarbitID.BARBASSAULT_POINTS_HEALER_BASE;
 		public static final int VARROCK_MUSEUM_KUDOS = VarbitID.VM_KUDOS;
+		public static final int[] ACHIEVEMENT_DIARY_TASK_COUNT = new int[] {
+			KARAMJA_EASY_COUNT, KARAMJA_MED_COUNT, KARAMJA_HARD_COUNT, KARAMJA_ELITE_COUNT,
+			ARDOUGNE_EASY_COUNT, ARDOUGNE_MED_COUNT, ARDOUGNE_HARD_COUNT, ARDOUGNE_ELITE_COUNT,
+			DESERT_EASY_COUNT, DESERT_MED_COUNT, DESERT_HARD_COUNT, DESERT_ELITE_COUNT,
+			FALADOR_EASY_COUNT, FALADOR_MED_COUNT, FALADOR_HARD_COUNT, FALADOR_ELITE_COUNT,
+			FREMENNIK_EASY_COUNT, FREMENNIK_MED_COUNT, FREMENNIK_HARD_COUNT, FREMENNIK_ELITE_COUNT,
+			KANDARIN_EASY_COUNT, KANDARIN_MED_COUNT, KANDARIN_HARD_COUNT, KANDARIN_ELITE_COUNT,
+			LUMBRIDGE_EASY_COUNT, LUMBRIDGE_MED_COUNT, LUMBRIDGE_HARD_COUNT, LUMBRIDGE_ELITE_COUNT,
+			MORYTANIA_EASY_COUNT, MORYTANIA_MED_COUNT, MORYTANIA_HARD_COUNT, MORYTANIA_ELITE_COUNT,
+			VARROCK_EASY_COUNT, VARROCK_MED_COUNT, VARROCK_HARD_COUNT, VARROCK_ELITE_COUNT,
+			WILDERNESS_EASY_COUNT, WILDERNESS_MED_COUNT, WILDERNESS_HARD_COUNT, WILDERNESS_ELITE_COUNT
+		};
 
 		// A pile of bones is sacrificed, but not really
 		public static final int SACRIFICES_SPARED = -7030;
