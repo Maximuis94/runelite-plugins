@@ -66,7 +66,7 @@ public class SessionStorageManager {
 			try
 			{
 				accountDir.createDirectories();
-				log.debug("Created account directory '{}'", accountDir.toString());
+				log.debug("Created account directory '{}'", accountDir);
 			}
 			catch (IOException e)
 			{
@@ -94,25 +94,23 @@ public class SessionStorageManager {
 
 		try (Reader reader = file.openBufferedReader()) {
 			Session session = gson.fromJson(reader, Session.class);
-
 			if (session != null) {
 				// Check if the session is using old IDs and migrate if necessary
 				if (migrateSessionData(session)) {
 					// Save the newly migrated data back to disk immediately
 					saveSession(session);
 				}
-			}
 
-			return session;
+				return session;
+			}
 		} catch (Exception e) {
 			log.error("Failed to load session from file", e);
-			return null;
 		}
+		return null;
 	}
 
 	/**
-	 * Migrates old Session JSONs (using volatile Varbit/Negative pseudo-IDs)
-	 * to the new immutable Storage ID architecture.
+	 * Migrates old Session JSONs to the new immutable Storage ID architecture.
 	 * Returns true if the session was modified and needs saving.
 	 */
 	private boolean migrateSessionData(Session session) {
@@ -127,7 +125,6 @@ public class SessionStorageManager {
 			int currentKey = entry.getKey();
 			Count count = entry.getValue();
 
-			// Find the matching TrackedActivity by its string name (which hasn't changed)
 			TrackedActivity matchedActivity = null;
 			for (TrackedActivity act : TrackedActivity.values()) {
 				if (act.getName().equals(count.getName())) {
@@ -139,7 +136,6 @@ public class SessionStorageManager {
 			if (matchedActivity != null) {
 				int newStorageId = matchedActivity.getId();
 
-				// If the key doesn't match the new Storage ID, it is an old save file
 				if (currentKey != newStorageId) {
 					Count updatedCount = new Count(count.getName(), newStorageId);
 					updatedCount.setInitialKc(count.getInitialKc());
@@ -148,11 +144,9 @@ public class SessionStorageManager {
 					newTrackedKills.put(newStorageId, updatedCount);
 					migrated = true;
 				} else {
-					// Already migrated, keep as is
 					newTrackedKills.put(currentKey, count);
 				}
 			} else {
-				// Orphaned activity (e.g. removed from the plugin entirely). Keep it just in case.
 				newTrackedKills.put(currentKey, count);
 			}
 		}
@@ -189,7 +183,7 @@ public class SessionStorageManager {
 			for (Filepath file : sessionFiles) {
 				Session session = loadSession(file);
 				if (session != null && session.isInProgress()) {
-					log.debug("Loading active session {} from file '{}'", session.getId(), file.toString());
+					log.debug("Loading active session {} from file '{}'", session.getId(), file);
 					return session;
 				}
 			}
@@ -231,9 +225,7 @@ public class SessionStorageManager {
 		try (Stream<Filepath> dirs = pluginDir.walk(1)) {
 			dirs.filter(Filepath::isDirectory)
 				.filter(d -> !d.equals(pluginDir))
-				.forEach(accountDir -> {
-					archived.addAll(getAccountSessions(accountDir));
-				});
+				.forEach(accountDir -> archived.addAll(getAccountSessions(accountDir)));
 		} catch (Exception e) {
 			log.error("Failed to load all archived sessions", e);
 		}

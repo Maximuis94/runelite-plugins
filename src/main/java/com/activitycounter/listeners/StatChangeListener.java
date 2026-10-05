@@ -48,8 +48,11 @@ public class StatChangeListener {
 	@Inject
 	private ActivityCounterPlugin plugin;
 
-	private boolean trackExperience = false;
-	private boolean trackLevels = false;
+	@Inject
+	private ConfigListener configListener;
+
+	private boolean trackExperience = true;
+	private boolean trackLevels = true;
 	private boolean statsLoaded = false;
 
 	/**
@@ -139,6 +142,7 @@ public class StatChangeListener {
 	@Subscribe
 	public void onStatChanged(StatChanged event) {
 		if (!trackExperience && !trackLevels) return;
+
 		Session currentSession = plugin.getCurrentSession();
 		if (currentSession == null || !currentSession.isInProgress()) return;
 
@@ -151,28 +155,28 @@ public class StatChangeListener {
 
 		if (plugin.getLoginTicks() < 5) return;
 
-		boolean isXpUpdated = false;
 		Skill skill = event.getSkill();
 		int xp = event.getXp();
 
-		if (currentSession.updateSkillXp(skill, xp)) {
-			plugin.setRequiresSaveAndRefresh(true);
-			isXpUpdated = true;
-		}
+		boolean isXpUpdated = currentSession.updateSkillXp(skill, xp);
 
-		int trackingId = getSkillTrackingId(skill);
-		if (currentSession.isTracking(trackingId)) {
-			processActivityUpdate(trackingId, xp);
-			isXpUpdated = true;
-		}
-
-		// 2. STRICTLY nest Total XP and Levels inside isXpUpdated to ignore potions
 		if (isXpUpdated) {
-			if (currentSession.isTracking(TrackedActivity.XP_TOTAL.getId())) {
+			plugin.setRequiresSaveAndRefresh(true);
+
+			int trackingId = getSkillTrackingId(skill);
+			if (configListener.isKcVisible(trackingId)) {
+				processActivityUpdate(trackingId, xp);
+			}
+
+			if (configListener.isKcVisible(TrackedActivity.XP_TOTAL)) {
 				int totalGained = currentSession.getGainedXpMap().values().stream()
 					.mapToInt(Integer::intValue)
 					.sum();
-				currentSession.getKillCount(TrackedActivity.XP_TOTAL.getId()).setSessionKc(totalGained);
+
+				Count totalKc = currentSession.getKillCount(TrackedActivity.XP_TOTAL.getId());
+				if (totalKc != null) {
+					totalKc.setSessionKc(totalGained);
+				}
 			}
 
 			if (trackLevels) {
@@ -193,7 +197,6 @@ public class StatChangeListener {
 		Session currentSession = plugin.getCurrentSession();
 		if (currentSession == null || !currentSession.isInProgress()) return;
 
-		// 1. Guarantee ALL skills are fully loaded before capturing baselines
 		for (Skill s : Skill.values()) {
 			if (s != Skill.OVERALL && client.getRealSkillLevel(s) == 0) return;
 		}

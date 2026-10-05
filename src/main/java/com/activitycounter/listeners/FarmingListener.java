@@ -55,6 +55,9 @@ public class FarmingListener {
 	@Inject
 	private ActivityCounterPlugin plugin;
 
+	@Inject
+	private ConfigListener configListener;
+
 	private boolean isHarvesting = false;
 	private TrackedActivity activityInProgress = null;
 
@@ -78,6 +81,7 @@ public class FarmingListener {
 		if (!isRegistered || !isFarmingChatType(type)) return false;
 
 		if (!isHarvesting) {
+			TrackedActivity activity;
 			switch (message)
 			{
 				case "You begin to harvest the herb patch.":
@@ -87,8 +91,21 @@ public class FarmingListener {
 					startHarvesting(TrackedActivity.CROPS_HARVESTED);
 					return true;
 				case "Your spell fails and the patch is cleared.":
-					plugin.increaseCountByOne(TrackedActivity.CROP_RESURRECTION_FAIL.getId());
+					activity = TrackedActivity.CROP_RESURRECTION_FAIL;
 					break;
+				case "You restore the patch to life.":
+					activity = TrackedActivity.CROP_RESURRECTION_SUCCESS;
+					break;
+				default:
+					activity = null;
+			}
+			if (activity != null)
+			{
+				if (configListener.isKcVisible(activity))
+				{
+					plugin.increaseCountByOne(activity.getId());
+				}
+				return true;
 			}
 		}
 

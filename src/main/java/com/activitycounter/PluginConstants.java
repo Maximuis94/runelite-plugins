@@ -53,6 +53,11 @@ public final class PluginConstants {
 		public static final int STUNNED_SOUND_EFFECT_ID = 2727;
 	}
 
+	public static final class RegionID {
+		public static final int MASTERING_MIXOLOGY_BASEMENT = 5521;
+
+	}
+
 
 	public static final class ActivityID {
 
@@ -295,6 +300,8 @@ public final class PluginConstants {
 		public static final int FOOD_COOKED = 2596;
 		public static final int FOOD_BURNT = 2596;
 
+		public static final int[] MIXOLOGY_DIGWEED_MATURED = {MM_HERB_READY_1, MM_HERB_READY_2, MM_HERB_READY_3, MM_HERB_READY_4};
+
 
 		public static final int GIANTS_FOUNDRY_POINTS = VarPlayerID.GIANTS_FOUNDRY_REWARD_SHOP_POINTS;
 		public static final int BA_ATTACKER_POINTS = VarbitID.BARBASSAULT_POINTS_ATTACKER_BASE;
@@ -333,27 +340,6 @@ public final class PluginConstants {
 		public static final int BOLT_DIAMOND = -7107;
 		public static final int BOLT_DRAGONSTONE = -7108;
 		public static final int BOLT_ONYX = -7109;
-
-		// --- SPELLS ---
-
-		// Regular spellbook
-		public static final int BOLT_GOLD = -7110;
-
-
-
-
-		// Ancient spellbook
-
-
-
-		// Lunar spellbook
-
-
-
-
-		// Arceeus spellbook
-
-
 
 		// Clue Scrolls
 		public static final int COMPLETED_BEGINNER_CLUE = VarPlayerID.COMPLETED_CLUES5;

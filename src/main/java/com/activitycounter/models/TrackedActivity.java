@@ -288,8 +288,10 @@ public enum TrackedActivity
 	POTIONS_MIXED(2329, "Potions mixed", Category.SKILLING, TrackerType.CHAT_MESSAGE, new int[]{-10002}),
 	ALCHEMISTS_AMULET_PROCS(2330, "Amulet of Chemistry procs", Category.SKILLING, TrackerType.CUSTOM, new int[]{-10001}),
 //	PRESCRIPTION_GOGGLE_PROCS(2331, "Prescription goggle procs", Category.SKILLING, TrackerType.CUSTOM, new int[]{-10000}),
-//	CROP_RESURRECTION_SUCCESS(2332, "Crops successfully resurrected", Category.SKILLING, TrackerType.CUSTOM, new int[]{-10001}),
+	CROP_RESURRECTION_SUCCESS(2332, "Crops successfully resurrected", Category.SKILLING, TrackerType.CUSTOM, new int[]{-10001}),
 	CROP_RESURRECTION_FAIL(2333, "Crops failed to resurrect", Category.SKILLING, TrackerType.CUSTOM, new int[]{-10001}),
+	MIXOLOGY_DIGWEED_MATURED(2334, "Mixology Digweed matured", Category.SKILLING, TrackerType.CHAT_MESSAGE, PluginConstants.ActivityID.MIXOLOGY_DIGWEED_MATURED),
+	MIXOLOGY_DIGWEED_PICKED(2335, "Mixology Digweed picked", Category.SKILLING, TrackerType.CHAT_MESSAGE, new int[]{-10001}),
 
 	// --- SUPPLIES (2400 - 2499) ---
 	POTIONS_SIPPED(2401, "Potions sipped", Category.SUPPLIES, TrackerType.VARPLAYER_VALUE, new int[]{PluginConstants.ActivityID.POTIONS_SIPPED}),
@@ -336,7 +338,7 @@ public enum TrackedActivity
 	// --- TERTIARY DROPS (2900 - 2999) ---
 	BIRD_EGGS_OFFERED(2900, "Bird eggs offered", Category.TERTIARY_DROPS, TrackerType.CHAT_MESSAGE, new int[]{PluginConstants.ActivityID.BIRD_EGGS_OFFERED}),
 
-	// Standard Spellbook (3000 - 3099)
+	// Spells (3000 - 3499)
 
 
 

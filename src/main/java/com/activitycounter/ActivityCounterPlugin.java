@@ -82,6 +82,9 @@ import net.runelite.client.util.ImageUtil;
 )
 public class ActivityCounterPlugin extends Plugin
 {
+	@Getter
+	private int loadedRegionId;
+
 	@Inject
 	private EventBus eventBus;
 
@@ -147,16 +150,15 @@ public class ActivityCounterPlugin extends Plugin
 			return null;
 		}
 	}
-
 	@Getter
-	private Session currentSession;
+	private Session currentSession = null;
+	private boolean pendingSessionResume = false;
 	private ActivityCounterPanel panel;
 	private NavigationButton navButton;
 
 	@Setter
 	private boolean requiresSaveAndRefresh = false;
 
-	// Delegated config getters
 	public boolean isShowSessionDuration() {
 		return config.showSessionDuration();
 	}
@@ -236,39 +238,21 @@ public class ActivityCounterPlugin extends Plugin
 	public void onGameStateChanged(GameStateChanged event)
 	{
 		GameState state = event.getGameState();
-
 		if (state == GameState.LOGGED_IN)
 		{
 			loginTicks = 0;
-
-			long accountHash = client.getAccountHash();
-			if (accountHash == -1) return;
-
-			if (currentSession == null)
-			{
-				Session activeSession = storageManager.loadActiveSession(accountHash);
-				if (activeSession != null)
-				{
-					currentSession = activeSession;
-					initializeKillCounts(false);
-					log.debug("Resumed active session: {}", currentSession.getId());
-
-					panel.forceActiveSessionSelection();
-				}
-			}
-
-			panel.reloadComboBox();
-
+			pendingSessionResume = true;
 		}
 		else if (state == GameState.LOGIN_SCREEN || state == GameState.HOPPING)
 		{
 			if (currentSession != null && state == GameState.LOGIN_SCREEN)
 			{
 				storageManager.saveSession(currentSession);
-				currentSession = null;
 			}
-
+			currentSession = null;
+			pendingSessionResume = false;
 			panel.reloadComboBox();
+			loadedRegionId = -1;
 		}
 	}
 
@@ -374,7 +358,6 @@ public class ActivityCounterPlugin extends Plugin
 	{
 		if (session == null) return new ArrayList<>();
 
-		// Delegated visibility check to ConfigListener
 		List<Count> visibleKcs = session.getAllKillCounts().stream()
 			.filter(kc -> kc.getSessionKc() > 0 && configListener.isKcVisible(kc.getTrackingId()))
 			.collect(Collectors.toList());
@@ -430,6 +413,25 @@ public class ActivityCounterPlugin extends Plugin
 	@Subscribe
 	public void onGameTick(GameTick event)
 	{
+		if (pendingSessionResume && client.getAccountHash() != -1)
+		{
+			pendingSessionResume = false;
+			long accountHash = client.getAccountHash();
+
+			if (currentSession == null)
+			{
+				Session activeSession = storageManager.loadActiveSession(accountHash);
+				if (activeSession != null)
+				{
+					currentSession = activeSession;
+					initializeKillCounts(false);
+					log.debug("Resumed active session: {}", currentSession.getId());
+					panel.forceActiveSessionSelection();
+					panel.reloadComboBox();
+				}
+			}
+		}
+
 		if (currentSession != null && currentSession.isInProgress() && loginTicks < 5)
 		{
 			loginTicks++;
@@ -438,12 +440,10 @@ public class ActivityCounterPlugin extends Plugin
 		if (requiresSaveAndRefresh && currentSession != null)
 		{
 			storageManager.saveSession(currentSession);
-
 			if (panel != null)
 			{
 				panel.refreshKcContainer();
 			}
-
 			requiresSaveAndRefresh = false;
 		}
 	}
@@ -495,7 +495,6 @@ public class ActivityCounterPlugin extends Plugin
 								int[] sourceIds = act.getGameSourceIds();
 
 								if (sourceIds != null) {
-									// Iterate over the array and sum up the baselines
 									for (int sourceId : sourceIds) {
 										if (sourceId > 0) {
 											initialBaseline += (act.getTrackerType() == TrackerType.VARPLAYER_VALUE)

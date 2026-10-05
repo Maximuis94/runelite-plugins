@@ -90,6 +90,7 @@ public class ChatMessageListener {
 	private static final int CRYSTAL_CHESTS = -7017;
 	private static final String CRYSTAL_CHESTS_MESSAGE = "You find some treasure in the chest!";
 	private static final int CRYSTAL_CHEST_REGION_ID = 11573;
+	private static final int MASTERING_MIXOLOGY_REGION_ID = 5521;
 
 	private static final String SNEAKING_SUSPICION_PREFIX = "You have a sneaking suspicion that";
 	private static final String SNEAKING_SUSPICION_BEGINNER_AFFIX = " beginner scroll box.";
@@ -287,6 +288,20 @@ public class ChatMessageListener {
 		if (configListener.isKcVisible(TrackedActivity.MUSIC_TRACKS_UNLOCKED) && message.startsWith(MUSIC_TRACK_UNLOCK_PREFIX)) {
 			incrementChatboxActivity(TrackedActivity.MUSIC_TRACKS_UNLOCKED);
 			return;
+		}
+
+		if (regionId == MASTERING_MIXOLOGY_REGION_ID)
+		{
+			if (configListener.isKcVisible(TrackedActivity.MIXOLOGY_DIGWEED_PICKED) && message.equals("You collect a handful of digweed."))
+			{
+				incrementChatboxActivity(TrackedActivity.MIXOLOGY_DIGWEED_PICKED);
+				return;
+			}
+			if (configListener.isKcVisible(TrackedActivity.MIXOLOGY_DIGWEED_MATURED) && message.endsWith("has matured..."))
+			{
+				incrementChatboxActivity(TrackedActivity.MIXOLOGY_DIGWEED_PICKED);
+				return;
+			}
 		}
 
 		if (experienceDropListener.getLastSkillExpGained() == Skill.HERBLORE)
