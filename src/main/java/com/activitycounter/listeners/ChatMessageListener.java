@@ -309,18 +309,16 @@ public class ChatMessageListener {
 			if (processHerbloreActivity(message)) return;
 		}
 
-
-
 		if (message.startsWith(CHESTS_PREFIX)) {
-			if (message.startsWith(LARRANS_SMALL_CHEST_PREFIX) && configListener.isKcVisible(TrackedActivity.LARRANS_SMALL_CHESTS)) {
+			if (configListener.isKcVisible(TrackedActivity.LARRANS_SMALL_CHESTS) && message.startsWith(LARRANS_SMALL_CHEST_PREFIX)) {
 				incrementChatboxActivity(TrackedActivity.LARRANS_SMALL_CHESTS);
-			} else if (message.startsWith(LARRANS_BIG_CHEST_PREFIX) && configListener.isKcVisible(TrackedActivity.LARRANS_BIG_CHESTS)) {
+			} else if (configListener.isKcVisible(TrackedActivity.LARRANS_BIG_CHESTS) && message.startsWith(LARRANS_BIG_CHEST_PREFIX)) {
 				incrementChatboxActivity(TrackedActivity.LARRANS_BIG_CHESTS);
-			} else if (message.startsWith(BRIMSTONE_CHEST_PREFIX) && configListener.isKcVisible(TrackedActivity.BRIMSTONE_CHESTS)) {
+			} else if (configListener.isKcVisible(TrackedActivity.BRIMSTONE_CHESTS) && message.startsWith(BRIMSTONE_CHEST_PREFIX)) {
 				incrementChatboxActivity(TrackedActivity.BRIMSTONE_CHESTS);
-			} else if (message.startsWith(ZOMBIE_PIRATE_LOCKER_PREFIX) && configListener.isKcVisible(TrackedActivity.ZOMBIE_PIRATE_CHESTS)) {
+			} else if (configListener.isKcVisible(TrackedActivity.ZOMBIE_PIRATE_CHESTS) && message.startsWith(ZOMBIE_PIRATE_LOCKER_PREFIX)) {
 				incrementChatboxActivity(TrackedActivity.ZOMBIE_PIRATE_CHESTS);
-			} else if (message.startsWith(ELVEN_CRYSTAL_CHESTS_PREFIX) && configListener.isKcVisible(TrackedActivity.ELVEN_CRYSTAL_CHESTS)) {
+			} else if (configListener.isKcVisible(TrackedActivity.ELVEN_CRYSTAL_CHESTS) && message.startsWith(ELVEN_CRYSTAL_CHESTS_PREFIX)) {
 				incrementChatboxActivity(TrackedActivity.ELVEN_CRYSTAL_CHESTS);
 			}
 			return;
