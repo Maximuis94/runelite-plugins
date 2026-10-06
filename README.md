@@ -10,7 +10,7 @@ The labels at the top that show the time / session start+end / notes can also be
 ![example.PNG](images/example.PNG)
 
 
-## Counted values
+## Counted values (267 total)
 
 <details>
 <summary><b>Boss killcount</b></summary>
@@ -78,109 +78,29 @@ The labels at the top that show the time / session start+end / notes can also be
 - Sol Heredit
 - Colosseum waves
 - Doom of Mokhaiotl levels
-- Doom of Mokhaiotl Level 1
-- Doom of Mokhaiotl Level 2
-- Doom of Mokhaiotl Level 3
-- Doom of Mokhaiotl Level 4
-- Doom of Mokhaiotl Level 5
-- Doom of Mokhaiotl Level 6
-- Doom of Mokhaiotl Level 7
-- Doom of Mokhaiotl Level 8
-- Doom of Mokhaiotl Level 8+
+- Doom of Mokhaiotl Level 1-8, 8+ completions
 </details>
 
 <details>
 <summary><b>Chests Looted</b></summary>
 
 - Barrows Chests
-- Chambers of Xeric
-- Chambers of Xeric: Challenge Mode
-- Theatre of Blood
-- Theatre of Blood: Story Mode
-- Theatre of Blood: Hard Mode
-- The Gauntlet
-- The Corrupted Gauntlet
-- Tombs of Amascut
-- Tombs of Amascut: Entry Mode
-- Tombs of Amascut: Expert Mode
 - Perilous Moons Chests
-</details>
-
-<details>
-<summary><b>Other (Minigames & Misc)</b></summary>
-
-- Wintertodt
-- Zalcano
-- Tempoross
-- Guardians of the Rift
-- Jad Challenge 1
-- Jad Challenge 2
-- Jad Challenge 3
-- Jad Challenge 4
-- Jad Challenge 5
-- Jad Challenge 6
-- Gemstone Crab
-- Soul Wars wins
-- Soul Wars games
-- Hunter Rumours
-- Farming Contracts
-- Mahogany Homes
-- New collections logged
-- Bird eggs offered
-- Player deaths
-- Player kills
-- Monster kills
-- Quests
-- Quest points
-- CA Diary tasks
-- CA Diary points
-- Mixology orders
-- Mixology Aga points
-- Mixology Lye points
-- Mixology Mox points
-- Music tracks unlocked
 - Larran's small chests
 - Larran's big chests
 - Brimstone chests
-- Bird houses built
-- Damage dealt to NPCs
-- Special attacks used
-- Damage taken from NPCs
-- Fish caught
-- Logs chopped
-- Ore mined
-- Potions sipped
-- Food eaten
-- Teleport tablets used
-- Scythe of Vitur charges
-- Coins gained
-- Coins lost
-- Cannons lost&found
-- Cannonballs fired
-- NMZ points
-- Pest control points
-- Tithe farm points
-- Giant's foundry points
-- BA Attacker points
-- BA Collector points
-- BA Defender points
-- BA Healer points
-- Varrock Museum kudos
+- Zombie pirate lockers
+- Crystal chests
+- Elven crystal chests
 </details>
 
 <details>
-<summary><b>Bolt Procs</b></summary>
+<summary><b>Other</b></summary>
 
-- Opal bolt procs
-- Sapphire bolt procs
-- Jade bolt procs
-- Pearl bolt procs
-- Emerald bolt procs
-- Red topaz bolt procs
-- Ruby bolt procs
-- Diamond bolt procs
-- Dragonstone bolt procs
-- Onyx bolt procs
+- Coins gained
+- Coins lost
+- Gemstone Crab
+- Spellbook changes
 </details>
 
 <details>
@@ -239,6 +159,21 @@ The labels at the top that show the time / session start+end / notes can also be
 </details>
 
 <details>
+<summary><b>Bolt Procs</b></summary>
+
+- Opal bolt procs
+- Sapphire bolt procs
+- Jade bolt procs
+- Pearl bolt procs
+- Emerald bolt procs
+- Red topaz bolt procs
+- Ruby bolt procs
+- Diamond bolt procs
+- Dragonstone bolt procs
+- Onyx bolt procs
+</details>
+
+<details>
 <summary><b>Skills</b></summary>
 
 - XP gained
@@ -246,16 +181,130 @@ The labels at the top that show the time / session start+end / notes can also be
 </details>
 
 <details>
+<summary><b>Raids</b></summary>
+
+- Chambers of Xeric
+- Chambers of Xeric: Challenge Mode
+- Theatre of Blood
+- Theatre of Blood: Story Mode
+- Theatre of Blood: Hard Mode
+- The Gauntlet
+- The Corrupted Gauntlet
+- Tombs of Amascut
+- Tombs of Amascut: Entry Mode
+- Tombs of Amascut: Expert Mode
+</details>
+
+<details>
+<summary><b>Minigames</b></summary>
+
+- BA Attacker points
+- BA Collector points
+- BA Defender points
+- BA Healer points
+- Jad Challenge 1-6
+- Soul Wars wins
+- Soul Wars games
+- NMZ points
+- Pest control points
+- Tithe farm points
+- Giant's foundry points
+- Guardians of the Rift
+- Wintertodt
+- Zalcano
+- Tempoross
+- Reward permits
+</details>
+
+<details>
+<summary><b>Combat</b></summary>
+
+- Damage dealt to NPCs
+- Damage taken from NPCs
+- Special attacks used
+- Player deaths
+- Player kills
+- Monster kills
+- Max hits
+</details>
+
+<details>
+<summary><b>Supplies</b></summary>
+
+- Potions sipped
+- Food eaten
+- Teleport tablets used
+- Cannonballs fired
+- Scythe of Vitur charges
+- Cannons lost&found
+</details>
+
+<details>
+<summary><b>Skilling</b></summary>
+
+- Fish caught
+- Logs chopped
+- Ore mined
+- Bird houses built
+- Farming Contracts
+- Hunter Rumours
+- Mahogany Homes
+- Mastering Mixology
+	- Completed orders
+	- Aga/Lye/Mox points
+	- Digweed matured/collected
+- Offerings spared
+- Bones offered
+- Pickpockets succeeded
+- Pickpockets failed
+- Patches composted
+- Seeds planted
+- Herbs harvested
+- Crops harvested
+- Weeds raked
+- Fruit picked
+- Logs burnt
+- Food cooked
+- Potions mixed
+- Amulet of Chemistry procs
+- Crops successfully resurrected
+- Crops failed to resurrect
+- Bird eggs offered
+</details>
+
+<details>
+<summary><b>Achievements</b></summary>
+
+- Achievement Diary tasks
+- Quests
+- Quest points
+- CA Diary tasks
+- CA Diary points
+- Music tracks unlocked
+- New collections logged
+- Varrock Museum kudos
+</details>
+
+<details>
+<summary><b>Random events</b></summary>
+
+- Drunken dwarf
+</details>
+
+<details>
 <summary>To-do (maybe)</summary>
 
 - Experience drop counters
+- Other random events
 - Incoming/outgoing hits (miss / not protected / hit)
 - Specific Spells cast
 - Metrics per timeframe (e.g. medium clues completed/hour)
 - Additional categories
 - GE tax paid
-- Champion scrolls (and sneaky suspicions thereof)
-- Pets
+- Tertiary drops
+  - Champion scrolls (and sneaky suspicions thereof)
+  - Pets
+  - Long/Curved bone
 - Reset option
 - If you have interesting ideas feel free to make an issue via the plugin page :D
 

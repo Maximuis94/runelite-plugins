@@ -299,7 +299,7 @@ public class ChatMessageListener {
 			}
 			if (configListener.isKcVisible(TrackedActivity.MIXOLOGY_DIGWEED_MATURED) && message.endsWith("has matured..."))
 			{
-				incrementChatboxActivity(TrackedActivity.MIXOLOGY_DIGWEED_PICKED);
+				incrementChatboxActivity(TrackedActivity.MIXOLOGY_DIGWEED_MATURED);
 				return;
 			}
 		}

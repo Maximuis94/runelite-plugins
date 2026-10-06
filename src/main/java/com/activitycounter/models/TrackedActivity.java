@@ -267,8 +267,8 @@ public enum TrackedActivity
 	MIXOLOGY_AGA_POINTS(2309, "Mixology Aga points", Category.SKILLING, TrackerType.VARPLAYER_VALUE, new int[]{PluginConstants.ActivityID.MIXOLOGY_AGA_POINTS}),
 	MIXOLOGY_LYE_POINTS(2310, "Mixology Lye points", Category.SKILLING, TrackerType.VARPLAYER_VALUE, new int[]{PluginConstants.ActivityID.MIXOLOGY_LYE_POINTS}),
 	MIXOLOGY_MOX_POINTS(2311, "Mixology Mox points", Category.SKILLING, TrackerType.VARPLAYER_VALUE, new int[]{PluginConstants.ActivityID.MIXOLOGY_MOX_POINTS}),
-	SACRIFICES_SPARED(2312, "Offerings spared", Category.SKILLING, TrackerType.CHAT_MESSAGE, new int[]{PluginConstants.ActivityID.SACRIFICES_SPARED}),
-	SACRIFICES_MADE(2313, "Bones offered", Category.SKILLING, TrackerType.SOUND_EFFECT, new int[]{PluginConstants.ActivityID.SACRIFICES_MADE}),
+	MIXOLOGY_DIGWEED_MATURED(2312, "Mixology Digweed matured", Category.SKILLING, TrackerType.CHAT_MESSAGE, PluginConstants.ActivityID.MIXOLOGY_DIGWEED_MATURED),
+	MIXOLOGY_DIGWEED_PICKED(2313, "Mixology Digweed picked", Category.SKILLING, TrackerType.CHAT_MESSAGE, new int[]{-10001}),
 	GUARDIANS_OF_THE_RIFT(2314, "Guardians of the Rift", Category.MINI_GAMES, TrackerType.VARPLAYER_VALUE, new int[]{PluginConstants.ActivityID.GUARDIANS_OF_THE_RIFT}),
 	WINTERTODT(2315, "Wintertodt", Category.MINI_GAMES, TrackerType.VARPLAYER_VALUE, new int[]{PluginConstants.ActivityID.WINTERTODT}),
 	ZALCANO(2316, "Zalcano", Category.MINI_GAMES, TrackerType.VARPLAYER_VALUE, new int[]{PluginConstants.ActivityID.ZALCANO}),
@@ -282,16 +282,16 @@ public enum TrackedActivity
 	CROPS_HARVESTED(2324, "Crops harvested", Category.SKILLING, TrackerType.CUSTOM, new int[]{PluginConstants.ActivityID.CROPS_PICKED_SPADE}),
 	WEEDS_RAKED(2325, "Weeds raked", Category.SKILLING, TrackerType.SOUND_EFFECT, new int[]{PluginConstants.ActivityID.WEEDS_RAKED}),
 	FRUIT_PICKED(2326, "Fruit picked", Category.SKILLING, TrackerType.SOUND_EFFECT, new int[]{PluginConstants.ActivityID.CROPS_PICKED_FRUIT_TREE}),
-	LOGS_BURNT(2327, "Logs burnt", Category.SKILLING, TrackerType.SOUND_EFFECT, new int[]{PluginConstants.ActivityID.LOGS_BURNT}),
-	FOOD_COOKED(2328, "Food cooked", Category.SKILLING, TrackerType.CHAT_MESSAGE, new int[]{PluginConstants.ActivityID.FOOD_COOKED}),
+	CROP_RESURRECTION_SUCCESS(2327, "Crops resurrected", Category.SKILLING, TrackerType.CUSTOM, new int[]{-10001}),
+	CROP_RESURRECTION_FAIL(2328, "Crops not resurrected", Category.SKILLING, TrackerType.CUSTOM, new int[]{-10001}),
 
 	POTIONS_MIXED(2329, "Potions mixed", Category.SKILLING, TrackerType.CHAT_MESSAGE, new int[]{-10002}),
 	ALCHEMISTS_AMULET_PROCS(2330, "Amulet of Chemistry procs", Category.SKILLING, TrackerType.CUSTOM, new int[]{-10001}),
-//	PRESCRIPTION_GOGGLE_PROCS(2331, "Prescription goggle procs", Category.SKILLING, TrackerType.CUSTOM, new int[]{-10000}),
-	CROP_RESURRECTION_SUCCESS(2332, "Crops successfully resurrected", Category.SKILLING, TrackerType.CUSTOM, new int[]{-10001}),
-	CROP_RESURRECTION_FAIL(2333, "Crops failed to resurrect", Category.SKILLING, TrackerType.CUSTOM, new int[]{-10001}),
-	MIXOLOGY_DIGWEED_MATURED(2334, "Mixology Digweed matured", Category.SKILLING, TrackerType.CHAT_MESSAGE, PluginConstants.ActivityID.MIXOLOGY_DIGWEED_MATURED),
-	MIXOLOGY_DIGWEED_PICKED(2335, "Mixology Digweed picked", Category.SKILLING, TrackerType.CHAT_MESSAGE, new int[]{-10001}),
+	LOGS_BURNT(2331, "Logs burnt", Category.SKILLING, TrackerType.SOUND_EFFECT, new int[]{PluginConstants.ActivityID.LOGS_BURNT}),
+	FOOD_COOKED(2332, "Food cooked", Category.SKILLING, TrackerType.CHAT_MESSAGE, new int[]{PluginConstants.ActivityID.FOOD_COOKED}),
+	SACRIFICES_SPARED(2334, "Offerings spared", Category.SKILLING, TrackerType.CHAT_MESSAGE, new int[]{PluginConstants.ActivityID.SACRIFICES_SPARED}),
+	SACRIFICES_MADE(2335, "Bones offered", Category.SKILLING, TrackerType.SOUND_EFFECT, new int[]{PluginConstants.ActivityID.SACRIFICES_MADE}),
+	BIRD_EGGS_OFFERED(2336, "Bird eggs offered", Category.SKILLING, TrackerType.CHAT_MESSAGE, new int[]{PluginConstants.ActivityID.BIRD_EGGS_OFFERED}),
 
 	// --- SUPPLIES (2400 - 2499) ---
 	POTIONS_SIPPED(2401, "Potions sipped", Category.SUPPLIES, TrackerType.VARPLAYER_VALUE, new int[]{PluginConstants.ActivityID.POTIONS_SIPPED}),
@@ -336,7 +336,6 @@ public enum TrackedActivity
 // --- SAILING (2800 - 2899) ---
 
 	// --- TERTIARY DROPS (2900 - 2999) ---
-	BIRD_EGGS_OFFERED(2900, "Bird eggs offered", Category.TERTIARY_DROPS, TrackerType.CHAT_MESSAGE, new int[]{PluginConstants.ActivityID.BIRD_EGGS_OFFERED}),
 
 	// Spells (3000 - 3499)
 
@@ -364,7 +363,8 @@ public enum TrackedActivity
 
 	// Fast lookup map for retrieving TrackedActivity by its Storage ID
 	private static final Map<Integer, TrackedActivity> STORAGE_ID_MAP = new HashMap<>();
-//	private static final Map<String, TrackedActivity> STORAGE_NAME_MAP = new HashMap<>();
+	//	private static final Map<String, TrackedActivity> STORAGE_NAME_MAP = new HashMap<>();
+	private static final Map<Category, TrackedActivity> CATEGORY_ACTIVITY_MAP = new HashMap<>();
 	public static final int MAX_TRACKING_ID;
 
 	static
