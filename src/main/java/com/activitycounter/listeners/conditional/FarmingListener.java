@@ -23,18 +23,14 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.activitycounter.listeners;
+package com.activitycounter.listeners.conditional;
 
-import com.activitycounter.ActivityCounterPlugin;
 import com.activitycounter.events.ExperienceDrop;
+import com.activitycounter.listeners.AbstractListenerLeaf;
 import com.activitycounter.models.TrackedActivity;
-import javax.inject.Inject;
 import javax.inject.Singleton;
-import lombok.Getter;
-import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.ChatMessageType;
-import net.runelite.api.Client;
 import net.runelite.api.Skill;
 import net.runelite.api.events.GameTick;
 import net.runelite.client.eventbus.Subscribe;
@@ -44,19 +40,8 @@ import net.runelite.client.eventbus.Subscribe;
  */
 @Slf4j
 @Singleton
-public class FarmingListener {
-	@Setter
-	@Getter
-	private boolean isRegistered = false;
-
-	@Inject
-	private Client client;
-
-	@Inject
-	private ActivityCounterPlugin plugin;
-
-	@Inject
-	private ConfigListener configListener;
+public class FarmingListener  extends AbstractListenerLeaf
+{
 
 	private boolean isHarvesting = false;
 	private TrackedActivity activityInProgress = null;
@@ -78,7 +63,7 @@ public class FarmingListener {
 	 * FarmingListener.
 	 */
 	public boolean onChatMessage(String message, ChatMessageType type) {
-		if (!isRegistered || !isFarmingChatType(type)) return false;
+		if (!isRegistered() || !isFarmingChatType(type)) return false;
 
 		if (!isHarvesting) {
 			TrackedActivity activity;
@@ -123,6 +108,10 @@ public class FarmingListener {
 		return false;
 	}
 
+	/**
+	 * Start harvesting. While harvesting, the experience drops are expected to be more or less the same for
+	 * subsequent experience drops until the player is done harvesting.
+	 */
 	private void startHarvesting(TrackedActivity activity) {
 		isHarvesting = true;
 		activityInProgress = activity;
@@ -162,5 +151,11 @@ public class FarmingListener {
 			isHarvesting = false;
 			activityInProgress = null;
 		}
+	}
+
+	@Override
+	public boolean isEnabled()
+	{
+		return config.enableFarmingListener();
 	}
 }

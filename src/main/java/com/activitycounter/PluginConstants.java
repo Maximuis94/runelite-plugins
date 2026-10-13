@@ -39,22 +39,34 @@ public final class PluginConstants {
 	public static final String CONFIG_GROUP = "activitycounter";
 	public static final String PLUGIN_DIR_NAME = "activity-counter";
 
+	public static final int MAX_ITEM_ID = 35000;
+	public static final int MAX_SOUND_EFFECT_ID = 35000;
 	public static final int VARBIT_OFFSET = 100000;
 	public static final int SOUND_EFFECT_OFFSET = 200000;
 	public static final int SPOT_ANIM_OFFSET = 300000;
 
 	public static final int EQUIPPED_ITEM_CONTAINER_ID = InventoryID.WORN;
+	public static final int INVENTORY_CONTAINER_ID = InventoryID.INV;
 
 	public static final class SoundID {
 		public static final int TELEPORT_TABLET = 965;
 		public static final int SCYTHE_SLASH = 2522;
 		public static final int SCYTHE_CRUSH = 2524;
+		public static final int POWERED_STAFF_ATTACK = 178;
 		public static final int ALTAR_OFFER_SOUND_ID = 958;
 		public static final int STUNNED_SOUND_EFFECT_ID = 2727;
 	}
 
+	public static final class SoundIDs {
+		public static final int[] SCYTHE_SOUND_EFFECTS = new int[]{SoundID.SCYTHE_SLASH, SoundID.SCYTHE_CRUSH};
+		public static final int[] POWERED_STAFF_ATTACK = new int[]{SoundID.POWERED_STAFF_ATTACK};
+		public static final int[] ETHER_USED = new int[]{2566,2693,178};
+		public static final int[] WILDY_SCEPTRE_ATTACK = new int[]{SoundID.POWERED_STAFF_ATTACK};
+	}
+
 	public static final class RegionID {
 		public static final int MASTERING_MIXOLOGY_BASEMENT = 5521;
+		public static final int CRYSTAL_CHEST_REGION_ID = 11573;
 
 	}
 
@@ -301,6 +313,8 @@ public final class PluginConstants {
 		public static final int FOOD_BURNT = 2596;
 
 		public static final int[] MIXOLOGY_DIGWEED_MATURED = {MM_HERB_READY_1, MM_HERB_READY_2, MM_HERB_READY_3, MM_HERB_READY_4};
+		public static final int[] DRIFT_NET_BUILT_IDS = {FOSSIL_DRIFT_NET_CURRENT, FOSSIL_DRIFT_NET2};
+		public static final int[] DRIFT_NET_CAUGHT_IDS = {FOSSIL_DRIFT_NET1_CATCH, FOSSIL_DRIFT_NET2_CATCH};
 
 
 		public static final int GIANTS_FOUNDRY_POINTS = VarPlayerID.GIANTS_FOUNDRY_REWARD_SHOP_POINTS;

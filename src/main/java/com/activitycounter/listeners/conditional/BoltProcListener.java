@@ -23,11 +23,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.activitycounter.listeners;
+package com.activitycounter.listeners.conditional;
 
-import com.activitycounter.ActivityCounterPlugin;
 import com.activitycounter.PluginConstants;
 import static com.activitycounter.PluginConstants.EQUIPPED_ITEM_CONTAINER_ID;
+import com.activitycounter.listeners.AbstractListenerLeaf;
 import com.activitycounter.models.Count;
 import com.activitycounter.models.CrossbowBoltEffect;
 import com.activitycounter.models.Session;
@@ -36,7 +36,6 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.ActorSpotAnim;
-import net.runelite.api.Client;
 import net.runelite.api.EquipmentInventorySlot;
 import net.runelite.api.GameState;
 import net.runelite.api.Item;
@@ -49,6 +48,7 @@ import net.runelite.api.events.SoundEffectPlayed;
 import net.runelite.api.events.VarbitChanged;
 import net.runelite.api.gameval.VarPlayerID;
 import net.runelite.api.gameval.VarbitID;
+import net.runelite.client.callback.ClientThread;
 import net.runelite.client.eventbus.Subscribe;
 
 /**
@@ -58,13 +58,10 @@ import net.runelite.client.eventbus.Subscribe;
  */
 @Slf4j
 @Singleton
-public class BoltProcListener
+public class BoltProcListener extends AbstractListenerLeaf
 {
 	@Inject
-	private Client client;
-
-	@Inject
-	private ActivityCounterPlugin plugin;
+	private ClientThread clientThread;
 
 	// Equipment State
 	private boolean hasCrossbowEquipped = false;
@@ -212,6 +209,11 @@ public class BoltProcListener
 		disableSoundAndAnimListeners = applicableCrossbowBoltEffect == null;
 	}
 
+	@Override
+	protected void onRegistered() {
+		clientThread.invokeLater(this::initializeState);
+	}
+
 	/**
 	 * Manually loads the current equipment state. Called when the listener is registered mid-session.
 	 */
@@ -227,11 +229,34 @@ public class BoltProcListener
 		ItemContainer equipment = client.getItemContainer(EQUIPPED_ITEM_CONTAINER_ID);
 		if (equipment != null)
 		{
-			Item ammoItem = equipment.getItem(AMMO_EQUIPMENT_SLOT_IDX);
-			equippedAmmoItemId = ammoItem != null ? ammoItem.getId() : -1;
-			equippedAmmoEffect = CrossbowBoltEffect.getEffectByItemId(equippedAmmoItemId);
+			setAmmoItem(equipment.getItem(AMMO_EQUIPMENT_SLOT_IDX));
 		}
 
 		requiresUpdate = true;
+	}
+
+	public void setQuiverItemId(int itemId)
+	{
+
+	}
+
+	public void setAmmoItem(Item ammoItem)
+	{
+		if (ammoItem == null)
+		{
+			equippedAmmoItemId = -1;
+			equippedAmmoEffect = null;
+		}
+		else
+		{
+			equippedAmmoItemId = ammoItem.getId();
+			equippedAmmoEffect = CrossbowBoltEffect.getEffectByItemId(equippedAmmoItemId);
+		}
+	}
+
+	@Override
+	public boolean isEnabled()
+	{
+		return config.enableBoltProcListener();
 	}
 }

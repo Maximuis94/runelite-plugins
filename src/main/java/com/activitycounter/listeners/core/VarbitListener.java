@@ -23,9 +23,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.activitycounter.listeners;
+package com.activitycounter.listeners.core;
 
-import com.activitycounter.ActivityCounterPlugin;
+import com.activitycounter.listeners.AbstractListenerNode;
 import com.activitycounter.models.Count;
 import com.activitycounter.models.Session;
 import com.activitycounter.models.TrackedActivity;
@@ -36,30 +36,30 @@ import java.util.List;
 import java.util.Map;
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
-import net.runelite.api.Client;
 import net.runelite.api.GameState;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.VarbitChanged;
 import net.runelite.api.gameval.VarPlayerID;
 import net.runelite.api.gameval.VarbitID;
+import net.runelite.client.callback.ClientThread;
 import net.runelite.client.eventbus.Subscribe;
 
 @Slf4j
 @Singleton
-public class VarbitListener {
-
-	@Inject
-	private Client client;
-
-	@Inject
-	private ActivityCounterPlugin plugin;
-
+public class VarbitListener  extends AbstractListenerNode
+{
 	private static final int SLAYER_POINTS_VARBITID = VarbitID.SLAYER_POINTS;
 	private static final int CANNON_BALLS_VARPLAYERID = VarPlayerID.ROCKTHROWER;
 	private static final int NIGHTMARE_ZONE_POINTS_SESSION_VARBITID = VarbitID.NZONE_CURRENTPOINTS;
 	private static final int TITHE_FARM_VARBITID = VarbitID.HOSIDIUS_TITHE_REWARDPOINTS;
 	private static final int GIANTS_FOUNDRY_POINTS_VARPLAYERID = VarPlayerID.GIANTS_FOUNDRY_REWARD_SHOP_POINTS;
+
+	@Getter
+	private final boolean isBusy = false;
+	@Getter
+	private final boolean isInWilderness = false;
 
 	private static final int MAX_VAR_ID = 20000;
 
@@ -235,6 +235,14 @@ public class VarbitListener {
 						updateCurrency(session, act, compositeValue, 2000000);
 					} else if (varbitId == TITHE_FARM_VARBITID) {
 						updateCurrency(session, act, compositeValue, 500);
+					} else if (act == TrackedActivity.DRIFT_NET_CAUGHT) {
+						if (client.getVarbitValue(varbitId) > 0) {
+							plugin.increaseCountByOne(act.getId());
+						}
+					} else if (act == TrackedActivity.DRIFT_NETS_SET_UP) {
+						if (client.getVarbitValue(varbitId) == 1) {
+							plugin.increaseCountByOne(act.getId());
+						}
 					} else {
 						processActivityUpdate(act.getId(), compositeValue);
 					}

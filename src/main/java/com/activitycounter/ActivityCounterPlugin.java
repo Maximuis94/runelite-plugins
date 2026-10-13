@@ -26,19 +26,28 @@ package com.activitycounter;
 
 import static com.activitycounter.PluginConstants.CONFIG_GROUP;
 import static com.activitycounter.PluginConstants.PLUGIN_NAME;
-import com.activitycounter.listeners.BoltProcListener;
-import com.activitycounter.listeners.ChatMessageListener;
-import com.activitycounter.listeners.ConfigListener;
-import com.activitycounter.listeners.ExperienceDropListener;
-import com.activitycounter.listeners.FarmingListener;
-import com.activitycounter.listeners.SoundEffectListener;
-import com.activitycounter.listeners.StatChangeListener;
-import com.activitycounter.listeners.VarbitListener;
+import com.activitycounter.listeners.AbstractListenerLeaf;
+import com.activitycounter.listeners.AbstractListenerNode;
+import com.activitycounter.listeners.conditional.BoltProcListener;
+import com.activitycounter.listeners.conditional.FarmingListener;
+import com.activitycounter.listeners.conditional.GrandExchangeTaxListener;
+import com.activitycounter.listeners.conditional.MagicSpellListener;
+import com.activitycounter.listeners.core.ChatMessageListener;
+import com.activitycounter.listeners.core.ConfigListener;
+import com.activitycounter.listeners.core.EquippedItemListener;
+import com.activitycounter.listeners.core.ExperienceDropListener;
+import com.activitycounter.listeners.core.InventoryListener;
+import com.activitycounter.listeners.core.PlayerListener;
+import com.activitycounter.listeners.core.SoundEffectListener;
+import com.activitycounter.listeners.core.StatChangeListener;
+import com.activitycounter.listeners.core.VarbitListener;
 import com.activitycounter.models.Category;
 import com.activitycounter.models.Count;
 import com.activitycounter.models.Session;
 import com.activitycounter.models.TrackedActivity;
 import com.activitycounter.models.TrackerType;
+import com.activitycounter.ui.ActivityCounterOverlay;
+import com.activitycounter.ui.ActivityCounterPanel;
 import com.google.inject.Provides;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
@@ -70,6 +79,7 @@ import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.ClientToolbar;
 import net.runelite.client.ui.NavigationButton;
+import net.runelite.client.ui.overlay.OverlayManager;
 import net.runelite.client.util.Filepath;
 import net.runelite.client.util.ImageUtil;
 
@@ -77,14 +87,41 @@ import net.runelite.client.util.ImageUtil;
 @PluginDescriptor(
 	name = PLUGIN_NAME,
 	internalName = PluginConstants.PLUGIN_DIR_NAME,
-	description = "Highly customizable plugin that counts bosses/laps/tablets/bolt procs/sneaky suspicions and much more per manually defined session.",
-	tags = {"session","tracker","counter","kc","killcount","activity","lap","minigame","supplies","stats","skilling","sneaky","suspicion"}
+	description = "Highly customizable plugin that counts spells/laps/tablets/bolt procs/sneaky suspicions/tax and more per manually defined session.",
+	tags = {"session","tracker","counter","kc","killcount","activity","lap","minigame","runes","spells","supplies","stats","skilling","sneaky","suspicion"}
 )
 public class ActivityCounterPlugin extends Plugin
 {
 	@Getter
 	private int loadedRegionId;
 
+	@Getter
+	private final List<Integer> pinnedActivityIds = new ArrayList<>();
+
+	public void togglePinnedActivity(TrackedActivity activity)
+	{
+		int id = activity.getId();
+		if (pinnedActivityIds.contains(id))
+		{
+			pinnedActivityIds.remove((Integer) id);
+		}
+		else
+		{
+			pinnedActivityIds.add(id);
+		}
+	}
+
+	public void movePinnedActivityToTop(TrackedActivity activity)
+	{
+		int id = activity.getId();
+		pinnedActivityIds.remove((Integer) id);
+		pinnedActivityIds.add(0, id);
+	}
+
+	public boolean isActivityPinned(TrackedActivity activity)
+	{
+		return pinnedActivityIds.contains(activity.getId());
+	}
 	@Inject
 	private EventBus eventBus;
 
@@ -105,10 +142,15 @@ public class ActivityCounterPlugin extends Plugin
 
 	@Inject
 	private BoltProcListener boltProcListener;
-	private boolean hasRegisteredBoltProcListener = false;
 
 	@Inject
 	private FarmingListener farmingListener;
+
+	@Inject
+	private EquippedItemListener equippedItemListener;
+
+	@Inject
+	private InventoryListener inventoryListener;
 
 	@Getter
 	private int loginTicks = 0;
@@ -127,10 +169,57 @@ public class ActivityCounterPlugin extends Plugin
 	private ClientToolbar clientToolbar;
 
 	@Inject
+	private OverlayManager overlayManager;
+
+	@Inject
+	private ActivityCounterOverlay activityOverlay;
+
+	@Inject
 	private SessionStorageManager storageManager;
 
 	@Inject
 	private ConfigListener configListener;
+
+	@Inject
+	private PlayerListener playerListener;
+
+	@Inject
+	private MagicSpellListener magicSpellListener;
+
+	@Inject
+	private GrandExchangeTaxListener grandExchangeTaxListener;
+
+
+	/**
+	 * Listener classes that other classes depend on in some way
+	 */
+	private AbstractListenerNode[] getCoreListeners() {
+		return new AbstractListenerNode[] {
+			configListener,
+			chatMessageListener,
+			statChangeListener,
+			varbitListener,
+			equippedItemListener,
+			soundEffectListener,
+			experienceDropListener,
+			playerListener,
+			inventoryListener,
+
+
+		};
+	}
+
+	/**
+	 * Listener classes that only listen and count
+	 */
+	private AbstractListenerLeaf[] getConditionalListeners() {
+		return new AbstractListenerLeaf[] {
+			boltProcListener,
+			farmingListener,
+			magicSpellListener,
+			grandExchangeTaxListener,
+		};
+	}
 
 	@Provides
 	ActivityCounterConfig provideConfig(ConfigManager configManager)
@@ -175,22 +264,15 @@ public class ActivityCounterPlugin extends Plugin
 	@Override
 	protected void startUp()
 	{
-		eventBus.register(configListener);
+		for (AbstractListenerNode listener : getCoreListeners()) {
+			listener.register();
+		}
 		configListener.buildAllCaches();
-
-		eventBus.register(chatMessageListener);
-		eventBus.register(statChangeListener);
-		eventBus.register(varbitListener);
-		eventBus.register(soundEffectListener);
 		soundEffectListener.initializeRoutingCaches();
 
-		eventBus.register(experienceDropListener);
 
-		registerFarmingListener();
-
-		if (config.enableBoltProcListener())
-		{
-			registerBoltProcListener();
+		for (AbstractListenerLeaf listener : getConditionalListeners()) {
+			listener.register();
 		}
 
 		panel = new ActivityCounterPanel(this, soundEffectListener, configListener);
@@ -204,26 +286,25 @@ public class ActivityCounterPlugin extends Plugin
 
 		clientToolbar.addNavigation(navButton);
 		panel.reloadComboBox();
+		overlayManager.add(activityOverlay);
 	}
 
 	@Override
 	protected void shutDown()
 	{
-		eventBus.unregister(configListener);
-		eventBus.unregister(chatMessageListener);
-		eventBus.unregister(statChangeListener);
-		eventBus.unregister(varbitListener);
-		eventBus.unregister(soundEffectListener);
-		eventBus.unregister(experienceDropListener);
+		for (AbstractListenerNode listener : getCoreListeners()) {
+			listener.unregister();
+		}
 
-		unregisterFarmingListener();
-		unregisterBoltProcListener();
-
+		for (AbstractListenerLeaf listener : getConditionalListeners()) {
+			listener.unregister();
+		}
 		clientToolbar.removeNavigation(navButton);
 		if (currentSession != null)
 		{
 			storageManager.saveSession(currentSession);
 		}
+		overlayManager.remove(activityOverlay);
 	}
 
 	public void saveSession(Session session)
@@ -268,37 +349,65 @@ public class ActivityCounterPlugin extends Plugin
 	}
 
 	/**
-	 * Starts a new session
+	 * Starts a new session and passes it on to all of the active Listener classes
 	 */
 	public void startSession()
 	{
-		clientThread.invokeLater(() -> {
+		clientThread.invokeLater(() ->
+		{
 			if (client == null || client.getGameState() != GameState.LOGGED_IN)
 			{
 				return;
 			}
 
-			String accountName = client.getLocalPlayer() != null
-				? client.getLocalPlayer().getName()
-				: "Unknown";
-
+			String accountName = client.getLocalPlayer() != null ? client.getLocalPlayer().getName() : "Unknown";
 			currentSession = new Session(client.getAccountHash(), accountName);
 			initializeKillCounts(true);
-			storageManager.saveSession(currentSession);
-			log.debug("Session started.");
 
+			syncActiveSessionScores();
+			storageManager.saveSession(currentSession);
+
+			for (AbstractListenerNode listener : getCoreListeners())
+			{
+				listener.onSessionStarted(currentSession);
+			}
+			for (AbstractListenerLeaf listener : getConditionalListeners())
+			{
+				listener.onSessionStarted(currentSession);
+			}
+
+			log.debug("Session started.");
 			panel.reloadComboBox();
 		});
 	}
 
-	public void closeSession() {
-		clientThread.invokeLater(() -> {
-			if (currentSession != null) {
+	/**
+	 * Closes an ongoing session and removes it from all registered listening classes.
+	 */
+	public void closeSession()
+	{
+		clientThread.invokeLater(() ->
+		{
+			if (currentSession != null)
+			{
 				currentSession.setInProgress(false);
 				currentSession.setEndTime(Instant.now());
 				storageManager.saveSession(currentSession);
-				log.debug("Session closed and archived.");
+
+				Session closedSession = currentSession;
 				currentSession = null;
+
+				// --- NEW: Notify all listeners directly ---
+				for (AbstractListenerNode listener : getCoreListeners())
+				{
+					listener.onSessionStopped(closedSession);
+				}
+				for (AbstractListenerLeaf listener : getConditionalListeners())
+				{
+					listener.onSessionStopped(closedSession);
+				}
+
+				log.debug("Session closed and archived.");
 				panel.reloadComboBox();
 			}
 		});
@@ -352,6 +461,30 @@ public class ActivityCounterPlugin extends Plugin
 	}
 
 	/**
+	 * Safely toggles a conditional listener on or off, ensuring it receives the
+	 * active session state if a session is currently in progress.
+	 */
+	private void toggleConditionalListener(AbstractListenerLeaf listener, boolean isEnabled)
+	{
+		if (isEnabled)
+		{
+			listener.register();
+			if (currentSession != null && currentSession.isInProgress())
+			{
+				listener.onSessionStarted(currentSession);
+			}
+		}
+		else
+		{
+			if (currentSession != null)
+			{
+				listener.onSessionStopped(currentSession);
+			}
+			listener.unregister();
+		}
+	}
+
+	/**
 	 * Returns a processed list of counts to display in the UI, applying merges if configured.
 	 */
 	public List<Count> getDisplayKcs(Session session)
@@ -396,23 +529,36 @@ public class ActivityCounterPlugin extends Plugin
 	@Subscribe
 	public void onConfigChanged(ConfigChanged event) {
 		if (!event.getGroup().equals(CONFIG_GROUP)) return;
-
 		String eventKey = event.getKey();
 
-		if (panel != null) {
-			panel.refreshKcContainer();
+		// Update active session instantly when a new score is set in the context menu
+		if (eventKey.equals("activityScores")) {
+			syncActiveSessionScores();
+			setRequiresSaveAndRefresh(true);
 		}
 
-		if (eventKey.equals("enableBoltProcListener"))
+		switch (eventKey)
 		{
-			if (config.enableBoltProcListener()) registerBoltProcListener();
-			else unregisterBoltProcListener();
+			case "enableBoltProcListener":
+				toggleConditionalListener(boltProcListener, config.enableBoltProcListener());
+				break;
+			case "enableMagicSpellListener":
+				toggleConditionalListener(magicSpellListener, config.enableMagicSpellListener());
+				break;
+			case "enableFarmingListener":
+				toggleConditionalListener(farmingListener, config.enableFarmingListener());
+				break;
 		}
+		clientThread.invokeLater(() -> {
+			if (panel != null)
+			{
+				panel.refreshKcContainer();
+			}
+		});
 	}
 
 	@Subscribe
-	public void onGameTick(GameTick event)
-	{
+	public void onGameTick(GameTick event) {
 		if (pendingSessionResume && client.getAccountHash() != -1)
 		{
 			pendingSessionResume = false;
@@ -425,6 +571,17 @@ public class ActivityCounterPlugin extends Plugin
 				{
 					currentSession = activeSession;
 					initializeKillCounts(false);
+					syncActiveSessionScores();
+
+					for (AbstractListenerNode listener : getCoreListeners())
+					{
+						listener.onSessionStarted(currentSession);
+					}
+					for (AbstractListenerLeaf listener : getConditionalListeners())
+					{
+						listener.onSessionStarted(currentSession);
+					}
+
 					log.debug("Resumed active session: {}", currentSession.getId());
 					panel.forceActiveSessionSelection();
 					panel.reloadComboBox();
@@ -467,6 +624,9 @@ public class ActivityCounterPlugin extends Plugin
 		}
 	}
 
+	/**
+	 * Initializes all counts appropriately.
+	 */
 	private void initializeKillCounts(boolean isManualStart)
 	{
 		if (currentSession == null) return;
@@ -484,7 +644,13 @@ public class ActivityCounterPlugin extends Plugin
 				kc.setSessionKc(0);
 				kc.setInitialKc(-1);
 
-				if (isManualStart && client != null && client.getGameState() == GameState.LOGGED_IN) {
+
+				if (act.getCategory() == Category.AGILITY)
+				{
+					kc.setInitialKc(-1);
+				}
+
+				else if (isManualStart && client != null && client.getGameState() == GameState.LOGGED_IN) {
 					try
 					{
 						switch (act.getTrackerType())
@@ -519,6 +685,8 @@ public class ActivityCounterPlugin extends Plugin
 						log.error("{} for TrackedActivity {} {} {}", e.getClass(), act.getName(), act.getId(), act.getConfigId());
 					}
 				}
+
+				// KCs that are typically incremented by 1 whenever they occur
 				else if (act.getTrackerType() == TrackerType.CHAT_MESSAGE ||
 					act.getTrackerType() == TrackerType.CUSTOM ||
 					act.getTrackerType() == TrackerType.SOUND_EFFECT ||
@@ -592,70 +760,6 @@ public class ActivityCounterPlugin extends Plugin
 	}
 
 	/**
-	 * Registers the boltProcListener and updates the corresponding flag.
-	 */
-	public void registerBoltProcListener()
-	{
-		if (!hasRegisteredBoltProcListener)
-		{
-			eventBus.register(boltProcListener);
-			hasRegisteredBoltProcListener = true;
-
-			clientThread.invokeLater(() -> boltProcListener.initializeState());
-		}
-		else {
-			log.warn("Unable to register Bolt Proc Listener; it has already been registered");
-		}
-	}
-
-	/**
-	 * Unregisters the boltProcListener and updates the corresponding flag.
-	 */
-	public void unregisterBoltProcListener()
-	{
-		if (hasRegisteredBoltProcListener)
-		{
-			eventBus.unregister(boltProcListener);
-			hasRegisteredBoltProcListener = false;
-		}
-		else {
-			log.warn("Unable to unregister Bolt Proc Listener; it has not been registered");
-		}
-	}
-
-	/**
-	 * Registers the farmingListener and updates the corresponding flag.
-	 */
-	public void registerFarmingListener()
-	{
-		if (!farmingListener.isRegistered())
-		{
-			eventBus.register(farmingListener);
-			farmingListener.setRegistered(true);
-
-			clientThread.invokeLater(() -> boltProcListener.initializeState());
-		}
-		else {
-			log.warn("Unable to register FarmingListener; it has already been registered");
-		}
-	}
-
-	/**
-	 * Unregisters the farmingListener and updates the corresponding flag.
-	 */
-	public void unregisterFarmingListener()
-	{
-		if (farmingListener.isRegistered())
-		{
-			eventBus.unregister(farmingListener);
-			farmingListener.setRegistered(false);
-		}
-		else {
-			log.warn("Unable to unregister FarmingListener; it has not been registered");
-		}
-	}
-
-	/**
 	 * Increases the count of the specified counter by one and set a flag for an update/refresh
 	 */
 	public void increaseCountByOne(int activityId)
@@ -665,6 +769,171 @@ public class ActivityCounterPlugin extends Plugin
 			Count kc = session.getKillCount(activityId);
 			kc.setSessionKc(kc.getSessionKc() + 1);
 			setRequiresSaveAndRefresh(true);
+		}
+	}
+
+	public void setActivityScore(TrackedActivity activity, float score) {
+		configListener.setActivityScore(activity, score);
+	}
+
+	public void syncActiveSessionScores() {
+		if (currentSession != null && currentSession.isInProgress()) {
+			for (Count kc : currentSession.getAllKillCounts()) {
+				kc.setScore(configListener.getScore(kc.getTrackingId()));
+			}
+		}
+	}
+
+	public void pinAllActivities(Iterable<TrackedActivity> activities)
+	{
+		for (TrackedActivity activity : activities)
+		{
+			pinnedActivityIds.add(activity.getId());
+		}
+		// If saving to config, call your save method once here
+	}
+
+	public void unpinAllActivities(Iterable<TrackedActivity> activities)
+	{
+		for (TrackedActivity activity : activities)
+		{
+			pinnedActivityIds.remove(activity.getId());
+		}
+		// If saving to config, call your save method once here
+	}
+
+	/**
+	 * Completely resets a specific activity count and re-samples its baseline
+	 * from the game state to ensure it starts counting from 0 cleanly.
+	 */
+	public void resetActivityCount(Session targetSession, TrackedActivity activity)
+	{
+		if (targetSession == null || activity == null) return;
+
+		// If it is an archived session, simply zero the count and save
+		if (targetSession != currentSession || !targetSession.isInProgress())
+		{
+			Count kc = targetSession.getKillCount(activity.getId());
+			if (kc != null)
+			{
+				kc.setSessionKc(0);
+				saveSession(targetSession);
+				if (panel != null) panel.refreshKcContainer();
+			}
+			return;
+		}
+
+		clientThread.invokeLater(() ->
+		{
+			Count kc = currentSession.getKillCount(activity.getId());
+			if (kc != null)
+			{
+				resetActivityCountSync(kc, activity);
+				setRequiresSaveAndRefresh(true);
+			}
+		});
+	}
+
+	/**
+	 * Completely resets ALL activity counts in the targeted session.
+	 */
+	public void resetAllActivityCounts(Session targetSession)
+	{
+		if (targetSession == null) return;
+
+		if (targetSession != currentSession || !targetSession.isInProgress())
+		{
+			for (Count kc : targetSession.getAllKillCounts())
+			{
+				kc.setSessionKc(0);
+			}
+			saveSession(targetSession);
+			if (panel != null) panel.refreshKcContainer();
+			return;
+		}
+
+		clientThread.invokeLater(() ->
+		{
+			for (Count kc : currentSession.getAllKillCounts())
+			{
+				TrackedActivity activity = getActivityById(kc.getTrackingId());
+				if (activity != null)
+				{
+					resetActivityCountSync(kc, activity);
+				}
+				else
+				{
+					kc.setSessionKc(0);
+				}
+			}
+			setRequiresSaveAndRefresh(true);
+		});
+	}
+
+	private void resetActivityCountSync(Count kc, TrackedActivity activity)
+	{
+		kc.setSessionKc(0);
+
+		if (client != null && client.getGameState() == GameState.LOGGED_IN)
+		{
+			switch (activity.getTrackerType())
+			{
+				case VARPLAYER_VALUE:
+				case VARBIT_VALUE:
+					int initialBaseline = 0;
+					int[] sourceIds = activity.getGameSourceIds();
+					if (sourceIds != null)
+					{
+						for (int sourceId : sourceIds)
+						{
+							if (sourceId > 0)
+							{
+								initialBaseline += (activity.getTrackerType() == TrackerType.VARPLAYER_VALUE)
+									? client.getVarpValue(sourceId)
+									: client.getVarbitValue(sourceId);
+							}
+						}
+					}
+					kc.setInitialKc(initialBaseline);
+					break;
+
+				case STAT_CHANGE:
+					if (activity.getId() == PluginConstants.ActivityID.LVL_TOTAL)
+					{
+						kc.setInitialKc(client.getTotalLevel());
+					}
+					else
+					{
+						// Reset underlying skill baseline in the session's internal memory
+						for (Skill skill : Skill.values())
+						{
+							if (statChangeListener.getSkillTrackingId(skill) == activity.getId())
+							{
+								int currentXp = client.getSkillExperience(skill);
+								kc.setInitialKc(currentXp);
+								currentSession.initializeSkill(skill, currentXp);
+								break;
+							}
+							if (statChangeListener.getSkillLevelTrackingId(skill) == activity.getId())
+							{
+								kc.setInitialKc(client.getRealSkillLevel(skill));
+								break;
+							}
+						}
+					}
+					break;
+
+				case CHAT_MESSAGE:
+				case SOUND_EFFECT:
+				case AREA_SOUND:
+				case CUSTOM:
+					kc.setInitialKc(0);
+					break;
+			}
+		}
+		else
+		{
+			kc.setInitialKc(-1);
 		}
 	}
 }

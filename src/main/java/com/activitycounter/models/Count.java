@@ -37,6 +37,7 @@ public class Count {
 
 	private int initialKc;
 	private int sessionKc;
+	private float score = 0f;
 
 	public Count(String name, int trackingId) {
 		this.name = name;

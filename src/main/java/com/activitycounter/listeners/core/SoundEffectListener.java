@@ -23,10 +23,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.activitycounter.listeners;
+package com.activitycounter.listeners.core;
 
-import com.activitycounter.ActivityCounterPlugin;
 import com.activitycounter.PluginConstants;
+import com.activitycounter.listeners.AbstractListenerNode;
+import com.activitycounter.models.EquipmentWorn;
 import com.activitycounter.models.TrackedActivity;
 import java.util.ArrayList;
 import java.util.EnumMap;
@@ -36,7 +37,6 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
-import net.runelite.api.Client;
 import net.runelite.api.Hitsplat;
 import net.runelite.api.HitsplatID;
 import net.runelite.api.Skill;
@@ -51,16 +51,13 @@ import net.runelite.client.eventbus.Subscribe;
 
 @Slf4j
 @Singleton
-public class SoundEffectListener
+public class SoundEffectListener extends AbstractListenerNode
 {
 	@Inject
-	private Client client;
-
-	@Inject
-	private ActivityCounterPlugin plugin;
-
-	@Inject
 	private ExperienceDropListener xpDropListener;
+
+	@Inject
+	private EquippedItemListener equippedItemListener;
 
 	// Map specific activities to the Skill they grant XP in
 	private final Map<TrackedActivity, Skill> activitySkillMap = new EnumMap<>(TrackedActivity.class);
@@ -68,7 +65,7 @@ public class SoundEffectListener
 	// Add this to your initializeRoutingCaches() or Constructor:
 	private void buildSkillMap() {
 		activitySkillMap.put(TrackedActivity.PICKPOCKET_SUCCESS, Skill.THIEVING);
-		activitySkillMap.put(TrackedActivity.CROPS_HARVESTED, Skill.FARMING); // Revert to whichever enum handles the sound
+		activitySkillMap.put(TrackedActivity.CROPS_HARVESTED, Skill.FARMING);
 		// Add any future XP-generating sound activities here
 	}
 
@@ -82,7 +79,6 @@ public class SoundEffectListener
 	private boolean hasMusic = false;
 
 	private int scheduledLogTick = -1;
-	private int hitSplatTick = 0;
 
 	private int pickpocketTick = 0;
 	private static final int PICKPOCKET_TICK_WINDOW = 5;
@@ -154,6 +150,8 @@ public class SoundEffectListener
 			}
 		}
 
+		if (isWeaponSoundEffect(soundId)) return;
+
 		List<TrackedActivity> activities = soundEffectArray[soundId];
 		if (activities == null || activities.isEmpty()) return;
 
@@ -177,6 +175,19 @@ public class SoundEffectListener
 				}
 			}
 		}
+	}
+
+	/**
+	 * Checks if the given soundId is associated with the currently equipped weapon.
+	 */
+	private boolean isWeaponSoundEffect(int soundId)
+	{
+		EquipmentWorn currentWeapon = equippedItemListener.getWeapon();
+
+		if (currentWeapon == null || !currentWeapon.hasSoundEffect(soundId)) return false;
+
+		plugin.increaseCountByOne(currentWeapon.getTrackedActivity().getId());
+		return true;
 	}
 
 	@Subscribe
@@ -214,17 +225,6 @@ public class SoundEffectListener
 				hasMusic = hasAnySound && client.getVarpValue(SOUND_MUSIC_VOLUME_VARPLAYERID) > 0;
 				scheduleNoSoundActiveLog();
 				break;
-		}
-	}
-
-	@Subscribe
-	public void onHitsplatApplied(HitsplatApplied event)
-	{
-		Hitsplat hitsplat = event.getHitsplat();
-		int type = hitsplat.getHitsplatType();
-		if (type == HitsplatID.DAMAGE_MAX_ME || type == HitsplatID.DAMAGE_ME)
-		{
-			hitSplatTick = client.getTickCount();
 		}
 	}
 

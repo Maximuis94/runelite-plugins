@@ -137,6 +137,33 @@ public interface ActivityCounterConfig extends Config {
 	)
 	default boolean enableBoltProcListener() { return true; }
 
+	@ConfigItem(
+		keyName = "enableFarmingListener",
+		name = "Count farming-related activities",
+		description = "If checked, farming-related activities are counted.",
+		position = 1,
+		section = categoryFilterSection
+	)
+	default boolean enableFarmingListener() { return true; }
+
+	@ConfigItem(
+		keyName = "enableGeTaxListener",
+		name = "Count GE tax paid",
+		description = "If checked, Grand Exchange tax paid is counted.",
+		position = 2,
+		section = categoryFilterSection
+	)
+	default boolean enableGeTaxListener() { return false; }
+
+	@ConfigItem(
+		keyName = "enableMagicSpellListener",
+		name = "Count spells cast",
+		description = "If checked, Rune consumption and spell casts are counted.",
+		position = 3,
+		section = categoryFilterSection
+	)
+	default boolean enableMagicSpellListener() { return false; }
+
 
 
 	// --- SORTING ---
@@ -325,4 +352,14 @@ public interface ActivityCounterConfig extends Config {
 		position = 99
 	)
 	default String hiddenActivities() { return ""; }
+
+	@ConfigItem(
+		keyName = "activityScores",
+		name = "Activity Scores",
+		description = "Hidden config for activity scores",
+		hidden = true
+	)
+	default String activityScores() {
+		return "";
+	}
 }

@@ -153,7 +153,6 @@ public class SessionStorageManager {
 
 		if (migrated) {
 			session.setTrackedKills(newTrackedKills);
-			log.info("Migrated session '{}' to new Storage ID architecture.", session.getId());
 		}
 
 		return migrated;

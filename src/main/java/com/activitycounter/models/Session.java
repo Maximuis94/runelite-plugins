@@ -33,6 +33,7 @@ import java.util.UUID;
 import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
+import net.runelite.api.Client;
 import net.runelite.api.Skill;
 
 /**
@@ -130,5 +131,36 @@ public class Session {
 	public Map<Skill, Integer> getGainedXpMap() {
 		ensureXpMapsExist();
 		return gainedXp;
+	}
+
+	public void initializeActivity(Client client, TrackedActivity act) {
+		Count kc = new Count(act.getName(), act.getId());
+
+		int baseline = act.getTrackerType().fetchBaseline(client, act);
+		kc.setInitialKc(baseline);
+
+		addKillCount(kc);
+	}
+
+	/**
+	 * Unified update method.
+	 * @param newValue Either the increment amount (+1) or the new game state total, depending on TrackerType.
+	 * @return true if the sessionKc actually increased.
+	 */
+	public boolean processActivityUpdate(TrackedActivity act, int newValue) {
+		Count kc = getKillCount(act.getId());
+		if (kc == null) return false;
+
+		if (kc.getInitialKc() == -1) {
+			kc.setInitialKc(newValue);
+		}
+
+		int newSessionKc = act.getTrackerType().calculateNewSessionKc(kc, newValue);
+
+		if (newSessionKc > kc.getSessionKc()) {
+			kc.setSessionKc(newSessionKc);
+			return true;
+		}
+		return false;
 	}
 }

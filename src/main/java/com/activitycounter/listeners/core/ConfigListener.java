@@ -23,10 +23,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.activitycounter.listeners;
+package com.activitycounter.listeners.core;
 
 import com.activitycounter.ActivityCounterConfig;
 import com.activitycounter.PluginConstants;
+import com.activitycounter.listeners.AbstractListenerNode;
 import com.activitycounter.models.Category;
 import com.activitycounter.models.TrackedActivity;
 import static com.activitycounter.models.TrackedActivity.MAX_TRACKING_ID;
@@ -35,7 +36,6 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.inject.Singleton;
-import net.runelite.api.Client;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
@@ -44,21 +44,20 @@ import net.runelite.client.events.ConfigChanged;
  * Class that handles plugin configurations
  */
 @Singleton
-public class ConfigListener
+public class ConfigListener extends AbstractListenerNode
 {
 	@Inject
 	private ActivityCounterConfig config;
 
 	@Inject
-	private Client client;
-
-	@Inject
 	private ConfigManager configManager;
 
 	private final static String HIDDEN_ACTIVITIES_CONFIG_KEY = "hiddenActivities";
+	private final static String ACTIVITY_SCORES_CONFIG_KEY = "activityScores";
 
 	private final boolean[] visibilityCache = new boolean[MAX_TRACKING_ID + 1];
 	private final int[] categorySortCache = new int[Category.values().length];
+	private final float[] scoreCache = new float[MAX_TRACKING_ID + 1];
 
 	/**
 	 * Initializes/rebuilds all configuration caches
@@ -66,6 +65,7 @@ public class ConfigListener
 	public void buildAllCaches() {
 		parseHiddenActivities();
 		cacheCategorySortOrder();
+		parseActivityScores();
 	}
 
 	@Subscribe
@@ -76,6 +76,8 @@ public class ConfigListener
 
 		if (key.equals(HIDDEN_ACTIVITIES_CONFIG_KEY)) {
 			parseHiddenActivities();
+		} else if (key.equals(ACTIVITY_SCORES_CONFIG_KEY)) {
+			parseActivityScores();
 		} else if (key.startsWith("sort")) {
 			cacheCategorySortOrder();
 		}
@@ -98,6 +100,30 @@ public class ConfigListener
 
 		for (TrackedActivity activity : TrackedActivity.values()) {
 			visibilityCache[activity.getId()] = !hiddenActivitySet.contains(activity.getConfigId());
+		}
+	}
+
+	private void parseActivityScores() {
+		String scoresStr = config.activityScores();
+		Arrays.fill(scoreCache, 0f);
+
+		if (scoresStr == null || scoresStr.trim().isEmpty()) return;
+
+		String[] entries = scoresStr.split(",");
+		for (String entry : entries) {
+			String[] parts = entry.split(":");
+			if (parts.length == 2) {
+				String configId = parts[0].trim();
+				try {
+					float score = Float.parseFloat(parts[1].trim());
+					for (TrackedActivity act : TrackedActivity.values()) {
+						if (act.getConfigId().equals(configId)) {
+							scoreCache[act.getId()] = score;
+							break;
+						}
+					}
+				} catch (NumberFormatException ignored) {}
+			}
 		}
 	}
 
@@ -177,5 +203,28 @@ public class ConfigListener
 			case RANDOM_EVENTS: return config.sortRandomEvents();
 			default: return 99;
 		}
+	}
+
+	/**
+	 * Hides/updates a score and commits it back to the RuneLite ConfigManager.
+	 */
+	public void setActivityScore(TrackedActivity activity, float score) {
+		if (activity == null) return;
+		scoreCache[activity.getId()] = score;
+
+		StringBuilder newScoreString = new StringBuilder();
+		for (TrackedActivity act : TrackedActivity.values()) {
+			float s = scoreCache[act.getId()];
+			if (s != 0f) {
+				if (newScoreString.length() > 0) newScoreString.append(",");
+				newScoreString.append(act.getConfigId()).append(":").append(s);
+			}
+		}
+		configManager.setConfiguration(PluginConstants.CONFIG_GROUP, ACTIVITY_SCORES_CONFIG_KEY, newScoreString.toString());
+	}
+
+	public float getScore(int trackingId) {
+		if (trackingId < 0 || trackingId > MAX_TRACKING_ID) return 0f;
+		return scoreCache[trackingId];
 	}
 }

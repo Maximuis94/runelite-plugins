@@ -23,15 +23,14 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.activitycounter.listeners;
+package com.activitycounter.listeners.core;
 
-import com.activitycounter.ActivityCounterPlugin;
+import com.activitycounter.listeners.AbstractListenerNode;
 import com.activitycounter.models.Count;
 import com.activitycounter.models.Session;
 import com.activitycounter.models.TrackedActivity;
 import javax.inject.Inject;
 import javax.inject.Singleton;
-import net.runelite.api.Client;
 import net.runelite.api.GameState;
 import net.runelite.api.Skill;
 import net.runelite.api.events.GameStateChanged;
@@ -40,20 +39,28 @@ import net.runelite.api.events.StatChanged;
 import net.runelite.client.eventbus.Subscribe;
 
 @Singleton
-public class StatChangeListener {
-
-	@Inject
-	private Client client;
-
-	@Inject
-	private ActivityCounterPlugin plugin;
-
+public class StatChangeListener  extends AbstractListenerNode
+{
 	@Inject
 	private ConfigListener configListener;
 
-	private boolean trackExperience = true;
-	private boolean trackLevels = true;
+//	private boolean trackExperience = true;
+//	private boolean trackLevels = true;
 	private boolean statsLoaded = false;
+
+	// Boosted levels, may be used for gatekeeping, among others.
+	private final int[] effectiveLevels = new int[Skill.values().length];
+
+
+
+	/**
+	 * Returns the current effective (boosted) level of a skill.
+	 */
+	public int getEffectiveLevel(Skill skill)
+	{
+		if (skill == null) return 0;
+		return effectiveLevels[skill.ordinal()];
+	}
 
 	/**
 	 * Maps an OSRS Skill to its corresponding Experience TrackedActivity Storage ID.
@@ -141,11 +148,6 @@ public class StatChangeListener {
 
 	@Subscribe
 	public void onStatChanged(StatChanged event) {
-		if (!trackExperience && !trackLevels) return;
-
-		Session currentSession = plugin.getCurrentSession();
-		if (currentSession == null || !currentSession.isInProgress()) return;
-
 		if (!statsLoaded) {
 			for (Skill s : Skill.values()) {
 				if (client.getRealSkillLevel(s) == 0) return;
@@ -157,6 +159,14 @@ public class StatChangeListener {
 
 		Skill skill = event.getSkill();
 		int xp = event.getXp();
+		effectiveLevels[skill.ordinal()] = event.getBoostedLevel();
+
+
+//		if (!trackExperience && !trackLevels) return;
+
+		Session currentSession = plugin.getCurrentSession();
+		if (currentSession == null || !currentSession.isInProgress()) return;
+
 
 		boolean isXpUpdated = currentSession.updateSkillXp(skill, xp);
 
@@ -179,18 +189,18 @@ public class StatChangeListener {
 				}
 			}
 
-			if (trackLevels) {
-				int lvlTrackingId = getSkillLevelTrackingId(skill);
-				if (currentSession.isTracking(lvlTrackingId)) {
-					processActivityUpdate(lvlTrackingId, client.getRealSkillLevel(skill));
-				}
+//			if (trackLevels) {
+			int lvlTrackingId = getSkillLevelTrackingId(skill);
+			if (currentSession.isTracking(lvlTrackingId)) {
+				processActivityUpdate(lvlTrackingId, client.getRealSkillLevel(skill));
+			}
 
-				if (currentSession.isTracking(TrackedActivity.LVL_TOTAL.getId())) {
-					processActivityUpdate(TrackedActivity.LVL_TOTAL.getId(), client.getTotalLevel());
-				}
+			if (currentSession.isTracking(TrackedActivity.LVL_TOTAL.getId())) {
+				processActivityUpdate(TrackedActivity.LVL_TOTAL.getId(), client.getTotalLevel());
 			}
 		}
 	}
+
 
 	@Subscribe
 	public void onGameTick(GameTick event) {
@@ -198,7 +208,7 @@ public class StatChangeListener {
 		if (currentSession == null || !currentSession.isInProgress()) return;
 
 		for (Skill s : Skill.values()) {
-			if (s != Skill.OVERALL && client.getRealSkillLevel(s) == 0) return;
+			if (client.getRealSkillLevel(s) == 0) return;
 		}
 
 		if (plugin.getLoginTicks() < 5) return;

@@ -23,10 +23,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.activitycounter;
+package com.activitycounter.ui;
 
-import com.activitycounter.listeners.ConfigListener;
-import com.activitycounter.listeners.SoundEffectListener;
+import com.activitycounter.ActivityCounterConfig;
+import com.activitycounter.ActivityCounterPlugin;
+import com.activitycounter.listeners.core.ConfigListener;
+import com.activitycounter.listeners.core.SoundEffectListener;
 import com.activitycounter.models.Category;
 import com.activitycounter.models.Count;
 import com.activitycounter.models.Session;
@@ -46,11 +48,13 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
+import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
@@ -62,6 +66,8 @@ import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
 import javax.swing.Timer;
 import javax.swing.border.EmptyBorder;
+import javax.swing.event.PopupMenuEvent;
+import javax.swing.event.PopupMenuListener;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.PluginPanel;
 
@@ -81,6 +87,7 @@ public class ActivityCounterPanel extends PluginPanel {
 	private final JLabel timePassedLabel = new JLabel();
 	private final JLabel startTimeLabel = new JLabel();
 	private final JLabel endTimeLabel = new JLabel();
+	private final JLabel scoreLabel = new JLabel();
 	private final JLabel warningLabel = new JLabel();
 	private final JTextArea notesArea = new JTextArea();
 	private final JScrollPane notesScrollPane = new JScrollPane(notesArea);
@@ -88,6 +95,7 @@ public class ActivityCounterPanel extends PluginPanel {
 	private final JPanel kcContainer = new JPanel();
 
 	private volatile boolean forceNextReloadToActive = false;
+	private String customScoreLabel = "Score";
 	private final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MMM dd, yyyy - HH:mm")
 		.withZone(ZoneId.systemDefault());
 
@@ -194,9 +202,83 @@ public class ActivityCounterPanel extends PluginPanel {
 		actionButtonsPanel.add(Box.createRigidArea(new Dimension(5, 0)));
 		actionButtonsPanel.add(deleteSessionButton);
 
-		// Setup Warning Label
 		warningLabel.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
 		warningLabel.setVisible(false);
+
+		scoreLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+		scoreLabel.setFont(scoreLabel.getFont().deriveFont(Font.BOLD));
+		scoreLabel.setForeground(ColorScheme.BRAND_ORANGE);
+		scoreLabel.setVisible(false);
+		scoreLabel.setToolTipText("Right-click to configure score");
+
+		JPopupMenu scoreMenu = new JPopupMenu();
+
+		JMenuItem resetCountsItem = new JMenuItem("Reset all counts to 0");
+		resetCountsItem.addActionListener(e -> {
+			SessionNode selectedNode = (SessionNode) sessionComboBox.getSelectedItem();
+			Session active = (selectedNode != null && selectedNode.session != null)
+				? selectedNode.session
+				: plugin.getCurrentSession();
+
+			if (active != null) {
+				int confirm = JOptionPane.showConfirmDialog(
+					this,
+					"Are you sure you want to reset all counts in this session to 0?",
+					"Reset Counts",
+					JOptionPane.YES_NO_OPTION,
+					JOptionPane.WARNING_MESSAGE
+				);
+
+				if (confirm == JOptionPane.YES_OPTION) {
+					plugin.resetAllActivityCounts(active);
+				}
+			}
+		});
+
+		JMenuItem resetScoresItem = new JMenuItem("Reset all scores to 0");
+		resetScoresItem.addActionListener(e -> {
+			SessionNode selectedNode = (SessionNode) sessionComboBox.getSelectedItem();
+			Session active = (selectedNode != null && selectedNode.session != null)
+				? selectedNode.session
+				: plugin.getCurrentSession();
+
+			if (active != null) {
+				int confirm = JOptionPane.showConfirmDialog(
+					this,
+					"Are you sure you want to reset all assigned scores to 0?",
+					"Reset Scores",
+					JOptionPane.YES_NO_OPTION,
+					JOptionPane.WARNING_MESSAGE
+				);
+
+				if (confirm == JOptionPane.YES_OPTION) {
+					for (Count kc : active.getAllKillCounts()) {
+						if (kc.getScore() != 0f) {
+							TrackedActivity activity = plugin.getActivityById(kc.getTrackingId());
+							if (activity != null) {
+								plugin.setActivityScore(activity, 0f);
+							}
+						}
+					}
+					plugin.setRequiresSaveAndRefresh(true);
+					updateTime();
+				}
+			}
+		});
+
+		JMenuItem changeLabelItem = new JMenuItem("Change score label");
+		changeLabelItem.addActionListener(e -> {
+			String input = JOptionPane.showInputDialog(this, "Enter new score label:", customScoreLabel);
+			if (input != null && !input.trim().isEmpty()) {
+				customScoreLabel = input.trim();
+				updateTime();
+			}
+		});
+
+		scoreMenu.add(resetCountsItem);
+		scoreMenu.add(resetScoresItem);
+		scoreMenu.add(changeLabelItem);
+		scoreLabel.setComponentPopupMenu(scoreMenu);
 
 		// Setup Notes Area
 		notesArea.setLineWrap(true);
@@ -236,6 +318,7 @@ public class ActivityCounterPanel extends PluginPanel {
 		infoRow.add(timePassedLabel);
 		infoRow.add(startTimeLabel);
 		infoRow.add(endTimeLabel);
+		infoRow.add(scoreLabel);
 		infoRow.add(Box.createRigidArea(new Dimension(0, 5)));
 		infoRow.add(warningLabel);
 		infoRow.add(Box.createRigidArea(new Dimension(0, 5)));
@@ -323,7 +406,6 @@ public class ActivityCounterPanel extends PluginPanel {
 
 			if (sessionToDisplay != null) {
 
-				// Duration
 				if (sessionToDisplay.isInProgress() && !config.showSessionDuration()) {
 					timePassedLabel.setText("");
 				} else {
@@ -348,6 +430,28 @@ public class ActivityCounterPanel extends PluginPanel {
 					endTimeLabel.setVisible(true);
 				} else {
 					endTimeLabel.setVisible(false);
+				}
+
+				// Score
+				boolean hasScore = false;
+				float totalScore = 0f;
+
+				for (Count kc : sessionToDisplay.getAllKillCounts()) {
+					if (kc.getScore() != 0f) {
+						hasScore = true;
+					}
+					totalScore += kc.getSessionKc() * kc.getScore();
+				}
+
+				if (hasScore) {
+					if (Math.abs(totalScore - Math.round(totalScore)) < 0.0001) {
+						scoreLabel.setText(String.format("%s: %,d", customScoreLabel, Math.round(totalScore)));
+					} else {
+						scoreLabel.setText(String.format("%s: %,.2f", customScoreLabel, totalScore));
+					}
+					scoreLabel.setVisible(true);
+				} else {
+					scoreLabel.setVisible(false);
 				}
 
 				// Notes
@@ -424,6 +528,7 @@ public class ActivityCounterPanel extends PluginPanel {
 				timePassedLabel.setText("Time passed: NA");
 				startTimeLabel.setVisible(false);
 				endTimeLabel.setVisible(false);
+				scoreLabel.setVisible(false);
 				warningLabel.setVisible(false);
 				notesScrollPane.setVisible(false);
 			}
@@ -498,6 +603,13 @@ public class ActivityCounterPanel extends PluginPanel {
 					categoryLabel.setForeground(Color.WHITE);
 					categoryLabel.setFont(categoryLabel.getFont().deriveFont(Font.BOLD));
 
+					List<TrackedActivity> activities = categoryKcs.stream()
+						.map(kc -> TrackedActivity.getByStorageId(kc.getTrackingId()))
+						.filter(Objects::nonNull)
+						.collect(Collectors.toList());
+
+					attachHeaderContextMenu(categoryHeader, activities);
+
 					categoryHeader.add(categoryLabel, BorderLayout.WEST);
 					kcContainer.add(categoryHeader);
 
@@ -508,9 +620,29 @@ public class ActivityCounterPanel extends PluginPanel {
 						JPanel kcPanel = new JPanel(new BorderLayout());
 						kcPanel.setBackground(ColorScheme.DARKER_GRAY_COLOR);
 						kcPanel.setBorder(new EmptyBorder(3, 15, 3, 5));
-						kcPanel.setToolTipText("Right-click to hide");
+						kcPanel.setToolTipText("Right-click to configure");
 
 						JPopupMenu popupMenu = new JPopupMenu();
+
+						JMenuItem resetCountItem = new JMenuItem("Reset count to 0");
+						resetCountItem.addActionListener(e -> {
+							int confirm = JOptionPane.showConfirmDialog(
+								this,
+								"Are you sure you want to reset the count for " + kc.getName() + " to 0?",
+								"Reset Count",
+								JOptionPane.YES_NO_OPTION,
+								JOptionPane.WARNING_MESSAGE
+							);
+
+							if (confirm == JOptionPane.YES_OPTION) {
+								TrackedActivity activityToReset = plugin.getActivityById(kc.getTrackingId());
+								if (activityToReset != null) {
+									plugin.resetActivityCount(sessionToDisplay, activityToReset);
+								}
+							}
+						});
+						popupMenu.add(resetCountItem);
+
 						JMenuItem hideItem = new JMenuItem("Hide " + kc.getName());
 						hideItem.addActionListener(e -> {
 							TrackedActivity activityToHide = plugin.getActivityById(kc.getTrackingId());
@@ -519,6 +651,57 @@ public class ActivityCounterPanel extends PluginPanel {
 							}
 						});
 						popupMenu.add(hideItem);
+
+						JMenuItem setScoreItem = new JMenuItem("Set score for " + kc.getName());
+						setScoreItem.addActionListener(e -> {
+							TrackedActivity activityToUpdate = plugin.getActivityById(kc.getTrackingId());
+							if (activityToUpdate != null) {
+								String currentScore = (Math.abs(kc.getScore() - Math.round(kc.getScore())) < 0.0001) ?
+									String.valueOf(Math.round(kc.getScore())) : String.valueOf(kc.getScore());
+
+								String input = JOptionPane.showInputDialog(this,
+									"Enter score per count for " + kc.getName() + " (e.g. 1.5, -0.5):", currentScore);
+
+								if (input != null) {
+									try {
+										float newScore = Float.parseFloat(input.trim());
+										plugin.setActivityScore(activityToUpdate, newScore);
+									} catch (NumberFormatException ex) {
+										JOptionPane.showMessageDialog(this, "Invalid number format. Please enter a valid number.", "Error", JOptionPane.ERROR_MESSAGE);
+									}
+								}
+							}
+						});
+						popupMenu.add(setScoreItem);
+
+						// Dynamic In-Game Overlay Pin Menu
+						JMenuItem pinItem = new JMenuItem();
+						JMenuItem moveToTopItem = new JMenuItem("Move to overlay top");
+						TrackedActivity activity = TrackedActivity.getByStorageId(kc.getTrackingId());
+
+						popupMenu.addPopupMenuListener(new PopupMenuListener()
+						{
+							@Override
+							public void popupMenuWillBecomeVisible(PopupMenuEvent e)
+							{
+								boolean isPinned = plugin.isActivityPinned(activity);
+								pinItem.setText(isPinned ? "Remove from ingame overlay" : "Add to ingame overlay");
+								moveToTopItem.setVisible(isPinned);
+							}
+
+							@Override
+							public void popupMenuWillBecomeInvisible(PopupMenuEvent e) {}
+
+							@Override
+							public void popupMenuCanceled(PopupMenuEvent e) {}
+						});
+
+						pinItem.addActionListener(e -> plugin.togglePinnedActivity(activity));
+						moveToTopItem.addActionListener(e -> plugin.movePinnedActivityToTop(activity));
+
+						popupMenu.add(pinItem);
+						popupMenu.add(moveToTopItem);
+
 						kcPanel.setComponentPopupMenu(popupMenu);
 
 						JLabel nameLabel = new JLabel(kc.getName());
@@ -542,5 +725,43 @@ public class ActivityCounterPanel extends PluginPanel {
 
 		kcContainer.revalidate();
 		kcContainer.repaint();
+	}
+
+	private void attachHeaderContextMenu(JComponent headerComponent, java.util.List<TrackedActivity> categoryActivities)
+	{
+		JPopupMenu popupMenu = new JPopupMenu();
+		JMenuItem toggleItem = new JMenuItem();
+		popupMenu.add(toggleItem);
+
+		popupMenu.addPopupMenuListener(new PopupMenuListener()
+		{
+			@Override
+			public void popupMenuWillBecomeVisible(PopupMenuEvent e)
+			{
+				boolean allPinned = categoryActivities.stream().allMatch(plugin::isActivityPinned);
+				toggleItem.setText(allPinned ? "Remove all from ingame overlay" : "Add all to ingame overlay");
+			}
+
+			@Override
+			public void popupMenuWillBecomeInvisible(PopupMenuEvent e) {}
+
+			@Override
+			public void popupMenuCanceled(PopupMenuEvent e) {}
+		});
+
+		toggleItem.addActionListener(e ->
+		{
+			boolean allPinned = categoryActivities.stream().allMatch(plugin::isActivityPinned);
+			if (allPinned)
+			{
+				plugin.unpinAllActivities(categoryActivities);
+			}
+			else
+			{
+				plugin.pinAllActivities(categoryActivities);
+			}
+		});
+
+		headerComponent.setComponentPopupMenu(popupMenu);
 	}
 }

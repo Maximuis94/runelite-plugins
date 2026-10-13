@@ -30,13 +30,30 @@ import lombok.Getter;
 @Getter
 public enum Category
 {
-	BOSSES, CHESTS, OTHER, CLUE, SLAYER, AGILITY, BOLTS, LEVELS, EXPERIENCE,
-	RAIDS, MINI_GAMES, MAGIC_SPELLS, COMBAT, SUPPLIES, SKILLING, ACHIEVEMENTS,
-	SAILING, TERTIARY_DROPS, RANDOM_EVENTS;
+	BOSSES(5856),
+	CHESTS(1108),
+	OTHER(6390),
+	CLUE(5853),
+	SLAYER(216),
+	AGILITY(204),
+	BOLTS(358),
+	LEVELS(222),
+	EXPERIENCE(1198),
+	RAIDS(4288),
+	MINI_GAMES(1053),
+	MAGIC_SPELLS(202),
+	COMBAT(168),
+	SUPPLIES(223),
+	SKILLING(209),
+	ACHIEVEMENTS(1298),
+	SAILING(228),
+	TERTIARY_DROPS(3018),
+	RANDOM_EVENTS(7087);
 
 	private final String header;
+	private final int iconId;
 
-	Category()
+	Category(int iconId)
 	{
 		String[] words = this.name().toLowerCase().split("_");
 		StringBuilder sb = new StringBuilder();
@@ -46,7 +63,7 @@ public enum Category
 				.append(word.substring(1))
 				.append(" ");
 		}
-
+		this.iconId = iconId;
 		this.header = sb.toString().trim().replace("_", " ");
 	}
 }

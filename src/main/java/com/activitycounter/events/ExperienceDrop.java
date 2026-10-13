@@ -33,4 +33,5 @@ public class ExperienceDrop
 {
 	Skill skill;
 	int xpGained;
+	int tick;
 }
