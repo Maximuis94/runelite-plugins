@@ -1,7 +1,35 @@
+/*
+ * Copyright (c) 2026, maximuis94 <https://github.com/maximuis94>
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright notice, this
+ *    list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ *    this list of conditions and the following disclaimer in the documentation
+ *    and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
+ * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
 package com.activitycounter.listeners.conditional;
 
 import com.activitycounter.ActivityCounterPlugin;
+import static com.activitycounter.PluginConstants.CONFIG_KEY_ACTIVITY_GROUP_GRAND_EXCHANGE;
 import com.activitycounter.listeners.AbstractListenerLeaf;
+import com.activitycounter.listeners.core.PlayerListener;
+import com.activitycounter.models.Category;
 import com.activitycounter.models.TrackedActivity;
 import com.google.gson.Gson;
 import java.util.Arrays;
@@ -15,17 +43,34 @@ import net.runelite.api.GrandExchangeOfferState;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.VarbitChanged;
+import net.runelite.api.gameval.VarbitID;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 
+/**
+ * Class that counts activities related to the Grand Exchange. By definition, it is only enabled if the active game mode
+ * allows full access to the Grand Exchange.
+ * TODO: Add counters for N completed buy/sell offers
+ * TODO: Add counters for money spent/received
+ */
 @Slf4j
 @Singleton
-public class GrandExchangeTaxListener extends AbstractListenerLeaf
+public class GrandExchangeListener extends AbstractListenerLeaf
 {
+	private static final TrackedActivity[] MANAGED_ACTIVITIES = new TrackedActivity[]{
+		TrackedActivity.GE_TAX_PAID,
+	};
+
 	@Override
-	public boolean isEnabled()
+	protected TrackedActivity[] getManagedActivities()
 	{
-		return config.enableGeTaxListener();
+		return MANAGED_ACTIVITIES;
+	}
+
+	@Override
+	protected String getActivityGroupConfigKey()
+	{
+		return CONFIG_KEY_ACTIVITY_GROUP_GRAND_EXCHANGE;
 	}
 
 	@Data
@@ -36,6 +81,9 @@ public class GrandExchangeTaxListener extends AbstractListenerLeaf
 		private long price;
 		private long taxPaid;
 	}
+
+	@Inject
+	private PlayerListener playerListener;
 
 	@Inject
 	private ActivityCounterPlugin plugin;
@@ -56,11 +104,19 @@ public class GrandExchangeTaxListener extends AbstractListenerLeaf
 	private boolean isInitialized = false;
 	private boolean requiresSync = false;
 
-	@Subscribe
+	@Subscribe(priority = 100.f)
 	public void onGameStateChanged(GameStateChanged event)
 	{
 		if (event.getGameState() == GameState.LOGGED_IN)
 		{
+			// Instant gatekeeper: Ironmen (including Hardcore/Ultimate/Group) cannot use the GE.
+			// By returning here, isInitialized remains false, effectively disabling the listener logic.
+			if (!playerListener.isAbleToFullyAccessGE() ) {
+				log.debug("Ironman account detected. GE tracking disabled.");
+				isInitialized = false;
+				return;
+			}
+
 			// Flag for sync, but wait for GameTick to ensure GE offers have populated
 			requiresSync = true;
 		}
@@ -75,6 +131,7 @@ public class GrandExchangeTaxListener extends AbstractListenerLeaf
 	@Subscribe
 	public void onGameTick(GameTick event)
 	{
+		if (!isInitialized) return;
 		if (requiresSync)
 		{
 			syncOfflineTax();
@@ -111,11 +168,9 @@ public class GrandExchangeTaxListener extends AbstractListenerLeaf
 					if (currentTax > savedSignature.getTaxPaid())
 					{
 						long offlineTaxPaid = currentTax - savedSignature.getTaxPaid();
-						if (plugin.getCurrentSession() != null)
-						{
-							plugin.getCurrentSession().processActivityUpdate(TrackedActivity.GE_TAX_PAID, (int) offlineTaxPaid);
-							plugin.setRequiresSaveAndRefresh(true);
-						}
+
+						// Updated to use the central Facade plugin architecture
+						plugin.increaseCountByAmount(TrackedActivity.GE_TAX_PAID.getId(), (int) offlineTaxPaid);
 					}
 				}
 
@@ -129,10 +184,16 @@ public class GrandExchangeTaxListener extends AbstractListenerLeaf
 		isInitialized = true;
 	}
 
-	@Subscribe
+	@Subscribe(priority = 100.f)
 	public void onVarbitChanged(VarbitChanged event)
 	{
 		int varpId = event.getVarpId();
+		int varbitId = event.getVarbitId();
+
+		if (varbitId == VarbitID.IRONMAN)
+		{
+			isInitialized = playerListener.isAbleToFullyAccessGE();
+		}
 
 		if (varpId >= GE_TAX_VARP_START && varpId < GE_TAX_VARP_START + N_GE_SLOTS)
 		{
@@ -147,11 +208,8 @@ public class GrandExchangeTaxListener extends AbstractListenerLeaf
 			{
 				long taxPaidDelta = newTax - oldTax;
 
-				if (plugin.getCurrentSession() != null)
-				{
-					plugin.getCurrentSession().processActivityUpdate(TrackedActivity.GE_TAX_PAID, (int) taxPaidDelta);
-					plugin.setRequiresSaveAndRefresh(true);
-				}
+				// Updated to use the central Facade plugin architecture
+				plugin.increaseCountByAmount(TrackedActivity.GE_TAX_PAID.getId(), (int) taxPaidDelta);
 			}
 
 			// Always sync RAM Cache

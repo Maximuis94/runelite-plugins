@@ -41,7 +41,6 @@ import net.runelite.api.Skill;
 import net.runelite.api.events.AreaSoundEffectPlayed;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.SoundEffectPlayed;
-import net.runelite.api.events.StatChanged;
 import net.runelite.api.events.VarbitChanged;
 import net.runelite.api.gameval.VarPlayerID;
 import net.runelite.client.eventbus.Subscribe;
@@ -56,15 +55,7 @@ public class SoundEffectListener extends AbstractListenerNode
 	@Inject
 	private EquippedItemListener equippedItemListener;
 
-	// Map specific activities to the Skill they grant XP in
 	private final Map<TrackedActivity, Skill> activitySkillMap = new EnumMap<>(TrackedActivity.class);
-
-	// Add this to your initializeRoutingCaches() or Constructor:
-	private void buildSkillMap() {
-		activitySkillMap.put(TrackedActivity.PICKPOCKET_SUCCESS, Skill.THIEVING);
-		activitySkillMap.put(TrackedActivity.CROPS_HARVESTED, Skill.FARMING);
-		// Add any future XP-generating sound activities here
-	}
 
 	@Getter
 	private boolean hasAnySound = false;
@@ -76,7 +67,6 @@ public class SoundEffectListener extends AbstractListenerNode
 	private boolean hasMusic = false;
 
 	private int scheduledLogTick = -1;
-
 	private int pickpocketTick = 0;
 	private static final int PICKPOCKET_TICK_WINDOW = 5;
 
@@ -95,12 +85,19 @@ public class SoundEffectListener extends AbstractListenerNode
 
 	private boolean isInitialized = false;
 
+	private void buildSkillMap() {
+		activitySkillMap.put(TrackedActivity.PICKPOCKET_SUCCESS, Skill.THIEVING);
+		activitySkillMap.put(TrackedActivity.CROPS_HARVESTED, Skill.FARMING);
+		// Add any future XP-generating sound activities here
+	}
+
 	/**
 	 * Sets up routing caches for sound listeners
 	 */
 	public void initializeRoutingCaches() {
 		if (isInitialized) return;
 		buildSkillMap();
+
 		for (TrackedActivity act : TrackedActivity.values()) {
 			int[] sourceIds = act.getGameSourceIds();
 			if (sourceIds == null) continue;
@@ -129,11 +126,14 @@ public class SoundEffectListener extends AbstractListenerNode
 
 	@Subscribe
 	public void onSoundEffectPlayed(SoundEffectPlayed event) {
+		if (!plugin.hasActiveSession()) return; // Gatekeep via plugin
+
 		int soundId = event.getSoundId();
 		if (soundId < 0 || soundId >= MAX_SOUND_ID) return;
 
+		// 1. Check Pickpocketing
 		if (client.getTickCount() < pickpocketTick) {
-			if (soundId == PluginConstants.ActivityID.PICKPOCKET_SUCCESS)
+			if (soundId == PluginConstants.SoundID.PICKPOCKET_SUCCESS)
 			{
 				plugin.increaseCountByOne(TrackedActivity.PICKPOCKET_SUCCESS.getId());
 				pickpocketTick = 0;
@@ -147,8 +147,10 @@ public class SoundEffectListener extends AbstractListenerNode
 			}
 		}
 
+		// 2. Check Weapons
 		if (isWeaponSoundEffect(soundId)) return;
 
+		// 3. Check General Sound Effects
 		List<TrackedActivity> activities = soundEffectArray[soundId];
 		if (activities == null || activities.isEmpty()) return;
 
@@ -157,18 +159,26 @@ public class SoundEffectListener extends AbstractListenerNode
 			return;
 		}
 
+		// Handle Tie-breaking for overlapping sounds
 		Skill[] competingSkills = new Skill[activities.size()];
+		boolean hasCompetingSkills = false;
+
 		for (int i = 0; i < activities.size(); i++) {
-			competingSkills[i] = activitySkillMap.get(activities.get(i));
+			Skill mappedSkill = activitySkillMap.get(activities.get(i));
+			if (mappedSkill != null) {
+				competingSkills[i] = mappedSkill;
+				hasCompetingSkills = true;
+			}
 		}
 
-		Skill winningSkill = xpDropListener.getMostRecentDrop(competingSkills);
-
-		if (winningSkill != null) {
-			for (TrackedActivity act : activities) {
-				if (activitySkillMap.get(act) == winningSkill) {
-					plugin.increaseCountByOne(act.getId());
-					break;
+		if (hasCompetingSkills) {
+			Skill winningSkill = xpDropListener.getMostRecentDrop(competingSkills);
+			if (winningSkill != null) {
+				for (TrackedActivity act : activities) {
+					if (activitySkillMap.get(act) == winningSkill) {
+						plugin.increaseCountByOne(act.getId());
+						break;
+					}
 				}
 			}
 		}
@@ -189,8 +199,9 @@ public class SoundEffectListener extends AbstractListenerNode
 
 	@Subscribe
 	public void onAreaSoundEffectPlayed(AreaSoundEffectPlayed event) {
-		int soundId = event.getSoundId();
+		if (!plugin.hasActiveSession()) return; // Gatekeep via plugin
 
+		int soundId = event.getSoundId();
 		if (soundId < 0 || soundId >= MAX_SOUND_ID) return;
 
 		List<TrackedActivity> activities = areaSoundEffectArray[soundId];
@@ -222,15 +233,6 @@ public class SoundEffectListener extends AbstractListenerNode
 				hasMusic = hasAnySound && client.getVarpValue(SOUND_MUSIC_VOLUME_VARPLAYERID) > 0;
 				scheduleNoSoundActiveLog();
 				break;
-		}
-	}
-
-	@Subscribe
-	public void onStatChanged(StatChanged event)
-	{
-		if (event.getSkill() == Skill.MAGIC)
-		{
-			log.debug("[TICK={}] Magic stat changed event={}", client.getTickCount(), event);
 		}
 	}
 
@@ -279,6 +281,6 @@ public class SoundEffectListener extends AbstractListenerNode
 	 */
 	public void startPickpocketing()
 	{
-		pickpocketTick = client.getTickCount() + PICKPOCKET_TICK_WINDOW ;
+		pickpocketTick = client.getTickCount() + PICKPOCKET_TICK_WINDOW;
 	}
 }

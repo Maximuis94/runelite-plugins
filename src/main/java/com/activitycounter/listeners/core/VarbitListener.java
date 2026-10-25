@@ -31,29 +31,21 @@ import com.activitycounter.models.Session;
 import com.activitycounter.models.TrackedActivity;
 import com.activitycounter.models.TrackerType;
 import java.util.ArrayList;
-import java.util.EnumMap;
+import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import javax.inject.Singleton;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.GameState;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.VarbitChanged;
-import net.runelite.api.gameval.VarPlayerID;
 import net.runelite.api.gameval.VarbitID;
 import net.runelite.client.eventbus.Subscribe;
 
 @Slf4j
 @Singleton
-public class VarbitListener  extends AbstractListenerNode
+public class VarbitListener extends AbstractListenerNode
 {
-	private static final int SLAYER_POINTS_VARBITID = VarbitID.SLAYER_POINTS;
-	private static final int CANNON_BALLS_VARPLAYERID = VarPlayerID.ROCKTHROWER;
-	private static final int NIGHTMARE_ZONE_POINTS_SESSION_VARBITID = VarbitID.NZONE_CURRENTPOINTS;
-	private static final int TITHE_FARM_VARBITID = VarbitID.HOSIDIUS_TITHE_REWARDPOINTS;
-	private static final int GIANTS_FOUNDRY_POINTS_VARPLAYERID = VarPlayerID.GIANTS_FOUNDRY_REWARD_SHOP_POINTS;
-
 	@Getter
 	private final boolean isBusy = false;
 	@Getter
@@ -67,9 +59,12 @@ public class VarbitListener  extends AbstractListenerNode
 	@SuppressWarnings("unchecked")
 	private final List<TrackedActivity>[] varbitArray = (List<TrackedActivity>[]) new List[MAX_VAR_ID];
 
-	private final Map<TrackedActivity, Integer> previousValues = new EnumMap<>(TrackedActivity.class);
+	private final int[] previousValues;
 
 	public VarbitListener() {
+		previousValues = new int[TrackedActivity.MAX_TRACKING_ID + 1];
+		Arrays.fill(previousValues, -1);
+
 		for (TrackedActivity act : TrackedActivity.values()) {
 			int[] sourceIds = act.getGameSourceIds();
 			if (sourceIds == null) continue;
@@ -90,7 +85,7 @@ public class VarbitListener  extends AbstractListenerNode
 
 	/**
 	 * Calculates the sum of all varp/varbit IDs associated with an activity.
-	 * This enables composite counters (e.g., adding 4 different boss KCs together).
+	 * This enables composite counters (e.g., adding 4 different boss KCs together)
 	 */
 	private int calculateCompositeValue(TrackedActivity act) {
 		int total = 0;
@@ -108,152 +103,139 @@ public class VarbitListener  extends AbstractListenerNode
 	}
 
 	private Integer initialCount(TrackedActivity activity, int newCount) {
-		Integer prev = previousValues.get(activity);
-		if (prev == null || plugin.getLoginTicks() < 5) {
-			previousValues.put(activity, newCount);
+		int id = activity.getId();
+		int prev = previousValues[id];
+		if (prev == -1 || plugin.getLoginTicks() < 5) {
+			previousValues[id] = newCount;
 			return null;
 		}
 		return prev;
 	}
 
-	private void updateCurrency(Session currentSession, TrackedActivity activity, int newValue, int maxDelta) {
+	/**
+	 * Registers a value update for a TrackedActivity, but only if it's an increase within certain limits.
+	 * @param activity The activity the number is related to
+	 * @param newValue The new value of the number
+	 * @param maxDelta Max increase of this number in a single update. Ignore update if this threshold is exceeded
+	 */
+	private void updateIncreasing(TrackedActivity activity, int newValue, int maxDelta) {
 		Integer prev = initialCount(activity, newValue);
 		if (prev == null) return;
 
 		int delta = newValue - prev;
 		if (delta > 0 && delta <= maxDelta) {
-			Count kc = currentSession.getKillCount(activity.getId());
-			if (kc != null) {
-				if (kc.getInitialKc() == -1) {
-					kc.setInitialKc(0);
-				}
-				kc.setSessionKc(kc.getSessionKc() + delta);
-				plugin.setRequiresSaveAndRefresh(true);
-			}
+			plugin.increaseCountByAmount(activity.getId(), delta);
 		}
-		previousValues.put(activity, newValue);
+		previousValues[activity.getId()] = newValue;
 	}
 
-	private void updateCannonBalls(Session currentSession) {
-		int newCannonBalls = client.getVarpValue(CANNON_BALLS_VARPLAYERID);
-		Integer prev = initialCount(TrackedActivity.CANNONBALLS_FIRED, newCannonBalls);
+	/**
+	 * Registers a value update for a TrackedActivity, but only if it's a decrease within certain limits.
+	 * @param activity The activity the number is related to
+	 * @param newValue The new value of the number
+	 * @param maxDelta Max decrease of this number in a single update. Ignore update if this threshold is exceeded
+	 */
+	private void updateDecreasing(TrackedActivity activity, int newValue, int maxDelta) {
+		Integer prev = initialCount(activity, newValue);
 		if (prev == null) return;
 
-		int deltaCb = prev - newCannonBalls;
-		if (deltaCb > 0 && deltaCb <= 2) {
-			Count kc = currentSession.getKillCount(TrackedActivity.CANNONBALLS_FIRED.getId());
-			if (kc != null) {
-				if (kc.getInitialKc() == -1) kc.setInitialKc(0);
-				kc.setSessionKc(kc.getSessionKc() + deltaCb);
-				plugin.setRequiresSaveAndRefresh(true);
-			}
+		int delta = prev - newValue;
+		if (delta > 0 && delta <= maxDelta) {
+			plugin.increaseCountByAmount(activity.getId(), delta);
 		}
-		previousValues.put(TrackedActivity.CANNONBALLS_FIRED, newCannonBalls);
-	}
-
-	private void processActivityUpdate(int storageId, int currentValue) {
-		Session session = plugin.getCurrentSession();
-		if (session == null) return;
-		if (plugin.getLoginTicks() < 5) return;
-
-		Count kc = session.getKillCount(storageId);
-		if (kc == null) return;
-
-		if (kc.getInitialKc() == -1) {
-			kc.setInitialKc(currentValue);
-		}
-
-		int newSessionKc = currentValue - kc.getInitialKc();
-		if (newSessionKc > kc.getSessionKc()) {
-			kc.setSessionKc(newSessionKc);
-			plugin.setRequiresSaveAndRefresh(true);
-		}
+		previousValues[activity.getId()] = newValue;
 	}
 
 	public void resetBaselines() {
 		if (client != null && client.getGameState() == GameState.LOGGED_IN) {
-			previousValues.put(TrackedActivity.CANNONBALLS_FIRED, client.getVarpValue(VarPlayerID.ROCKTHROWER));
-			previousValues.put(TrackedActivity.NMZ_POINTS, client.getVarbitValue(VarbitID.NZONE_CURRENTPOINTS));
-			previousValues.put(TrackedActivity.SLAYER_POINTS, client.getVarbitValue(VarbitID.SLAYER_POINTS));
-			previousValues.put(TrackedActivity.TITHE_FARM_POINTS, client.getVarbitValue(TITHE_FARM_VARBITID));
-			previousValues.put(TrackedActivity.GIANTS_FOUNDRY_POINTS, client.getVarpValue(VarPlayerID.GIANTS_FOUNDRY_REWARD_SHOP_POINTS));
+			for (TrackedActivity act : TrackedActivity.values()) {
+				if (act.getMaxDelta() > 0 || act.isDecreasing()) {
+					previousValues[act.getId()] = calculateCompositeValue(act);
+				}
+			}
+		}
+	}
+
+	/**
+	 * Iterate over all given trackedActivities. Act based on TrackedActivity parameters.
+	 */
+	private void iterateOverActivities(List<TrackedActivity> trackedActivities)
+	{
+		if (trackedActivities != null) {
+			for (TrackedActivity act : trackedActivities) {
+				if (!plugin.isTracking(act.getId())) continue;
+
+				int compositeValue = calculateCompositeValue(act);
+
+				if (act.getMaxDelta() > 0) {
+					if (act.isDecreasing()) {
+						updateDecreasing(act, compositeValue, act.getMaxDelta());
+					} else {
+						updateIncreasing(act, compositeValue, act.getMaxDelta());
+					}
+				}
+				else if (act.getTriggerCondition() != null) {
+					boolean shouldTrigger = false;
+					if (act.getTriggerCondition() == TrackedActivity.TriggerCondition.GREATER_THAN_ZERO && compositeValue > 0) {
+						shouldTrigger = true;
+					} else if (act.getTriggerCondition() == TrackedActivity.TriggerCondition.EQUALS_ONE && compositeValue == 1) {
+						shouldTrigger = true;
+					}
+
+					if (shouldTrigger) {
+						plugin.increaseCountByOne(act.getId());
+					}
+				}
+				else {
+					plugin.processActivityUpdate(act.getId(), compositeValue);
+				}
+			}
 		}
 	}
 
 	@Subscribe
 	public void onVarbitChanged(VarbitChanged event) {
-		Session session = plugin.getCurrentSession();
-		if (session == null || !session.isInProgress()) return;
+		if (!plugin.hasActiveSession()) return;
 
 		int varbitId = event.getVarbitId();
 		int varpId = event.getVarpId();
 
 		if (varbitId == VarbitID.DATE_SECONDS_PAST_MINUTE) {
-			session.addSecond();
-			if (plugin.isShowSessionDuration()) {
-				plugin.updatePanelTime();
-			}
-			return;
+			plugin.tickSessionTime();
 		}
 
-		// Handle VarPlayers
-		if (varpId != -1 && varpId < MAX_VAR_ID) {
-			List<TrackedActivity> varpActivities = varpArray[varpId];
-			if (varpActivities != null) {
-				for (TrackedActivity act : varpActivities) {
-					if (!session.isTracking(act.getId())) continue;
-
-					int compositeValue = calculateCompositeValue(act);
-
-					if (varpId == GIANTS_FOUNDRY_POINTS_VARPLAYERID) {
-						updateCurrency(session, act, compositeValue, 50000);
-					} else {
-						processActivityUpdate(act.getId(), compositeValue);
-					}
-				}
-			}
-
-			if (varpId == CANNON_BALLS_VARPLAYERID && session.isTracking(TrackedActivity.CANNONBALLS_FIRED.getId())) {
-				updateCannonBalls(session);
+		if (varbitId != -1) {
+			if (varbitId < MAX_VAR_ID) {
+				iterateOverActivities(varbitArray[varbitId]);
+			} else {
+				log.warn("Varbit value change detected for Varbit with VarbitID={}, exceeding MAX_VAR_ID", varbitId);
 			}
 		}
 
-		// Handle Varbits
-		if (varbitId != -1 && varbitId < MAX_VAR_ID) {
-			List<TrackedActivity> varbitActivities = varbitArray[varbitId];
-			if (varbitActivities != null) {
-				for (TrackedActivity act : varbitActivities) {
-					if (!session.isTracking(act.getId())) continue;
-
-					int compositeValue = calculateCompositeValue(act);
-
-					if (varbitId == SLAYER_POINTS_VARBITID) {
-						updateCurrency(session, act, compositeValue, 1500);
-					} else if (varbitId == NIGHTMARE_ZONE_POINTS_SESSION_VARBITID) {
-						updateCurrency(session, act, compositeValue, 2000000);
-					} else if (varbitId == TITHE_FARM_VARBITID) {
-						updateCurrency(session, act, compositeValue, 500);
-					} else if (act == TrackedActivity.DRIFT_NET_CAUGHT) {
-						if (client.getVarbitValue(varbitId) > 0) {
-							plugin.increaseCountByOne(act.getId());
-						}
-					} else if (act == TrackedActivity.DRIFT_NETS_SET_UP) {
-						if (client.getVarbitValue(varbitId) == 1) {
-							plugin.increaseCountByOne(act.getId());
-						}
-					} else {
-						processActivityUpdate(act.getId(), compositeValue);
-					}
-				}
+		if (varpId != -1) {
+			if (varpId < MAX_VAR_ID) {
+				iterateOverActivities(varpArray[varpId]);
+			} else {
+				log.warn("VarPlayer value change detected for Varpbit with VarpID={}, exceeding MAX_VAR_ID", varpId);
 			}
 		}
 	}
 
 	@Subscribe
-	public void onGameTick(GameTick event) {
+	public void onGameTick(GameTick event)
+	{
 		Session session = plugin.getCurrentSession();
 		if (session == null || !session.isInProgress()) return;
+
 		if (plugin.getLoginTicks() < 5) return;
+
+		for (TrackedActivity act : TrackedActivity.values()) {
+			if (act.getMaxDelta() > 0 || act.isDecreasing()) {
+				if (previousValues[act.getId()] == -1) {
+					previousValues[act.getId()] = calculateCompositeValue(act);
+				}
+			}
+		}
 
 		boolean baselinesUpdated = false;
 

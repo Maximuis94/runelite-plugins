@@ -28,9 +28,11 @@ import static com.activitycounter.PluginConstants.CONFIG_GROUP;
 import static com.activitycounter.PluginConstants.PLUGIN_NAME;
 import com.activitycounter.listeners.AbstractListenerLeaf;
 import com.activitycounter.listeners.AbstractListenerNode;
+import com.activitycounter.listeners.PreprocessedChatListener;
 import com.activitycounter.listeners.conditional.BoltProcListener;
 import com.activitycounter.listeners.conditional.FarmingListener;
-import com.activitycounter.listeners.conditional.GrandExchangeTaxListener;
+import com.activitycounter.listeners.conditional.GrandExchangeListener;
+import com.activitycounter.listeners.conditional.HerbloreListener;
 import com.activitycounter.listeners.conditional.MagicSpellListener;
 import com.activitycounter.listeners.core.ChatMessageListener;
 import com.activitycounter.listeners.core.ConfigListener;
@@ -41,7 +43,11 @@ import com.activitycounter.listeners.core.PlayerListener;
 import com.activitycounter.listeners.core.SoundEffectListener;
 import com.activitycounter.listeners.core.StatChangeListener;
 import com.activitycounter.listeners.core.VarbitListener;
+import com.activitycounter.managers.IdleMessageManager;
+import com.activitycounter.managers.PresetManager;
+import com.activitycounter.managers.SessionStorageManager;
 import com.activitycounter.models.Category;
+import com.activitycounter.models.ConfigPreset;
 import com.activitycounter.models.Count;
 import com.activitycounter.models.Session;
 import com.activitycounter.models.TrackedActivity;
@@ -53,8 +59,12 @@ import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import javax.inject.Inject;
 import lombok.Getter;
@@ -75,6 +85,7 @@ import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
+import net.runelite.client.game.SpriteManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.ClientToolbar;
@@ -96,32 +107,34 @@ public class ActivityCounterPlugin extends Plugin
 	private int loadedRegionId;
 
 	@Getter
-	private final List<Integer> pinnedActivityIds = new ArrayList<>();
+	private final List<TrackedActivity> pinnedActivities = new ArrayList<>();
+
+	// Safely tracks which conditional listeners are actively registered to the EventBus
+	private final Set<AbstractListenerLeaf> dynamicallyRegisteredLeaves = new HashSet<>();
 
 	public void togglePinnedActivity(TrackedActivity activity)
 	{
-		int id = activity.getId();
-		if (pinnedActivityIds.contains(id))
+		if (pinnedActivities.contains(activity))
 		{
-			pinnedActivityIds.remove((Integer) id);
+			pinnedActivities.remove(activity);
 		}
 		else
 		{
-			pinnedActivityIds.add(id);
+			pinnedActivities.add(activity);
 		}
 	}
 
 	public void movePinnedActivityToTop(TrackedActivity activity)
 	{
-		int id = activity.getId();
-		pinnedActivityIds.remove((Integer) id);
-		pinnedActivityIds.add(0, id);
+		pinnedActivities.remove(activity);
+		pinnedActivities.add(0, activity);
 	}
 
 	public boolean isActivityPinned(TrackedActivity activity)
 	{
-		return pinnedActivityIds.contains(activity.getId());
+		return pinnedActivities.contains(activity);
 	}
+
 	@Inject
 	private EventBus eventBus;
 
@@ -178,7 +191,16 @@ public class ActivityCounterPlugin extends Plugin
 	private SessionStorageManager storageManager;
 
 	@Inject
+	private PresetManager presetManager;
+
+	@Inject
 	private ConfigListener configListener;
+
+	@Inject
+	private ConfigManager configManager;
+
+	@Inject
+	private IdleMessageManager idleMessageManager;
 
 	@Inject
 	private PlayerListener playerListener;
@@ -187,13 +209,31 @@ public class ActivityCounterPlugin extends Plugin
 	private MagicSpellListener magicSpellListener;
 
 	@Inject
-	private GrandExchangeTaxListener grandExchangeTaxListener;
+	private GrandExchangeListener grandExchangeTaxListener;
+
+	@Inject
+	private HerbloreListener herbloreListener;
+
+	@Getter
+	@Inject
+	private SpriteManager spriteManager;
+
+	@Getter
+	private boolean sessionPaused = false;
+
+	public void toggleSessionPaused() {
+		this.sessionPaused = !this.sessionPaused;
+		if (panel != null) {
+			panel.updatePauseButtonState();
+		}
+	}
+
 
 
 	/**
 	 * Listener classes that other classes depend on in some way
 	 */
-	private AbstractListenerNode[] getCoreListeners() {
+	public AbstractListenerNode[] getCoreListeners() {
 		return new AbstractListenerNode[] {
 			configListener,
 			chatMessageListener,
@@ -204,18 +244,17 @@ public class ActivityCounterPlugin extends Plugin
 			experienceDropListener,
 			playerListener,
 			inventoryListener,
-
-
 		};
 	}
 
 	/**
 	 * Listener classes that only listen and count
 	 */
-	private AbstractListenerLeaf[] getConditionalListeners() {
+	public AbstractListenerLeaf[] getConditionalListeners() {
 		return new AbstractListenerLeaf[] {
 			boltProcListener,
 			farmingListener,
+			herbloreListener,
 			magicSpellListener,
 			grandExchangeTaxListener,
 		};
@@ -239,9 +278,11 @@ public class ActivityCounterPlugin extends Plugin
 			return null;
 		}
 	}
+
 	@Getter
 	private Session currentSession = null;
 	private boolean pendingSessionResume = false;
+	@Getter
 	private ActivityCounterPanel panel;
 	private NavigationButton navButton;
 
@@ -262,20 +303,21 @@ public class ActivityCounterPlugin extends Plugin
 	}
 
 	@Override
-	protected void startUp()
-	{
+	protected void startUp() {
 		for (AbstractListenerNode listener : getCoreListeners()) {
 			listener.register();
 		}
 		configListener.buildAllCaches();
 		soundEffectListener.initializeRoutingCaches();
 
+		// Ensure default exists, then load the last used preset (defaults to "")
+		presetManager.ensureDefaultPresetExists();
+		presetManager.loadPresetByName(config.lastPresetUsed());
 
-		for (AbstractListenerLeaf listener : getConditionalListeners()) {
-			listener.register();
-		}
+		// Initial evaluation of all conditional toggles
+		evaluateConditionalListeners();
 
-		panel = new ActivityCounterPanel(this, soundEffectListener, configListener);
+		panel = new ActivityCounterPanel(this, soundEffectListener, configListener, presetManager, idleMessageManager);
 		final BufferedImage icon = ImageUtil.loadImageResource(getClass(), "icon.png");
 		navButton = NavigationButton.builder()
 			.tooltip(PLUGIN_NAME)
@@ -285,34 +327,103 @@ public class ActivityCounterPlugin extends Plugin
 			.build();
 
 		clientToolbar.addNavigation(navButton);
-		panel.reloadComboBox();
+
+		if (panel != null) {
+			panel.reloadComboBox();
+			panel.refreshKcContainer();
+		}
 		overlayManager.add(activityOverlay);
 	}
 
 	@Override
-	protected void shutDown()
-	{
+	protected void shutDown() {
+		presetManager.saveDefaultPreset();
+
 		for (AbstractListenerNode listener : getCoreListeners()) {
 			listener.unregister();
 		}
 
-		for (AbstractListenerLeaf listener : getConditionalListeners()) {
+		for (AbstractListenerLeaf listener : dynamicallyRegisteredLeaves) {
 			listener.unregister();
 		}
+		dynamicallyRegisteredLeaves.clear();
+
 		clientToolbar.removeNavigation(navButton);
+
 		if (currentSession != null)
 		{
-			storageManager.saveSession(currentSession);
+			saveSession(currentSession);
 		}
+
 		overlayManager.remove(activityOverlay);
+	}
+
+	/**
+	 * Iterates over all conditional listeners and mounts/unmounts them based
+	 * entirely on the logic defined in their respective isEnabled() methods.
+	 */
+	public void evaluateConditionalListeners()
+	{
+		for (AbstractListenerLeaf listener : getConditionalListeners())
+		{
+			boolean needed = listener.isEnabled();
+			boolean registered = dynamicallyRegisteredLeaves.contains(listener);
+
+			if (needed && !registered)
+			{
+				listener.register();
+
+				if (listener instanceof PreprocessedChatListener) {
+					chatMessageListener.register((PreprocessedChatListener) listener);
+				}
+
+				if (currentSession != null && currentSession.isInProgress())
+				{
+					listener.onSessionStarted(currentSession);
+				}
+				dynamicallyRegisteredLeaves.add(listener);
+				log.debug("Dynamically registered {}", listener.getClass().getSimpleName());
+			}
+			else if (!needed && registered)
+			{
+				if (currentSession != null)
+				{
+					listener.onSessionStopped(currentSession);
+				}
+
+				if (listener instanceof PreprocessedChatListener) {
+					chatMessageListener.unregister((PreprocessedChatListener) listener);
+				}
+
+				listener.unregister();
+				dynamicallyRegisteredLeaves.remove(listener);
+				log.debug("Dynamically unregistered {}", listener.getClass().getSimpleName());
+			}
+		}
 	}
 
 	public void saveSession(Session session)
 	{
-		if (session != null)
+		if (session == null) return;
+
+		if (config.enableSessionConfigurations() && session.isInProgress())
 		{
-			storageManager.saveSession(session);
+			if (session.getSettings() == null)
+			{
+				session.setSettings(new HashMap<>());
+			}
+
+			session.getSettings().clear();
+			for (String key : PresetManager.PRESET_KEYS)
+			{
+				String value = configManager.getConfiguration(PluginConstants.CONFIG_GROUP, key);
+				if (value != null)
+				{
+					session.getSettings().put(key, value);
+				}
+			}
 		}
+		storageManager.saveSession(session);
 	}
 
 	@Subscribe
@@ -348,9 +459,6 @@ public class ActivityCounterPlugin extends Plugin
 		}
 	}
 
-	/**
-	 * Starts a new session and passes it on to all of the active Listener classes
-	 */
 	public void startSession()
 	{
 		clientThread.invokeLater(() ->
@@ -359,6 +467,7 @@ public class ActivityCounterPlugin extends Plugin
 			{
 				return;
 			}
+			sessionPaused = false;
 
 			String accountName = client.getLocalPlayer() != null ? client.getLocalPlayer().getName() : "Unknown";
 			currentSession = new Session(client.getAccountHash(), accountName);
@@ -371,25 +480,24 @@ public class ActivityCounterPlugin extends Plugin
 			{
 				listener.onSessionStarted(currentSession);
 			}
-			for (AbstractListenerLeaf listener : getConditionalListeners())
+			// Only push session state to actively registered leaves
+			for (AbstractListenerLeaf listener : dynamicallyRegisteredLeaves)
 			{
 				listener.onSessionStarted(currentSession);
 			}
-
+			idleMessageManager.rollNewTip();
 			log.debug("Session started.");
 			panel.reloadComboBox();
 		});
 	}
 
-	/**
-	 * Closes an ongoing session and removes it from all registered listening classes.
-	 */
 	public void closeSession()
 	{
 		clientThread.invokeLater(() ->
 		{
 			if (currentSession != null)
 			{
+				sessionPaused = false;
 				currentSession.setInProgress(false);
 				currentSession.setEndTime(Instant.now());
 				storageManager.saveSession(currentSession);
@@ -397,12 +505,11 @@ public class ActivityCounterPlugin extends Plugin
 				Session closedSession = currentSession;
 				currentSession = null;
 
-				// --- NEW: Notify all listeners directly ---
 				for (AbstractListenerNode listener : getCoreListeners())
 				{
 					listener.onSessionStopped(closedSession);
 				}
-				for (AbstractListenerLeaf listener : getConditionalListeners())
+				for (AbstractListenerLeaf listener : dynamicallyRegisteredLeaves)
 				{
 					listener.onSessionStopped(closedSession);
 				}
@@ -450,9 +557,6 @@ public class ActivityCounterPlugin extends Plugin
 		}
 	}
 
-	/**
-	 * Hides an activity by delegating to ConfigListener and refreshing the UI.
-	 */
 	public void disableActivity(TrackedActivity activity) {
 		configListener.disableActivity(activity);
 		if (panel != null) {
@@ -460,33 +564,6 @@ public class ActivityCounterPlugin extends Plugin
 		}
 	}
 
-	/**
-	 * Safely toggles a conditional listener on or off, ensuring it receives the
-	 * active session state if a session is currently in progress.
-	 */
-	private void toggleConditionalListener(AbstractListenerLeaf listener, boolean isEnabled)
-	{
-		if (isEnabled)
-		{
-			listener.register();
-			if (currentSession != null && currentSession.isInProgress())
-			{
-				listener.onSessionStarted(currentSession);
-			}
-		}
-		else
-		{
-			if (currentSession != null)
-			{
-				listener.onSessionStopped(currentSession);
-			}
-			listener.unregister();
-		}
-	}
-
-	/**
-	 * Returns a processed list of counts to display in the UI, applying merges if configured.
-	 */
 	public List<Count> getDisplayKcs(Session session)
 	{
 		if (session == null) return new ArrayList<>();
@@ -529,31 +606,23 @@ public class ActivityCounterPlugin extends Plugin
 	@Subscribe
 	public void onConfigChanged(ConfigChanged event) {
 		if (!event.getGroup().equals(CONFIG_GROUP)) return;
-		String eventKey = event.getKey();
 
-		// Update active session instantly when a new score is set in the context menu
+		String eventKey = event.getKey();
 		if (eventKey.equals("activityScores")) {
 			syncActiveSessionScores();
 			setRequiresSaveAndRefresh(true);
+		} else if (eventKey.equals("showPresetsTab")) {
+			clientThread.invokeLater(() -> {
+				if (panel != null) {
+					panel.updatePresetsTabVisibility();
+				}
+			});
 		}
 
-		switch (eventKey)
-		{
-			case "enableBoltProcListener":
-				toggleConditionalListener(boltProcListener, config.enableBoltProcListener());
-				break;
-			case "enableMagicSpellListener":
-				toggleConditionalListener(magicSpellListener, config.enableMagicSpellListener());
-				break;
-			case "enableFarmingListener":
-				toggleConditionalListener(farmingListener, config.enableFarmingListener());
-				break;
-		}
+		evaluateConditionalListeners();
+
 		clientThread.invokeLater(() -> {
-			if (panel != null)
-			{
-				panel.refreshKcContainer();
-			}
+			if (panel != null) panel.refreshKcContainer();
 		});
 	}
 
@@ -567,9 +636,23 @@ public class ActivityCounterPlugin extends Plugin
 			if (currentSession == null)
 			{
 				Session activeSession = storageManager.loadActiveSession(accountHash);
-				if (activeSession != null)
-				{
+				if (activeSession != null) {
 					currentSession = activeSession;
+
+					// Load attached preset if it exists
+					if (currentSession.getAttachedPresetName() != null) {
+						ConfigPreset attached = presetManager.getPresetByName(currentSession.getAttachedPresetName());
+						if (attached != null) {
+							presetManager.applyPreset(attached);
+						} else {
+							log.warn("Attached preset '{}' not found.", currentSession.getAttachedPresetName());
+						}
+					} else if (config.enableSessionConfigurations() && currentSession.getSettings() != null) {
+						for (Map.Entry<String, String> entry : currentSession.getSettings().entrySet()) {
+							configManager.setConfiguration(PluginConstants.CONFIG_GROUP, entry.getKey(), entry.getValue());
+						}
+					}
+
 					initializeKillCounts(false);
 					syncActiveSessionScores();
 
@@ -577,7 +660,7 @@ public class ActivityCounterPlugin extends Plugin
 					{
 						listener.onSessionStarted(currentSession);
 					}
-					for (AbstractListenerLeaf listener : getConditionalListeners())
+					for (AbstractListenerLeaf listener : dynamicallyRegisteredLeaves)
 					{
 						listener.onSessionStarted(currentSession);
 					}
@@ -624,9 +707,6 @@ public class ActivityCounterPlugin extends Plugin
 		}
 	}
 
-	/**
-	 * Initializes all counts appropriately.
-	 */
 	private void initializeKillCounts(boolean isManualStart)
 	{
 		if (currentSession == null) return;
@@ -644,12 +724,10 @@ public class ActivityCounterPlugin extends Plugin
 				kc.setSessionKc(0);
 				kc.setInitialKc(-1);
 
-
 				if (act.getCategory() == Category.AGILITY)
 				{
 					kc.setInitialKc(-1);
 				}
-
 				else if (isManualStart && client != null && client.getGameState() == GameState.LOGGED_IN) {
 					try
 					{
@@ -685,8 +763,6 @@ public class ActivityCounterPlugin extends Plugin
 						log.error("{} for TrackedActivity {} {} {}", e.getClass(), act.getName(), act.getId(), act.getConfigId());
 					}
 				}
-
-				// KCs that are typically incremented by 1 whenever they occur
 				else if (act.getTrackerType() == TrackerType.CHAT_MESSAGE ||
 					act.getTrackerType() == TrackerType.CUSTOM ||
 					act.getTrackerType() == TrackerType.SOUND_EFFECT ||
@@ -699,7 +775,6 @@ public class ActivityCounterPlugin extends Plugin
 			}
 		}
 
-		// Initialize stat baselines
 		if (isManualStart && client != null && client.getGameState() == GameState.LOGGED_IN)
 		{
 			for (Skill skill : Skill.values())
@@ -726,9 +801,10 @@ public class ActivityCounterPlugin extends Plugin
 				}
 			}
 
-			if (currentSession.isTracking(PluginConstants.ActivityID.LVL_TOTAL))
+			int totalLvlId = TrackedActivity.LVL_TOTAL.getId();
+			if (currentSession.isTracking(totalLvlId))
 			{
-				Count kc = currentSession.getKillCount(PluginConstants.ActivityID.LVL_TOTAL);
+				Count kc = currentSession.getKillCount(totalLvlId);
 				if (kc.getInitialKc() == -1)
 				{
 					kc.setInitialKc(client.getTotalLevel());
@@ -737,9 +813,6 @@ public class ActivityCounterPlugin extends Plugin
 		}
 	}
 
-	/**
-	 * Helper method to map a raw tracking ID back to its Enum instance.
-	 */
 	public TrackedActivity getActivityById(int trackingId) {
 		for (TrackedActivity act : TrackedActivity.values()) {
 			if (act.getId() == trackingId) {
@@ -759,21 +832,86 @@ public class ActivityCounterPlugin extends Plugin
 		return act != null ? act.ordinal() : Integer.MAX_VALUE;
 	}
 
-	/**
-	 * Increases the count of the specified counter by one and set a flag for an update/refresh
-	 */
+	public boolean hasActiveSession() {
+		return currentSession != null && currentSession.isInProgress() && !sessionPaused;
+	}
+
+	public boolean isTracking(int activityId) {
+		return hasActiveSession() && currentSession.isTracking(activityId);
+	}
+
+	public void tickSessionTime() {
+		if (hasActiveSession()) {
+			currentSession.addSecond();
+			if (isShowSessionDuration()) {
+				updatePanelTime();
+			}
+		}
+	}
+
 	public void increaseCountByOne(int activityId)
 	{
+		if (!hasActiveSession()) return;
+		if (currentSession.isTracking(activityId)) {
+			Count kc = currentSession.getKillCount(activityId);
+			if (kc != null) {
+				if (kc.getInitialKc() == -1) {
+					kc.setInitialKc(0);
+				}
+				kc.setSessionKc(kc.getSessionKc() + 1);
+				setRequiresSaveAndRefresh(true);
+			}
+		}
+	}
+
+	public void increaseCountByAmount(int activityId, int amount)
+	{
+		if (!hasActiveSession()) return;
+		if (currentSession.isTracking(activityId)) {
+			Count kc = currentSession.getKillCount(activityId);
+			if (kc != null) {
+				if (kc.getInitialKc() == -1) {
+					kc.setInitialKc(0);
+				}
+				kc.setSessionKc(kc.getSessionKc() + amount);
+				setRequiresSaveAndRefresh(true);
+			}
+		}
+	}
+
+	public void processActivityUpdate(int activityId, int currentValue)
+	{
+		if (!hasActiveSession() || getLoginTicks() < 5) return;
 		Session session = getCurrentSession();
-		if (session != null && session.isTracking(activityId)) {
-			Count kc = session.getKillCount(activityId);
-			kc.setSessionKc(kc.getSessionKc() + 1);
-			setRequiresSaveAndRefresh(true);
+		if (session == null) return;
+
+		Count kc = session.getKillCount(activityId);
+		if (kc != null) {
+			if (kc.getInitialKc() == -1) {
+				kc.setInitialKc(currentValue);
+			}
+
+			int newSessionKc = currentValue - kc.getInitialKc();
+			if (newSessionKc > kc.getSessionKc()) {
+				kc.setSessionKc(newSessionKc);
+				setRequiresSaveAndRefresh(true);
+			}
 		}
 	}
 
 	public void setActivityScore(TrackedActivity activity, float score) {
 		configListener.setActivityScore(activity, score);
+	}
+
+	public void setCountAbsolute(int activityId, int absoluteValue) {
+		if (!hasActiveSession()) return;
+		if (currentSession.isTracking(activityId)) {
+			Count kc = currentSession.getKillCount(activityId);
+			if (kc != null) {
+				kc.setSessionKc(absoluteValue);
+				setRequiresSaveAndRefresh(true);
+			}
+		}
 	}
 
 	public void syncActiveSessionScores() {
@@ -788,29 +926,22 @@ public class ActivityCounterPlugin extends Plugin
 	{
 		for (TrackedActivity activity : activities)
 		{
-			pinnedActivityIds.add(activity.getId());
+			pinnedActivities.add(activity);
 		}
-		// If saving to config, call your save method once here
 	}
 
 	public void unpinAllActivities(Iterable<TrackedActivity> activities)
 	{
 		for (TrackedActivity activity : activities)
 		{
-			pinnedActivityIds.remove(activity.getId());
+			pinnedActivities.remove(activity.getId());
 		}
-		// If saving to config, call your save method once here
 	}
 
-	/**
-	 * Completely resets a specific activity count and re-samples its baseline
-	 * from the game state to ensure it starts counting from 0 cleanly.
-	 */
 	public void resetActivityCount(Session targetSession, TrackedActivity activity)
 	{
 		if (targetSession == null || activity == null) return;
 
-		// If it is an archived session, simply zero the count and save
 		if (targetSession != currentSession || !targetSession.isInProgress())
 		{
 			Count kc = targetSession.getKillCount(activity.getId());
@@ -834,9 +965,6 @@ public class ActivityCounterPlugin extends Plugin
 		});
 	}
 
-	/**
-	 * Completely resets ALL activity counts in the targeted session.
-	 */
 	public void resetAllActivityCounts(Session targetSession)
 	{
 		if (targetSession == null) return;
@@ -898,13 +1026,12 @@ public class ActivityCounterPlugin extends Plugin
 					break;
 
 				case STAT_CHANGE:
-					if (activity.getId() == PluginConstants.ActivityID.LVL_TOTAL)
+					if (activity.getId() == TrackedActivity.LVL_TOTAL.getId())
 					{
 						kc.setInitialKc(client.getTotalLevel());
 					}
 					else
 					{
-						// Reset underlying skill baseline in the session's internal memory
 						for (Skill skill : Skill.values())
 						{
 							if (statChangeListener.getSkillTrackingId(skill) == activity.getId())
@@ -935,5 +1062,29 @@ public class ActivityCounterPlugin extends Plugin
 		{
 			kc.setInitialKc(-1);
 		}
+	}
+
+	public static String formatCountDisplay(int count, int secondsPassed, boolean isHourly)
+	{
+		if (isHourly)
+		{
+			if (secondsPassed > 0)
+			{
+				double hours = secondsPassed / 3600.0;
+				double rate = count / hours;
+
+				if (rate >= 100.0)
+				{
+					return String.format("%,d/hr", Math.round(rate));
+				}
+				else
+				{
+					return String.format("%,.1f/hr", rate);
+				}
+			}
+			return "0/hr";
+		}
+
+		return String.format("%,d", count);
 	}
 }

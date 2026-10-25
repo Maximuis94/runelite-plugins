@@ -23,8 +23,10 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.activitycounter;
+package com.activitycounter.managers;
 
+import com.activitycounter.ActivityCounterPlugin;
+import com.activitycounter.PluginConstants;
 import com.activitycounter.models.Count;
 import com.activitycounter.models.Session;
 import com.activitycounter.models.TrackedActivity;
@@ -33,6 +35,7 @@ import java.io.IOException;
 import java.io.Reader;
 import java.io.Writer;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -206,7 +209,7 @@ public class SessionStorageManager {
 		}
 
 		archived.addAll(getAccountSessions(accountDir));
-		archived.sort((s1, s2) -> s2.getStartTime().compareTo(s1.getStartTime()));
+		archived.sort(Comparator.comparing(Session::getStartTime, Comparator.nullsLast(Comparator.reverseOrder())));
 		return archived;
 	}
 
@@ -224,12 +227,13 @@ public class SessionStorageManager {
 		try (Stream<Filepath> dirs = pluginDir.walk(1)) {
 			dirs.filter(Filepath::isDirectory)
 				.filter(d -> !d.equals(pluginDir))
+				.filter(d -> !PluginConstants.PRESETS_DIR_NAME.equals(d.getFileName()))
 				.forEach(accountDir -> archived.addAll(getAccountSessions(accountDir)));
 		} catch (Exception e) {
 			log.error("Failed to load all archived sessions", e);
 		}
 
-		archived.sort((s1, s2) -> s2.getStartTime().compareTo(s1.getStartTime()));
+		archived.sort(Comparator.comparing(Session::getStartTime, Comparator.nullsLast(Comparator.reverseOrder())));
 		return archived;
 	}
 
@@ -267,9 +271,14 @@ public class SessionStorageManager {
 			files.filter(f -> f.isFile() && f.getFileName().endsWith(".json"))
 				.forEach(file -> {
 					Session session = loadSession(file);
-					if (session != null) {
-						sessions.add(session);
+					if (session == null) {
+						return;
 					}
+					if (session.getStartTime() == null) {
+						log.warn("Skipping session file '{}' because it has no start time", file.getFileName());
+						return;
+					}
+					sessions.add(session);
 				});
 		} catch (Exception e) {
 			log.error("Failed to list account sessions in dir {}", accountDir.toString(), e);

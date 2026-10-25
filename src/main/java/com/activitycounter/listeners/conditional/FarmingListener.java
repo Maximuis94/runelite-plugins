@@ -25,9 +25,13 @@
 
 package com.activitycounter.listeners.conditional;
 
+import static com.activitycounter.PluginConstants.CONFIG_KEY_ACTIVITY_GROUP_FARMING;
 import com.activitycounter.events.ExperienceDrop;
 import com.activitycounter.listeners.AbstractListenerLeaf;
+import com.activitycounter.listeners.PreprocessedChatListener;
+import com.activitycounter.listeners.core.ChatMessageListener;
 import com.activitycounter.models.TrackedActivity;
+import javax.inject.Inject;
 import javax.inject.Singleton;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.ChatMessageType;
@@ -40,7 +44,7 @@ import net.runelite.client.eventbus.Subscribe;
  */
 @Slf4j
 @Singleton
-public class FarmingListener  extends AbstractListenerLeaf
+public class FarmingListener  extends AbstractListenerLeaf implements PreprocessedChatListener
 {
 
 	private boolean isHarvesting = false;
@@ -50,62 +54,15 @@ public class FarmingListener  extends AbstractListenerLeaf
 	private int timeoutTick = -1;
 	private static final int HARVESTING_TICK_WINDOW = 10;
 
+	@Inject
+	private ChatMessageListener chatMessageListener;
+
 	/**
 	 * Minimal check to evaluate if the given String is potentially farming-related.
 	 * Returns the resulting status.
 	 */
 	private boolean isFarmingChatType(ChatMessageType type) {
 		return type == ChatMessageType.GAMEMESSAGE || type == ChatMessageType.SPAM;
-	}
-
-	/**
-	 * Process the preprocessed chat message. The returned value indicates whether the message was relevant for the
-	 * FarmingListener.
-	 */
-	public boolean onChatMessage(String message, ChatMessageType type) {
-		if (!isRegistered() || !isFarmingChatType(type)) return false;
-
-		if (!isHarvesting) {
-			TrackedActivity activity;
-			switch (message)
-			{
-				case "You begin to harvest the herb patch.":
-					startHarvesting(TrackedActivity.HERBS_HARVESTED);
-					return true;
-				case "You begin to harvest the allotment.":
-					startHarvesting(TrackedActivity.CROPS_HARVESTED);
-					return true;
-				case "Your spell fails and the patch is cleared.":
-					activity = TrackedActivity.CROP_RESURRECTION_FAIL;
-					break;
-				case "You restore the patch to life.":
-					activity = TrackedActivity.CROP_RESURRECTION_SUCCESS;
-					break;
-				default:
-					activity = null;
-			}
-			if (activity != null)
-			{
-				if (configListener.isKcVisible(activity))
-				{
-					plugin.increaseCountByOne(activity.getId());
-				}
-				return true;
-			}
-		}
-
-		else if (activityInProgress != null) {
-			if ((message.equals("The herb patch is now empty.") && activityInProgress == TrackedActivity.HERBS_HARVESTED) ||
-				(message.equals("The allotment is now empty.") && activityInProgress == TrackedActivity.CROPS_HARVESTED)) {
-
-				plugin.increaseCountByOne(activityInProgress.getId());
-				isHarvesting = false;
-				activityInProgress = null;
-				timeoutTick = client.getTickCount();
-				return true;
-			}
-		}
-		return false;
 	}
 
 	/**
@@ -153,9 +110,96 @@ public class FarmingListener  extends AbstractListenerLeaf
 		}
 	}
 
+	private static final TrackedActivity[] MANAGED_ACTIVITIES = new TrackedActivity[]{
+		TrackedActivity.CROP_RESURRECTION_SUCCESS,
+		TrackedActivity.CROP_RESURRECTION_FAIL,
+		TrackedActivity.CROPS_HARVESTED,
+		TrackedActivity.HERBS_HARVESTED,
+	};
+
+	@Override
+	protected TrackedActivity[] getManagedActivities()
+	{
+		return MANAGED_ACTIVITIES;
+	}
+
+	@Override
+	protected String getActivityGroupConfigKey()
+	{
+		return CONFIG_KEY_ACTIVITY_GROUP_FARMING;
+	}
+
 	@Override
 	public boolean isEnabled()
 	{
 		return config.enableFarmingListener();
+	}
+
+	@Override
+	public boolean onPreprocessedChatMessage(String message, ChatMessageType type, int regionId)
+	{
+		if (!isRegistered() || !isFarmingChatType(type)) return false;
+
+		if (!isHarvesting) {
+			TrackedActivity activity;
+			switch (message)
+			{
+				case "You begin to harvest the herb patch.":
+					startHarvesting(TrackedActivity.HERBS_HARVESTED);
+					return true;
+				case "You begin to harvest the allotment.":
+					startHarvesting(TrackedActivity.CROPS_HARVESTED);
+					return true;
+				case "Your spell fails and the patch is cleared.":
+					activity = TrackedActivity.CROP_RESURRECTION_FAIL;
+					break;
+				case "You restore the patch to life.":
+					activity = TrackedActivity.CROP_RESURRECTION_SUCCESS;
+					break;
+				default:
+					activity = null;
+			}
+			if (activity != null)
+			{
+				if (configListener.isKcVisible(activity))
+				{
+					plugin.increaseCountByOne(activity.getId());
+				}
+				return true;
+			}
+		}
+
+		else if (activityInProgress != null) {
+			switch (message){
+				case "The herb patch is now empty.":
+					plugin.increaseCountByOne(TrackedActivity.HERB_PATCHES.getId());
+					plugin.increaseCountByOne(TrackedActivity.HERBS_HARVESTED.getId());
+					break;
+				case "The allotment is now empty.":
+					plugin.increaseCountByOne(TrackedActivity.ALLOTMENT_PATCHES.getId());
+					plugin.increaseCountByOne(TrackedActivity.CROPS_HARVESTED.getId());
+					break;
+				default:
+					return false;
+			}
+
+			isHarvesting = false;
+			activityInProgress = null;
+			timeoutTick = client.getTickCount();
+			return true;
+		}
+		return false;
+	}
+
+	@Override
+	protected void onRegistered()
+	{
+		chatMessageListener.register(this);
+	}
+
+	@Override
+	protected void onUnregistered()
+	{
+		chatMessageListener.unregister(this);
 	}
 }

@@ -26,23 +26,24 @@
 package com.activitycounter.listeners.core;
 
 import com.activitycounter.ActivityCounterConfig;
+import com.activitycounter.ActivityCounterPlugin;
 import com.activitycounter.PluginConstants;
 import com.activitycounter.listeners.AbstractListenerNode;
 import com.activitycounter.models.Category;
 import com.activitycounter.models.TrackedActivity;
 import static com.activitycounter.models.TrackedActivity.MAX_TRACKING_ID;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import lombok.Getter;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
 
-/**
- * Class that handles plugin configurations
- */
 @Singleton
 public class ConfigListener extends AbstractListenerNode
 {
@@ -52,20 +53,108 @@ public class ConfigListener extends AbstractListenerNode
 	@Inject
 	private ConfigManager configManager;
 
+	@Inject
+	private ActivityCounterPlugin plugin;
+
 	private final static String HIDDEN_ACTIVITIES_CONFIG_KEY = "hiddenActivities";
 	private final static String ACTIVITY_SCORES_CONFIG_KEY = "activityScores";
+	private final static String HOURLY_RATE_CONFIG_KEY = "hourlyRateActivities";
 
 	private final boolean[] visibilityCache = new boolean[MAX_TRACKING_ID + 1];
 	private final int[] categorySortCache = new int[Category.values().length];
 	private final float[] scoreCache = new float[MAX_TRACKING_ID + 1];
 
-	/**
-	 * Initializes/rebuilds all configuration caches
-	 */
 	public void buildAllCaches() {
 		parseHiddenActivities();
 		cacheCategorySortOrder();
 		parseActivityScores();
+		loadPinnedActivitiesConfig();
+	}
+
+	@Getter
+	private final List<TrackedActivity> pinnedActivities = new ArrayList<>();
+
+	/**
+	 * Restores the pinned activities from the ConfigManager into RAM.
+	 */
+	public void loadPinnedActivitiesConfig()
+	{
+		pinnedActivities.clear();
+		String csv = configManager.getConfiguration(PluginConstants.CONFIG_GROUP, "pinnedActivities");
+
+		if (csv != null && !csv.trim().isEmpty())
+		{
+			for (String part : csv.split(","))
+			{
+				try
+				{
+					int id = Integer.parseInt(part.trim());
+					for (TrackedActivity act : TrackedActivity.values()) {
+						if (act.getId() == id) {
+							pinnedActivities.add(act);
+							break;
+						}
+					}
+				}
+				catch (NumberFormatException ignored) {}
+			}
+		}
+	}
+
+	/**
+	 * Serializes the current RAM list into a CSV string and pushes it to the ConfigManager.
+	 */
+	private void savePinnedActivitiesConfig()
+	{
+		String csv = pinnedActivities.stream()
+			.map(act -> String.valueOf(act.getId()))
+			.collect(Collectors.joining(","));
+		configManager.setConfiguration(PluginConstants.CONFIG_GROUP, "pinnedActivities", csv);
+	}
+
+	public void togglePinnedActivity(TrackedActivity activity)
+	{
+		if (pinnedActivities.contains(activity))
+		{
+			pinnedActivities.remove(activity);
+		}
+		else
+		{
+			pinnedActivities.add(activity);
+		}
+		savePinnedActivitiesConfig();
+	}
+
+	public void movePinnedActivityToTop(TrackedActivity activity)
+	{
+		pinnedActivities.remove(activity);
+		pinnedActivities.add(0, activity);
+		savePinnedActivitiesConfig();
+	}
+
+	public boolean isActivityPinned(TrackedActivity activity)
+	{
+		return pinnedActivities.contains(activity);
+	}
+
+	public void pinAllActivities(Iterable<TrackedActivity> activities)
+	{
+		for (TrackedActivity activity : activities)
+		{
+			if (!pinnedActivities.contains(activity)) {
+				pinnedActivities.add(activity);
+			}
+		}
+		savePinnedActivitiesConfig();
+	}
+
+	public void unpinAllActivities(Iterable<TrackedActivity> activities)
+	{
+		for (TrackedActivity activity : activities)
+		{
+			pinnedActivities.remove(activity);
+		}
+		savePinnedActivitiesConfig();
 	}
 
 	@Subscribe
@@ -83,23 +172,24 @@ public class ConfigListener extends AbstractListenerNode
 		}
 	}
 
-	/**
-	 * Parses hiddenActivities config and converts it into an array of booleans that indicate what should (not) be shown
-	 */
 	private void parseHiddenActivities() {
 		String hiddenStr = config.hiddenActivities();
 
 		if (hiddenStr == null || hiddenStr.trim().isEmpty()) {
 			Arrays.fill(visibilityCache, true);
-			return;
+		} else {
+			Set<String> hiddenActivitySet = Arrays.stream(hiddenStr.split(","))
+				.map(String::trim)
+				.collect(Collectors.toSet());
+
+			for (TrackedActivity activity : TrackedActivity.values()) {
+				visibilityCache[activity.getId()] = !hiddenActivitySet.contains(activity.getConfigId());
+			}
 		}
 
-		Set<String> hiddenActivitySet = Arrays.stream(hiddenStr.split(","))
-			.map(String::trim)
-			.collect(Collectors.toSet());
-
-		for (TrackedActivity activity : TrackedActivity.values()) {
-			visibilityCache[activity.getId()] = !hiddenActivitySet.contains(activity.getConfigId());
+		// Whenever visibility changes, force a re-evaluation of all conditional listeners
+		if (plugin != null) {
+			plugin.evaluateConditionalListeners();
 		}
 	}
 
@@ -127,9 +217,59 @@ public class ConfigListener extends AbstractListenerNode
 		}
 	}
 
-	/**
-	 * Hides an activity by updating the array cache instantly and saving it to the configManager.
-	 */
+	private final boolean[] hourlyRateCache = new boolean[MAX_TRACKING_ID + 1];
+
+	public void buildHourlyRateCache()
+	{
+		Arrays.fill(hourlyRateCache, false);
+
+		String raw = config.hourlyRateActivities();
+		if (raw == null || raw.trim().isEmpty())
+		{
+			return;
+		}
+
+		for (String part : raw.split(","))
+		{
+			try
+			{
+				int id = Integer.parseInt(part.trim());
+				if (id >= 0 && id < hourlyRateCache.length)
+				{
+					hourlyRateCache[id] = true;
+				}
+			}
+			catch (NumberFormatException ignored) {}
+		}
+	}
+
+	public boolean isHourlyRate(int activityId)
+	{
+		return activityId >= 0 && activityId < hourlyRateCache.length && hourlyRateCache[activityId];
+	}
+
+	public void toggleHourlyRate(TrackedActivity activity)
+	{
+		if (activity == null) return;
+
+		int id = activity.getId();
+		if (id < 0 || id >= hourlyRateCache.length) return;
+
+		hourlyRateCache[id] = !hourlyRateCache[id];
+
+		StringBuilder sb = new StringBuilder();
+		for (int i = 0; i < hourlyRateCache.length; i++)
+		{
+			if (hourlyRateCache[i])
+			{
+				if (sb.length() > 0) sb.append(",");
+				sb.append(i);
+			}
+		}
+
+		configManager.setConfiguration(PluginConstants.CONFIG_GROUP, HOURLY_RATE_CONFIG_KEY, sb.toString());
+	}
+
 	public void disableActivity(TrackedActivity activity) {
 		if (activity == null || !visibilityCache[activity.getId()]) {
 			return;
@@ -146,6 +286,11 @@ public class ConfigListener extends AbstractListenerNode
 		}
 
 		configManager.setConfiguration(PluginConstants.CONFIG_GROUP, HIDDEN_ACTIVITIES_CONFIG_KEY, newHiddenString.toString());
+
+		// Immediately re-evaluate dynamically
+		if (plugin != null) {
+			plugin.evaluateConditionalListeners();
+		}
 	}
 
 	public boolean isKcVisible(int trackedActivityIndex) {
@@ -157,17 +302,11 @@ public class ConfigListener extends AbstractListenerNode
 		return visibilityCache[trackedActivity.getId()];
 	}
 
-	/**
-	 * Fetch the O(1) cached category sort order.
-	 */
 	public int getCategorySortOrder(Category category) {
 		if (category == null) return 99;
 		return categorySortCache[category.ordinal()];
 	}
 
-	/**
-	 * Determine and cache the order in which categories are to be sorted in advance
-	 */
 	private void cacheCategorySortOrder()
 	{
 		for (Category category : Category.values()) {
@@ -175,9 +314,6 @@ public class ConfigListener extends AbstractListenerNode
 		}
 	}
 
-	/**
-	 * Internal method to pull from the config object.
-	 */
 	private int fetchCategorySortOrder(Category category)
 	{
 		switch (category)
@@ -205,9 +341,6 @@ public class ConfigListener extends AbstractListenerNode
 		}
 	}
 
-	/**
-	 * Hides/updates a score and commits it back to the RuneLite ConfigManager.
-	 */
 	public void setActivityScore(TrackedActivity activity, float score) {
 		if (activity == null) return;
 		scoreCache[activity.getId()] = score;
@@ -226,5 +359,45 @@ public class ConfigListener extends AbstractListenerNode
 	public float getScore(int trackingId) {
 		if (trackingId < 0 || trackingId > MAX_TRACKING_ID) return 0f;
 		return scoreCache[trackingId];
+	}
+
+	public void togglePinScore()
+	{
+		configManager.setConfiguration(PluginConstants.CONFIG_GROUP, "pinScoreOverlay", !config.pinScoreOverlay());
+	}
+
+	public void toggleScoreHourlyRate()
+	{
+		configManager.setConfiguration(PluginConstants.CONFIG_GROUP, "scoreHourlyRate", !config.scoreHourlyRate());
+	}
+
+	public void togglePinTime()
+	{
+		configManager.setConfiguration(PluginConstants.CONFIG_GROUP, "pinTimeOverlay", !config.pinTimeOverlay());
+	}
+
+	public void toggleShowStartTime()
+	{
+		configManager.setConfiguration(PluginConstants.CONFIG_GROUP, "showStartTime", !config.showStartTime());
+	}
+
+	public void toggleShowEndTime()
+	{
+		configManager.setConfiguration(PluginConstants.CONFIG_GROUP, "showEndTime", !config.showEndTime());
+	}
+
+	public void toggleShowNotes()
+	{
+		configManager.setConfiguration(PluginConstants.CONFIG_GROUP, "showNotes", !config.showNotes());
+	}
+
+	public void toggleShowSessionDuration()
+	{
+		configManager.setConfiguration(PluginConstants.CONFIG_GROUP, "showSessionDuration", !config.showSessionDuration());
+	}
+
+	public void setCustomScoreLabel(String label)
+	{
+		configManager.setConfiguration(PluginConstants.CONFIG_GROUP, "customScoreLabel", label);
 	}
 }

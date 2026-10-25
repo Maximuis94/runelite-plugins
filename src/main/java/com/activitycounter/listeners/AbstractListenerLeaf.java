@@ -1,35 +1,68 @@
+/*
+ * Copyright (c) 2026, maximuis94 <https://github.com/maximuis94>
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright notice, this
+ *    list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ *    this list of conditions and the following disclaimer in the documentation
+ *    and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
+ * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
 package com.activitycounter.listeners;
 
 import com.activitycounter.ActivityCounterConfig;
 import com.activitycounter.listeners.core.ConfigListener;
+import com.activitycounter.models.TrackedActivity;
 import javax.inject.Inject;
+import net.runelite.client.eventbus.EventBus;
 
-/**
- * Listener class that manages a group of TrackedActivities that can be toggled via the plugin configurations.
- * As a leaf, it does not have other classes depending on it.
- */
-public abstract class AbstractListenerLeaf extends AbstractListenerNode
-{
+public abstract class AbstractListenerLeaf extends AbstractListenerNode {
+
 	@Inject
 	protected ActivityCounterConfig config;
 
 	@Inject
 	protected ConfigListener configListener;
 
-	/**
-	 * Defines the rule for whether this listener should currently be active.
-	 * Typically hooked directly into a config getter.
-	 */
-	public abstract boolean isEnabled();
+	protected abstract String getActivityGroupConfigKey();
+
+	protected abstract TrackedActivity[] getManagedActivities();
+
+	public boolean isEnabled() {
+		TrackedActivity[] activities = getManagedActivities();
+		if (activities == null) return false;
+
+		for (TrackedActivity activity : activities) {
+			if (configListener.isKcVisible(activity)) {
+				return true;
+			}
+		}
+		return false;
+	}
 
 	/**
-	 * Evaluates the current configuration and registers or unregisters the listener accordingly.
+	 * Optional hook for subclasses to perform setup immediately after registration.
 	 */
-	public final void evaluateState() {
-		if (isEnabled()) {
-			register();
-		} else {
-			unregister();
-		}
-	}
+	protected void onRegistered() {}
+
+	/**
+	 * Optional hook for subclasses to perform cleanup immediately after unregistration.
+	 */
+	protected void onUnregistered() {}
+
 }

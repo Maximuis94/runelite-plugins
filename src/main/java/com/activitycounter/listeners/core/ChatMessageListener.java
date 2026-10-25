@@ -25,14 +25,13 @@
 
 package com.activitycounter.listeners.core;
 
-import static com.activitycounter.PluginConstants.RegionID.CRYSTAL_CHEST_REGION_ID;
 import com.activitycounter.listeners.AbstractListenerNode;
-import com.activitycounter.listeners.conditional.FarmingListener;
-import com.activitycounter.models.Count;
-import com.activitycounter.models.Session;
+import com.activitycounter.listeners.PreprocessedChatListener;
 import com.activitycounter.models.TrackedActivity;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.inject.Inject;
@@ -45,9 +44,13 @@ import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.util.Text;
 
 /**
- * Listener that processes messages related to specific counters that tend to be updated after parsing a single,
- * specific message that meets certain criteria.
- * Due to preprocessing, this is the only class with the onChatMessageListener.
+ * Centralized chatmessage listener/router class.
+ * Given that chatmessages tend to be preprocessed to make them easier/cheaper to parse, all chatmessages are routed
+ * through and preprocessed in this class.
+ * Each chat message is assumed to contribute to up to one counter. As such, whenever a match is made, further
+ * processing of that message is terminated. To allow for this format, external classes that require chat messages to be
+ * parsed ought to register a parser method here using (un)register. The registered method should follow the signature
+ * described by the ChatMessageHandler interface.
  */
 @Slf4j
 @Singleton
@@ -55,7 +58,7 @@ public class ChatMessageListener extends AbstractListenerNode
 {
 	public static final int AMULET_OF_BOUNTY_ITEM_ID = 21160;
 	public static final int AMULET_OF_CHEMISTRY_ITEM_ID = 21161;
-	public static final int ALCHEMISTS_AMULET_ITEM_ID = 29988;
+	public static final int ALCHEMISTS_AMULET_ITEM_ID = 29990;
 
 	public static final int BRACELET_OF_SLAUGHTER_ITEM_ID = 21183;
 	public static final int EXPEDITIOUS_BRACELET_ITEM_ID = 21177;
@@ -70,15 +73,7 @@ public class ChatMessageListener extends AbstractListenerNode
 	private SoundEffectListener soundEffectListener;
 
 	@Inject
-	private FarmingListener farmingListener;
-
-	@Inject
 	private EquippedItemListener equippedItemListener;
-
-	private ChatMessageType messageType = null;
-	private String message = null;
-	private int regionId = -1;
-
 
 	private int tickCountPestControlPoints = -1;
 	private static final int PEST_CONTROL_POINTS_COOLDOWN = 100;
@@ -111,7 +106,6 @@ public class ChatMessageListener extends AbstractListenerNode
 	private static final String FARMING_CONTRACT_MESSAGE = "You've completed a Farming Guild Contract. You should return to GuildMaster Jane.";
 	private static final String YOU_HAVE_COMPLETED_PREFIX = "You have completed ";
 
-	// Pre-trimmed regex patterns
 	private static final Pattern RUMOUR_PATTERN = Pattern.compile("([\\d,]+) rumours for the Hunter Guild\\.");
 	private static final Pattern MAHOGANY_HOMES_PATTERN = Pattern.compile("([\\d,]+) contracts with a total of [\\d,]+ points\\.");
 	private static final Pattern LAP_PATTERN = Pattern.compile("Your (.+) count is: ([\\d,]+)\\.");
@@ -122,23 +116,22 @@ public class ChatMessageListener extends AbstractListenerNode
 	private static final String PEST_CONTROL_POINTS_PREFIX = "Squire|Congratulations! You managed to destroy all the portals!";
 
 	private static final String PICKPOCKET_START_PREFIX = "You attempt to pick";
-	private static final String PICKPOCKET_FAILED_PREFIX = "You fail to pick";
 
 	private static final String LAP_PREFIX = "Your ";
 
-	private static final String POTIONS_MIXED_PREFIX = "You mix";
-	private static final String ALCHEMIST_AMULET_PROC_PREFIX = "Your Alchemist's amulet helps you create";
-	private static final String CHEMISTRY_AMULET_PROC_PREFIX = "Your amulet of chemistry helps you create";
 	private static final String AMULET_OF_BOUNTY_PROC_PREFIX = "Your amulet of bounty saves some seeds for you.";
 	private static final String EXPEDITIOUS_BRACELET_PROC_PREFIX = "Your expeditious bracelet";
 	private static final String BRACELET_OF_SLAUGHTER_PROC_PREFIX = "Your bracelet of slaughter";
 
 	private static final String DRUNKEN_DWARF_RANDOM_EVENT = "Drunken Dwarf|I 'new it were you matey! I remember your kebab stories! 'Ere, have some ob the good stuff!";
 	private static final String GENIE_RANDOM_EVENT_PREFIX = "Genie|Ah, so you are there,";
+	private static final String MIME_RANDOM_EVENT_AFFIX = "Yeah, I'd love to do a mime show.";
+	private static final String RICK_RANDOM_EVENT_PREFIX = "Rick Turpentine|Today is your lucky day,";
 
 	private static final Map<String, TrackedActivity> AGILITY_COURSES = new HashMap<>();
 
-	static {
+	static
+	{
 		AGILITY_COURSES.put("Gnome Stronghold Agility lap", TrackedActivity.AGILITY_GNOME_STRONGHOLD);
 		AGILITY_COURSES.put("Shayzien Basic Agility Course lap", TrackedActivity.AGILITY_SHAYZIEN_LOW);
 		AGILITY_COURSES.put("Shayzien Advanced Agility Course lap", TrackedActivity.AGILITY_SHAYZIEN_HIGH);
@@ -164,40 +157,45 @@ public class ChatMessageListener extends AbstractListenerNode
 		AGILITY_COURSES.put("Agility Arena Total Ticket", TrackedActivity.AGILITY_BRIMHAVEN);
 	}
 
-	private void incrementChatboxActivity(Session session, TrackedActivity activity) {
-		if (configListener.isKcVisible(activity) && session.isTracking(activity.getId())) {
-			Count kc = session.getKillCount(activity.getId());
-			kc.setSessionKc(kc.getSessionKc() + 1);
-			plugin.setRequiresSaveAndRefresh(true);
+	// --- THE REGISTRY PATTERN ---
+
+	// CopyOnWriteArrayList prevents ConcurrentModificationException
+	private final List<PreprocessedChatListener> handlers = new CopyOnWriteArrayList<>();
+
+	public void register(PreprocessedChatListener handler)
+	{
+		if (!handlers.contains(handler))
+		{
+			handlers.add(handler);
 		}
 	}
 
-	private void processChatboxUpdate(Session session, TrackedActivity activity, int newTotalCount) {
-		if (!configListener.isKcVisible(activity) || !session.isTracking(activity.getId())) return;
-
-		Count kc = session.getKillCount(activity.getId());
-
-		if (kc.getInitialKc() == -1) {
-			kc.setInitialKc(newTotalCount - 1);
-		}
-
-		int newSessionKc = newTotalCount - kc.getInitialKc();
-
-		if (newSessionKc > kc.getSessionKc()) {
-			kc.setSessionKc(newSessionKc);
-			plugin.setRequiresSaveAndRefresh(true);
-			log.debug("Updated session KC for {}: {}", kc.getName(), newSessionKc);
-		}
+	public void unregister(PreprocessedChatListener handler)
+	{
+		handlers.remove(handler);
 	}
+
 
 	/**
-	 * Extract the points earned from a message that is known to be from Pest Control and update the count accordingly.
-	 * Maintains some cooldown between counts.
+	 * Guice executes this automatically after injecting dependencies.
+	 * Internal handlers are registered here.
 	 */
-	private void pestControlPointsMessage(Session session, String message)
+	@Inject
+	public void initializeRegistry()
 	{
-		if (!configListener.isKcVisible(TrackedActivity.PEST_CONTROL_POINTS) || !session.isTracking(TrackedActivity.PEST_CONTROL_POINTS.getId())) return;
+		register((msg, type, region) -> type == ChatMessageType.DIALOG && processDialogueMessage(msg));
+		register((msg, type, region) -> type == ChatMessageType.MESBOX && processMesboxMessage(msg));
+		register((msg, type, region) -> processRegionSpecificMessages(msg, region));
+		register((msg, type, region) -> processEquipmentChatMessages(msg));
+		register((msg, type, region) -> identifyChestOpened(msg));
+		register((msg, type, region) -> processGeneralMessages(msg));
+	}
 
+
+	// --- MESSAGE PROCESSORS (All return true if they consume the message) ---
+
+	private boolean pestControlPointsMessage(String message)
+	{
 		Matcher pcMatcher = PEST_CONTROL_POINTS_PATTERN.matcher(message);
 		if (pcMatcher.find())
 		{
@@ -205,121 +203,125 @@ public class ChatMessageListener extends AbstractListenerNode
 			int deltaT = currentTickCount - tickCountPestControlPoints;
 			if (deltaT < PEST_CONTROL_POINTS_COOLDOWN)
 			{
-				return;
+				return true; // Still consumed, just on cooldown
 			}
 
 			int pointsEarned = Integer.parseInt(pcMatcher.group(1));
-
-			Count kc = session.getKillCount(TrackedActivity.PEST_CONTROL_POINTS.getId());
-			int newPoints = kc.getSessionKc() + pointsEarned;
-			kc.setSessionKc(newPoints);
-			plugin.setRequiresSaveAndRefresh(true);
+			plugin.increaseCountByAmount(TrackedActivity.PEST_CONTROL_POINTS.getId(), pointsEarned);
 			tickCountPestControlPoints = currentTickCount;
 
-			log.debug("Earned {} Pest Control points, session total is {}", pointsEarned, newPoints);
+			log.debug("Earned {} Pest Control points", pointsEarned);
+			return true;
 		}
+		return false;
 	}
 
-	/**
-	 * Processes a message of type DIALOG
-	 */
-	private void processDialogueMessage(Session session, String message)
+	private boolean processDialogueMessage(String message)
 	{
-		// Pest Control points
-		if (message.startsWith(PEST_CONTROL_POINTS_PREFIX)) {
-			pestControlPointsMessage(session, message);
-			return;
+		if (message.startsWith(PEST_CONTROL_POINTS_PREFIX))
+		{
+			return pestControlPointsMessage(message);
 		}
-
 		if (message.startsWith(DRUNKEN_DWARF_RANDOM_EVENT))
 		{
-			incrementChatboxActivity(session, TrackedActivity.DRUNKEN_DWARF);
-			return;
+			plugin.increaseCountByOne(TrackedActivity.DRUNKEN_DWARF.getId());
+			return true;
 		}
-
 		if (message.startsWith(GENIE_RANDOM_EVENT_PREFIX))
 		{
-			incrementChatboxActivity(session, TrackedActivity.GENIE);
-			return;
-		}
-	}
-
-	/**
-	 * Processes a message of type MESBOX (i.e. statement with 'Click here to continue')
-	 */
-	private void processMesboxMessage(Session session, String message)
-	{
-		if (message.equals(CANNON_LOST_AND_FOUND_MESSAGE)) {
-			incrementChatboxActivity(session, TrackedActivity.CANNONS_LOST);
-		}
-	}
-
-	/**
-	 * Checks for herblore-related messages using the most recent exp drop as gatekeeper.
-	 */
-	private boolean processHerbloreActivity(Session session, String message)
-	{
-		if (!experienceDropListener.hasSkillGainedExpLastTick(Skill.HERBLORE)) return false;
-		int amuletId = equippedItemListener.getNeckId();
-		if ((amuletId == ALCHEMISTS_AMULET_ITEM_ID && message.startsWith(ALCHEMIST_AMULET_PROC_PREFIX)) ||
-			(amuletId == AMULET_OF_CHEMISTRY_ITEM_ID && message.startsWith(CHEMISTRY_AMULET_PROC_PREFIX)))
-		{
-			incrementChatboxActivity(session, TrackedActivity.ALCHEMISTS_AMULET_PROCS);
+			plugin.increaseCountByOne(TrackedActivity.GENIE.getId());
 			return true;
 		}
-		if (message.startsWith(POTIONS_MIXED_PREFIX))
+
+//		Chat message type DIALOG: Dogadon|Yeah, I'd love to do a mime show.
+//		Chat message type GAMEMESSAGE: You need to copy the mime's performance, then you'll return to where you were.
+//		Chat message type DIALOG: Mysterious Old Man|You need to copy the mime's performance, then you'll be returned to where you were.
+		if (message.endsWith(MIME_RANDOM_EVENT_AFFIX))
 		{
-			incrementChatboxActivity(session, TrackedActivity.POTIONS_MIXED);
+			plugin.increaseCountByOne(TrackedActivity.MIME.getId());
+			return true;
+		}
+
+		if (message.startsWith(RICK_RANDOM_EVENT_PREFIX))
+		{
+			plugin.increaseCountByOne(TrackedActivity.RICK_TURPENTINE.getId());
+		}
+
+//		2026-10-17 00:53:45 CEST [Client] DEBUG injected-client - Chat message type GAMEMESSAGE: Your reward is: <col=ff0000>480</col> x <col=ff0000>Coins</col>.
+//		2026-10-17 00:53:45 CEST [Client] DEBUG injected-client - Chat message type DIALOG: Rick Turpentine|Today is your lucky day, milady! I am donating to the victims of crime to atone for my past actions!
+
+
+		// 2026-10-18 20:32:48 CEST [Client] DEBUG injected-client - Chat message type DIALOG: Mysterious Old Man|Ah, so you are there. I hoped you would talk to me, I get so lonely. Here, have a present! I must be going now though.
+		return false;
+	}
+
+	private boolean processMesboxMessage(String message)
+	{
+		if (message.equals(CANNON_LOST_AND_FOUND_MESSAGE))
+		{
+			plugin.increaseCountByOne(TrackedActivity.CANNONS_LOST.getId());
 			return true;
 		}
 		return false;
 	}
 
-	/**
-	 * Processes the message if it starts with prefix "You have opened " and returns true. Otherwise it returns false.
-	 */
-	private boolean identifyChestOpened(Session session, String message)
+	private boolean processRegionSpecificMessages(String message, int regionId)
 	{
-		if (message.startsWith(CHESTS_PREFIX)) {
-			if (message.startsWith(LARRANS_SMALL_CHEST_PREFIX)) {
-				incrementChatboxActivity(session, TrackedActivity.LARRANS_SMALL_CHESTS);
-			} else if (message.startsWith(LARRANS_BIG_CHEST_PREFIX)) {
-				incrementChatboxActivity(session, TrackedActivity.LARRANS_BIG_CHESTS);
-			} else if (message.startsWith(BRIMSTONE_CHEST_PREFIX)) {
-				incrementChatboxActivity(session, TrackedActivity.BRIMSTONE_CHESTS);
-			} else if (message.startsWith(ZOMBIE_PIRATE_LOCKER_PREFIX)) {
-				incrementChatboxActivity(session, TrackedActivity.ZOMBIE_PIRATE_CHESTS);
-			} else if (message.startsWith(ELVEN_CRYSTAL_CHESTS_PREFIX)) {
-				incrementChatboxActivity(session, TrackedActivity.ELVEN_CRYSTAL_CHESTS);
+		if (regionId == MASTERING_MIXOLOGY_REGION_ID)
+		{
+			if (message.equals(MIXOLOGY_DIGWEED_PICKED_MESSAGE))
+			{
+				plugin.increaseCountByOne(TrackedActivity.MIXOLOGY_DIGWEED_PICKED.getId());
+				return true;
 			}
-			else log.warn("Encountered a message with CHESTS_PREFIX='{}', but was unable to match it with a chest. Message={}", CHESTS_PREFIX, message);
-			return true;
+			if (message.endsWith(MIXOLOGY_DIGWEED_MATURED_SUFFIX))
+			{
+				plugin.increaseCountByOne(TrackedActivity.MIXOLOGY_DIGWEED_MATURED.getId());
+				return true;
+			}
 		}
 		return false;
 	}
 
-	private boolean identifyEqualMessageWithRegionId(Session session, String message, TrackedActivity trackedActivity, String compareTo, int regionId)
+	private boolean identifyChestOpened(String message)
 	{
-		if (regionId == CRYSTAL_CHEST_REGION_ID && message.equals(compareTo)) {
-			incrementChatboxActivity(session, trackedActivity);
+		if (message.startsWith(CHESTS_PREFIX))
+		{
+			if (message.startsWith(LARRANS_SMALL_CHEST_PREFIX))
+			{
+				plugin.increaseCountByOne(TrackedActivity.LARRANS_SMALL_CHESTS.getId());
+			}
+			else if (message.startsWith(LARRANS_BIG_CHEST_PREFIX))
+			{
+				plugin.increaseCountByOne(TrackedActivity.LARRANS_BIG_CHESTS.getId());
+			}
+			else if (message.startsWith(BRIMSTONE_CHEST_PREFIX))
+			{
+				plugin.increaseCountByOne(TrackedActivity.BRIMSTONE_CHESTS.getId());
+			}
+			else if (message.startsWith(ZOMBIE_PIRATE_LOCKER_PREFIX))
+			{
+				plugin.increaseCountByOne(TrackedActivity.ZOMBIE_PIRATE_CHESTS.getId());
+			}
+			else if (message.startsWith(ELVEN_CRYSTAL_CHESTS_PREFIX))
+			{
+				plugin.increaseCountByOne(TrackedActivity.ELVEN_CRYSTAL_CHESTS.getId());
+			}
+			else
+				log.warn("Encountered a message with CHESTS_PREFIX='{}', but was unable to match it with a chest. Message={}", CHESTS_PREFIX, message);
 			return true;
 		}
 		return false;
 	}
 
-	/**
-	 * Method for processing all chat messages that are related to equipment charge drains. First, check if the item is
-	 * equipped, then check if the message indicates an item charge update. If the message is associated with an
-	 * activity, return true, otherwise false.
-	 */
-	private boolean processEquipmentChatMessages(Session session, String message)
+	private boolean processEquipmentChatMessages(String message)
 	{
 		switch (equippedItemListener.getNeckId())
 		{
 			case AMULET_OF_BOUNTY_ITEM_ID:
-				if (chatMessageStartsWithIncreaseOne(session, message, AMULET_OF_BOUNTY_PROC_PREFIX, TrackedActivity.AMULET_OF_BOUNTY_PROCS)) return true;
+				if (chatMessageStartsWithIncreaseOne(message, AMULET_OF_BOUNTY_PROC_PREFIX, TrackedActivity.AMULET_OF_BOUNTY_PROCS))
+					return true;
 				break;
-
 			default:
 				break;
 		}
@@ -327,12 +329,13 @@ public class ChatMessageListener extends AbstractListenerNode
 		switch (equippedItemListener.getGlovesId())
 		{
 			case BRACELET_OF_SLAUGHTER_ITEM_ID:
-				if (chatMessageStartsWithIncreaseOne(session, message, BRACELET_OF_SLAUGHTER_PROC_PREFIX, TrackedActivity.SLAUGHTER_BRACELET_PROCS)) return true;
+				if (chatMessageStartsWithIncreaseOne(message, BRACELET_OF_SLAUGHTER_PROC_PREFIX, TrackedActivity.SLAUGHTER_BRACELET_PROCS))
+					return true;
 				break;
 			case EXPEDITIOUS_BRACELET_ITEM_ID:
-				if (chatMessageStartsWithIncreaseOne(session, message, EXPEDITIOUS_BRACELET_PROC_PREFIX, TrackedActivity.EXPEDITIOUS_BRACELET_PROCS)) return true;
+				if (chatMessageStartsWithIncreaseOne(message, EXPEDITIOUS_BRACELET_PROC_PREFIX, TrackedActivity.EXPEDITIOUS_BRACELET_PROCS))
+					return true;
 				break;
-
 			default:
 				break;
 		}
@@ -340,56 +343,182 @@ public class ChatMessageListener extends AbstractListenerNode
 		return false;
 	}
 
+	private boolean processGeneralMessages(String message)
+	{
+		if (message.equals(BONES_SPARED_MESSAGE))
+		{
+			plugin.increaseCountByOne(TrackedActivity.SACRIFICES_SPARED.getId());
+			return true;
+		}
+		if (message.equals(FARMING_CONTRACT_MESSAGE))
+		{
+			plugin.increaseCountByOne(TrackedActivity.FARMING_CONTRACTS.getId());
+			return true;
+		}
+		if (message.equals(BIRD_HOUSE_MESSAGE))
+		{
+			plugin.increaseCountByOne(TrackedActivity.BIRD_HOUSES.getId());
+			return true;
+		}
+		if (message.equals(SUPERIOR_SPAWN_MESSAGE))
+		{
+			plugin.increaseCountByOne(TrackedActivity.SUPERIOR_SPAWNS.getId());
+			return true;
+		}
+		if (message.equals(BIRD_EGG_OFFERING_MESSAGE))
+		{
+			plugin.increaseCountByOne(TrackedActivity.BIRD_EGGS_OFFERED.getId());
+			return true;
+		}
+		if (message.startsWith(MUSIC_TRACK_UNLOCK_PREFIX))
+		{
+			plugin.increaseCountByOne(TrackedActivity.MUSIC_TRACKS_UNLOCKED.getId());
+			return true;
+		}
+		if (message.startsWith(NEW_COLLECTION_LOG_PREFIX))
+		{
+			plugin.increaseCountByOne(TrackedActivity.NEW_COLLECTIONS_LOGGED.getId());
+			return true;
+		}
+		if (message.startsWith(SNEAKING_SUSPICION_PREFIX))
+		{
+			if (message.endsWith(SNEAKING_SUSPICION_BEGINNER_AFFIX))
+				plugin.increaseCountByOne(TrackedActivity.MISSED_BEGINNER_CLUE.getId());
+			else if (message.endsWith(SNEAKING_SUSPICION_EASY_AFFIX))
+				plugin.increaseCountByOne(TrackedActivity.MISSED_EASY_CLUE.getId());
+			else if (message.endsWith(SNEAKING_SUSPICION_MEDIUM_AFFIX))
+				plugin.increaseCountByOne(TrackedActivity.MISSED_MEDIUM_CLUE.getId());
+			else if (message.endsWith(SNEAKING_SUSPICION_HARD_AFFIX))
+				plugin.increaseCountByOne(TrackedActivity.MISSED_HARD_CLUE.getId());
+			else if (message.endsWith(SNEAKING_SUSPICION_ELITE_AFFIX))
+				plugin.increaseCountByOne(TrackedActivity.MISSED_ELITE_CLUE.getId());
+			return true;
+		}
+		if (message.startsWith(CA_PREFIX))
+		{
+			plugin.increaseCountByOne(TrackedActivity.CA_DIARY_TASKS.getId());
+			return true;
+		}
+		if (message.startsWith(PICKPOCKET_START_PREFIX))
+		{
+			soundEffectListener.startPickpocketing();
+			return true;
+		}
+		if (message.startsWith(LAP_PREFIX))
+		{
+			Matcher matcher = LAP_PATTERN.matcher(message);
+			if (matcher.find())
+			{
+				String courseName = matcher.group(1);
+				TrackedActivity lapActivity = AGILITY_COURSES.get(courseName);
+
+				if (lapActivity != null)
+				{
+					plugin.increaseCountByOne(lapActivity.getId());
+				}
+				else
+				{
+					log.warn("Failed to recognize a suspected agility lap completion (preprocessed msg='{}') ", message);
+				}
+				return true;
+			}
+		}
+		if (message.startsWith(YOU_HAVE_COMPLETED_PREFIX))
+		{
+			Matcher rumourMatcher = RUMOUR_PATTERN.matcher(message);
+			if (rumourMatcher.find())
+			{
+				int newRumourCount = Integer.parseInt(rumourMatcher.group(1).replace(",", ""));
+				plugin.processActivityUpdate(TrackedActivity.HUNTER_RUMOURS.getId(), newRumourCount);
+				return true;
+			}
+
+			Matcher mahoganyMatcher = MAHOGANY_HOMES_PATTERN.matcher(message);
+			if (mahoganyMatcher.find())
+			{
+				int newContractCount = Integer.parseInt(mahoganyMatcher.group(1).replace(",", ""));
+				plugin.processActivityUpdate(TrackedActivity.MAHOGANY_HOMES.getId(), newContractCount);
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private boolean chatMessageStartsWithIncreaseOne(String chatMessage, String prefix, TrackedActivity trackedActivity)
+	{
+		if (chatMessage.startsWith(prefix))
+		{
+			plugin.increaseCountByOne(trackedActivity.getId());
+			return true;
+		}
+		return false;
+	}
+
+	// --- UTILITIES & EVENT SUBSCRIPTION ---
+
 	/**
-	 * Returns true if this message has a type that is covered by at least one of the listeners.
+	 * Used as initial gatekeeper
 	 */
-	private static boolean isRelevantMessageType(ChatMessageType messageType) {
+	private static boolean isRelevantMessageType(ChatMessageType messageType)
+	{
 		return messageType == ChatMessageType.GAMEMESSAGE || messageType == ChatMessageType.SPAM || messageType == ChatMessageType.DIALOG || messageType == ChatMessageType.MESBOX;
 	}
 
 	/**
-	 * Return the message without the styling tags like <></> and @mes_hl_red@.
+	 * Returns the given message, minus any styling tags and such. Assume that every message that is further processed
+	 * throughout the codebase has passed through this method exactly once.
 	 */
-	public static String preprocessMessage(String message) {
-		if (message == null) {
+	private static String preprocessMessage(String message)
+	{
+		if (message == null)
+		{
 			return null;
 		}
 
 		String tagsRemoved = Text.removeTags(message);
 
-		if (tagsRemoved.indexOf('@') == -1) {
+		if (tagsRemoved.indexOf('@') == -1)
+		{
 			return tagsRemoved;
 		}
 
 		StringBuilder sb = new StringBuilder(tagsRemoved.length());
 		int currentIndex = 0;
 
-		while (currentIndex < tagsRemoved.length()) {
+		while (currentIndex < tagsRemoved.length())
+		{
 			int start = tagsRemoved.indexOf('@', currentIndex);
-			if (start == -1) {
+			if (start == -1)
+			{
 				sb.append(tagsRemoved, currentIndex, tagsRemoved.length());
 				break;
 			}
 
 			int end = tagsRemoved.indexOf('@', start + 1);
-			if (end == -1) {
+			if (end == -1)
+			{
 				sb.append(tagsRemoved, currentIndex, tagsRemoved.length());
 				break;
 			}
 
 			boolean isTag = (end > start + 1);
-			for (int i = start + 1; i < end; i++) {
+			for (int i = start + 1; i < end; i++)
+			{
 				char c = tagsRemoved.charAt(i);
-				if (!Character.isLetterOrDigit(c) && c != '_') {
+				if (!Character.isLetterOrDigit(c) && c != '_')
+				{
 					isTag = false;
 					break;
 				}
 			}
 
-			if (isTag) {
+			if (isTag)
+			{
 				sb.append(tagsRemoved, currentIndex, start);
 				currentIndex = end + 1;
-			} else {
+			}
+			else
+			{
 				sb.append(tagsRemoved, currentIndex, start + 1);
 				currentIndex = start + 1;
 			}
@@ -397,181 +526,24 @@ public class ChatMessageListener extends AbstractListenerNode
 		return sb.toString();
 	}
 
-	private boolean setMessage(ChatMessage event)
-	{
-		ChatMessageType type = event.getType();
-		if (isRelevantMessageType(type))
-		{
-			messageType = type;
-			message = preprocessMessage(event.getMessage());
-			regionId = client.getLocalPlayer().getWorldLocation().getRegionID();
-			return true;
-		}
-		return false;
-	}
-
-	/**
-	 *  Clears the message variables
-	 */
-	private void resetMessage()
-	{
-		messageType = null;
-		message = null;
-		regionId = -1;
-	}
-
-	/**
-	 * Preprocesses a chatmessage and forwards it to other subscribers.
-	 * NB In order to prevent preprocessing the same message multiple times, this should be the only onChatMessage
-	 * subscriber.
-	 */
 	@Subscribe
-	public void onChatMessage(ChatMessage event) {
-		if (!setMessage(event)) return;
-
-		Session session = plugin.getCurrentSession();
-		if (session == null || !session.isInProgress()) {
+	public void onChatMessage(ChatMessage event)
+	{
+		ChatMessageType messageType = event.getType();
+		if (!isRelevantMessageType(messageType) || !plugin.hasActiveSession())
+		{
 			return;
 		}
 
 		String message = preprocessMessage(event.getMessage());
+		int regionId = client.getLocalPlayer() != null ? client.getLocalPlayer().getWorldLocation().getRegionID() : -1;
 
-		if (messageType == ChatMessageType.DIALOG)
+		for (PreprocessedChatListener handler : handlers)
 		{
-			processDialogueMessage(session, message);
-			return;
-		}
-
-		if (messageType == ChatMessageType.MESBOX)
-		{
-			processMesboxMessage(session, message);
-			return;
-		}
-
-		if (farmingListener.onChatMessage(message, messageType)) return;
-
-		int regionId = client.getLocalPlayer().getWorldLocation().getRegionID();
-
-
-
-		// TODO: Add regionId
-		if (message.equals(BONES_SPARED_MESSAGE)) {
-			incrementChatboxActivity(session, TrackedActivity.SACRIFICES_SPARED);
-			return;
-		}
-
-		// TODO: Add regionId
-		if (message.equals(FARMING_CONTRACT_MESSAGE)) {
-			incrementChatboxActivity(session, TrackedActivity.FARMING_CONTRACTS);
-			return;
-		}
-		if (message.equals(BIRD_HOUSE_MESSAGE)) {
-			incrementChatboxActivity(session, TrackedActivity.BIRD_HOUSES);
-			return;
-		}
-		if (message.equals(SUPERIOR_SPAWN_MESSAGE)) {
-			incrementChatboxActivity(session, TrackedActivity.SUPERIOR_SPAWNS);
-			return;
-		}
-		// TODO: Add regionId
-		if (message.equals(BIRD_EGG_OFFERING_MESSAGE)) {
-			incrementChatboxActivity(session, TrackedActivity.BIRD_EGGS_OFFERED);
-			return;
-		}
-
-		if (message.startsWith(MUSIC_TRACK_UNLOCK_PREFIX)) {
-			incrementChatboxActivity(session, TrackedActivity.MUSIC_TRACKS_UNLOCKED);
-			return;
-		}
-
-		if (regionId == MASTERING_MIXOLOGY_REGION_ID)
-		{
-			if (message.equals(MIXOLOGY_DIGWEED_PICKED_MESSAGE))
+			if (handler.onPreprocessedChatMessage(message, messageType, regionId))
 			{
-				incrementChatboxActivity(session, TrackedActivity.MIXOLOGY_DIGWEED_PICKED);
-				return;
-			}
-			if (message.endsWith(MIXOLOGY_DIGWEED_MATURED_SUFFIX))
-			{
-				incrementChatboxActivity(session, TrackedActivity.MIXOLOGY_DIGWEED_MATURED);
 				return;
 			}
 		}
-
-		if (processEquipmentChatMessages(session, message)) return;
-
-		if (processHerbloreActivity(session, message)) return;
-
-		if (identifyChestOpened(session, message)) return;
-
-
-		if (message.startsWith(NEW_COLLECTION_LOG_PREFIX)) {
-			incrementChatboxActivity(session, TrackedActivity.NEW_COLLECTIONS_LOGGED);
-			return;
-		}
-
-		if (message.startsWith(SNEAKING_SUSPICION_PREFIX)) {
-			if (message.endsWith(SNEAKING_SUSPICION_BEGINNER_AFFIX)) incrementChatboxActivity(session, TrackedActivity.MISSED_BEGINNER_CLUE);
-			else if (message.endsWith(SNEAKING_SUSPICION_EASY_AFFIX)) incrementChatboxActivity(session, TrackedActivity.MISSED_EASY_CLUE);
-			else if (message.endsWith(SNEAKING_SUSPICION_MEDIUM_AFFIX)) incrementChatboxActivity(session, TrackedActivity.MISSED_MEDIUM_CLUE);
-			else if (message.endsWith(SNEAKING_SUSPICION_HARD_AFFIX)) incrementChatboxActivity(session, TrackedActivity.MISSED_HARD_CLUE);
-			else if (message.endsWith(SNEAKING_SUSPICION_ELITE_AFFIX)) incrementChatboxActivity(session, TrackedActivity.MISSED_ELITE_CLUE);
-			return;
-		}
-
-		if (message.startsWith(CA_PREFIX)) {
-			incrementChatboxActivity(session, TrackedActivity.CA_DIARY_TASKS);
-			return;
-		}
-
-		if (message.startsWith(PICKPOCKET_START_PREFIX))
-		{
-			soundEffectListener.startPickpocketing();
-			return;
-		}
-
-		if (message.startsWith(LAP_PREFIX)) {
-			Matcher matcher = LAP_PATTERN.matcher(message);
-			if (matcher.find()) {
-				String courseName = matcher.group(1);
-				TrackedActivity lapActivity = AGILITY_COURSES.get(courseName);
-
-				if (lapActivity != null) {
-					incrementChatboxActivity(session, lapActivity);
-				}
-				else {
-					log.warn("Failed to recognize a suspected agility lap completion (preprocessed msg='{}') ", message);
-				}
-			}
-			return;
-		}
-
-		if (message.startsWith(YOU_HAVE_COMPLETED_PREFIX)) {
-			Matcher rumourMatcher = RUMOUR_PATTERN.matcher(message);
-			if (rumourMatcher.find()) {
-				int newRumourCount = Integer.parseInt(rumourMatcher.group(1).replace(",", ""));
-				processChatboxUpdate(session, TrackedActivity.HUNTER_RUMOURS, newRumourCount);
-				return;
-			}
-
-			Matcher mahoganyMatcher = MAHOGANY_HOMES_PATTERN.matcher(message);
-			if (mahoganyMatcher.find()) {
-				int newContractCount = Integer.parseInt(mahoganyMatcher.group(1).replace(",", ""));
-				processChatboxUpdate(session, TrackedActivity.MAHOGANY_HOMES, newContractCount);
-			}
-		}
-	}
-
-	/**
-	 * Check if chatMessage starts with prefix, if so, increase the count for trackedActivity by one and return true. If
-	 * not, return false.
-	 */
-	private boolean chatMessageStartsWithIncreaseOne(Session session, String chatMessage, String prefix, TrackedActivity trackedActivity)
-	{
-		if (chatMessage.startsWith(prefix)) {
-			incrementChatboxActivity(session, trackedActivity);
-			return true;
-		}
-		return false;
 	}
 }

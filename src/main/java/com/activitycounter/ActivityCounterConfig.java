@@ -80,10 +80,20 @@ public interface ActivityCounterConfig extends Config {
 	default boolean confirmTerminateSession() { return false; }
 
 	@ConfigItem(
+		keyName = "enableSessionConfigurations",
+		name = "Enable session configurations",
+		description = "If checked, configurations are attached to a session and<br>" +
+			"applied on start-up, provided the session is active.",
+		position = 2,
+		section = generalSection
+	)
+	default boolean enableSessionConfigurations () { return true; }
+
+	@ConfigItem(
 		keyName = "mergeSlayerTaskCounts ",
 		name = "Merge Slayer task counts",
 		description = "If checked, show a single, merged slayer task count instead of 3.",
-		position = 2,
+		position = 3,
 		section = generalSection
 	)
 	default boolean mergeSlayerTaskCounts () { return false; }
@@ -126,10 +136,31 @@ public interface ActivityCounterConfig extends Config {
 	)
 	default boolean showNotes() { return true; }
 
+	@ConfigItem(
+		keyName = "showSessionsTab",
+		name = "Show sessions tab",
+		description = "If checked, render the Session tab, which can be used to<br>" +
+			"manage/review sessions for different activities.<br>",
+		position = 4,
+		section = uiSection,
+		hidden = true
+	)
+	default boolean showSessionsTab() { return true; }
+
+	@ConfigItem(
+		keyName = "showPresetsTab",
+		name = "Show presets tab",
+		description = "If checked, add the Presets tab to the sidebar panel, which can be<br>" +
+			"used to switch between configuration profiles for different activities<br>",
+		position = 5,
+		section = uiSection
+	)
+	default boolean showPresetsTab() { return true; }
+
 	// --- Tracker groups ---
 
 	@ConfigItem(
-		keyName = "enableBoltProcListener",
+		keyName = PluginConstants.CONFIG_KEY_ACTIVITY_GROUP_BOLT_PROC,
 		name = "Count enchanted bolt procs",
 		description = "If checked, enchanted bolt effect procs are counted.",
 		position = 0,
@@ -138,7 +169,7 @@ public interface ActivityCounterConfig extends Config {
 	default boolean enableBoltProcListener() { return true; }
 
 	@ConfigItem(
-		keyName = "enableFarmingListener",
+		keyName = PluginConstants.CONFIG_KEY_ACTIVITY_GROUP_FARMING,
 		name = "Count farming-related activities",
 		description = "If checked, farming-related activities are counted.",
 		position = 1,
@@ -147,16 +178,16 @@ public interface ActivityCounterConfig extends Config {
 	default boolean enableFarmingListener() { return true; }
 
 	@ConfigItem(
-		keyName = "enableGeTaxListener",
-		name = "Count GE tax paid",
-		description = "If checked, Grand Exchange tax paid is counted.",
+		keyName = PluginConstants.CONFIG_KEY_ACTIVITY_GROUP_GRAND_EXCHANGE,
+		name = "Enable GE counters",
+		description = "If checked, Grand Exchange related variables like GE tax paid are counted.",
 		position = 2,
 		section = categoryFilterSection
 	)
-	default boolean enableGeTaxListener() { return false; }
+	default boolean enableGeListener() { return false; }
 
 	@ConfigItem(
-		keyName = "enableMagicSpellListener",
+		keyName = PluginConstants.CONFIG_KEY_ACTIVITY_GROUP_MAGIC_SPELLS,
 		name = "Count spells cast",
 		description = "If checked, Rune consumption and spell casts are counted.",
 		position = 3,
@@ -164,6 +195,14 @@ public interface ActivityCounterConfig extends Config {
 	)
 	default boolean enableMagicSpellListener() { return false; }
 
+	@ConfigItem(
+		keyName = PluginConstants.CONFIG_KEY_ACTIVITY_GROUP_HERBLORE,
+		name = "Count Herblore activities",
+		description = "If checked, count Herblore-related activities.",
+		position = 4,
+		section = categoryFilterSection
+	)
+	default boolean enableHerbloreListener() { return false; }
 
 
 	// --- SORTING ---
@@ -360,6 +399,50 @@ public interface ActivityCounterConfig extends Config {
 		hidden = true
 	)
 	default String activityScores() {
+		return "";
+	}
+
+	@ConfigItem(
+		keyName = "hourlyRateActivities",
+		name = "Hourly Rate Activities",
+		description = "Activities configured to display as rate per hour instead of absolute count",
+		hidden = true
+	)
+	default String hourlyRateActivities()
+	{
+		return "";
+	}
+
+	@ConfigItem(
+		keyName = "savedPresets",
+		name = "Saved Presets",
+		description = "JSON storage for configuration presets",
+		hidden = true
+	)
+	default String savedPresets()
+	{
+		return "[]";
+	}
+
+	@ConfigItem(keyName = "pinScoreOverlay", name = "Pin Score Overlay", description = "", hidden = true)
+	default boolean pinScoreOverlay() { return false; }
+
+	@ConfigItem(keyName = "scoreHourlyRate", name = "Score Hourly Rate", description = "", hidden = true)
+	default boolean scoreHourlyRate() { return false; }
+
+	@ConfigItem(keyName = "pinTimeOverlay", name = "Pin Time Overlay", description = "", hidden = true)
+	default boolean pinTimeOverlay() { return false; }
+
+	@ConfigItem(keyName = "customScoreLabel", name = "Custom Score Label", description = "", hidden = true)
+	default String customScoreLabel() { return "Score"; }
+
+	@ConfigItem(
+		keyName = "lastPresetUsed",
+		name = "Last Preset Used",
+		description = "Hidden config tracking the last loaded/saved preset",
+		hidden = true
+	)
+	default String lastPresetUsed() {
 		return "";
 	}
 }

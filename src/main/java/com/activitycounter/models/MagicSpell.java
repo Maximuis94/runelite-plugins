@@ -272,7 +272,7 @@ public enum MagicSpell
 	DEATH_CHARGE(TrackedActivity.DEATH_CHARGE, SpellBook.ARCEEUS, SpellType.UTILITY, 82, 90.0f, -1, new RuneStack(DEATH, 1), new RuneStack(BLOOD, 1), new RuneStack(SOUL, 1)),
 	DARK_DEMONBANE(TrackedActivity.DARK_DEMONBANE, SpellBook.ARCEEUS, SpellType.COMBAT, 82, 43.5f, -1, new RuneStack(FIRE, 7), new RuneStack(SOUL, 2)),
 	DEMONIC_OFFERING(TrackedActivity.DEMONIC_OFFERING, SpellBook.ARCEEUS, SpellType.UTILITY, 84, 86.0f, -1, new RuneStack(SOUL, 1), new RuneStack(WRATH, 1)),
-	GREATER_CORRUPTION(TrackedActivity.GREATER_CORRUPTION, SpellBook.ARCEEUS, SpellType.UTILITY, 85, 85.0f, -1, new RuneStack(BLOOD, 1), new RuneStack(SOUL, 3)),
+	GREATER_CORRUPTION(TrackedActivity.GREATER_CORRUPTION, SpellBook.ARCEEUS, SpellType.UTILITY, 85, 95.0f, -1, new RuneStack(BLOOD, 1), new RuneStack(SOUL, 3)),
 	MASTER_REANIMATION(TrackedActivity.MASTER_REANIMATION, SpellBook.ARCEEUS, SpellType.UTILITY, 93, 170.0f, -1, new RuneStack(BLOOD, 2), new RuneStack(NATURE, 4), new RuneStack(SOUL, 4)),
 	SINISTER_OFFERING(TrackedActivity.SINISTER_OFFERING, SpellBook.ARCEEUS, SpellType.UTILITY, 92, 98.0f, -1, new RuneStack(BLOOD, 1), new RuneStack(WRATH, 1));
 

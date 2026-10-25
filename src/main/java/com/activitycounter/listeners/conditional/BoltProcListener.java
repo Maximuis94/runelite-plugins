@@ -25,13 +25,17 @@
 
 package com.activitycounter.listeners.conditional;
 
+import com.activitycounter.ActivityCounterConfig;
 import com.activitycounter.PluginConstants;
-import static com.activitycounter.PluginConstants.EQUIPPED_ITEM_CONTAINER_ID;
+import static com.activitycounter.PluginConstants.CONFIG_KEY_ACTIVITY_GROUP_BOLT_PROC;
+import static com.activitycounter.PluginConstants.EQUIPPED_ID;
 import com.activitycounter.listeners.AbstractListenerLeaf;
+import com.activitycounter.models.Category;
 import com.activitycounter.models.Count;
 import com.activitycounter.models.CrossbowBoltEffect;
 import com.activitycounter.models.Session;
 import com.activitycounter.models.TrackedActivity;
+import java.util.Arrays;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import lombok.extern.slf4j.Slf4j;
@@ -60,8 +64,15 @@ import net.runelite.client.eventbus.Subscribe;
 @Singleton
 public class BoltProcListener extends AbstractListenerLeaf
 {
+	private static final TrackedActivity[] MANAGED_ACTIVITIES = Arrays.stream(TrackedActivity.values())
+		.filter(activity -> activity.getCategory() == Category.BOLTS)
+		.toArray(TrackedActivity[]::new);
+
 	@Inject
 	private ClientThread clientThread;
+
+	@Inject
+	private ActivityCounterConfig config;
 
 	// Equipment State
 	private boolean hasCrossbowEquipped = false;
@@ -83,6 +94,8 @@ public class BoltProcListener extends AbstractListenerLeaf
 	private static final int COMBAT_WEAPON_CATEGORY_VARBIT_ID = VarbitID.COMBAT_WEAPON_CATEGORY;
 	private static final int QUIVER_AMMO_TYPE_VARP_ID = VarPlayerID.DIZANAS_QUIVER_TEMP_AMMO;
 	private static final int AMMO_EQUIPMENT_SLOT_IDX = EquipmentInventorySlot.AMMO.getSlotIdx();
+
+
 
 	@Subscribe
 	public void onVarbitChanged(VarbitChanged event)
@@ -106,7 +119,7 @@ public class BoltProcListener extends AbstractListenerLeaf
 	@Subscribe
 	public void onItemContainerChanged(ItemContainerChanged event)
 	{
-		if (event.getContainerId() == PluginConstants.EQUIPPED_ITEM_CONTAINER_ID)
+		if (event.getContainerId() == PluginConstants.EQUIPPED_ID)
 		{
 			Item ammoItem = event.getItemContainer().getItem(AMMO_EQUIPMENT_SLOT_IDX);
 			int ammoItemId = ammoItem != null ? ammoItem.getId() : -1;
@@ -226,7 +239,7 @@ public class BoltProcListener extends AbstractListenerLeaf
 
 		hasCrossbowEquipped = client.getVarbitValue(COMBAT_WEAPON_CATEGORY_VARBIT_ID) == CROSSBOW_WEAPON_CATEGORY;
 
-		ItemContainer equipment = client.getItemContainer(EQUIPPED_ITEM_CONTAINER_ID);
+		ItemContainer equipment = client.getItemContainer(EQUIPPED_ID);
 		if (equipment != null)
 		{
 			setAmmoItem(equipment.getItem(AMMO_EQUIPMENT_SLOT_IDX));
@@ -255,8 +268,14 @@ public class BoltProcListener extends AbstractListenerLeaf
 	}
 
 	@Override
-	public boolean isEnabled()
+	protected TrackedActivity[] getManagedActivities()
 	{
-		return config.enableBoltProcListener();
+		return MANAGED_ACTIVITIES;
+	}
+
+	@Override
+	protected String getActivityGroupConfigKey()
+	{
+		return CONFIG_KEY_ACTIVITY_GROUP_BOLT_PROC;
 	}
 }

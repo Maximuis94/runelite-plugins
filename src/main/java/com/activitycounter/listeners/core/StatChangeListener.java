@@ -26,32 +26,20 @@
 package com.activitycounter.listeners.core;
 
 import com.activitycounter.listeners.AbstractListenerNode;
-import com.activitycounter.models.Count;
-import com.activitycounter.models.Session;
 import com.activitycounter.models.TrackedActivity;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import net.runelite.api.GameState;
 import net.runelite.api.Skill;
 import net.runelite.api.events.GameStateChanged;
-import net.runelite.api.events.GameTick;
 import net.runelite.api.events.StatChanged;
 import net.runelite.client.eventbus.Subscribe;
 
 @Singleton
-public class StatChangeListener  extends AbstractListenerNode
+public class StatChangeListener extends AbstractListenerNode
 {
-	@Inject
-	private ConfigListener configListener;
-
-//	private boolean trackExperience = true;
-//	private boolean trackLevels = true;
 	private boolean statsLoaded = false;
-
-	// Boosted levels, may be used for gatekeeping, among others.
 	private final int[] effectiveLevels = new int[Skill.values().length];
-
-
 
 	/**
 	 * Returns the current effective (boosted) level of a skill.
@@ -128,24 +116,6 @@ public class StatChangeListener  extends AbstractListenerNode
 		}
 	}
 
-	private void processActivityUpdate(int storageId, int currentValue) {
-		Session session = plugin.getCurrentSession();
-		if (session == null) return;
-
-		Count kc = session.getKillCount(storageId);
-		if (kc == null) return;
-
-		if (kc.getInitialKc() == -1) {
-			kc.setInitialKc(currentValue);
-		}
-
-		int newSessionKc = currentValue - kc.getInitialKc();
-		if (newSessionKc > kc.getSessionKc()) {
-			kc.setSessionKc(newSessionKc);
-			plugin.setRequiresSaveAndRefresh(true);
-		}
-	}
-
 	@Subscribe
 	public void onStatChanged(StatChanged event) {
 		if (!statsLoaded) {
@@ -155,97 +125,39 @@ public class StatChangeListener  extends AbstractListenerNode
 			statsLoaded = true;
 		}
 
-		if (plugin.getLoginTicks() < 5) return;
+		if (plugin.getLoginTicks() < 5 || !plugin.hasActiveSession()) return;
 
 		Skill skill = event.getSkill();
 		int xp = event.getXp();
 		effectiveLevels[skill.ordinal()] = event.getBoostedLevel();
 
-
-//		if (!trackExperience && !trackLevels) return;
-
-		Session currentSession = plugin.getCurrentSession();
-		if (currentSession == null || !currentSession.isInProgress()) return;
-
-
-		boolean isXpUpdated = currentSession.updateSkillXp(skill, xp);
+		boolean isXpUpdated = plugin.getCurrentSession().updateSkillXp(skill, xp);
 
 		if (isXpUpdated) {
-			plugin.setRequiresSaveAndRefresh(true);
-
 			int trackingId = getSkillTrackingId(skill);
-			if (configListener.isKcVisible(trackingId)) {
-				processActivityUpdate(trackingId, xp);
+			if (plugin.isTracking(trackingId)) {
+				plugin.processActivityUpdate(trackingId, xp);
 			}
 
-			if (configListener.isKcVisible(TrackedActivity.XP_TOTAL)) {
-				int totalGained = currentSession.getGainedXpMap().values().stream()
-					.mapToInt(Integer::intValue)
-					.sum();
-
-				Count totalKc = currentSession.getKillCount(TrackedActivity.XP_TOTAL.getId());
-				if (totalKc != null) {
-					totalKc.setSessionKc(totalGained);
+			if (plugin.isTracking(TrackedActivity.XP_TOTAL.getId())) {
+				int totalGained = 0;
+				for (Integer gained : plugin.getCurrentSession().getGainedXpMap().values()) {
+					if (gained != null) {
+						totalGained += gained;
+					}
 				}
-			}
 
-//			if (trackLevels) {
-			int lvlTrackingId = getSkillLevelTrackingId(skill);
-			if (currentSession.isTracking(lvlTrackingId)) {
-				processActivityUpdate(lvlTrackingId, client.getRealSkillLevel(skill));
-			}
-
-			if (currentSession.isTracking(TrackedActivity.LVL_TOTAL.getId())) {
-				processActivityUpdate(TrackedActivity.LVL_TOTAL.getId(), client.getTotalLevel());
-			}
-		}
-	}
-
-
-	@Subscribe
-	public void onGameTick(GameTick event) {
-		Session currentSession = plugin.getCurrentSession();
-		if (currentSession == null || !currentSession.isInProgress()) return;
-
-		for (Skill s : Skill.values()) {
-			if (client.getRealSkillLevel(s) == 0) return;
-		}
-
-		if (plugin.getLoginTicks() < 5) return;
-
-		boolean baselinesUpdated = false;
-
-		for (Skill skill : Skill.values()) {
-			int xpTrackingId = getSkillTrackingId(skill);
-			if (currentSession.isTracking(xpTrackingId)) {
-				Count kc = currentSession.getKillCount(xpTrackingId);
-				if (kc != null && kc.getInitialKc() == -1) {
-					kc.setInitialKc(client.getSkillExperience(skill));
-					currentSession.initializeSkill(skill, client.getSkillExperience(skill));
-					baselinesUpdated = true;
-				}
+				plugin.setCountAbsolute(TrackedActivity.XP_TOTAL.getId(), totalGained);
 			}
 
 			int lvlTrackingId = getSkillLevelTrackingId(skill);
-			if (currentSession.isTracking(lvlTrackingId)) {
-				Count kc = currentSession.getKillCount(lvlTrackingId);
-				if (kc != null && kc.getInitialKc() == -1) {
-					kc.setInitialKc(client.getRealSkillLevel(skill));
-					baselinesUpdated = true;
-				}
+			if (plugin.isTracking(lvlTrackingId)) {
+				plugin.processActivityUpdate(lvlTrackingId, client.getRealSkillLevel(skill));
 			}
-		}
 
-		if (currentSession.isTracking(TrackedActivity.LVL_TOTAL.getId())) {
-			Count kc = currentSession.getKillCount(TrackedActivity.LVL_TOTAL.getId());
-			if (kc != null && kc.getInitialKc() == -1) {
-				kc.setInitialKc(client.getTotalLevel());
-				baselinesUpdated = true;
+			if (plugin.isTracking(TrackedActivity.LVL_TOTAL.getId())) {
+				plugin.processActivityUpdate(TrackedActivity.LVL_TOTAL.getId(), client.getTotalLevel());
 			}
-		}
-
-		if (baselinesUpdated) {
-			plugin.setRequiresSaveAndRefresh(true);
 		}
 	}
 

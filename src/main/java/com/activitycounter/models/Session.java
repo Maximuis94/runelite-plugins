@@ -46,7 +46,7 @@ public class Session {
 	@Getter
 	@Setter
 	private String sessionName;
-
+	private String attachedPresetName;
 	private long accountHash;
 	private String accountName;
 	private Instant startTime;
@@ -58,6 +58,8 @@ public class Session {
 	private Map<Integer, Count> trackedKills;
 	private Map<Skill, Integer> initialXp;
 	private Map<Skill, Integer> gainedXp;
+
+	private Map<String, String> settings = new HashMap<>();
 
 	public Session(long accountHash, String accountName) {
 		id = UUID.randomUUID().toString();

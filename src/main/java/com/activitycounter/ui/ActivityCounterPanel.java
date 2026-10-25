@@ -27,741 +27,249 @@ package com.activitycounter.ui;
 
 import com.activitycounter.ActivityCounterConfig;
 import com.activitycounter.ActivityCounterPlugin;
+import static com.activitycounter.PluginConstants.FileName.ICON_FILE_ABOUT;
+import static com.activitycounter.PluginConstants.FileName.ICON_FILE_PAUSE;
+import static com.activitycounter.PluginConstants.FileName.ICON_FILE_PLAY;
+import static com.activitycounter.PluginConstants.FileName.ICON_FILE_PRESETS;
+import static com.activitycounter.PluginConstants.FileName.ICON_FILE_SESSION;
 import com.activitycounter.listeners.core.ConfigListener;
 import com.activitycounter.listeners.core.SoundEffectListener;
-import com.activitycounter.models.Category;
-import com.activitycounter.models.Count;
+import com.activitycounter.managers.IdleMessageManager;
+import com.activitycounter.managers.PresetManager;
 import com.activitycounter.models.Session;
-import com.activitycounter.models.TrackedActivity;
 import java.awt.BorderLayout;
-import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
-import java.awt.Font;
-import java.awt.event.FocusAdapter;
-import java.awt.event.FocusEvent;
-import java.time.Duration;
-import java.time.Instant;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Objects;
-import java.util.stream.Collectors;
-import javax.swing.Box;
-import javax.swing.BoxLayout;
+import java.awt.Image;
+import java.awt.image.BufferedImage;
+import javax.swing.ImageIcon;
 import javax.swing.JButton;
-import javax.swing.JComboBox;
-import javax.swing.JComponent;
 import javax.swing.JLabel;
-import javax.swing.JMenuItem;
-import javax.swing.JOptionPane;
 import javax.swing.JPanel;
-import javax.swing.JPopupMenu;
-import javax.swing.JScrollPane;
-import javax.swing.JTextArea;
-import javax.swing.JTextField;
+import javax.swing.JTabbedPane;
+import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.Timer;
 import javax.swing.border.EmptyBorder;
-import javax.swing.event.PopupMenuEvent;
-import javax.swing.event.PopupMenuListener;
-import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.PluginPanel;
+import net.runelite.client.util.ImageUtil;
 
-public class ActivityCounterPanel extends PluginPanel {
+public class ActivityCounterPanel extends PluginPanel
+{
 
 	private final ActivityCounterPlugin plugin;
-	private final SoundEffectListener soundEffectListener;
-	private final ConfigListener configListener;
-	private final ActivityCounterConfig config;
 
-	private final JButton toggleSessionButton = new JButton();
-	private final JButton renameSessionButton = new JButton("Rename");
-	private final JButton deleteSessionButton = new JButton("Delete");
-	private final JComboBox<SessionNode> sessionComboBox = new JComboBox<>();
+	private final JTabbedPane topTabs;
+	private final JButton pauseButton = new JButton();
+	public static final int TOP_TAB_WIDTH = 55;
+	public static final int TOP_TAB_HEIGHT = 35;
 
-	// Session Info Components
-	private final JLabel timePassedLabel = new JLabel();
-	private final JLabel startTimeLabel = new JLabel();
-	private final JLabel endTimeLabel = new JLabel();
-	private final JLabel scoreLabel = new JLabel();
-	private final JLabel warningLabel = new JLabel();
-	private final JTextArea notesArea = new JTextArea();
-	private final JScrollPane notesScrollPane = new JScrollPane(notesArea);
+	private final ImageIcon playIcon;
+	private final ImageIcon pauseIcon;
+	private final ImageIcon sessionIcon;
+	private final ImageIcon presetIcon;
+	private final ImageIcon helpIcon;
 
-	private final JPanel kcContainer = new JPanel();
+	private final SessionControlPanel sessionControlPanel;
+	private final PresetControlPanel presetControlPanel;
+	private final SessionInfoPanel sessionInfoPanel;
+	private final HelpControlPanel helpControlPanel;
+	private final ActivityListPanel activityListPanel;
+	private final IdleMessageManager idleMessageManager;
 
-	private volatile boolean forceNextReloadToActive = false;
-	private String customScoreLabel = "Score";
-	private final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MMM dd, yyyy - HH:mm")
-		.withZone(ZoneId.systemDefault());
-
-	private static class SessionNode {
-		final Session session;
-		final String label;
-
-		SessionNode(Session session, String label) {
-			this.session = session;
-			this.label = label;
-		}
-
-		@Override
-		public String toString() {
-			return label;
-		}
-	}
-
-	public ActivityCounterPanel(ActivityCounterPlugin plugin, SoundEffectListener soundEffectListener, ConfigListener configListener) {
+	public ActivityCounterPanel(
+		ActivityCounterPlugin plugin,
+		SoundEffectListener soundEffectListener,
+		ConfigListener configListener,
+		PresetManager presetManager,
+		IdleMessageManager idleMessageManager)
+	{
 		this.plugin = plugin;
-		this.soundEffectListener = soundEffectListener;
-		this.configListener = configListener;
-		this.config = plugin.getConfig();
+		ActivityCounterConfig config = plugin.getConfig();
 
 		setLayout(new BorderLayout(0, 10));
 		setBorder(new EmptyBorder(10, 10, 10, 10));
 
-		toggleSessionButton.setFocusable(false);
-		toggleSessionButton.addActionListener(e -> {
-			if (plugin.getCurrentSession() != null) {
-				if (plugin.isConfirmSessionTermination()) {
-					int confirm = JOptionPane.showConfirmDialog(
-						this,
-						"Are you sure you want to terminate the active session?",
-						"Terminate Session",
-						JOptionPane.YES_NO_OPTION,
-						JOptionPane.WARNING_MESSAGE
-					);
+		this.sessionControlPanel = new SessionControlPanel(plugin, this);
+		this.presetControlPanel = new PresetControlPanel(presetManager, this, plugin);
+		this.sessionInfoPanel = new SessionInfoPanel(plugin, configListener, config, soundEffectListener, this, idleMessageManager);
+		this.activityListPanel = new ActivityListPanel(plugin, configListener, this);
+		this.idleMessageManager = idleMessageManager;
+		this.helpControlPanel = new HelpControlPanel();
 
-					if (confirm == JOptionPane.YES_OPTION) {
-						plugin.closeSession();
-					}
-				} else plugin.closeSession();
-			} else {
-				forceNextReloadToActive = true;
-				plugin.startSession();
+		topTabs = new JTabbedPane();
+
+		final BufferedImage playImg = ImageUtil.loadImageResource(ActivityCounterPlugin.class, ICON_FILE_PLAY);
+		this.playIcon = playImg != null ? new ImageIcon(playImg.getScaledInstance(14, 14, Image.SCALE_SMOOTH)) : null;
+
+		final BufferedImage pauseImg = ImageUtil.loadImageResource(ActivityCounterPlugin.class, ICON_FILE_PAUSE);
+		this.pauseIcon = pauseImg != null ? new ImageIcon(pauseImg.getScaledInstance(14, 14, Image.SCALE_SMOOTH)) : null;
+
+		final BufferedImage sessionImg = ImageUtil.loadImageResource(ActivityCounterPlugin.class, ICON_FILE_SESSION);
+		this.sessionIcon = sessionImg != null ? new ImageIcon(sessionImg.getScaledInstance(18, 18, Image.SCALE_SMOOTH)) : null;
+
+		final BufferedImage presetImg = ImageUtil.loadImageResource(ActivityCounterPlugin.class, ICON_FILE_PRESETS);
+		this.presetIcon = presetImg != null ? new ImageIcon(presetImg.getScaledInstance(18, 18, Image.SCALE_SMOOTH)) : null;
+
+		final BufferedImage helpImg = ImageUtil.loadImageResource(ActivityCounterPlugin.class, ICON_FILE_ABOUT);
+		this.helpIcon = helpImg != null ? new ImageIcon(helpImg.getScaledInstance(18, 18, Image.SCALE_SMOOTH)) : null;
+
+		// Configure the pause button
+		pauseButton.setPreferredSize(new Dimension(24, 24));
+		pauseButton.setFocusable(false);
+		pauseButton.setContentAreaFilled(false);
+		pauseButton.setBorder(new EmptyBorder(0, 4, 0, 4));
+
+		pauseButton.addActionListener(e -> {
+			if (plugin.getCurrentSession() != null && plugin.getCurrentSession().isInProgress())
+			{
+				plugin.toggleSessionPaused();
 			}
 		});
 
-		renameSessionButton.setFocusable(false);
-		renameSessionButton.setVisible(false);
-		renameSessionButton.addActionListener(e -> {
-			SessionNode selectedNode = (SessionNode) sessionComboBox.getSelectedItem();
-			if (selectedNode != null && selectedNode.session != null) {
-				String currentName = selectedNode.label;
-				JTextField nameInput = new JTextField(currentName);
-				int result = JOptionPane.showConfirmDialog(
-					this,
-					nameInput,
-					"Rename Session",
-					JOptionPane.OK_CANCEL_OPTION,
-					JOptionPane.PLAIN_MESSAGE
-				);
+		// Build tabs natively using icons and tooltips instead of text
+		topTabs.putClientProperty("JTabbedPane.leadingComponent", pauseButton);
+		topTabs.addTab("", sessionIcon, sessionControlPanel, "Sessions");
 
-				if (result == JOptionPane.OK_OPTION) {
-					String newName = nameInput.getText();
-					if (newName != null && !newName.trim().isEmpty()) {
-						plugin.renameSession(selectedNode.session, newName);
-					}
-				}
-			}
-		});
+		if (config.showPresetsTab())
+		{
+			topTabs.addTab("", presetIcon, presetControlPanel, "Presets");
+		}
 
-		deleteSessionButton.setFocusable(false);
-		deleteSessionButton.setVisible(false);
-		deleteSessionButton.addActionListener(e -> {
-			SessionNode selectedNode = (SessionNode) sessionComboBox.getSelectedItem();
-			if (selectedNode != null && selectedNode.session != null) {
-				int confirm = JOptionPane.showConfirmDialog(
-					this,
-					"Are you sure you want to delete this archived session?",
-					"Delete Session",
-					JOptionPane.YES_NO_OPTION,
-					JOptionPane.WARNING_MESSAGE
-				);
+		topTabs.addTab("", helpIcon, helpControlPanel, "Help");
 
-				if (confirm == JOptionPane.YES_OPTION) {
-					plugin.deleteArchivedSession(selectedNode.session);
-				}
-			}
-		});
-
-		sessionComboBox.addActionListener(e -> refreshKcContainer());
-
-		kcContainer.setLayout(new BoxLayout(kcContainer, BoxLayout.Y_AXIS));
-
-		JPanel kcWrapper = new JPanel(new BorderLayout());
-		kcWrapper.add(kcContainer, BorderLayout.NORTH);
-
-		// Action Buttons Panel
-		JPanel actionButtonsPanel = new JPanel();
-		actionButtonsPanel.setLayout(new BoxLayout(actionButtonsPanel, BoxLayout.X_AXIS));
-		actionButtonsPanel.add(renameSessionButton);
-		actionButtonsPanel.add(Box.createRigidArea(new Dimension(5, 0)));
-		actionButtonsPanel.add(deleteSessionButton);
-
-		warningLabel.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
-		warningLabel.setVisible(false);
-
-		scoreLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
-		scoreLabel.setFont(scoreLabel.getFont().deriveFont(Font.BOLD));
-		scoreLabel.setForeground(ColorScheme.BRAND_ORANGE);
-		scoreLabel.setVisible(false);
-		scoreLabel.setToolTipText("Right-click to configure score");
-
-		JPopupMenu scoreMenu = new JPopupMenu();
-
-		JMenuItem resetCountsItem = new JMenuItem("Reset all counts to 0");
-		resetCountsItem.addActionListener(e -> {
-			SessionNode selectedNode = (SessionNode) sessionComboBox.getSelectedItem();
-			Session active = (selectedNode != null && selectedNode.session != null)
-				? selectedNode.session
-				: plugin.getCurrentSession();
-
-			if (active != null) {
-				int confirm = JOptionPane.showConfirmDialog(
-					this,
-					"Are you sure you want to reset all counts in this session to 0?",
-					"Reset Counts",
-					JOptionPane.YES_NO_OPTION,
-					JOptionPane.WARNING_MESSAGE
-				);
-
-				if (confirm == JOptionPane.YES_OPTION) {
-					plugin.resetAllActivityCounts(active);
-				}
-			}
-		});
-
-		JMenuItem resetScoresItem = new JMenuItem("Reset all scores to 0");
-		resetScoresItem.addActionListener(e -> {
-			SessionNode selectedNode = (SessionNode) sessionComboBox.getSelectedItem();
-			Session active = (selectedNode != null && selectedNode.session != null)
-				? selectedNode.session
-				: plugin.getCurrentSession();
-
-			if (active != null) {
-				int confirm = JOptionPane.showConfirmDialog(
-					this,
-					"Are you sure you want to reset all assigned scores to 0?",
-					"Reset Scores",
-					JOptionPane.YES_NO_OPTION,
-					JOptionPane.WARNING_MESSAGE
-				);
-
-				if (confirm == JOptionPane.YES_OPTION) {
-					for (Count kc : active.getAllKillCounts()) {
-						if (kc.getScore() != 0f) {
-							TrackedActivity activity = plugin.getActivityById(kc.getTrackingId());
-							if (activity != null) {
-								plugin.setActivityScore(activity, 0f);
-							}
-						}
-					}
-					plugin.setRequiresSaveAndRefresh(true);
-					updateTime();
-				}
-			}
-		});
-
-		JMenuItem changeLabelItem = new JMenuItem("Change score label");
-		changeLabelItem.addActionListener(e -> {
-			String input = JOptionPane.showInputDialog(this, "Enter new score label:", customScoreLabel);
-			if (input != null && !input.trim().isEmpty()) {
-				customScoreLabel = input.trim();
-				updateTime();
-			}
-		});
-
-		scoreMenu.add(resetCountsItem);
-		scoreMenu.add(resetScoresItem);
-		scoreMenu.add(changeLabelItem);
-		scoreLabel.setComponentPopupMenu(scoreMenu);
-
-		// Setup Notes Area
-		notesArea.setLineWrap(true);
-		notesArea.setWrapStyleWord(true);
-		notesArea.setBackground(ColorScheme.DARKER_GRAY_COLOR);
-		notesArea.setForeground(Color.WHITE);
-		notesArea.setToolTipText("Session notes (auto-saves when you click away)");
-		notesScrollPane.setPreferredSize(new Dimension(PluginPanel.PANEL_WIDTH - 20, 85));
-		notesScrollPane.setVisible(false);
-
-		notesArea.addFocusListener(new FocusAdapter() {
-			@Override
-			public void focusLost(FocusEvent e) {
-				SessionNode selectedNode = (SessionNode) sessionComboBox.getSelectedItem();
-				Session active = (selectedNode != null && selectedNode.session != null)
-					? selectedNode.session
-					: plugin.getCurrentSession();
-
-				if (active != null) {
-					active.setNotes(notesArea.getText());
-					plugin.saveSession(active);
-				}
-			}
-		});
-
-		actionButtonsPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
-		timePassedLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
-		startTimeLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
-		endTimeLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
-		warningLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
-		notesScrollPane.setAlignmentX(Component.LEFT_ALIGNMENT);
-
-		JPanel infoRow = new JPanel();
-		infoRow.setLayout(new BoxLayout(infoRow, BoxLayout.Y_AXIS));
-		infoRow.add(actionButtonsPanel);
-		infoRow.add(Box.createRigidArea(new Dimension(0, 5)));
-		infoRow.add(timePassedLabel);
-		infoRow.add(startTimeLabel);
-		infoRow.add(endTimeLabel);
-		infoRow.add(scoreLabel);
-		infoRow.add(Box.createRigidArea(new Dimension(0, 5)));
-		infoRow.add(warningLabel);
-		infoRow.add(Box.createRigidArea(new Dimension(0, 5)));
-		infoRow.add(notesScrollPane);
-
+		// Use BorderLayout to anchor elements tightly to the top and fill the remaining space
 		JPanel northWrapper = new JPanel(new BorderLayout(0, 5));
-		northWrapper.add(toggleSessionButton, BorderLayout.NORTH);
-		northWrapper.add(sessionComboBox, BorderLayout.CENTER);
-		northWrapper.add(infoRow, BorderLayout.SOUTH);
+		northWrapper.add(topTabs, BorderLayout.NORTH);
+		northWrapper.add(sessionInfoPanel, BorderLayout.SOUTH);
 
 		add(northWrapper, BorderLayout.NORTH);
-		add(kcWrapper, BorderLayout.CENTER);
+		add(activityListPanel, BorderLayout.CENTER);
+
+		// Force the JTabbedPane to shrink/expand based on the currently selected tab
+		topTabs.addChangeListener(e -> {
+			Component selected = topTabs.getSelectedComponent();
+			if (selected != null)
+			{
+				// Calculate the height of the tab content + ~35px for the tab header bar
+				int requiredHeight = selected.getPreferredSize().height + 35;
+
+				// Apply the new height (width is 0 because BorderLayout automatically stretches width to 100%)
+				topTabs.setPreferredSize(new Dimension(0, requiredHeight));
+
+				// Force the main panel layout to update instantly
+				revalidate();
+				repaint();
+			}
+		});
+
+		// Force the visual state to correctly sync before the plugin even renders
+		updatePauseButtonState();
 
 		Timer updateTimer = new Timer(1000, e -> updateTime());
 		updateTimer.start();
 	}
 
-	public void forceActiveSessionSelection() {
-		forceNextReloadToActive = true;
-	}
-
-	public void reloadComboBox() {
-		SwingUtilities.invokeLater(() -> {
-			String selectedId = null;
-
-			if (!forceNextReloadToActive) {
-				SessionNode selectedNode = (SessionNode) sessionComboBox.getSelectedItem();
-				if (selectedNode != null && selectedNode.session != null) {
-					selectedId = selectedNode.session.getId();
-				}
-			}
-
-			forceNextReloadToActive = false;
-			sessionComboBox.removeAllItems();
-
-			SessionNode toSelect = null;
-			if (plugin.getCurrentSession() != null) {
-				SessionNode activeNode = new SessionNode(null, "Active session");
-				sessionComboBox.addItem(activeNode);
-				toSelect = activeNode;
-			}
-
-			List<Session> archived = plugin.getArchivedSessions();
-
-			for (Session s : archived) {
-				String label;
-
-				if (s.getSessionName() != null && !s.getSessionName().trim().isEmpty()) {
-					label = s.getSessionName();
-				} else {
-					String accountPrefix = (s.getAccountName() != null && !s.getAccountName().isEmpty())
-						? s.getAccountName() + " - "
-						: "";
-					label = accountPrefix + formatter.format(s.getStartTime());
-				}
-
-				SessionNode node = new SessionNode(s, label);
-				sessionComboBox.addItem(node);
-
-				if (s.getId().equals(selectedId)) {
-					toSelect = node;
-				}
-			}
-
-			if (toSelect != null) {
-				sessionComboBox.setSelectedItem(toSelect);
-			}
-
-			refreshKcContainer();
-		});
-	}
-
-	public void updateTime() {
-		SwingUtilities.invokeLater(() -> {
-			SessionNode selectedNode = (SessionNode) sessionComboBox.getSelectedItem();
-			Session sessionToDisplay = null;
-
-			if (selectedNode != null) {
-				if (selectedNode.session == null) {
-					sessionToDisplay = plugin.getCurrentSession();
-				} else {
-					sessionToDisplay = selectedNode.session;
-				}
-			}
-
-			if (sessionToDisplay != null) {
-
-				if (sessionToDisplay.isInProgress() && !config.showSessionDuration()) {
-					timePassedLabel.setText("");
-				} else {
-					int totalSeconds = sessionToDisplay.getSecondsPassed();
-					int hours = totalSeconds / 3600;
-					int minutes = (totalSeconds % 3600) / 60;
-					int seconds = totalSeconds % 60;
-					timePassedLabel.setText(String.format("Time passed: %02d:%02d:%02d", hours, minutes, seconds));
-				}
-
-				// Start Time
-				if (config.showStartTime() && sessionToDisplay.getStartTime() != null) {
-					startTimeLabel.setText("Started: " + formatter.format(sessionToDisplay.getStartTime()));
-					startTimeLabel.setVisible(true);
-				} else {
-					startTimeLabel.setVisible(false);
-				}
-
-				// End Time
-				if (config.showEndTime() && sessionToDisplay.getEndTime() != null && !sessionToDisplay.isInProgress()) {
-					endTimeLabel.setText("Ended: " + formatter.format(sessionToDisplay.getEndTime()));
-					endTimeLabel.setVisible(true);
-				} else {
-					endTimeLabel.setVisible(false);
-				}
-
-				// Score
-				boolean hasScore = false;
-				float totalScore = 0f;
-
-				for (Count kc : sessionToDisplay.getAllKillCounts()) {
-					if (kc.getScore() != 0f) {
-						hasScore = true;
-					}
-					totalScore += kc.getSessionKc() * kc.getScore();
-				}
-
-				if (hasScore) {
-					if (Math.abs(totalScore - Math.round(totalScore)) < 0.0001) {
-						scoreLabel.setText(String.format("%s: %,d", customScoreLabel, Math.round(totalScore)));
-					} else {
-						scoreLabel.setText(String.format("%s: %,.2f", customScoreLabel, totalScore));
-					}
-					scoreLabel.setVisible(true);
-				} else {
-					scoreLabel.setVisible(false);
-				}
-
-				// Notes
-				if (config.showNotes()) {
-					if (!notesArea.hasFocus()) {
-						notesArea.setText(sessionToDisplay.getNotes() != null ? sessionToDisplay.getNotes() : "");
-					}
-					notesScrollPane.setVisible(true);
-				} else {
-					notesScrollPane.setVisible(false);
-				}
-
-				if (sessionToDisplay.isInProgress()) {
-					long secondsSinceStart = sessionToDisplay.getStartTime() != null
-						? Duration.between(sessionToDisplay.getStartTime(), Instant.now()).getSeconds()
-						: 0;
-
-					boolean hasKc = sessionToDisplay.getAllKillCounts().stream().anyMatch(c -> c.getSessionKc() > 0);
-
-					if (secondsSinceStart < 8 || !hasKc) {
-						int hiddenIndividualCount = 0;
-						for (TrackedActivity act : TrackedActivity.values()) {
-							if (!configListener.isKcVisible(act)) {
-								hiddenIndividualCount++;
-							}
-						}
-
-						List<String> disabledGroups = new ArrayList<>();
-						if (!config.enableBoltProcListener()) {
-							disabledGroups.add("Enchanted bolt proc counters");
-						}
-
-						StringBuilder sb = new StringBuilder();
-						sb.append("<html><div style='margin-top: 5px; margin-bottom: 5px;'>");
-						sb.append("<b style='color: #40ff40;'>Counter is ");
-
-						if (hiddenIndividualCount > 0 || !disabledGroups.isEmpty()) {
-							sb.append("partially ");
-						}
-						sb.append("active!</b><br><br>");
-
-						if (hiddenIndividualCount > 0) {
-							sb.append("A total of <b>").append(hiddenIndividualCount)
-								.append("</b> individual counters have been disabled/hidden. ")
-								.append("They can be made visible by removing the key from the list in the textbox at the bottom of the plugin config panel.<br><br>");
-						}
-
-						if (!soundEffectListener.isHasSoundEffects())
-						{
-							sb.append("Sound effects are currently muted. This may impact the performance of some counters like the teletab/enchanted bolt proc counters. " +
-								"If you wish to use these counters, consider setting the volume to 1 instead.<br><br>");
-						}
-
-						if (!disabledGroups.isEmpty()) {
-							sb.append("The following groups have been completely disabled:<br>");
-							for (String group : disabledGroups) {
-								sb.append("- ").append(group).append("<br>");
-							}
-							sb.append("They can be re-enabled by checking their respective boxes in the 'Group filters' config section.");
-						}
-
-						sb.append("</div></html>");
-
-						warningLabel.setText(sb.toString());
-						warningLabel.setVisible(true);
-					} else {
-						warningLabel.setVisible(false);
-					}
-				} else {
-					warningLabel.setVisible(false);
-				}
-
-			} else {
-				timePassedLabel.setText("Time passed: NA");
-				startTimeLabel.setVisible(false);
-				endTimeLabel.setVisible(false);
-				scoreLabel.setVisible(false);
-				warningLabel.setVisible(false);
-				notesScrollPane.setVisible(false);
-			}
-		});
-	}
-
-	public void refreshKcContainer() {
-		SwingUtilities.invokeLater(() -> {
-			boolean loggedIn = plugin.isLoggedIn();
-			toggleSessionButton.setEnabled(loggedIn);
-
-			Session activeSession = plugin.getCurrentSession();
-			if (activeSession != null && activeSession.isInProgress()) {
-				toggleSessionButton.setText("Stop Session");
-				toggleSessionButton.setBackground(loggedIn ? ColorScheme.PROGRESS_ERROR_COLOR : ColorScheme.DARK_GRAY_COLOR);
-			} else {
-				toggleSessionButton.setText("Start Session");
-				toggleSessionButton.setBackground(loggedIn ? ColorScheme.PROGRESS_COMPLETE_COLOR : ColorScheme.DARK_GRAY_COLOR);
-			}
-
-			SessionNode selectedNode = (SessionNode) sessionComboBox.getSelectedItem();
-			Session sessionToDisplay = null;
-
-			if (selectedNode != null) {
-				if (selectedNode.session == null) {
-					sessionToDisplay = plugin.getCurrentSession();
-					renameSessionButton.setVisible(false);
-					deleteSessionButton.setVisible(false);
-				} else {
-					sessionToDisplay = selectedNode.session;
-					renameSessionButton.setVisible(true);
-					deleteSessionButton.setVisible(true);
-				}
-			} else {
-				renameSessionButton.setVisible(false);
-				deleteSessionButton.setVisible(false);
-			}
-
-			updateTime();
-			buildKcContainer(sessionToDisplay);
-		});
-	}
-
-	private void buildKcContainer(Session sessionToDisplay) {
-		kcContainer.removeAll();
-
-		if (sessionToDisplay != null) {
-			List<Count> visibleKcs = plugin.getDisplayKcs(sessionToDisplay);
-
-			boolean isFirstCategory = true;
-
-			List<Category> sortedCategories = Arrays.asList(Category.values());
-			sortedCategories.sort(Comparator.comparingInt(configListener::getCategorySortOrder));
-
-			for (Category category : sortedCategories) {
-				List<Count> categoryKcs = visibleKcs.stream()
-					.filter(kc -> plugin.getActivityCategory(kc.getTrackingId()) == category)
-					.sorted(Comparator.comparingInt(kc -> plugin.getActivityOrder(kc.getTrackingId())))
-					.collect(Collectors.toList());
-
-				if (!categoryKcs.isEmpty()) {
-					if (!isFirstCategory) {
-						kcContainer.add(Box.createRigidArea(new Dimension(0, 15)));
-					}
-					isFirstCategory = false;
-
-					JPanel categoryHeader = new JPanel(new BorderLayout());
-					categoryHeader.setBackground(ColorScheme.DARKER_GRAY_COLOR.darker());
-					categoryHeader.setBorder(new EmptyBorder(5, 5, 5, 5));
-
-					JLabel categoryLabel = new JLabel(category.getHeader());
-					categoryLabel.setForeground(Color.WHITE);
-					categoryLabel.setFont(categoryLabel.getFont().deriveFont(Font.BOLD));
-
-					List<TrackedActivity> activities = categoryKcs.stream()
-						.map(kc -> TrackedActivity.getByStorageId(kc.getTrackingId()))
-						.filter(Objects::nonNull)
-						.collect(Collectors.toList());
-
-					attachHeaderContextMenu(categoryHeader, activities);
-
-					categoryHeader.add(categoryLabel, BorderLayout.WEST);
-					kcContainer.add(categoryHeader);
-
-					kcContainer.add(Box.createRigidArea(new Dimension(0, 5)));
-
-					for (int i = 0; i < categoryKcs.size(); i++) {
-						Count kc = categoryKcs.get(i);
-						JPanel kcPanel = new JPanel(new BorderLayout());
-						kcPanel.setBackground(ColorScheme.DARKER_GRAY_COLOR);
-						kcPanel.setBorder(new EmptyBorder(3, 15, 3, 5));
-						kcPanel.setToolTipText("Right-click to configure");
-
-						JPopupMenu popupMenu = new JPopupMenu();
-
-						JMenuItem resetCountItem = new JMenuItem("Reset count to 0");
-						resetCountItem.addActionListener(e -> {
-							int confirm = JOptionPane.showConfirmDialog(
-								this,
-								"Are you sure you want to reset the count for " + kc.getName() + " to 0?",
-								"Reset Count",
-								JOptionPane.YES_NO_OPTION,
-								JOptionPane.WARNING_MESSAGE
-							);
-
-							if (confirm == JOptionPane.YES_OPTION) {
-								TrackedActivity activityToReset = plugin.getActivityById(kc.getTrackingId());
-								if (activityToReset != null) {
-									plugin.resetActivityCount(sessionToDisplay, activityToReset);
-								}
-							}
-						});
-						popupMenu.add(resetCountItem);
-
-						JMenuItem hideItem = new JMenuItem("Hide " + kc.getName());
-						hideItem.addActionListener(e -> {
-							TrackedActivity activityToHide = plugin.getActivityById(kc.getTrackingId());
-							if (activityToHide != null) {
-								plugin.disableActivity(activityToHide);
-							}
-						});
-						popupMenu.add(hideItem);
-
-						JMenuItem setScoreItem = new JMenuItem("Set score for " + kc.getName());
-						setScoreItem.addActionListener(e -> {
-							TrackedActivity activityToUpdate = plugin.getActivityById(kc.getTrackingId());
-							if (activityToUpdate != null) {
-								String currentScore = (Math.abs(kc.getScore() - Math.round(kc.getScore())) < 0.0001) ?
-									String.valueOf(Math.round(kc.getScore())) : String.valueOf(kc.getScore());
-
-								String input = JOptionPane.showInputDialog(this,
-									"Enter score per count for " + kc.getName() + " (e.g. 1.5, -0.5):", currentScore);
-
-								if (input != null) {
-									try {
-										float newScore = Float.parseFloat(input.trim());
-										plugin.setActivityScore(activityToUpdate, newScore);
-									} catch (NumberFormatException ex) {
-										JOptionPane.showMessageDialog(this, "Invalid number format. Please enter a valid number.", "Error", JOptionPane.ERROR_MESSAGE);
-									}
-								}
-							}
-						});
-						popupMenu.add(setScoreItem);
-
-						// Dynamic In-Game Overlay Pin Menu
-						JMenuItem pinItem = new JMenuItem();
-						JMenuItem moveToTopItem = new JMenuItem("Move to overlay top");
-						TrackedActivity activity = TrackedActivity.getByStorageId(kc.getTrackingId());
-
-						popupMenu.addPopupMenuListener(new PopupMenuListener()
-						{
-							@Override
-							public void popupMenuWillBecomeVisible(PopupMenuEvent e)
-							{
-								boolean isPinned = plugin.isActivityPinned(activity);
-								pinItem.setText(isPinned ? "Remove from ingame overlay" : "Add to ingame overlay");
-								moveToTopItem.setVisible(isPinned);
-							}
-
-							@Override
-							public void popupMenuWillBecomeInvisible(PopupMenuEvent e) {}
-
-							@Override
-							public void popupMenuCanceled(PopupMenuEvent e) {}
-						});
-
-						pinItem.addActionListener(e -> plugin.togglePinnedActivity(activity));
-						moveToTopItem.addActionListener(e -> plugin.movePinnedActivityToTop(activity));
-
-						popupMenu.add(pinItem);
-						popupMenu.add(moveToTopItem);
-
-						kcPanel.setComponentPopupMenu(popupMenu);
-
-						JLabel nameLabel = new JLabel(kc.getName());
-						nameLabel.setForeground(Color.WHITE);
-
-						JLabel countLabel = new JLabel(String.format("%,d", kc.getSessionKc()));
-						countLabel.setForeground(ColorScheme.BRAND_ORANGE);
-
-						kcPanel.add(nameLabel, BorderLayout.WEST);
-						kcPanel.add(countLabel, BorderLayout.EAST);
-
-						kcContainer.add(kcPanel);
-
-						if (i < categoryKcs.size() - 1) {
-							kcContainer.add(Box.createRigidArea(new Dimension(0, 5)));
-						}
-					}
-				}
-			}
-		}
-
-		kcContainer.revalidate();
-		kcContainer.repaint();
-	}
-
-	private void attachHeaderContextMenu(JComponent headerComponent, java.util.List<TrackedActivity> categoryActivities)
+	public void forceActiveSessionSelection()
 	{
-		JPopupMenu popupMenu = new JPopupMenu();
-		JMenuItem toggleItem = new JMenuItem();
-		popupMenu.add(toggleItem);
+		sessionControlPanel.forceActiveSessionSelection();
+	}
 
-		popupMenu.addPopupMenuListener(new PopupMenuListener()
-		{
-			@Override
-			public void popupMenuWillBecomeVisible(PopupMenuEvent e)
-			{
-				boolean allPinned = categoryActivities.stream().allMatch(plugin::isActivityPinned);
-				toggleItem.setText(allPinned ? "Remove all from ingame overlay" : "Add all to ingame overlay");
-			}
+	public void reloadComboBox()
+	{
+		sessionControlPanel.reloadComboBox();
+	}
 
-			@Override
-			public void popupMenuWillBecomeInvisible(PopupMenuEvent e) {}
+	public void updateTime()
+	{
+		Session sessionToDisplay = sessionControlPanel.getSelectedSession();
+		sessionInfoPanel.updateInfo(sessionToDisplay);
+	}
 
-			@Override
-			public void popupMenuCanceled(PopupMenuEvent e) {}
+	public void refreshKcContainer()
+	{
+		SwingUtilities.invokeLater(() -> {
+			Session activeSession = plugin.getCurrentSession();
+			boolean loggedIn = plugin.isLoggedIn();
+
+			sessionControlPanel.updateUIState(loggedIn, activeSession);
+
+			updatePauseButtonState();
+
+			Session sessionToDisplay = sessionControlPanel.getSelectedSession();
+			updateTime();
+			activityListPanel.updateList(sessionToDisplay);
 		});
+	}
 
-		toggleItem.addActionListener(e ->
-		{
-			boolean allPinned = categoryActivities.stream().allMatch(plugin::isActivityPinned);
-			if (allPinned)
+	public void updatePresetsTabVisibility()
+	{
+		SwingUtilities.invokeLater(() -> {
+			boolean show = plugin.getConfig().showPresetsTab();
+			int index = topTabs.indexOfComponent(presetControlPanel);
+
+			if (show && index == -1)
 			{
-				plugin.unpinAllActivities(categoryActivities);
+				// Insert the raw tab, then inject the fixed-width label over it
+				topTabs.insertTab(null, null, presetControlPanel, null, 1);
+				topTabs.setTabComponentAt(1, createTabLabel(presetIcon, "Presets", 55, 30));
+			}
+			else if (!show && index != -1)
+			{
+				// Remove it if it is currently visible
+				topTabs.removeTabAt(index);
+			}
+		});
+	}
+
+	public void updatePauseButtonState()
+	{
+		SwingUtilities.invokeLater(() -> {
+			boolean hasActiveSession = plugin.getCurrentSession() != null && plugin.getCurrentSession().isInProgress();
+			boolean isPaused = plugin.isSessionPaused() || !hasActiveSession;
+			ImageIcon iconToDisplay = isPaused ? playIcon : pauseIcon;
+
+			if (iconToDisplay != null)
+			{
+				pauseButton.setText("");
+				pauseButton.setIcon(iconToDisplay);
+				// Ensures the icon remains visible even when setEnabled(false) is active
+				pauseButton.setDisabledIcon(iconToDisplay);
 			}
 			else
 			{
-				plugin.pinAllActivities(categoryActivities);
+				pauseButton.setIcon(null);
+				pauseButton.setDisabledIcon(null);
+				pauseButton.setText(isPaused ? "►" : "||");
 			}
-		});
 
-		headerComponent.setComponentPopupMenu(popupMenu);
+			// Correctly silences and grays out the button when no session exists
+			pauseButton.setEnabled(hasActiveSession);
+
+			if (!hasActiveSession)
+			{
+				pauseButton.setToolTipText("No active session");
+			}
+			else if (plugin.isSessionPaused())
+			{
+				pauseButton.setToolTipText("Resume session");
+			}
+			else
+			{
+				pauseButton.setToolTipText("Pause session");
+			}
+
+			pauseButton.revalidate();
+			pauseButton.repaint();
+		});
+	}
+
+	private JLabel createTabLabel(ImageIcon icon, String tooltip, int width, int height)
+	{
+		JLabel label = new JLabel(icon);
+		label.setToolTipText(tooltip);
+		label.setPreferredSize(new Dimension(width, height));
+		label.setHorizontalAlignment(SwingConstants.CENTER);
+		return label;
 	}
 }
