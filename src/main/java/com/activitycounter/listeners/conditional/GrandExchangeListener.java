@@ -29,7 +29,6 @@ import com.activitycounter.ActivityCounterPlugin;
 import static com.activitycounter.PluginConstants.CONFIG_KEY_ACTIVITY_GROUP_GRAND_EXCHANGE;
 import com.activitycounter.listeners.AbstractListenerLeaf;
 import com.activitycounter.listeners.core.PlayerListener;
-import com.activitycounter.models.Category;
 import com.activitycounter.models.TrackedActivity;
 import com.google.gson.Gson;
 import java.util.Arrays;

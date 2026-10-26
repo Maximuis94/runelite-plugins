@@ -49,6 +49,8 @@ public final class PluginConstants {
 	public static final int EQUIPPED_ID = InventoryID.WORN;
 	public static final int INVENTORY_ID = InventoryID.INV;
 
+//	public static final int TOTAL_COMPLETED_THEFRACTUREDARCHIVE = 5894;
+
 	public static final class FileName {
 		public static final String ICON_FILE_PLAY = "play.png";
 		public static final String ICON_FILE_PAUSE = "pause.png";

@@ -27,8 +27,10 @@ package com.activitycounter.models;
 
 import java.util.HashSet;
 import java.util.Set;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertTrue;
 import org.junit.Test;
-import static org.junit.Assert.*;
 
 public class TrackedActivityTest
 {

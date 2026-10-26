@@ -29,7 +29,6 @@ import com.activitycounter.ActivityCounterConfig;
 import com.activitycounter.listeners.core.ConfigListener;
 import com.activitycounter.models.TrackedActivity;
 import javax.inject.Inject;
-import net.runelite.client.eventbus.EventBus;
 
 public abstract class AbstractListenerLeaf extends AbstractListenerNode {
 

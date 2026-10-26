@@ -33,7 +33,6 @@ import com.activitycounter.models.TrackedActivity;
 import com.google.gson.Gson;
 import java.io.IOException;
 import java.io.Reader;
-import java.io.Writer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;

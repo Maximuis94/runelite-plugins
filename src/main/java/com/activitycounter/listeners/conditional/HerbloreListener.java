@@ -25,8 +25,8 @@
 
 package com.activitycounter.listeners.conditional;
 
-import static com.activitycounter.PluginConstants.CONFIG_KEY_ACTIVITY_GROUP_HERBLORE;
 import com.activitycounter.PluginConstants;
+import static com.activitycounter.PluginConstants.CONFIG_KEY_ACTIVITY_GROUP_HERBLORE;
 import com.activitycounter.listeners.AbstractListenerLeaf;
 import com.activitycounter.listeners.PreprocessedChatListener;
 import static com.activitycounter.listeners.core.ChatMessageListener.ALCHEMISTS_AMULET_ITEM_ID;

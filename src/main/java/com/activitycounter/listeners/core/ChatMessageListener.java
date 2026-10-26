@@ -38,7 +38,6 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.ChatMessageType;
-import net.runelite.api.Skill;
 import net.runelite.api.events.ChatMessage;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.util.Text;

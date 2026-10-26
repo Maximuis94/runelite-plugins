@@ -27,7 +27,6 @@ package com.activitycounter.listeners.core;
 
 import com.activitycounter.listeners.AbstractListenerNode;
 import com.activitycounter.models.TrackedActivity;
-import javax.inject.Inject;
 import javax.inject.Singleton;
 import net.runelite.api.GameState;
 import net.runelite.api.Skill;
