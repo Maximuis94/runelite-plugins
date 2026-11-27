@@ -63,6 +63,14 @@ public interface DynamicLineOfSightConfig extends Config
 	String virtualNpcSection = "virtualNpcSection";
 
 	@ConfigSection(
+		name = "Always shown NPC line of sight",
+		description = "NPCs whose line of sight is always drawn, without hovering over them",
+		position = 3,
+		closedByDefault = true
+	)
+	String alwaysShownNpcSection = "alwaysShownNpcSection";
+
+	@ConfigSection(
 		name = "Active Weapon Range",
 		description = "Settings for the currently equipped weapon's line of sight",
 		position = 4,
@@ -504,6 +512,48 @@ public interface DynamicLineOfSightConfig extends Config
 			"Jal-Ak|15\n" +
 			"JalTok-Jad|15";
 	}
+
+	// =========================================
+	// ALWAYS SHOWN NPC LOS
+	// =========================================
+
+	@ConfigItem(
+		keyName = "alwaysShownNpcDefs",
+		name = "Always shown NPCs",
+		description = "Format: <NPC_[NAME/ID]>|ATK_RANGE. The line of sight of these NPCs is always drawn, without hovering over them. Requires 'Enable NPC LoS'",
+		position = 0,
+		section = alwaysShownNpcSection
+	)
+	default String alwaysShownNpcDefs() { return ""; }
+
+	@Alpha
+	@ConfigItem(
+		keyName = "alwaysShownNpcOutlineColor",
+		name = "Outline color",
+		description = "The outline color for always shown NPC lines of sight",
+		position = 1,
+		section = alwaysShownNpcSection
+	)
+	default Color alwaysShownNpcOutlineColor() { return DEFAULT_COLOR_ALWAYS_SHOWN_OUTLINE; }
+
+	@Alpha
+	@ConfigItem(
+		keyName = "alwaysShownNpcFillColor",
+		name = "Fill color",
+		description = "The fill color for always shown NPC lines of sight",
+		position = 2,
+		section = alwaysShownNpcSection
+	)
+	default Color alwaysShownNpcFillColor() { return DEFAULT_COLOR_ALWAYS_SHOWN_FILL; }
+
+	@ConfigItem(
+		keyName = "alwaysShownNpcLineWidth",
+		name = "Line width",
+		description = "The thickness of the outline for always shown NPC lines of sight",
+		position = 3,
+		section = alwaysShownNpcSection
+	)
+	default double alwaysShownNpcLineWidth() { return DEFAULT_LINE_WIDTH; }
 
 
 	// =========================================

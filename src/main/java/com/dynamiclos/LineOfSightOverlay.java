@@ -37,6 +37,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import javax.inject.Inject;
 import net.runelite.api.Client;
 import net.runelite.api.CollisionData;
@@ -197,6 +198,22 @@ public class LineOfSightOverlay extends Overlay {
 	private final Map<Integer, List<NpcLosDef>> npcLosDefinitionsById = new HashMap<>();
 	private final Map<CombatStyle, Set<WorldPoint>> cachedHoveredNpcTilesByStyle = new EnumMap<>(CombatStyle.class);
 
+	private static class CachedNpcLos {
+		final WorldPoint location;
+		final Set<WorldPoint> tiles;
+
+		CachedNpcLos(WorldPoint location, Set<WorldPoint> tiles) {
+			this.location = location;
+			this.tiles = tiles;
+		}
+	}
+
+	private final Map<String, List<NpcLosDef>> alwaysShownDefinitionsByName = new HashMap<>();
+	private final Map<Integer, List<NpcLosDef>> alwaysShownDefinitionsById = new HashMap<>();
+	private final Map<NPC, CachedNpcLos> cachedAlwaysShownNpcLos = new ConcurrentHashMap<>();
+	private Color alwaysShownNpcOutlineColor, alwaysShownNpcFillColor;
+	private float alwaysShownNpcLineWidth;
+
 	@Inject
 	public LineOfSightOverlay(Client client, DynamicLineOfSightConfig config, ModelOutlineRenderer modelOutlineRenderer, DynamicLineOfSightPlugin plugin) {
 		this.client = client;
@@ -314,6 +331,10 @@ public class LineOfSightOverlay extends Overlay {
 		otherNpcFillColor = config.otherNpcFillColor();
 		otherNpcLineWidth = (float) config.otherNpcLineWidth();
 
+		alwaysShownNpcOutlineColor = config.alwaysShownNpcOutlineColor();
+		alwaysShownNpcFillColor = config.alwaysShownNpcFillColor();
+		alwaysShownNpcLineWidth = (float) config.alwaysShownNpcLineWidth();
+
 		virtualNpcLosHotkey = config.virtualNpcLosHotkey();
 		virtualNpcSize = Math.max(1, config.virtualNpcSize());
 		virtualNpcMeleeRange = config.virtualNpcMeleeRange();
@@ -340,12 +361,21 @@ public class LineOfSightOverlay extends Overlay {
 		parseNpcConfigString(config.rangedNpcDefs(), CombatStyle.RANGED);
 		parseNpcConfigString(config.magicNpcDefs(), CombatStyle.MAGIC);
 		parseNpcConfigString(config.otherNpcDefs(), CombatStyle.OTHER);
+
+		alwaysShownDefinitionsByName.clear();
+		alwaysShownDefinitionsById.clear();
+		cachedAlwaysShownNpcLos.clear();
+		parseNpcConfigString(config.alwaysShownNpcDefs(), CombatStyle.OTHER, alwaysShownDefinitionsByName, alwaysShownDefinitionsById);
+	}
+
+	private void parseNpcConfigString(String configValue, CombatStyle style) {
+		parseNpcConfigString(configValue, style, npcLosDefinitionsByName, npcLosDefinitionsById);
 	}
 
 	/**
 	 * Converts the NPC lines of sight definitions from the configurations into a mapping
 	 */
-	private void parseNpcConfigString(String configValue, CombatStyle style) {
+	private void parseNpcConfigString(String configValue, CombatStyle style, Map<String, List<NpcLosDef>> definitionsByName, Map<Integer, List<NpcLosDef>> definitionsById) {
 		if (configValue == null || configValue.trim().isEmpty()) return;
 
 		String normalizedConfig = configValue.replace("\r\n", "\n").replace(",", "\n");
@@ -372,9 +402,9 @@ public class LineOfSightOverlay extends Overlay {
 
 				try {
 					int id = Integer.parseInt(identifier);
-					npcLosDefinitionsById.computeIfAbsent(id, k -> new ArrayList<>()).add(def);
+					definitionsById.computeIfAbsent(id, k -> new ArrayList<>()).add(def);
 				} catch (NumberFormatException e) {
-					npcLosDefinitionsByName.computeIfAbsent(identifier, k -> new ArrayList<>()).add(def);
+					definitionsByName.computeIfAbsent(identifier, k -> new ArrayList<>()).add(def);
 				}
 			} catch (NumberFormatException e) { }
 		}
@@ -393,6 +423,10 @@ public class LineOfSightOverlay extends Overlay {
 		WorldView wv = client.getTopLevelWorldView();
 		WorldArea playerArea = player.getWorldArea();
 		WorldPoint currentLocation = player.getWorldLocation();
+
+		if (enabledNpcLos && !plugin.isNpcLosToggledOff()) {
+			drawAlwaysShownNpcLos(graphics, wv);
+		}
 
 		boolean mutuallyExcludedPlayerLos = false;
 		if (drawNpcLos)
@@ -547,6 +581,49 @@ public class LineOfSightOverlay extends Overlay {
 		} else {
 			lastHoveredNpc = null;
 		}
+	}
+
+	/**
+	 * Draws the line of sight of every NPC on the always shown list, without requiring a hover.
+	 * Tiles are cached per NPC and only recalculated when that NPC moves.
+	 */
+	private void drawAlwaysShownNpcLos(Graphics2D graphics, WorldView wv) {
+		if (alwaysShownDefinitionsByName.isEmpty() && alwaysShownDefinitionsById.isEmpty()) {
+			return;
+		}
+
+		Set<NPC> seen = new HashSet<>();
+		Set<WorldPoint> tiles = new HashSet<>();
+
+		for (NPC npc : wv.npcs()) {
+			if (npc == null || npc.isDead() || npc.getWorldArea() == null) continue;
+
+			List<NpcLosDef> defs = alwaysShownDefinitionsById.get(npc.getId());
+			if (defs == null && npc.getName() != null) {
+				defs = alwaysShownDefinitionsByName.get(npc.getName().toLowerCase());
+			}
+			if (defs == null || defs.isEmpty()) continue;
+
+			seen.add(npc);
+			WorldPoint location = npc.getWorldLocation();
+			CachedNpcLos cached = cachedAlwaysShownNpcLos.get(npc);
+
+			if (cached == null || !location.equals(cached.location)) {
+				Set<WorldPoint> npcTiles = new HashSet<>();
+				for (NpcLosDef def : defs) {
+					if (def.range >= 0) {
+						npcTiles.addAll(calculateLineOfSightTiles(npc.getWorldArea(), wv, def.range, true, false, def.diagonalMelee));
+					}
+				}
+				cached = new CachedNpcLos(location, npcTiles);
+				cachedAlwaysShownNpcLos.put(npc, cached);
+			}
+
+			tiles.addAll(cached.tiles);
+		}
+
+		cachedAlwaysShownNpcLos.keySet().retainAll(seen);
+		drawTilesArea(graphics, tiles, alwaysShownNpcFillColor, alwaysShownNpcOutlineColor, alwaysShownNpcLineWidth);
 	}
 
 	private void drawVirtualNpcLos(Graphics2D graphics, WorldView wv, WorldPoint cursorLocation) {

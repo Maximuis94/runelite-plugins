@@ -63,6 +63,9 @@ public final class PluginConstants
 	public static final Color DEFAULT_COLOR_OTHER_OUTLINE = new Color(155, 0, 155, DEFAULT_OUTLINE_ALPHA);
 	public static final Color DEFAULT_COLOR_OTHER_FILL = new Color(155, 0, 155, DEFAULT_FILL_ALPHA);
 
+	public static final Color DEFAULT_COLOR_ALWAYS_SHOWN_OUTLINE = new Color(255, 0, 0, DEFAULT_OUTLINE_ALPHA);
+	public static final Color DEFAULT_COLOR_ALWAYS_SHOWN_FILL = new Color(255, 0, 0, DEFAULT_FILL_ALPHA);
+
 //	public static final Color DEFAULT_COLOR_ACTIVE_WEAPON = new Color(255, 0, 125);
 	public static final Color DEFAULT_COLOR_ACTIVE_WEAPON_OUTLINE = new Color(255, 0, 125, DEFAULT_OUTLINE_ALPHA);
 	public static final Color DEFAULT_COLOR_ACTIVE_WEAPON_FILL = new Color(255, 0, 125, DEFAULT_FILL_ALPHA);
